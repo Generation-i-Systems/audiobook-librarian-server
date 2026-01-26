@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -113,20 +114,23 @@ class StatisticsController extends Controller
                 listening_date as date,
                 SUM(seconds_listened) * 1000 as listening_time_ms,
                 COUNT(*) as sessions_count
-            ')->get();
+            ')
+                ->toBase()
+                ->get();
 
             // Get book IDs separately for each date
-            $dailyStats = $rawStats->map(function ($stat) use ($userId, $startDate, $endDate) {
+            $dailyStats = $rawStats->map(function ($stat) use ($userId) {
+                /** @var \stdClass $stat */
                 $bookIds = ListeningStatistic::where('device_id', $userId)
-                    ->where('listening_date', $stat->date)
+                    ->where('listening_date', $stat->listening_date ?? $stat->date ?? '')
                     ->distinct('book_id')
                     ->pluck('book_id')
                     ->toArray();
 
                 return [
-                    'date' => $stat->date,
-                    'listening_time_ms' => (int) $stat->listening_time_ms,
-                    'sessions_count' => $stat->sessions_count,
+                    'date' => $stat->listening_date ?? $stat->date ?? '',
+                    'listening_time_ms' => (int) ($stat->listening_time_ms ?? 0),
+                    'sessions_count' => $stat->sessions_count ?? 0,
                     'books_listened' => $bookIds,
                 ];
             });
@@ -138,13 +142,15 @@ class StatisticsController extends Controller
                 COUNT(*) as sessions_count,
                 JSON_ARRAYAGG(DISTINCT book_id) as books_listened
             ')
+            ->toBase()
             ->get()
             ->map(function ($stat) {
+                /** @var \stdClass $stat */
                 return [
                     'date' => $stat->date,
                     'listening_time_ms' => (int) $stat->listening_time_ms,
                     'sessions_count' => $stat->sessions_count,
-                    'books_listened' => json_decode($stat->books_listened, true) ?? [],
+                    'books_listened' => json_decode((string)($stat->books_listened ?? '[]'), true) ?? [],
                 ];
             });
         }
@@ -226,7 +232,7 @@ class StatisticsController extends Controller
             return response()->json($response, 201);
         } catch (\Exception $e) {
             // Log badge evaluation error but don't fail the session recording
-            \Log::warning('Badge evaluation failed after session recording', [
+            Log::warning('Badge evaluation failed after session recording', [
                 'user_id' => $userId,
                 'error' => $e->getMessage()
             ]);
@@ -315,7 +321,7 @@ class StatisticsController extends Controller
             return response()->json($response, 201);
         } catch (\Exception $e) {
             // Log badge evaluation error but don't fail the session recording
-            \Log::warning('Badge evaluation failed after session recording', [
+            Log::warning('Badge evaluation failed after session recording', [
                 'device_id' => $validated['device_id'],
                 'error' => $e->getMessage()
             ]);
@@ -378,6 +384,7 @@ class StatisticsController extends Controller
             ')
             ->groupBy('listening_date')
             ->orderBy('listening_date')
+            ->toBase()
             ->get();
 
         $weeklyTotal = $stats->sum('total_seconds');
@@ -393,14 +400,15 @@ class StatisticsController extends Controller
                 'week_end' => $endDate->toDateString(),
                 'total_seconds' => $weeklyTotal,
                 'total_books' => $totalBooks,
-                'formatted_total_duration' => $this->formatSeconds($weeklyTotal),
+                'formatted_total_duration' => $this->formatSeconds((int) $weeklyTotal),
                 'daily_breakdown' => $stats->map(function ($stat) {
+                    /** @var \stdClass $stat */
                     return [
                         'date' => $stat->listening_date,
                         'total_seconds' => $stat->total_seconds,
                         'books_listened' => $stat->books_listened,
                         'session_count' => $stat->session_count,
-                        'formatted_duration' => $this->formatSeconds($stat->total_seconds),
+                        'formatted_duration' => $this->formatSeconds((int) $stat->total_seconds),
                     ];
                 })
             ]
@@ -491,6 +499,7 @@ class StatisticsController extends Controller
             ")
             ->groupByRaw($groupBy)
             ->orderBy('listening_date')
+            ->toBase()
             ->get();
 
         $totalSeconds = $stats->sum('total_seconds');
@@ -507,17 +516,18 @@ class StatisticsController extends Controller
                 'end_date' => $endDate->toDateString(),
                 'total_seconds' => $totalSeconds,
                 'total_books' => $totalBooks,
-                'formatted_total_duration' => $this->formatSeconds($totalSeconds),
-                'average_daily_seconds' => $stats->isNotEmpty() ? round($totalSeconds / $stats->count()) : 0,
+                'formatted_total_duration' => $this->formatSeconds((int) $totalSeconds),
+                'average_daily_seconds' => $stats->isNotEmpty() ? (int) round($totalSeconds / $stats->count()) : 0,
                 'trends' => $stats->map(function ($stat) {
+                    /** @var \stdClass $stat */
                     return [
                         'date' => $stat->listening_date,
                         'total_seconds' => $stat->total_seconds,
                         'books_listened' => $stat->books_listened,
                         'session_count' => $stat->session_count,
                         'avg_session_duration' => round($stat->avg_session_duration),
-                        'formatted_duration' => $this->formatSeconds($stat->total_seconds),
-                        'formatted_avg_session' => $this->formatSeconds(round($stat->avg_session_duration)),
+                        'formatted_duration' => $this->formatSeconds((int) $stat->total_seconds),
+                        'formatted_avg_session' => $this->formatSeconds((int) round($stat->avg_session_duration)),
                     ];
                 })
             ]
@@ -562,6 +572,7 @@ class StatisticsController extends Controller
         return response()->json([
             'success' => true,
             'data' => $topBooks->map(function ($stat) {
+                /** @var \App\Models\ListeningStatistic&object{book_id: int, total_seconds: int|float, session_count: int, days_listened: int, first_listened: string, last_listened: string} $stat */
                 return [
                     'book_id' => $stat->book_id,
                     'book' => [
@@ -569,12 +580,12 @@ class StatisticsController extends Controller
                         'title' => $stat->book->title,
                         'cover_image' => $stat->book->cover_image,
                     ],
-                    'total_seconds' => $stat->total_seconds,
+                    'total_seconds' => (int) $stat->total_seconds,
                     'session_count' => $stat->session_count,
                     'days_listened' => $stat->days_listened,
                     'first_listened' => $stat->first_listened,
                     'last_listened' => $stat->last_listened,
-                    'formatted_duration' => $this->formatSeconds($stat->total_seconds),
+                    'formatted_duration' => $this->formatSeconds((int) $stat->total_seconds),
                 ];
             })
         ]);
@@ -669,7 +680,7 @@ class StatisticsController extends Controller
      */
     public function getReadingHistoryStats(Request $request): JsonResponse
     {
-        /** @var User $user */
+        /** @var User|null $user */
         $user = Auth::user();
         if (!$user) {
             return response()->json(['message' => 'Authentication required.'], 401);
@@ -685,7 +696,7 @@ class StatisticsController extends Controller
         $statuses = $query->get();
 
         $stats = $statuses->groupBy(function ($item) use ($groupBy) {
-            $date = Carbon::parse($item->finished_at);
+            $date = Carbon::parse((string)$item->finished_at);
             return $groupBy === 'year' ? $date->format('Y') : $date->format('Y-m');
         })->map(function ($items, $period) {
             return [
@@ -795,14 +806,16 @@ class StatisticsController extends Controller
         ->groupBy('listening_date')
         ->orderByDesc('listening_date')
         ->limit(30)
+        ->toBase()
         ->get();
 
         return $stats->map(function ($stat) {
+            /** @var \stdClass $stat */
             return [
-                'date' => $stat->date,
-                'listening_time_ms' => (int) $stat->listening_time_ms,
-                'sessions_count' => $stat->sessions_count,
-                'books_listened' => json_decode($stat->books_listened, true) ?? [],
+                'date' => (string)($stat->date ?? ''),
+                'listening_time_ms' => (int) ($stat->listening_time_ms ?? 0),
+                'sessions_count' => (int) ($stat->sessions_count ?? 0),
+                'books_listened' => json_decode((string)($stat->books_listened ?? '[]'), true) ?? [],
             ];
         })->toArray();
     }
