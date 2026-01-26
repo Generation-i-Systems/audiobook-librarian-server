@@ -45,8 +45,7 @@ use App\Traits\Auditable;
  * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Narrator> $narrators
  * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Genre> $genres
  * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Series> $series
- * @method static Book|null find(int|string $id)
- * @method static \Illuminate\Database\Eloquent\Builder|Book where(string $column, $operator = null, $value = null, $boolean = 'and')
+ * @mixin \Illuminate\Database\Eloquent\Builder
  */
 class Book extends Model
 {

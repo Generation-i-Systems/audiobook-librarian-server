@@ -32,4 +32,8 @@ class ImportUIServiceQuitTestDouble extends ImportUIService
     public function render(): void
     {
     }
+
+    public function table(array $headers, array $rows): void
+    {
+    }
 }

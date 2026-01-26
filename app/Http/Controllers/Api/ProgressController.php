@@ -16,6 +16,7 @@ class ProgressController extends Controller
      */
     public function getBookProgress(Request $request, int $bookId): JsonResponse
     {
+        /** @var Book|null $book */
         $book = Book::find($bookId);
         if (!$book) {
             return response()->json([
@@ -27,6 +28,7 @@ class ProgressController extends Controller
         // Use authenticated user's device/session instead of requiring device_id
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
 
+        /** @var BookProgress|null $progress */
         $progress = BookProgress::where('book_id', $bookId)
             ->where('device_id', $userId)
             ->first();
@@ -64,6 +66,7 @@ class ProgressController extends Controller
             'current_chapter_name' => 'nullable|string|max:255',
         ]);
 
+        /** @var Book|null $book */
         $book = Book::find($bookId);
         if (!$book) {
             return response()->json([
@@ -74,6 +77,7 @@ class ProgressController extends Controller
 
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
 
+        /** @var BookProgress $progress */
         $progress = BookProgress::updateOrCreate(
             [
                 'book_id' => $bookId,

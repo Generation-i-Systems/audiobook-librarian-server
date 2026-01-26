@@ -6,6 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Traits\CamelCaseAttributeAccess;
 
+/**
+ * @property int $id
+ * @property int $book_id
+ * @property int $user_id
+ * @property string|null $device_id
+ * @property int $current_position_seconds
+ * @property int $total_duration_seconds
+ * @property float $progress_percentage
+ * @property int|null $current_chapter
+ * @property string|null $current_chapter_name
+ * @property \Illuminate\Support\Carbon|null $last_listened_at
+ * @property bool $completed
+ * @property \Illuminate\Support\Carbon|null $completed_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class BookProgress extends Model
 {
     use CamelCaseAttributeAccess;

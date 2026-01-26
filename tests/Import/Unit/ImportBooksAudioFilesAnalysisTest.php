@@ -3,7 +3,7 @@
 namespace Tests\Import\Unit;
 
 use App\Console\Commands\ImportBooksFromDownloads;
-use App\Services\ImportUIService;
+use App\Contracts\ImportUIInterface;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -15,7 +15,8 @@ class ImportBooksAudioFilesAnalysisTest extends TestCase
     {
         parent::setUp();
 
-        $uiService = \Mockery::mock(ImportUIService::class);
+        /** @var ImportUIInterface $uiService */
+        $uiService = \Mockery::mock(ImportUIInterface::class);
         $this->command = new ImportBooksFromDownloads($uiService);
     }
 

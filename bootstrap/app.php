@@ -73,6 +73,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('library:repair-scan --issue=missing_directory --issue=nested_audio --issue=duplicate_directory --issue=orphan_directory')
             ->dailyAt('05:00')
             ->appendOutputTo(storage_path('logs/library-repair.log'));
+
+        // Process import queue daily at 2:30 AM (after backup, before other maintenance)
+        $schedule->command('imports:process-queue --limit=50')
+            ->dailyAt('02:30')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/import-queue.log'));
+
+        // Cleanup old completed imports monthly (keep 30 days)
+        $schedule->command('imports:process-queue --cleanup --cleanup-days=30')
+            ->monthlyOn(1, '03:30')
+            ->appendOutputTo(storage_path('logs/import-queue.log'));
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [

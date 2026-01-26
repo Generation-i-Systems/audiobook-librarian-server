@@ -6,6 +6,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Traits\CamelCaseAttributeAccess;
 
+/**
+ * @property int $id
+ * @property int $book_id
+ * @property int $chapter_number
+ * @property string $file_name
+ * @property string $format
+ * @property int $duration
+ * @property int $size_bytes
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class Chapter extends Model
 {
     use HasFactory;

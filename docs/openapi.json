@@ -2024,6 +2024,371 @@
                 }
             }
         },
+        "/imports/check-duplicate": {
+            "post": {
+                "tags": ["Imports"],
+                "summary": "Check for duplicate book",
+                "description": "Checks if a book with the given title and author already exists to prevent duplicates during import.",
+                "operationId": "checkDuplicateImport",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["title", "author"],
+                                "properties": {
+                                    "title": { "type": "string" },
+                                    "author": { "type": "string" },
+                                    "series": { "type": "string" },
+                                    "series_number": { "type": "string" },
+                                    "isbn": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Check result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "is_duplicate": { "type": "boolean" },
+                                        "existing_book": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "properties": {
+                                                "id": { "type": "integer" },
+                                                "title": { "type": "string" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/imports/queue/stats": {
+            "get": {
+                "tags": ["Imports"],
+                "summary": "Get import queue statistics",
+                "operationId": "getImportQueueStats",
+                "security": [{ "BearerAuth": [] }],
+                "responses": {
+                    "200": {
+                        "description": "Queue statistics",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "pending": {
+                                                    "type": "integer"
+                                                },
+                                                "completed": {
+                                                    "type": "integer"
+                                                },
+                                                "failed": { "type": "integer" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/imports/queue/pending": {
+            "get": {
+                "tags": ["Imports"],
+                "summary": "Get pending imports",
+                "operationId": "getPendingImports",
+                "security": [{ "BearerAuth": [] }],
+                "responses": {
+                    "200": {
+                        "description": "List of pending imports",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": { "type": "string" },
+                                                    "title": {
+                                                        "type": "string"
+                                                    },
+                                                    "queued_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/imports/{importId}/status": {
+            "get": {
+                "tags": ["Imports"],
+                "summary": "Get import status",
+                "operationId": "getImportStatus",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "importId",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Import status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "found": { "type": "boolean" },
+                                        "status": { "type": "object" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/imports/genres": {
+            "get": {
+                "tags": ["Imports"],
+                "summary": "Get all genres",
+                "operationId": "getImportGenres",
+                "security": [{ "BearerAuth": [] }],
+                "responses": {
+                    "200": {
+                        "description": "List of genres",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": { "type": "integer" },
+                                                    "name": { "type": "string" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/authors/search": {
+            "get": {
+                "tags": ["Imports"],
+                "summary": "Search authors",
+                "operationId": "searchAuthors",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching authors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": { "type": "integer" },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "book_count": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/authors": {
+            "post": {
+                "tags": ["Imports"],
+                "summary": "Create author",
+                "operationId": "createAuthor",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name"],
+                                "properties": {
+                                    "name": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Author created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "created": { "type": "boolean" },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": { "type": "integer" },
+                                                "name": { "type": "string" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/series/search": {
+            "get": {
+                "tags": ["Imports"],
+                "summary": "Search series",
+                "operationId": "searchSeries",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching series",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": { "type": "integer" },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "book_count": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/series": {
+            "post": {
+                "tags": ["Imports"],
+                "summary": "Create series",
+                "operationId": "createSeries",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name"],
+                                "properties": {
+                                    "name": { "type": "string" },
+                                    "is_collection": { "type": "boolean" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Series created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "created": { "type": "boolean" },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": { "type": "integer" },
+                                                "name": { "type": "string" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/logout": {
             "post": {
                 "tags": ["Authentication"],

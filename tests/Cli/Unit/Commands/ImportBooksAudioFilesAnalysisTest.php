@@ -15,6 +15,7 @@ class ImportBooksAudioFilesAnalysisTest extends TestCase
     {
         parent::setUp();
 
+        /** @var ImportUIService $uiService */
         $uiService = \Mockery::mock(ImportUIService::class);
         $this->command = new ImportBooksFromDownloads($uiService);
     }

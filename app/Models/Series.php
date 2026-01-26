@@ -9,6 +9,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property bool $is_collection
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class Series extends Model
 {
     use HasFactory;

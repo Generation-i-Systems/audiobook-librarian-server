@@ -42,6 +42,10 @@ class ImportUIServiceDirectoryLabelTestDouble extends ImportUIService
     {
     }
 
+    public function table(array $headers, array $rows): void
+    {
+    }
+
     public function exposeDirectoryLabel(): string
     {
         return $this->getDirectoryLabel();

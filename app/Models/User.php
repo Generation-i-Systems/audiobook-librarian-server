@@ -12,6 +12,19 @@ use Laravel\Sanctum\HasApiTokens;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $username
+ * @property string $email
+ * @property string|null $photo_url
+ * @property string $password
+ * @property string $role
+ * @property \Illuminate\Support\Carbon|null $email_verified_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class User extends Authenticatable
 {
     use HasApiTokens;

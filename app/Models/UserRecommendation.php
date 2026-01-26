@@ -9,6 +9,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $sender_id
+ * @property int $recipient_id
+ * @property int $book_id
+ * @property string|null $message
+ * @property \Illuminate\Support\Carbon|null $acknowledged_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class UserRecommendation extends Model
 {
     use CamelCaseAttributeAccess;

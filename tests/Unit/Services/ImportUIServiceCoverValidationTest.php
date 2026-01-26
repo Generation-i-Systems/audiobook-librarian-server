@@ -111,6 +111,10 @@ class ImportUIServiceClearInlineStub extends ImportUIService
         $this->inlineCleared = true;
     }
 
+    public function table(array $headers, array $rows): void
+    {
+    }
+
     public function wasInlineCoverCleared(): bool
     {
         return $this->inlineCleared;

@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
+use App\Contracts\ImportUIInterface;
 use SoloTerm\Screen\Screen;
 
-class ImportUIService
+class ImportUIService implements ImportUIInterface
 {
     protected ?Screen $screen = null;
     protected bool $plainMode = false;
@@ -1215,9 +1216,11 @@ class ImportUIService
         }
 
         // Check if we have a valid cached cover for this URL
-        if ($coverUrl === $this->cachedCoverUrl
+        if (
+            $coverUrl === $this->cachedCoverUrl
             && $this->cachedCoverTempFile
-            && file_exists($this->cachedCoverTempFile)) {
+            && file_exists($this->cachedCoverTempFile)
+        ) {
             return;
         }
 
@@ -1367,13 +1370,18 @@ class ImportUIService
 
             if ($default !== '' && $this->terminalSupportsArrowInput()) {
                 $input = $this->readLineWithEditableDefault($default, $cursorY, $cursorX);
-                if ($this->interrupted) {
-                    return false;
-                }
             } elseif (extension_loaded('readline')) {
                 $input = $default !== '' ? $this->readLineWithPrefill($default) : (string) readline('');
             } else {
                 $input = trim((string) fgets(STDIN));
+            }
+
+            if ($this->interrupted) {
+                if ($clearPrompt) {
+                    $this->promptLines = [];
+                    $this->renderFull();
+                }
+                return '';
             }
 
             if (strtolower(trim($input)) === 'i') {
@@ -1449,7 +1457,7 @@ class ImportUIService
         if ($this->terminalSupportsArrowInput() && count($options) > 0) {
             $choice = $this->selectWithArrowKeys($question, $options, $default);
             if ($this->interrupted) {
-                return false;
+                return '';
             }
 
             return $choice;
@@ -1579,5 +1587,111 @@ class ImportUIService
 
         // Use the standard icat clear command
         @system($kittenPath . ' icat --clear 2>/dev/null');
+    }
+
+    public function confirm(string $question, bool $default = false): bool
+    {
+        $defaultStr = $default ? 'Y/n' : 'y/N';
+        $response = $this->ask("{$question} [{$defaultStr}]", $default ? 'y' : 'n');
+        $response = strtolower(trim($response));
+        if ($response === '') {
+            return $default;
+        }
+        return $response === 'y' || $response === 'yes';
+    }
+
+    public function progress(string $label, iterable $items, callable $callback): void
+    {
+        $itemsArray = is_array($items) ? $items : iterator_to_array($items);
+        $total = count($itemsArray);
+
+        $this->logMessage($label);
+        foreach ($itemsArray as $index => $item) {
+            $this->updateProgress($index + 1, $total);
+            $callback($index, $item);
+        }
+    }
+
+    public function spin(string $message, callable $callback): mixed
+    {
+        $this->logMessage("{$message}...");
+        $result = $callback();
+        $this->logMessage("{$message}... done");
+        return $result;
+    }
+
+    public function info(string $message): void
+    {
+        $this->logMessage($message);
+    }
+
+    public function warning(string $message): void
+    {
+        $this->logMessage("⚠️  {$message}");
+    }
+
+    public function error(string $message): void
+    {
+        $this->logMessage("❌ {$message}");
+    }
+
+    public function table(array $headers, array $rows): void
+    {
+        if ($this->plainMode) {
+            $colWidths = [];
+            foreach ($headers as $i => $header) {
+                $colWidths[$i] = strlen((string) $header);
+            }
+            foreach ($rows as $row) {
+                foreach ($row as $i => $cell) {
+                    $colWidths[$i] = max($colWidths[$i] ?? 0, strlen((string) $cell));
+                }
+            }
+
+            $line = '';
+            foreach ($headers as $i => $header) {
+                $line .= str_pad((string) $header, $colWidths[$i] + 2);
+            }
+            echo $line . PHP_EOL;
+            echo str_repeat('-', strlen($line)) . PHP_EOL;
+
+            foreach ($rows as $row) {
+                $line = '';
+                foreach ($row as $i => $cell) {
+                    $line .= str_pad((string) $cell, $colWidths[$i] + 2);
+                }
+                echo $line . PHP_EOL;
+            }
+            return;
+        }
+
+        $lines = [];
+        $colWidths = [];
+        foreach ($headers as $i => $header) {
+            $colWidths[$i] = strlen((string) $header);
+        }
+        foreach ($rows as $row) {
+            foreach ($row as $i => $cell) {
+                $colWidths[$i] = max($colWidths[$i] ?? 0, strlen((string) $cell));
+            }
+        }
+
+        $headerLine = '';
+        foreach ($headers as $i => $header) {
+            $headerLine .= str_pad((string) $header, $colWidths[$i] + 2);
+        }
+        $lines[] = "\e[1;36m" . $headerLine . "\e[0m";
+        $lines[] = str_repeat('-', strlen($headerLine));
+
+        foreach ($rows as $row) {
+            $line = '';
+            foreach ($row as $i => $cell) {
+                $line .= str_pad((string) $cell, $colWidths[$i] + 2);
+            }
+            $lines[] = $line;
+        }
+
+        $this->promptLines = $lines;
+        $this->renderFull();
     }
 }

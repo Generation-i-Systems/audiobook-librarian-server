@@ -416,6 +416,7 @@ class StatisticsController extends Controller
             'device_id' => 'nullable|string|max:255',
         ]);
 
+        /** @var Book|null $book */
         $book = Book::find($bookId);
         if (!$book) {
             return response()->json([

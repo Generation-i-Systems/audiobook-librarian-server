@@ -14,8 +14,10 @@ use App\Services\CoverImageAnalysisService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\GoogleImageSearchService;
+use App\Contracts\ImportUIInterface;
 use App\Services\ImportCacheService;
 use App\Services\ImportUIService;
+use App\Services\PromptsUIService;
 use App\Traits\GenreMapping;
 use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
@@ -49,7 +51,7 @@ class ImportBooksFromDownloads extends Command
                             {--force-audio : Force audio transcription even when AI confidence is high}
                             {--include-narrator : Include narrator in generated directory paths}
                             {--include-old : Include OpenAudible books_old directory when scanning}
-                            {--ui=ncurses : UI layer (ncurses|plain)}';
+                            {--ui=prompts : UI layer (prompts|ncurses|plain)}';
 
 
 
@@ -67,7 +69,7 @@ class ImportBooksFromDownloads extends Command
     protected ?ExternalCoverService $coverService = null;
     protected ?GoogleBooksApiService $googleBooksService = null;
     protected ?GoogleImageSearchService $googleImageService = null;
-    protected ?ImportUIService $uiService = null;
+    protected ?ImportUIInterface $uiService = null;
 
     // New services
     protected ?BookEnrichmentService $enrichmentService = null;
@@ -248,7 +250,7 @@ class ImportBooksFromDownloads extends Command
         return $name;
     }
 
-    public function __construct(?ImportUIService $uiService = null)
+    public function __construct(?ImportUIInterface $uiService = null)
     {
         parent::__construct();
         $this->uiService = $uiService;
@@ -411,11 +413,17 @@ class ImportBooksFromDownloads extends Command
      */
     public function handle()
     {
+        $uiMode = (string) ($this->option('ui') ?? 'prompts');
+
         if (!$this->uiService) {
-            $this->uiService = app(ImportUIService::class);
+            $this->uiService = match ($uiMode) {
+                'prompts' => app(PromptsUIService::class),
+                'ncurses' => app(ImportUIService::class),
+                'plain' => $this->createPlainUiService(),
+                default => app(PromptsUIService::class),
+            };
         }
 
-        $uiMode = (string) ($this->option('ui') ?? 'ncurses');
         if ($uiMode === 'plain') {
             $this->uiService->setPlainMode(true);
         }
@@ -1024,7 +1032,7 @@ class ImportBooksFromDownloads extends Command
         $this->inputInterrupted = true;
 
         // Set interrupted flag on UI service to break out of input loops
-        if ($this->uiService && method_exists($this->uiService, 'requestInterrupt')) {
+        if ($this->uiService) {
             $this->uiService->requestInterrupt();
         }
 
@@ -1739,5 +1747,15 @@ class ImportBooksFromDownloads extends Command
             $this->cacheService = new ImportCacheService(app(\Illuminate\Filesystem\Filesystem::class), $options);
         }
         return $this->cacheService;
+    }
+
+    /**
+     * Create a plain mode UI service instance
+     */
+    protected function createPlainUiService(): ImportUIInterface
+    {
+        $service = app(PromptsUIService::class);
+        $service->setPlainMode(true);
+        return $service;
     }
 }

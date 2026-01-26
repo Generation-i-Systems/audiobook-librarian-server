@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\UserStatusController;
+use App\Http\Controllers\Api\BookImportApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -223,6 +224,23 @@ Route::prefix('v1')->group(function () {
 
         // Message Route
         Route::post('/messages', [MessageApiController::class, 'store']);
+
+        // Import Support Routes (for NativePHP desktop app)
+        Route::prefix('imports')->group(function () {
+            Route::post('/check-duplicate', [BookImportApiController::class, 'checkDuplicate']);
+            Route::get('/queue/stats', [BookImportApiController::class, 'getQueueStats']);
+            Route::get('/queue/pending', [BookImportApiController::class, 'getPendingImports']);
+            Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
+            Route::get('/genres', [BookImportApiController::class, 'getGenres']);
+        });
+
+        // Author management (for imports)
+        Route::get('/authors/search', [BookImportApiController::class, 'searchAuthors']);
+        Route::post('/authors', [BookImportApiController::class, 'createAuthor']);
+
+        // Series management (for imports)
+        Route::get('/series/search', [BookImportApiController::class, 'searchSeries']);
+        Route::post('/series', [BookImportApiController::class, 'createSeries']);
 
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);

@@ -857,14 +857,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $id;
     }
 
-    public function listGenres()
+    public function listGenres(?int $since = null)
     {
         return array_values($this->genres);
     }
 
-    public function listGenresWithStats(): array
+    public function listGenresWithStats(?int $since = null): array
     {
-        $genres = $this->listGenres();
+        $genres = $this->listGenres($since);
 
         return array_map(fn (array $genre) => [
             'id' => (string) ($genre['id'] ?? ''),
@@ -974,7 +974,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return true;
     }
 
-    public function listSeries(): array
+    public function listSeries(?int $since = null): array
     {
         return array_values($this->series);
     }
@@ -1001,14 +1001,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $id;
     }
 
-    public function listAuthors()
+    public function listAuthors(?int $since = null)
     {
         return array_values($this->authors);
     }
 
-    public function listAuthorsWithStats(): array
+    public function listAuthorsWithStats(?int $since = null): array
     {
-        $authors = $this->listAuthors();
+        $authors = $this->listAuthors($since);
 
         return array_map(fn (array $author) => [
             'id' => (string) ($author['id'] ?? ''),

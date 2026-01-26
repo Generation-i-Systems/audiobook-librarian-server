@@ -265,7 +265,7 @@ interface DocumentStoreServiceInterface
      */
     public function getGenre(string $id): ?array;
 
-    public function listGenres();
+    public function listGenres(?int $since = null);
 
     public function deleteGenre(string $id);
 
@@ -288,9 +288,10 @@ interface DocumentStoreServiceInterface
      * - authorCount: int (distinct authors with books in this genre)
      * - bookCount: int (books in this genre)
      *
+     * @param int|null $since Timestamp to filter by updated_at
      * @return array
      */
-    public function listGenresWithStats(): array;
+    public function listGenresWithStats(?int $since = null): array;
 
     // SERIES
     public function createSeries(string $name, bool $isCollection = false);
@@ -305,7 +306,7 @@ interface DocumentStoreServiceInterface
 
     public function deleteSeries(string $id);
 
-    public function listSeries(): array;
+    public function listSeries(?int $since = null): array;
 
     public function searchSeriesByName(string $term): array;
 
@@ -331,7 +332,7 @@ interface DocumentStoreServiceInterface
      */
     public function updateAuthor(string $id, array $data): bool;
 
-    public function listAuthors();
+    public function listAuthors(?int $since = null);
 
     public function deleteAuthor(string $id): void;
 
@@ -343,9 +344,10 @@ interface DocumentStoreServiceInterface
      * - name: string
      * - bookCount: int (total books for this author)
      *
+     * @param int|null $since Timestamp to filter by updated_at
      * @return array
      */
-    public function listAuthorsWithStats(): array;
+    public function listAuthorsWithStats(?int $since = null): array;
 
     /**
      * Get hierarchy information for a specific genre.

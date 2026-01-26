@@ -6,6 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Traits\CamelCaseAttributeAccess;
 
+/**
+ * @property int $id
+ * @property int $book_id
+ * @property int|null $user_id
+ * @property string $device_id
+ * @property \Illuminate\Support\Carbon $listening_date
+ * @property int $seconds_listened
+ * @property \Illuminate\Support\Carbon $session_start
+ * @property \Illuminate\Support\Carbon $session_end
+ * @property int|null $start_position_seconds
+ * @property int|null $end_position_seconds
+ * @property string $session_type
+ * @property array|null $metadata
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class ListeningStatistic extends Model
 {
     use CamelCaseAttributeAccess;
@@ -69,7 +86,8 @@ class ListeningStatistic extends Model
         array $metadata = [],
         ?string $userId = null
     ): self {
-        return self::create([
+        /** @var self $session */
+        $session = self::create([
             'book_id' => $bookId,
             'user_id' => $userId,
             'device_id' => $deviceId,
@@ -82,6 +100,8 @@ class ListeningStatistic extends Model
             'session_type' => $sessionType,
             'metadata' => $metadata,
         ]);
+
+        return $session;
     }
 
     /**

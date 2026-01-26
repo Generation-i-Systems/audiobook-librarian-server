@@ -109,6 +109,7 @@ class ApiAuth
                 // Fallback: support legacy/custom tokens stored in api_tokens
                 $apiTokenRow = DB::table('api_tokens')->where('token', $token)->first();
                 if ($apiTokenRow) {
+                    /** @var User|null $user */
                     $user = User::find($apiTokenRow->user_id);
                     if (!$user) {
                         Log::warning('API Auth failed: User not found for api_tokens row', [
@@ -168,6 +169,7 @@ class ApiAuth
         }
 
         // Get the user associated with the token
+        /** @var User|null $user */
         $user = $accessToken->tokenable;
 
         if (!$user) {

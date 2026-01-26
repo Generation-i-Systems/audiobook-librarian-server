@@ -18,7 +18,6 @@ use App\Models\Narrator;
 use App\Models\ReadingSession;
 use App\Models\Series;
 use App\Models\User;
-use App\Models\Queue;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -1099,6 +1098,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             if ($newSeries) {
                 // Merge: move all books from old series to new series
+                /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books */
                 $books = $oldSeries->books;
                 $count = 0;
 
@@ -1144,36 +1144,51 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
-    public function listAuthors()
+    public function listAuthors(?int $since = null)
     {
-        return Author::orderBy('name')->get()->toArray();
+        $query = Author::orderBy('name');
+        if ($since) {
+            $query->where('updated_at', '>=', date('Y-m-d H:i:s', $since));
+        }
+        return $query->get()->toArray();
     }
 
-    public function listGenres()
+    public function listGenres(?int $since = null)
     {
-        return Genre::orderBy('name')->get()->toArray();
+        $query = Genre::orderBy('name');
+        if ($since) {
+            $query->where('updated_at', '>=', date('Y-m-d H:i:s', $since));
+        }
+        return $query->get()->toArray();
     }
 
-    public function listGenresWithStats(): array
+    public function listGenresWithStats(?int $since = null): array
     {
         try {
-            $rows = DB::table('genres')
+            $query = DB::table('genres')
                 ->leftJoin('book_genre', 'genres.id', '=', 'book_genre.genre_id')
                 ->leftJoin('books', 'book_genre.book_id', '=', 'books.id')
                 ->leftJoin('author_book', 'books.id', '=', 'author_book.book_id')
-                ->groupBy('genres.id', 'genres.name')
+                ->groupBy('genres.id', 'genres.name', 'genres.updated_at')
                 ->orderBy('genres.name')
                 ->select(
                     'genres.id',
                     'genres.name',
+                    'genres.updated_at',
                     DB::raw('COUNT(DISTINCT books.id) as book_count'),
                     DB::raw('COUNT(DISTINCT author_book.author_id) as author_count')
-                )
-                ->get();
+                );
+
+            if ($since) {
+                $query->where('genres.updated_at', '>=', date('Y-m-d H:i:s', $since));
+            }
+
+            $rows = $query->get();
 
             return $rows->map(fn ($row) => [
                 'id' => (string) $row->id,
                 'name' => (string) $row->name,
+                'updatedAt' => $row->updated_at,
                 'bookCount' => (int) $row->book_count,
                 'authorCount' => (int) $row->author_count,
             ])->toArray();
@@ -1184,24 +1199,31 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
-    public function listAuthorsWithStats(): array
+    public function listAuthorsWithStats(?int $since = null): array
     {
         try {
-            $rows = DB::table('authors')
+            $query = DB::table('authors')
                 ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
                 ->leftJoin('books', 'author_book.book_id', '=', 'books.id')
-                ->groupBy('authors.id', 'authors.name')
+                ->groupBy('authors.id', 'authors.name', 'authors.updated_at')
                 ->orderBy('authors.name')
                 ->select(
                     'authors.id',
                     'authors.name',
+                    'authors.updated_at',
                     DB::raw('COUNT(DISTINCT books.id) as book_count')
-                )
-                ->get();
+                );
+
+            if ($since) {
+                $query->where('authors.updated_at', '>=', date('Y-m-d H:i:s', $since));
+            }
+
+            $rows = $query->get();
 
             return $rows->map(fn ($row) => [
                 'id' => (string) $row->id,
                 'name' => (string) $row->name,
+                'updatedAt' => $row->updated_at,
                 'bookCount' => (int) $row->book_count,
             ])->toArray();
         } catch (\Exception $e) {
@@ -1530,9 +1552,13 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
-    public function listSeries(): array
+    public function listSeries(?int $since = null): array
     {
-        return Series::orderBy('name')->get()->toArray();
+        $query = Series::orderBy('name');
+        if ($since) {
+            $query->where('updated_at', '>=', date('Y-m-d H:i:s', $since));
+        }
+        return $query->get()->toArray();
     }
 
     public function getBooksInSeries(
@@ -2269,7 +2295,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function clearJobs(): bool
     {
-        return Job::truncate();
+        Job::truncate();
+
+        return true;
     }
 
     public function jobExistsByDirectoryPath(string $directoryPath): bool
@@ -2794,28 +2822,40 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     {
         $name = trim((string) ($data['name'] ?? ''));
 
-        return Author::firstOrCreate(['name' => $name]);
+        /** @var Author $author */
+        $author = Author::firstOrCreate(['name' => $name]);
+
+        return $author;
     }
 
     public function findOrCreateGenres(array $data): Genre
     {
         $name = trim((string) ($data['name'] ?? ''));
 
-        return Genre::firstOrCreate(['name' => $name]);
+        /** @var Genre $genre */
+        $genre = Genre::firstOrCreate(['name' => $name]);
+
+        return $genre;
     }
 
     public function findOrCreateNarrators(array $data): Narrator
     {
         $name = trim((string) ($data['name'] ?? ''));
 
-        return Narrator::firstOrCreate(['name' => $name]);
+        /** @var Narrator $narrator */
+        $narrator = Narrator::firstOrCreate(['name' => $name]);
+
+        return $narrator;
     }
 
     public function findOrCreateSeries(array $data): Series
     {
         $name = trim((string) ($data['name'] ?? ''));
 
-        return Series::firstOrCreate(['name' => $name]);
+        /** @var Series $series */
+        $series = Series::firstOrCreate(['name' => $name]);
+
+        return $series;
     }
 
     /**
@@ -3016,13 +3056,13 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     public function createFollow(string $userId, string $followableType, string $followableId): bool
     {
         try {
-            $follow = Follow::create([
+            return DB::table('follows')->insert([
                 'user_id' => $userId,
                 'followable_type' => $followableType,
                 'followable_id' => $followableId,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
-
-            return $follow ? true : false;
         } catch (\Exception $e) {
             Log::error('MySqlService createFollow failed: ' . $e->getMessage());
 
@@ -3045,11 +3085,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'updated_at' => now(),
             ]);
 
-            return $message ? true : false;
+            return $message ? (string) $message->id : null;
         } catch (\Exception $e) {
             Log::error('MySqlService createMessage failed: ' . $e->getMessage());
 
-            return false;
+            return null;
         }
     }
 
@@ -3113,17 +3153,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     public function deleteFollow(string $userId, string $followableType, string $followableId): bool
     {
         try {
-            $follow = Follow::where('user_id', $userId)
+            return DB::table('follows')
+                ->where('user_id', $userId)
                 ->where('followable_type', $followableType)
                 ->where('followable_id', $followableId)
-                ->first();
-
-            if (!$follow) {
-                return false;
-            }
-            $follow->delete();
-
-            return true;
+                ->delete() > 0;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteFollow failed: ' . $e->getMessage());
 
@@ -3259,24 +3293,6 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            return false;
-        }
-    }
-
-    public function deleteQueue(string $queueId): bool
-    {
-        try {
-            $queue = Queue::where('id', $queueId)->first();
-
-            if (!$queue) {
-                return false;
-            }
-            $queue->delete();
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteQueue failed: ' . $e->getMessage());
 
             return false;
         }

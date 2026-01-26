@@ -6,6 +6,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int $book_id
+ * @property \Illuminate\Support\Carbon|null $started_at
+ * @property \Illuminate\Support\Carbon|null $ended_at
+ * @property int $duration_seconds
+ * @property int|null $pages
+ * @property int|null $position_start
+ * @property int|null $position_end
+ * @property string|null $device
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
 class ReadingSession extends Model
 {
     protected $fillable = [

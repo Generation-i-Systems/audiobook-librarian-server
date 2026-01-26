@@ -33,6 +33,7 @@ class NarratorNormalizationTest extends TestCase
 
     public function testUpdatesNormalizedNameWhenCreatingNarrator()
     {
+        /** @var Narrator $narrator */
         $narrator = Narrator::create(['name' => '  Jóhñ  Döe  ']);
 
         $this->assertDatabaseHas('narrators', [
@@ -44,6 +45,7 @@ class NarratorNormalizationTest extends TestCase
 
     public function testUpdatesNormalizedNameWhenUpdatingNarrator()
     {
+        /** @var Narrator $narrator */
         $narrator = Narrator::create(['name' => 'John Doe']);
 
         $narrator->update(['name' => '  Jóhñ  Döe  ']);

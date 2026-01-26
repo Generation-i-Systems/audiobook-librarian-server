@@ -420,18 +420,22 @@ class BookApiController extends Controller
         $type = $request->input('type'); // 'genre', 'author', 'series'
         $perPage = $request->input('per_page', 100);
         $search = $request->input('search');
-        $dataMap = [
-            'genre' => $this->documentStoreService->listGenres(),
-            'author' => $this->documentStoreService->listAuthors(),
-            'series' => $this->documentStoreService->listSeries(),
-        ];
-        if (!isset($dataMap[$type])) {
+        $since = $request->input('since') ? (int) $request->input('since') : null;
+
+        $items = match ($type) {
+            'genre' => $this->documentStoreService->listGenres($since),
+            'author' => $this->documentStoreService->listAuthors($since),
+            'series' => $this->documentStoreService->listSeries($since),
+            default => null,
+        };
+
+        if ($items === null) {
             return response()->json([
                 'error' => 'Invalid browse type',
                 'message' => 'The browse type must be one of: genre, author, series',
             ], 400);
         }
-        $items = $dataMap[$type];
+
         if ($search) {
             $items = array_filter($items, function ($item) use ($search) {
                 return stripos($item['name'], $search) !== false;
@@ -451,6 +455,8 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($total > 0) ? min($page * $perPage, $total) : null,
                 'total' => $total,
+                'since' => $since, // Echo back the since parameter
+                'timestamp' => time(), // Current server timestamp for client to use next time
             ],
         ]);
     }
@@ -1271,7 +1277,8 @@ class BookApiController extends Controller
      */
     public function listGenres(Request $request)
     {
-        $genres = $this->documentStoreService->listGenresWithStats();
+        $since = $request->input('since') ? (int) $request->input('since') : null;
+        $genres = $this->documentStoreService->listGenresWithStats($since);
 
         // Filter out genres that have no books associated with them
         $genres = array_filter($genres, function (array $genre) {
@@ -1750,6 +1757,7 @@ class BookApiController extends Controller
         $perPage = min(100, max(1, (int) $request->input('per_page', 50)));
         $sort = $request->input('sort', 'name_asc');
         $search = $request->input('search');
+        $since = $request->input('since') ? (int) $request->input('since') : null;
         $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
 
         // Validate sort parameter
@@ -1763,6 +1771,7 @@ class BookApiController extends Controller
             ->select([
                 'authors.id',
                 'authors.name',
+                'authors.updated_at',
             ])
             ->selectSub(function ($q) use ($includeNeedsReview) {
                 $q->from('author_book')
@@ -1775,6 +1784,10 @@ class BookApiController extends Controller
             }, 'book_count')
             ->join('author_book', 'authors.id', '=', 'author_book.author_id')
             ->join('books', 'author_book.book_id', '=', 'books.id');
+
+        if ($since) {
+            $query->where('authors.updated_at', '>=', date('Y-m-d H:i:s', $since));
+        }
 
         // Exclude needs_review books unless explicitly included
         if (!$includeNeedsReview) {
@@ -1850,6 +1863,10 @@ class BookApiController extends Controller
         // Add search functionality if present
         if ($search) {
             $countQuery->where('authors.name', 'LIKE', '%' . $search . '%');
+        }
+
+        if ($since) {
+            $countQuery->where('authors.updated_at', '>=', date('Y-m-d H:i:s', $since));
         }
 
         $total = $countQuery->distinct()->count('authors.id');
@@ -1948,6 +1965,7 @@ class BookApiController extends Controller
         $perPage = min(100, max(1, (int) $request->input('per_page', 50)));
         $sort = $request->input('sort', 'name_asc');
         $search = $request->input('search');
+        $since = $request->input('since') ? (int) $request->input('since') : null;
         $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
 
         // Validate sort parameter
@@ -1961,10 +1979,15 @@ class BookApiController extends Controller
             ->select([
                 'series.id',
                 'series.name',
+                'series.updated_at',
             ])
             ->withCount('books as book_count')
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
+
+        if ($since) {
+            $query->where('series.updated_at', '>=', date('Y-m-d H:i:s', $since));
+        }
 
         if (!$includeNeedsReview) {
             $query->where('books.needs_review', false);
@@ -2039,6 +2062,10 @@ class BookApiController extends Controller
         // Add search functionality if present
         if ($search) {
             $countQuery->where('series.name', 'LIKE', '%' . $search . '%');
+        }
+
+        if ($since) {
+            $countQuery->where('series.updated_at', '>=', date('Y-m-d H:i:s', $since));
         }
 
         $total = $countQuery->distinct()->count('series.id');

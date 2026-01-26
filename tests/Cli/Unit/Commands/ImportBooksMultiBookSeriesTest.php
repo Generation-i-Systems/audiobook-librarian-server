@@ -3,7 +3,7 @@
 namespace Tests\Cli\Unit\Commands;
 
 use App\Console\Commands\ImportBooksFromDownloads;
-use App\Services\ImportUIService;
+use App\Contracts\ImportUIInterface;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -14,7 +14,8 @@ class ImportBooksMultiBookSeriesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $uiService = \Mockery::mock(ImportUIService::class);
+
+        $uiService = \Mockery::mock(ImportUIInterface::class);
         $uiService->shouldReceive('logMessage')->zeroOrMoreTimes();
         $uiService->shouldReceive('setCurrentBook')->zeroOrMoreTimes();
         $this->command = new ImportBooksFromDownloads($uiService);
