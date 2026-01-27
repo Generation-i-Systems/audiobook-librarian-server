@@ -494,6 +494,7 @@ class ApiHealthController extends Controller
                     $issues[] = "series[{$index}].name must be string";
                 }
 
+                // @phpstan-ignore-next-line
                 if (isset($seriesEntry['name']) && $seriesEntry['name'] === '') {
                     $issues[] = "series[{$index}].name must not be empty";
                 }

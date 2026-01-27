@@ -247,7 +247,7 @@ class LibraryRepairController extends Controller
         }
 
         $author = $book['authors'][0] ?? '';
-        $title = $book['title'] ?? '';
+        $title = $book['title']; // Title is verified to be non-empty above
         $raw = trim(implode(' ', array_filter([$author, $title])));
 
         if ($raw === '') {

@@ -815,7 +815,7 @@ class ImportFileController extends Controller
             if (count($topGenres) > 1) {
                 // Rule 3: Use the one with the most books
                 $mostBooks = 0;
-                $bestGenre = $topGenres[0] ?? null;
+                $bestGenre = $topGenres[0];
 
                 foreach ($topGenres as $genre) {
                     if ($genreBookCounts[$genre] > $mostBooks) {
@@ -1632,9 +1632,9 @@ class ImportFileController extends Controller
 
 
     /**
-     * Move the selected file or directory to the composed directoryPath under the import destination root.
+     * Move selected files/directories to a target directory.
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
      */
     public function moveSelected(Request $request)
     {
@@ -1771,9 +1771,7 @@ class ImportFileController extends Controller
             }
             $relativePath = ltrim($relativePath, '/');
             if ($relativePath === '') {
-                $relativePath = method_exists($file, 'getFilename')
-                    ? $file->getFilename()
-                    : basename($sourceFilePath);
+                $relativePath = $file->getFilename();
             }
             $targetFile = rtrim($destDir, '/') . '/' . $relativePath;
             $targetDirPath = dirname($targetFile);
@@ -1792,7 +1790,7 @@ class ImportFileController extends Controller
                 $counter = 1;
                 while (true) {
                     $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
-                    $candidate = ($pathInfo['dirname'] ?? '') . '/' . ($pathInfo['filename'] ?? 'file') . $suffix;
+                    $candidate = $pathInfo['dirname'] . '/' . $pathInfo['filename'] . $suffix;
                     if (!empty($pathInfo['extension'])) {
                         $candidate .= '.' . $pathInfo['extension'];
                     }

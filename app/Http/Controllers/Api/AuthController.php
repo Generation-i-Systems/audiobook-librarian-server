@@ -243,6 +243,7 @@ class AuthController extends Controller
             }
 
             if ($isNewUser) {
+                // @phpstan-ignore-next-line
                 $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
                 $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
 
