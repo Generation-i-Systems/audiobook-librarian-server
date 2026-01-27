@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Contracts\DocumentStoreServiceInterface;
 
 class ReviewController extends Controller
 {

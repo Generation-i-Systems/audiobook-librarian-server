@@ -6,6 +6,7 @@ use App\Traits\IsolatesErrorHandlers;
 use App\Traits\NormalizesSeriesNames;
 use App\Traits\NormalizesStrings;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Mozex\Anthropic\Facades\Anthropic;
