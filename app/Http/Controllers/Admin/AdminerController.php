@@ -55,16 +55,6 @@ class AdminerController extends Controller
             $_GET['db'] = $db;
         }
 
-
-
-        // Ensure DRIVER is set (defaults to 'server' for MySQL)
-
-        if (!isset($_GET['server']) && !isset($_GET['sqlite']) && !isset($_GET['pgsql']) && !isset($_GET['oracle']) && !isset($_GET['mssql']) && !isset($_GET['mongo'])) {
-            $_GET['server'] = $server;
-        }
-
-
-
         // Define constants expected by Adminer
 
         if (!defined('SID')) {
@@ -121,34 +111,7 @@ class AdminerController extends Controller
 
 
 
-
-
-        // Define the adminer_object function in the global namespace.
-
-
-
-
-
-        if (!function_exists('adminer_object')) {
-            function adminer_object()
-            {
-                if (!class_exists('Adminer\AdminerCustom')) {
-                    require_once base_path('resources/adminer/adminer-custom-class.php');
-                }
-
-                require_once base_path('resources/adminer/adminer-plugins/sql-gemini.php');
-
-                /** @phpstan-ignore-next-line */
-                return new \Adminer\Plugin(array(
-                    /** @phpstan-ignore-next-line */
-                    new \Adminer\AdminerCustom(),
-                    /** @phpstan-ignore-next-line */
-                    new \AdminerSqlGemini(),
-                ));
-            }
-        }
-
-
+        require_once base_path('app/Support/adminer_object.php');
 
         ob_start();
 
