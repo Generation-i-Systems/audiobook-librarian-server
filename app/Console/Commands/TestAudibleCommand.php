@@ -55,7 +55,10 @@ class TestAudibleCommand extends Command
     {
         $this->info("Searching for: {$query}" . ($author ? " by {$author}" : ''));
 
-        $books = $this->audibleService->searchBooks($query, $author, $limit);
+        $books = $this->audibleService->searchBooks($query, [
+            'author' => $author,
+            'limit' => $limit,
+        ]);
 
         if (empty($books)) {
             $this->error('No books found or an error occurred.');
