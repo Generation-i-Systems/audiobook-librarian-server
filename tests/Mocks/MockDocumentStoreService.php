@@ -564,9 +564,19 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $this->books;
     }
 
-    public function getAllBooks(): array
+    public function getAllBooks(?int $limit = null, int $offset = 0): array
     {
-        return array_values($this->books);
+        $books = array_values($this->books);
+
+        if ($offset > 0) {
+            $books = array_slice($books, $offset);
+        }
+
+        if ($limit !== null) {
+            $books = array_slice($books, 0, $limit);
+        }
+
+        return $books;
     }
 
     // dumpAllBooks method already exists above

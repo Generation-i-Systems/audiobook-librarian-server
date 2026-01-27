@@ -945,7 +945,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $userData;
     }
 
-    public function getAllBooks($limit = null, $offset = 0)
+    public function getAllBooks(?int $limit = null, int $offset = 0): array
     {
         $query = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters']);
 
@@ -956,6 +956,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $query->get()->map(function (Book $book) {
             $bookArray = $book->toArray();
             $bookArray['_id'] = (string) $book->id;
+
+            if (!isset($bookArray['directoryPath']) && isset($bookArray['directory_path'])) {
+                $bookArray['directoryPath'] = $bookArray['directory_path'];
+            }
 
             // Transform series to canonical format
             if (!empty($bookArray['series'])) {

@@ -30,6 +30,11 @@ interface DocumentStoreServiceInterface
     public function findBookByDirectoryPath(string $directoryPath): ?array;
 
     /**
+     * Get all books (optionally paginated by limit/offset).
+     */
+    public function getAllBooks(?int $limit = null, int $offset = 0): array;
+
+    /**
      * List books with pagination and optional filtering.
      *
      * @param int $page Page number (1-based)
