@@ -53,6 +53,47 @@ class BookImportService
         $this->config = $config;
     }
 
+    public function getAllBooks(bool $processAll = false): array
+    {
+        $query = Book::with(['authors', 'narrators', 'genres', 'series', 'publisher']);
+
+        if (!$processAll) {
+            $query->where(function ($q) {
+                $q->whereNull('last_library_json_update')
+                    ->orWhereNull('directory_path');
+            });
+        }
+
+        return $query->get()->map(static function (Book $book): array {
+            return $book->toArray();
+        })->toArray();
+    }
+
+    public function previewLibraryJson(array $book): array
+    {
+        return $this->prepareBookDataForJson($book);
+    }
+
+    public function generateLibraryJson(array $book, bool $dryRun = false): bool
+    {
+        if ($dryRun) {
+            return true;
+        }
+
+        return $this->updateLibraryJson($book);
+    }
+
+    public function resolveBookDirectoryPath(array $book): ?string
+    {
+        $relativePath = $book['directory_path'] ?? $book['directoryPath'] ?? null;
+
+        if (!is_string($relativePath) || $relativePath === '') {
+            return null;
+        }
+
+        return (string) \Illuminate\Support\Facades\Storage::disk('books')->path($relativePath);
+    }
+
     /**
      * Look up book metadata from OpenAudible books.json if available
      *

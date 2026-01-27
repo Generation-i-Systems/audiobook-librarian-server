@@ -295,7 +295,7 @@ trait HandlesLibraryJson
             'dateAdded' => $createdAt,
             'source' => $book['source'] ?? 'manual',
             'fileTags' => $book['file_tags'] ?? $book['fileTags'] ?? null,
-            'runtime' => $book['duration'] ? round($book['duration'] / 60, 1) : null,
+            'runtime' => is_numeric($book['duration'] ?? null) ? round(((float) $book['duration']) / 60, 1) : null,
             'created_at' => $createdAt,
             'updated_at' => $updatedAt,
 
