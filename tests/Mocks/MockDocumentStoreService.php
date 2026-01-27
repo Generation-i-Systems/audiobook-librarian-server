@@ -695,6 +695,48 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return (int) ($this->readingProgress[$key] ?? 0);
     }
 
+    public function getProgress(string $userId, string $bookId): ?int
+    {
+        $progress = $this->getReadingProgress($userId, $bookId);
+        return $progress > 0 ? $progress : null;
+    }
+
+    public function updateJobStatus(string $jobId, string $type, string $status, array $metadata = []): bool
+    {
+        if (!isset($this->jobs[$jobId])) {
+            $this->jobs[$jobId] = ['id' => $jobId, 'type' => $type, 'status' => $status, 'metadata' => []];
+        }
+        $this->jobs[$jobId]['type'] = $type;
+        $this->jobs[$jobId]['status'] = $status;
+        $this->jobs[$jobId]['metadata'] = array_merge($this->jobs[$jobId]['metadata'] ?? [], $metadata);
+        return true;
+    }
+
+    public function getExternalReads(string $userId, string $bookId): array
+    {
+        return [];
+    }
+
+    public function getExternalRead(string $externalReadId, string $userId, string $bookId): ?array
+    {
+        return null;
+    }
+
+    public function createExternalRead(array $data): string
+    {
+        return '1';
+    }
+
+    public function updateExternalRead(string $externalReadId, array $data): bool
+    {
+        return true;
+    }
+
+    public function deleteExternalRead(string $externalReadId, string $userId, string $bookId): bool
+    {
+        return true;
+    }
+
     /**
      * Check if a user with the given username exists.
      *
