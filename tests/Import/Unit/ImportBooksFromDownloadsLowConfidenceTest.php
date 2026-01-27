@@ -89,17 +89,14 @@ class ImportBooksFromDownloadsLowConfidenceTestDouble extends ImportBooksFromDow
 
     public function warn($string, $verbosity = null)
     {
-        return null;
     }
 
     public function info($string, $verbosity = null)
     {
-        return null;
     }
 
     public function line($string, $style = null, $verbosity = null)
     {
-        return null;
     }
 
     public function exposeHandleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata): bool

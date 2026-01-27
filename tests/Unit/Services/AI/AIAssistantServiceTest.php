@@ -22,6 +22,7 @@ class AIAssistantServiceTest extends TestCase
     use RefreshDatabase;
 
     protected AIAssistantService $service;
+    /** @var AIProviderInterface&Mockery\MockInterface */
     protected AIProviderInterface $mockProvider;
     protected User $user;
 
@@ -144,6 +145,8 @@ class AIAssistantServiceTest extends TestCase
         $this->assertEquals($sessionId, $result['session_id']);
 
         $session = DB::table('ai_assistant_sessions')->find($sessionId);
+        $this->assertNotNull($session);
+        /** @var object $session */
         $conversation = json_decode($session->conversation_history, true);
         $this->assertCount(3, $conversation); // Original + new user + assistant
     }
@@ -329,6 +332,8 @@ class AIAssistantServiceTest extends TestCase
         $this->assertEquals('Fantasy', $book->fresh()->genres->first()->name);
 
         $session = DB::table('ai_assistant_sessions')->find($sessionId);
+        $this->assertNotNull($session);
+        /** @var object $session */
         $this->assertEquals('completed', $session->status);
     }
 
@@ -430,6 +435,8 @@ class AIAssistantServiceTest extends TestCase
         $this->assertGreaterThan(0, $result['error_count']);
 
         $session = DB::table('ai_assistant_sessions')->find($sessionId);
+        $this->assertNotNull($session);
+        /** @var object $session */
         $this->assertEquals('partially_completed', $session->status);
     }
 
@@ -437,7 +444,6 @@ class AIAssistantServiceTest extends TestCase
     {
         $stats = $this->service->getUsageStats();
 
-        $this->assertIsArray($stats);
         $this->assertArrayHasKey('session_cost', $stats);
         $this->assertArrayHasKey('requests_this_minute', $stats);
         $this->assertArrayHasKey('requests_today', $stats);

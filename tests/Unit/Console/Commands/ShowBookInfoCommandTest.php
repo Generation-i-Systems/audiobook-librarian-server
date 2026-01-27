@@ -80,7 +80,10 @@ class ShowBookInfoCommandTest extends TestCase
         $input = str_repeat('A', 120);
         $maxWidth = 20;
 
-        $result = $this->command->wrapTextPublic($input, $maxWidth);
+        /** @var ShowBookInfo $command */
+        $command = $this->command;
+        // @phpstan-ignore-next-line
+        $result = $command->wrapTextPublic($input, $maxWidth);
         $lines = explode("\n", $result);
 
         foreach ($lines as $line) {
@@ -96,7 +99,10 @@ class ShowBookInfoCommandTest extends TestCase
         $input = '<fg=red>' . str_repeat('B', 50) . '</>';
         $maxWidth = 10;
 
-        $result = $this->command->wrapTextPublic($input, $maxWidth);
+        /** @var ShowBookInfo $command */
+        $command = $this->command;
+        // @phpstan-ignore-next-line
+        $result = $command->wrapTextPublic($input, $maxWidth);
         $lines = explode("\n", $result);
 
         $visibleLengths = array_map(function (string $line): int {

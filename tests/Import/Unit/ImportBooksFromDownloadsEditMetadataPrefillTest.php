@@ -116,7 +116,7 @@ class ImportBooksFromDownloadsEditMetadataPrefillTestDouble extends ImportBooksF
         }
 
         $title = $metadata['title'];
-        if (preg_match('/\b(\d+(?:\.\d+)?)\b/', $title, $matches) && isset($matches[1])) {
+        if (preg_match('/\b(\d+(?:\.\d+)?)\b/', $title, $matches)) {
             $metadata['series_number'] = $matches[1];
         }
     }

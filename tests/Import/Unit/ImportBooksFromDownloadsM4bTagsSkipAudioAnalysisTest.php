@@ -5,7 +5,6 @@ namespace Tests\Import\Unit\Commands;
 use App\Console\Commands\ImportBooksFromDownloads;
 use App\Services\AIBookProcessor;
 use Mockery;
-use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ImportBooksFromDownloadsM4bTagsSkipAudioAnalysisTest extends TestCase
@@ -15,8 +14,9 @@ class ImportBooksFromDownloadsM4bTagsSkipAudioAnalysisTest extends TestCase
     {
         $command = new ImportBooksFromDownloadsM4bTagsSkipAudioAnalysisTestDouble();
 
-        /** @var AIBookProcessor&MockInterface $aiProcessor */
+        /** @var AIBookProcessor $aiProcessor */
         $aiProcessor = Mockery::mock(AIBookProcessor::class);
+        // @phpstan-ignore-next-line
         $aiProcessor->shouldReceive('extractFileTags')
             ->once()
             ->andReturn([
@@ -27,7 +27,11 @@ class ImportBooksFromDownloadsM4bTagsSkipAudioAnalysisTest extends TestCase
                 'narrator' => 'Great Narrator',
             ]);
 
-        $command->setAiProcessor($aiProcessor);
+        // Inject via reflection to ensure we access the protected parent property
+        $reflection = new \ReflectionClass($command);
+        $property = $reflection->getProperty('aiProcessor');
+        $property->setAccessible(true);
+        $property->setValue($command, $aiProcessor);
 
         $audiobook = [
             'path' => '/tmp/book',
@@ -61,18 +65,7 @@ class ImportBooksFromDownloadsM4bTagsSkipAudioAnalysisTestDouble extends ImportB
         parent::__construct(null);
     }
 
-    /**
-     * @param  AIBookProcessor&MockInterface  $aiProcessor
-     */
-    public function setAiProcessor($aiProcessor): void
-    {
-        /** @var AIBookProcessor $processor */
-        $processor = $aiProcessor;
-
-        $this->aiProcessor = $processor;
-    }
-
-    public function exposeHandleLowConfidenceMetadata(array $audiobook, array &$aiMetadata): bool
+    public function exposeHandleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata): bool
     {
         return $this->handleLowConfidenceMetadata($audiobook, $aiMetadata);
     }
@@ -80,7 +73,7 @@ class ImportBooksFromDownloadsM4bTagsSkipAudioAnalysisTestDouble extends ImportB
     public function option($key = null): mixed
     {
         if ($key === 'min-confidence') {
-            return 80;
+            return '80';
         }
 
         if ($key === 'force-audio') {

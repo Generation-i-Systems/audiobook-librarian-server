@@ -5,7 +5,6 @@ namespace Tests\Unit\Console;
 use App\Console\Commands\GenerateLibraryJson;
 use App\Services\BookImportService;
 use Mockery;
-use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -13,7 +12,8 @@ class GenerateLibraryJsonCommandTest extends TestCase
 {
     private GenerateLibraryJson $command;
 
-    private BookImportService&MockInterface $importService;
+    /** @var \Mockery\MockInterface */
+    private $importService;
 
     protected function setUp(): void
     {

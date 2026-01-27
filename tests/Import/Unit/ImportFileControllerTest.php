@@ -206,8 +206,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock
@@ -286,8 +284,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock
@@ -358,8 +354,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock
@@ -432,8 +426,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock
