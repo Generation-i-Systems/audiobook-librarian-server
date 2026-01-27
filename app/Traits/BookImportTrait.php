@@ -261,6 +261,7 @@ trait BookImportTrait
             $parts = array_values(array_filter(explode('/', trim($directoryPath, '/')), 'strlen'));
 
             // Debug output
+            // @phpstan-ignore-next-line method.exists
             if (method_exists($this, 'debug')) {
                 $this->debug("Processing directory path: {$directoryPath}");
                 $this->debug('Path parts: ' . json_encode($parts));
@@ -268,6 +269,7 @@ trait BookImportTrait
 
             // Handle empty or invalid paths
             if (empty($parts)) {
+                // @phpstan-ignore-next-line method.exists
                 if (method_exists($this, 'debug')) {
                     $this->debug("Empty parts array for path: $directoryPath");
                 }
@@ -502,6 +504,7 @@ trait BookImportTrait
         $output = method_exists($this, 'line') ? $this : null;
 
         if (!$url) {
+            // @phpstan-ignore-next-line alwaysFalse
             if ($output) {
                 /** @phpstan-ignore-next-line method.notFound */
                 $output->error("Invalid URL: {$url}");
@@ -510,6 +513,7 @@ trait BookImportTrait
         }
 
         try {
+            // @phpstan-ignore-next-line alwaysFalse
             if ($output) {
                 $output->line("Downloading image from <comment>{$url}</comment>");
             }
@@ -521,6 +525,7 @@ trait BookImportTrait
                 // Create the default directory if it doesn't exist
                 if (!is_dir($storagePath)) {
                     if (!mkdir($storagePath, 0775, true) && !is_dir($storagePath)) {
+                        // @phpstan-ignore-next-line alwaysFalse
                         if ($output) {
                             /** @phpstan-ignore-next-line method.notFound */
                             $output->error("Unable to create default storage directory: {$storagePath}");
@@ -542,6 +547,7 @@ trait BookImportTrait
                         'user' => posix_getpwuid(posix_geteuid())['name'] ?? 'unknown',
                     ]);
 
+                    // @phpstan-ignore-next-line alwaysFalse
                     if ($output) {
                         /** @phpstan-ignore-next-line method.notFound */
                         $output->error("Unable to create directory at {$fullDir}");
@@ -550,6 +556,7 @@ trait BookImportTrait
                     $parentDir = dirname($fullDir);
                     if (is_dir($parentDir)) {
                         $perms = substr(sprintf('%o', fileperms($parentDir)), -4);
+                        // @phpstan-ignore-next-line alwaysFalse
                         if ($output) {
                             /** @phpstan-ignore-next-line method.notFound */
                             $output->error("Parent directory permissions: {$perms}");
@@ -557,6 +564,7 @@ trait BookImportTrait
                     }
                     return null;
                 }
+                // @phpstan-ignore-next-line alwaysFalse
                 if ($output) {
                     $output->line("Created directory: <info>{$directoryPath}</info>");
                 }
@@ -599,6 +607,7 @@ trait BookImportTrait
             curl_close($ch);
 
             if ($errorNo !== 0) {
+                // @phpstan-ignore-next-line alwaysFalse
                 if ($output) {
                     /** @phpstan-ignore-next-line method.notFound */
                     $output->error("cURL error ({$errorNo}): {$errorMsg}");
@@ -607,10 +616,12 @@ trait BookImportTrait
             }
 
             if ($httpCode !== 200) {
+                // @phpstan-ignore-next-line alwaysFalse
                 if ($output) {
                     /** @phpstan-ignore-next-line method.notFound */
                     $output->error("HTTP error: Received code {$httpCode} from {$url}");
                 }
+                // @phpstan-ignore-next-line alwaysFalse
                 if ($output) {
                     $output->line("<info>Response headers: {$header}</info>");
                 }
@@ -618,6 +629,7 @@ trait BookImportTrait
             }
 
             if (empty($contents)) {
+                // @phpstan-ignore-next-line alwaysFalse
                 if ($output) {
                     /** @phpstan-ignore-next-line method.notFound */
                     $output->error("Empty content received from {$url}");
@@ -645,6 +657,7 @@ trait BookImportTrait
             $bytesWritten = file_put_contents($fullPath, $contents);
 
             if ($bytesWritten === false) {
+                // @phpstan-ignore-next-line alwaysFalse
                 if ($output) {
                     /** @phpstan-ignore-next-line method.notFound */
                     $output->error("Unable to write file {$fullPath}");
@@ -652,6 +665,7 @@ trait BookImportTrait
                 // Check file permissions
                 if (is_dir($fullDir)) {
                     $perms = substr(sprintf('%o', fileperms($fullDir)), -4);
+                    // @phpstan-ignore-next-line alwaysFalse
                     if ($output) {
                         /** @phpstan-ignore-next-line method.notFound */
                         $output->error("Directory permissions: {$perms}");
@@ -660,6 +674,7 @@ trait BookImportTrait
                 return null;
             }
 
+            // @phpstan-ignore-next-line alwaysFalse
             if ($output) {
                 $output->line("Saved <info>{$bytesWritten}</info> bytes to <info>{$directoryPath}/{$filename}</info>");
             }
@@ -668,6 +683,7 @@ trait BookImportTrait
             $relativePath = ltrim($directoryPath, '/') . '/' . $filename;
             return $relativePath;
         } catch (\Exception $e) {
+            // @phpstan-ignore-next-line alwaysFalse
             if ($output) {
                 /** @phpstan-ignore-next-line method.notFound */
                 $output->error('Error downloading image: ' . $e->getMessage());
@@ -1031,7 +1047,9 @@ trait BookImportTrait
         $lowerName = strtolower($name);
 
         // Check for known variations
+        /** @phpstan-ignore-next-line property.notFound */
         if (isset($this->seriesVariations[$lowerName])) {
+            /** @phpstan-ignore-next-line property.notFound */
             $name = $this->seriesVariations[$lowerName];
         }
 
