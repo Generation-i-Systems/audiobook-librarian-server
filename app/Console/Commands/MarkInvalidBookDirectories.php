@@ -45,10 +45,7 @@ class MarkInvalidBookDirectories extends Command
                 $this->line("❌ Missing: [{$book->id}] {$book->title} -> {$path}");
 
                 if (!$dryRun) {
-                    $reasons = $book->needs_review_reasons ?: [];
-                    if (!is_array($reasons)) {
-                        $reasons = (array) $reasons;
-                    }
+                    $reasons = (array) ($book->needs_review_reasons ?: []);
 
                     $reasons = array_values(array_unique(array_merge($reasons, ['missing_directory'])));
 
