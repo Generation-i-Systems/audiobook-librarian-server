@@ -1571,7 +1571,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function renameBothDirectoriesByNarrator(array $audiobook, string $targetDir, Book $book): void
     {
-        $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+        $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
         $this->getImportService()->renameBothDirectoriesByNarrator($audiobook, $targetDir, $book, $bookStoragePath);
         $this->info("📁 Imported new files to: " . basename($targetDir));
     }

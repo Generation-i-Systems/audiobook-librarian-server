@@ -129,7 +129,7 @@ class ShowBookInfo extends Command
         // Validate directories - if any don't exist and we have update options, assume current directory
         $validDirectories = [];
         $hasInvalidDirectories = false;
-        $bookRoot = env('BOOK_STORAGE_PATH', config('app.book_root', '/media/audiobooks/books'));
+        $bookRoot = config('app.book_root');
 
         foreach ($directories as $directory) {
             if ($this->option('verbose')) {

@@ -716,7 +716,7 @@ class ImportFileController extends Controller
     {
         $libraryRoot = rtrim((string) config('app.book_root', ''), '/');
         if ($libraryRoot === '') {
-            $libraryRoot = rtrim((string) env('BOOK_STORAGE_PATH', ''), '/');
+            $libraryRoot = rtrim((string) config('app.book_root'), '/');
         }
         if (!is_dir($libraryRoot)) {
             Log::warning('[ImportFile] Library root directory not found', [
@@ -1506,7 +1506,7 @@ class ImportFileController extends Controller
             // Get the book storage root
             $bookStorageRoot = rtrim((string) config('app.book_root', ''), '/');
             if ($bookStorageRoot === '') {
-                $bookStorageRoot = rtrim((string) env('BOOK_STORAGE_PATH', ''), '/');
+                $bookStorageRoot = rtrim((string) config('app.book_root'), '/');
             }
             if (!$bookStorageRoot || !is_dir($bookStorageRoot)) {
                 Log::error('[ImportFile] Book storage path not found or invalid', [
@@ -1663,7 +1663,7 @@ class ImportFileController extends Controller
 
         $destRoot = (string) config('app.book_root', '');
         if ($destRoot === '') {
-            $destRoot = (string) env('BOOK_STORAGE_PATH', '');
+            $destRoot = (string) config('app.book_root');
         }
         if ($destRoot === '') {
             $destRoot = (string) Config::get('audiobooks.root', '');

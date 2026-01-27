@@ -35,7 +35,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             Log::info("[BulkImport] Starting: {$this->directoryPath}");
 
             $dirPath = '/' . ltrim($this->directoryPath, '/');
-            $storagePath = rtrim((string) env('BOOK_STORAGE_PATH'), '/');
+            $storagePath = rtrim((string) config('app.book_root'), '/');
             $fullPath = $storagePath . $dirPath;
 
             if (! is_dir($fullPath)) {

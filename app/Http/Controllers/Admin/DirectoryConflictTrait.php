@@ -14,7 +14,7 @@ trait DirectoryConflictTrait
     private function checkDirectoryConflict(string $newPath): array
     {
         $booksDisk = Storage::disk('books');
-        $booksRoot = config('app.book_root', env('BOOK_STORAGE_PATH', ''));
+        $booksRoot = config('app.book_root', config('app.book_root'));
 
         $newPath = trim($newPath, '/');
         if ($newPath === '') {

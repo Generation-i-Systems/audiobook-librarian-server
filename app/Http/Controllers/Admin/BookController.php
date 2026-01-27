@@ -1469,7 +1469,7 @@ class BookController extends Controller
                 }
             }
 
-            $storageRoot = (string) config('app.book_root', env('BOOK_STORAGE_PATH', ''));
+            $storageRoot = (string) config('app.book_root', config('app.book_root'));
             $storageRoot = rtrim($storageRoot, '/');
             if ($storageRoot !== '') {
                 $oldAbs = $storageRoot . '/' . ltrim($oldDirectoryPath, '/');

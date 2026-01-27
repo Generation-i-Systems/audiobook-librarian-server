@@ -1836,7 +1836,7 @@ class BookImportService
             return null;
         }
 
-        $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+        $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
         if (!$bookStoragePath || !File::isDirectory($bookStoragePath)) {
             return null;
         }
@@ -5726,7 +5726,7 @@ class BookImportService
         $alternativeRoots = [
             config('app.book_root'),
             config('filesystems.disks.books.root'),
-            env('BOOK_STORAGE_PATH'),
+            config('app.book_root'),
         ];
 
         foreach ($alternativeRoots as $altRoot) {
@@ -7097,7 +7097,7 @@ class BookImportService
             $warnCallback("⚠️  Book already exists (detected after AI processing)");
             $lineCallback("  Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
 
-            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
             if ($bookStoragePath && $existingBook->directory_path) {
                 $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
 

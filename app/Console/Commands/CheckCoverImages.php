@@ -425,7 +425,7 @@ class CheckCoverImages extends Command
 
         // Check if file exists without directoryPath prefix
         $diskName = 'books';
-        $bookStoragePath = env('BOOK_STORAGE_PATH', '/media/audiobooks/books');
+        $bookStoragePath = config('app.book_root');
 
         // If the coverImagePath is just a filename, check if it needs directoryPath prefix
         $baseFileName = basename($coverImagePath);

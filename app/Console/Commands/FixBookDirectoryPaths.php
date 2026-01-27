@@ -33,7 +33,7 @@ class FixBookDirectoryPaths extends Command
             $this->warn('DRY RUN MODE - No changes will be made');
         }
 
-        $bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $bookRoot = rtrim(config('app.book_root'), '/');
         $realBookRoot = realpath($bookRoot) ?: $bookRoot;
 
         $this->line("Book root: {$realBookRoot}");
