@@ -69,7 +69,6 @@ class AIToolServiceTest extends TestCase
 
         $history = $aiToolService->getConversationHistory();
 
-        $this->assertIsArray($history);
         $this->assertEmpty($history);
     }
 
@@ -78,7 +77,6 @@ class AIToolServiceTest extends TestCase
         $aiToolService = new AIToolService('gemini-2.5-flash');
         $result = $aiToolService->getConversationHistory();
 
-        $this->assertIsArray($result);
         $this->assertEmpty($result);
     }
 }

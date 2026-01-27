@@ -87,7 +87,7 @@ class BookEnrichmentServiceTest extends TestCase
         $this->assertSame(['Science Fiction', 'Action'], $result['genre']);
     }
 
-    #[Test]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function enrichWithExternalDataStillQueriesAudibleWhenOnlyGenreIsMissing(): void
     {
         $audibleMock = $this->createMock(AudibleService::class);
@@ -118,7 +118,7 @@ class BookEnrichmentServiceTest extends TestCase
         $this->assertSame(['Science Fiction'], $result['genre']);
     }
 
-    #[Test]
+    #[\PHPUnit\Framework\Attributes\Test]
     public function enrichWithExternalDataMapsAudibleCategoryToValidSystemGenre(): void
     {
         $audibleMock = $this->createMock(AudibleService::class);
@@ -480,7 +480,6 @@ class BookEnrichmentServiceTest extends TestCase
 
         // The function returns a fallback if pattern doesn't match
         // The patterns in the actual function look for exact matches with dashes
-        $this->assertIsString($result);
         $this->assertNotEmpty($result);
     }
 
