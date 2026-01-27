@@ -107,7 +107,7 @@ class BookDirectoryParser
     ) {
         $this->audioAnalyzer = $audioAnalyzer ?? new AudioFileAnalyzer();
         $this->metadataService = $metadataService ?? app(BookMetadataService::class);
-        $this->storageRoot = rtrim(env('BOOK_STORAGE_PATH') ?? '', '/');
+        $this->storageRoot = rtrim((string) config('filesystems.disks.books.root', ''), '/');
     }
 
     /**
@@ -227,9 +227,6 @@ class BookDirectoryParser
         }
 
         // Fallback to legacy logic if genre/subgenre detection fails
-        // Reset array keys after filtering
-        $parts = array_values($parts);
-
         // Check each directory component from deepest to shallowest
         for ($i = count($parts) - 1; $i >= 0; $i--) {
             $currentPart = $parts[$i];
@@ -441,9 +438,7 @@ class BookDirectoryParser
 
                             continue;
                         }
-                        if (!empty($descriptionLines) || $trimmedLine !== '') {
-                            $descriptionLines[] = $line;
-                        }
+                        $descriptionLines[] = $line;
                     }
                     if (!empty($descriptionLines)) {
                         $metadata['description'] = implode("\n", array_map('trim', $descriptionLines));
@@ -453,7 +448,7 @@ class BookDirectoryParser
                         'author' => array_key_exists('author', $metadata) ? (is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']]) : [],
                         'narrator' => array_key_exists('narrator', $metadata) ? $metadata['narrator'] : '',
                         'series' => array_key_exists('series', $metadata) ? $metadata['series'] : '',
-                        'seriesNumber' => array_key_exists('seriesNumber', $metadata) ? (is_numeric($metadata['seriesNumber']) ? (str_contains((string) $metadata['seriesNumber'], '.') ? (float) $metadata['seriesNumber'] : (int) $metadata['seriesNumber']) : null) : (array_key_exists('series_number', $metadata) ? (is_numeric($metadata['series_number']) ? (str_contains((string) $metadata['series_number'], '.') ? (float) $metadata['series_number'] : (int) $metadata['series_number']) : null) : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex']) ? (str_contains((string) $metadata['seriesIndex'], '.') ? (float) $metadata['seriesIndex'] : (int) $metadata['seriesIndex']) : null)),
+                        'seriesNumber' => array_key_exists('seriesNumber', $metadata) ? (is_numeric($metadata['seriesNumber']) ? (str_contains((string) $metadata['seriesNumber'], '.') ? (float) $metadata['seriesNumber'] : (int) $metadata['seriesNumber']) : null) : (array_key_exists('series_number', $metadata) ? (is_numeric($metadata['series_number']) ? (str_contains((string) $metadata['series_number'], '.') ? (float) $metadata['series_number'] : (int) $metadata['series_number']) : null) : (array_key_exists('seriesindex', $metadata) && is_numeric($metadata['seriesindex']) ? (str_contains((string) $metadata['seriesindex'], '.') ? (float) $metadata['seriesindex'] : (int) $metadata['seriesindex']) : null)),
                         'year' => (
                             (array_key_exists('year', $metadata) && is_numeric($metadata['year'])) ? (int) $metadata['year'] : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear'])) ? (int) $metadata['publishedYear'] : null)
                         ),
@@ -554,7 +549,7 @@ class BookDirectoryParser
         $audioFileCount = count($audioFilesArray);
 
         $totalDuration = 0;
-        if ($this->audioAnalyzer && $audioFileCount > 0) {
+        if ($audioFileCount > 0) {
             foreach ($audioFilesArray as $file) {
                 try {
                     $duration = $this->audioAnalyzer->getAudioDuration($file->getPathname());
@@ -721,13 +716,8 @@ class BookDirectoryParser
                     $edition = null;
 
                     if (!empty($bookPathInfo['series'])) {
-                        if (is_array($bookPathInfo['series'])) {
-                            $seriesName = array_key_first($bookPathInfo['series']);
-                            $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
-                        } else {
-                            $seriesName = $bookPathInfo['series'];
-                            $seriesNumber = $bookPathInfo['seriesNumber'] ?? null;
-                        }
+                        $seriesName = (string) array_key_first($bookPathInfo['series']);
+                        $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                     }
 
                     if (!empty($bookPathInfo['edition'])) {
@@ -738,16 +728,16 @@ class BookDirectoryParser
                     $book = [
                         'directoryPath' => $path,
                         'directory_path' => $path,
-                        'genre' => $bookPathInfo['genre'] ?? [],
-                        'author' => is_array($bookPathInfo['author']) ? $bookPathInfo['author'] : [$bookPathInfo['author'] ?? 'Unknown Author'],
+                        'genre' => $bookPathInfo['genre'],
+                        'author' => $bookPathInfo['author'],
                         'series' => $seriesName,
                         'seriesName' => $seriesName,
                         'seriesNumber' => $seriesNumber,
                         'series_number' => $seriesNumber, // Adding series_number for backward compatibility
-                        'title' => $bookPathInfo['title'] ?? '',
+                        'title' => $bookPathInfo['title'],
                         'audioFileCount' => $audioFilesData['count'],
                         'duration' => round($audioFilesData['totalDuration'], 0),
-                        'durationFormatted' => is_numeric($audioFilesData['totalDuration']) ? $this->formatDuration($audioFilesData['totalDuration']) : 'N/A',
+                        'durationFormatted' => is_numeric($audioFilesData['totalDuration']) ? $this->formatDuration((float) $audioFilesData['totalDuration']) : 'N/A',
                         'fileTags' => $audioFilesData['fileTags'],
                         'needsReview' => false,
                         'coverImage' => $coverImage ?? null,
@@ -833,13 +823,8 @@ class BookDirectoryParser
                 }
 
                 if (!empty($bookPathInfo['series'])) {
-                    if (is_array($bookPathInfo['series'])) {
-                        $seriesName = array_key_first($bookPathInfo['series']);
-                        $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
-                    } else {
-                        $seriesName = $bookPathInfo['series'];
-                        $seriesNumber = $bookPathInfo['seriesNumber'] ?? null;
-                    }
+                    $seriesName = (string) array_key_first($bookPathInfo['series']);
+                    $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                 } else {
                     $seriesName = '';
                     $seriesNumber = null;
@@ -851,16 +836,16 @@ class BookDirectoryParser
                 // Build $book array using trait output and audio file data
                 $book = [
                     'directoryPath' => $path,
-                    'genre' => $bookPathInfo['genre'] ?? [],
-                    'author' => is_array($bookPathInfo['author']) ? $bookPathInfo['author'] : [$bookPathInfo['author'] ?? 'Unknown Author'],
+                    'genre' => $bookPathInfo['genre'],
+                    'author' => $bookPathInfo['author'],
                     'series' => $seriesName,
                     'seriesName' => $seriesName,
                     'seriesNumber' => $seriesNumber,
                     'series_number' => $seriesNumber, // Adding series_number for backward compatibility
-                    'title' => $bookPathInfo['title'] ?? '',
+                    'title' => $bookPathInfo['title'],
                     'audioFileCount' => $audioFileCount,
                     'duration' => $totalDuration,
-                    'durationFormatted' => is_numeric($totalDuration) ? $this->formatDuration($totalDuration) : 'N/A',
+                    'durationFormatted' => is_numeric($totalDuration) ? $this->formatDuration((float) $totalDuration) : 'N/A',
                     'fileTags' => $fileTags,
                     'needsReview' => false,
                     'coverImage' => $coverImage ?? null,
@@ -946,7 +931,7 @@ class BookDirectoryParser
         $this->debug("Finding leaf directories with audio files in: {$rootDir}");
 
         // Validate root directory
-        if (empty($rootDir) || !is_string($rootDir) || !is_dir($rootDir)) {
+        if (empty($rootDir) || !is_dir($rootDir)) {
             $this->debug("Invalid root directory: {$rootDir}");
 
             return [];
@@ -968,11 +953,6 @@ class BookDirectoryParser
 
             // Sort directories by depth (deepest first)
             usort($directories, static function ($a, $b) {
-                // Ensure we're comparing strings
-                if (!is_string($a) || !is_string($b)) {
-                    return 0;
-                }
-
                 $depthA = substr_count($a, DIRECTORY_SEPARATOR);
                 $depthB = substr_count($b, DIRECTORY_SEPARATOR);
 
