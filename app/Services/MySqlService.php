@@ -3229,6 +3229,28 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
+    public function acknowledgeMessage(string $messageId): bool
+    {
+        $id = (int) $messageId;
+
+        if ($id <= 0) {
+            return false;
+        }
+
+        try {
+            $updated = Message::query()
+                ->whereKey($id)
+                ->whereNull('acknowledged_at')
+                ->update(['acknowledged_at' => now()]);
+
+            return $updated > 0;
+        } catch (\Exception $e) {
+            Log::error('MySqlService acknowledgeMessage failed: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
     public function createNarrator(array $data)
     {
         return Narrator::create($data);

@@ -449,6 +449,11 @@ interface DocumentStoreServiceInterface
     public function createMessage(array $messageData): ?string;
 
     /**
+     * Mark a message as acknowledged.
+     */
+    public function acknowledgeMessage(string $messageId): bool;
+
+    /**
      * Create an API token for a user.
      *
      * @param array $tokenData the token data including user_id, token, etc

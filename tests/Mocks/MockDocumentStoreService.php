@@ -1190,6 +1190,17 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $id;
     }
 
+    public function acknowledgeMessage(string $messageId): bool
+    {
+        if (! isset($this->messages[$messageId])) {
+            return false;
+        }
+
+        $this->messages[$messageId]['acknowledged_at'] = now()->toIso8601String();
+
+        return true;
+    }
+
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
     {
         if ($userId === null) {
