@@ -37,7 +37,7 @@ use Illuminate\Support\Str;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereWebsite($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher withTrashed(bool $withTrashed = true)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher withoutTrashed()
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 class Publisher extends Model
 {

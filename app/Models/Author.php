@@ -13,7 +13,9 @@ use App\Traits\Auditable;
  * @property string $name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Genre>|array $genres
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
+ * @property-read int|null $book_count
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property string|null $biography
  * @property string|null $image_url
@@ -33,7 +35,7 @@ use App\Traits\Auditable;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author withTrashed(bool $withTrashed = true)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author withoutTrashed()
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 class Author extends Model
 {

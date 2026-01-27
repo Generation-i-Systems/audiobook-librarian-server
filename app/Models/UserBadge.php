@@ -19,11 +19,14 @@ use Carbon\Carbon;
  * @property int $tier_level
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property int $total_points
+ * @property int $total_badges
  * @property-read \App\Models\Badge $badge
  * @property-read \App\Models\User $user
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property-read string $earned_at_formatted
  * @property-read string $earned_at_human
+ * @mixin \Illuminate\Database\Eloquent\Model
  * @method static Builder<static>|UserBadge forDevice(string $deviceId)
  * @method static Builder<static>|UserBadge forUser(string $userId)
  * @method static Builder<static>|UserBadge forUserOrDevice(string $userId, ?string $deviceId = null)
@@ -44,7 +47,7 @@ use Carbon\Carbon;
  * @method static Builder<static>|UserBadge whereTierLevel($value)
  * @method static Builder<static>|UserBadge whereUpdatedAt($value)
  * @method static Builder<static>|UserBadge whereUserId($value)
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 class UserBadge extends Model
 {

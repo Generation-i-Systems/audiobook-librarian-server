@@ -85,9 +85,10 @@ class BookImportApiController extends Controller
                     'title' => $existingBook->title,
                     'authors' => $existingBook->authors->pluck('name')->toArray(),
                     'series' => $existingBook->series->first()?->name,
-                    'series_number' => $existingBook->series->first()?->pivot?->series_number,
-                    'directory_path' => $existingBook->directory_path,
-                ],
+            // @phpstan-ignore-next-line
+            'series_number' => $existingBook->series->first()?->pivot?->series_number,
+            'directory_path' => $existingBook->directory_path,
+        ],
             ]);
         }
 

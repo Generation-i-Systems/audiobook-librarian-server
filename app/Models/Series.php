@@ -16,7 +16,10 @@ use App\Traits\Auditable;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books_in_series
+ * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Author>|array $authors
  * @property-read \Illuminate\Database\Eloquent\Relations\Pivot|null $pivot
+ * @property-read int|null $book_count
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property-read int|null $books_count
@@ -33,7 +36,7 @@ use App\Traits\Auditable;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Series whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Series withTrashed(bool $withTrashed = true)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Series withoutTrashed()
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 class Series extends Model
 {

@@ -83,7 +83,7 @@ class UserStatusController extends Controller
         if ($data['status'] === 'completed' && $previousStatus !== 'completed') {
             $updateData['finished_at'] = now();
             // Increment read count
-            $updateData['read_count'] = ($currentStatus?->read_count ?? 0) + 1;
+            $updateData['read_count'] = ($currentStatus ? $currentStatus->read_count : 0) + 1;
         }
 
         if ($currentStatus) {

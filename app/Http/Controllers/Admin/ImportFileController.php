@@ -421,6 +421,10 @@ class ImportFileController extends Controller
                 $details = 'The system does not have permission to read the selected file or directory.';
             }
 
+            if ($request->input('redirectToForm', false)) {
+                return redirect()->back()->with('error', $userMessage . ': ' . $details);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => $userMessage,
@@ -429,6 +433,7 @@ class ImportFileController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Extract metadata from a file or directory using AI enhancement and redirect to import form.
@@ -652,7 +657,7 @@ class ImportFileController extends Controller
         $parts = [];
         foreach (['genre', 'author', 'series', 'seriesNumber', 'title'] as $key) {
             if (!empty($meta[$key])) {
-                $parts[] = preg_replace('/[\\\/]/', '-', trim($meta[$key]));
+                $parts[] = preg_replace('~[\\\\/]~', '-', trim($meta[$key]));
             }
         }
 

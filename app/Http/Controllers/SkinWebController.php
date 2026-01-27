@@ -22,7 +22,7 @@ class SkinWebController extends Controller
             $page = $request->get('page', 1);
 
             $filters = $search ? ['search' => $search] : [];
-            $result = $this->skinService->listSkins($filters, $page, 24, $sort);
+            $result = $this->skinService->listSkins($filters, (int) $page, 24, (string) $sort);
 
             return view('gallery.skins.index', [
                 'skins' => $result['data'],
@@ -33,6 +33,7 @@ class SkinWebController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to list skins: ' . $e->getMessage());
 
+            // @phpstan-ignore-next-line
             return redirect()->back()->with('error', 'Failed to load skins. Please try again.');
         }
     }

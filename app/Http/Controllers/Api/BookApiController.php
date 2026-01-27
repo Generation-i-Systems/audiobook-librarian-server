@@ -263,9 +263,9 @@ class BookApiController extends Controller
      *
      * @param string $coverImage The cover image value from database
      * @param string|null $directoryPath The directory path for the book
-     * @return string|null The resolved cover image path
+     * @return string The resolved cover image path
      */
-    private function resolveCoverImagePath(string $coverImage, ?string $directoryPath): ?string
+    private function resolveCoverImagePath(string $coverImage, ?string $directoryPath): string
     {
         // Clean up any corrupted paths (remove quotes, etc.)
         $coverImage = trim($coverImage, "'\"");
@@ -337,14 +337,15 @@ class BookApiController extends Controller
      * Proxy a remote cover image URL with caching and error handling
      *
      * @param string $url The remote URL to proxy
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      */
-    private function proxyRemoteCoverImage(string $url): \Illuminate\Http\Response
+    private function proxyRemoteCoverImage(string $url): \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
     {
         try {
             Log::info('Proxying remote cover image', ['url' => $url]);
 
             // Use Laravel's HTTP client with a reasonable timeout
+            /** @var \Illuminate\Http\Client\Response $response */
             $response = \Illuminate\Support\Facades\Http::timeout(10)
                 ->withHeaders([
                     'User-Agent' => 'Mozilla/5.0 (compatible; BooksCoverProxy/1.0)',

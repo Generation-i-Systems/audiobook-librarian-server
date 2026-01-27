@@ -147,8 +147,10 @@ class BookEnrichmentService
         $maxRetries = $options['max_retries'] ?? 3;
         $forceEnrichment = $options['force'] ?? false;
 
-        // If we already have all critical fields, skip enrichment entirely (unless forced)
-        if (!$forceEnrichment && $this->hasCriticalMetadata($metadata)) {
+        // If we already have all critical fields AND genre, skip enrichment (unless forced)
+        $genre = $metadata['genre'] ?? null;
+        $hasGenre = $genre !== null && $genre !== '' && (!is_array($genre) || count($genre) > 0);
+        if (!$forceEnrichment && $this->hasCriticalMetadata($metadata) && $hasGenre) {
             return [];
         }
 
@@ -212,7 +214,13 @@ class BookEnrichmentService
             }
 
             // Do not replace existing original metadata
-            if (array_key_exists($key, $original) && $original[$key] !== null && $original[$key] !== '') {
+            // For arrays (like genre), also check if they're empty
+            $originalValue = $original[$key] ?? null;
+            $hasOriginalValue = $originalValue !== null && $originalValue !== '';
+            if (is_array($originalValue)) {
+                $hasOriginalValue = count($originalValue) > 0;
+            }
+            if (array_key_exists($key, $original) && $hasOriginalValue) {
                 continue;
             }
 

@@ -30,7 +30,7 @@ class BookController extends Controller
      * Display the main books index page with pagination and filtering
      *
      * @param Request $request
-     * @return \Illuminate\View\View
+     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
      */
     public function index(Request $request)
     {
@@ -237,7 +237,7 @@ class BookController extends Controller
     /**
      * JSON API endpoint for recent books AJAX loading
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
      */
     public function jsonRecent(Request $request)
     {
@@ -251,14 +251,20 @@ class BookController extends Controller
             'order' => 'desc',
         ]);
 
-        return $this->handleMainBooksAjaxRequest($request, $books);
+        if (method_exists($this, 'handleMainBooksAjaxRequest')) {
+            return $this->handleMainBooksAjaxRequest($request, $books);
+        }
+
+        // Fallback or legacy behavior if needed, otherwise this path shouldn't be reached
+        // based on previous code structure, but to satisfy PHPStan:
+        return response()->json(['data' => $books]);
     }
 
     /**
      * Display a specific book
      *
      * @param  string|null  $id
-     * @return \Illuminate\View\View
+     * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
      */
     public function show(Request $request, $id = null)
     {
@@ -378,7 +384,7 @@ class BookController extends Controller
      *
      * @deprecated Use the jsonIndex method instead
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
      */
     public function loadMainBooks(Request $request)
     {

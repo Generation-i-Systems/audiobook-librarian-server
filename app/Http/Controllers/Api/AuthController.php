@@ -175,7 +175,7 @@ class AuthController extends Controller
 
         try {
             // Verify the Google ID token
-            $client = new \Google_Client(['client_id' => env('GOOGLE_CLIENT_ID')]);
+            $client = new \Google_Client(['client_id' => config('services.google.client_id')]);
             $payload = $client->verifyIdToken($request->idToken);
 
             if (!$payload) {

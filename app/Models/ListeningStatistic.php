@@ -21,6 +21,10 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property array|null $metadata
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $first_session
+ * @property \Illuminate\Support\Carbon|null $last_session
+ * @property \Illuminate\Support\Carbon|null $first_listened
+ * @property \Illuminate\Support\Carbon|null $last_listened
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property-read \App\Models\Book $book
  * @property-read string $formatted_duration
@@ -41,7 +45,7 @@ use App\Traits\CamelCaseAttributeAccess;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereStartPositionSeconds($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereUserId($value)
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 class ListeningStatistic extends Model
 {

@@ -2188,13 +2188,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getUserByCredentials($credentials)
     {
-        if (empty($credentials['email']) || empty($credentials['password'])) {
+        if (empty($credentials['password'])) {
             return null;
         }
 
-        $user = User::where('email', $credentials['email'])->first();
+        // Support both email and username login
+        $user = null;
+        if (!empty($credentials['email'])) {
+            $user = User::where('email', $credentials['email'])->first();
+        } elseif (!empty($credentials['username'])) {
+            $user = User::where('username', $credentials['username'])->first();
+        }
 
-        if ($user && Hash::check($credentials['password'], $user->getAuthPassword())) {
+        if (!$user) {
+            return null;
+        }
+
+        if (Hash::check($credentials['password'], $user->getAuthPassword())) {
             return $user->toArray();
         }
 

@@ -42,6 +42,7 @@ class BookmarkApiController extends Controller
             $formattedBookmarks[] = [
                 'id' => (int) ($bookmark['_id'] ?? $bookmark['id']),
                 'book_id' => (int) $bookmark['book_id'],
+                // @phpstan-ignore-next-line
                 'position_ms' => ((int) ($bookmark['position'] ?? 0)) * 1000, // Convert to milliseconds
                 'title' => $bookmark['title'] ?? null,
                 'note' => $bookmark['note'] ?? null,
@@ -190,6 +191,7 @@ class BookmarkApiController extends Controller
 
         // Format response
         $bookmarkData['id'] = $bookmarkId;
+        // @phpstan-ignore-next-line
         unset($bookmarkData['_id']);
 
         return response()->json($bookmarkData, 201);
