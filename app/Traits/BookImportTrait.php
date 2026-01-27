@@ -295,6 +295,7 @@ trait BookImportTrait
                             $book['genre'] = [$pathParts[$genreIndex]];
                             $book['author'] = [$pathParts[$genreIndex + 1]];
                             $book['title'] = $pathParts[$genreIndex + 2];
+                            /** @phpstan-ignore-next-line function.alreadyNarrowedType */
                             if (method_exists($this, 'debug')) {
                                 $this->debug("Extracted from absolute path: Genre={$pathParts[$genreIndex]}, " .
                                     "Author={$pathParts[$genreIndex + 1]}, Title={$pathParts[$genreIndex + 2]}");
@@ -542,6 +543,7 @@ trait BookImportTrait
                     ]);
 
                     if ($output) {
+                        /** @phpstan-ignore-next-line method.notFound */
                         $output->error("Unable to create directory at {$fullDir}");
                     }
                     // Check directory permissions
@@ -549,6 +551,7 @@ trait BookImportTrait
                     if (is_dir($parentDir)) {
                         $perms = substr(sprintf('%o', fileperms($parentDir)), -4);
                         if ($output) {
+                            /** @phpstan-ignore-next-line method.notFound */
                             $output->error("Parent directory permissions: {$perms}");
                         }
                     }
