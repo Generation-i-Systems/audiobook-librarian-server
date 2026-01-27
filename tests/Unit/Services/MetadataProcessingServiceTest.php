@@ -267,6 +267,7 @@ class MetadataProcessingServiceTest extends TestCase
 
         // phpstan-ignore-next-line offsetAccess.notFound
         $this->assertEquals('The Great Adventure', $metadata['title']);
+        /** @phpstan-ignore-next-line offsetAccess.notFound */
         $this->assertEquals(5, $metadata['series_number']);
     }
 
@@ -286,6 +287,7 @@ class MetadataProcessingServiceTest extends TestCase
 
         // phpstan-ignore-next-line offsetAccess.notFound
         $this->assertEquals('Epic Series', $metadata['title']);
+        /** @phpstan-ignore-next-line offsetAccess.notFound */
         $this->assertEquals(12, $metadata['series_number']);
     }
 

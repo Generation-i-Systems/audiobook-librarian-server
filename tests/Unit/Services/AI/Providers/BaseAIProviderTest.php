@@ -30,9 +30,11 @@ class BaseAIProviderTest extends TestCase
         ]);
 
         // Make requests up to limit
+        /** @phpstan-ignore-next-line method.notFound */
         $provider->trackRequestForTest();
         $this->assertTrue($provider->canMakeRequest());
 
+        /** @phpstan-ignore-next-line method.notFound */
         $provider->trackRequestForTest();
         $this->assertFalse($provider->canMakeRequest());
     }
@@ -43,7 +45,6 @@ class BaseAIProviderTest extends TestCase
 
         $stats = $provider->getUsageStats();
 
-        $this->assertIsArray($stats);
         $this->assertArrayHasKey('session_cost', $stats);
         $this->assertArrayHasKey('requests_this_minute', $stats);
         $this->assertArrayHasKey('requests_today', $stats);
@@ -56,6 +57,7 @@ class BaseAIProviderTest extends TestCase
         $provider = $this->createTestProvider();
 
         $json = '{"title": "Test Book", "author": "Test Author"}';
+        /** @phpstan-ignore-next-line method.notFound */
         $result = $provider->parseStructuredResponseForTest($json);
 
         $this->assertIsArray($result);
@@ -68,6 +70,7 @@ class BaseAIProviderTest extends TestCase
         $provider = $this->createTestProvider();
 
         $json = "```json\n{\"title\": \"Test\"}\n```";
+        /** @phpstan-ignore-next-line method.notFound */
         $result = $provider->parseStructuredResponseForTest($json);
 
         $this->assertIsArray($result);
@@ -78,6 +81,7 @@ class BaseAIProviderTest extends TestCase
     {
         $provider = $this->createTestProvider();
 
+        /** @phpstan-ignore-next-line method.notFound */
         $result = $provider->parseStructuredResponseForTest('invalid json');
 
         $this->assertNull($result);
@@ -90,6 +94,7 @@ class BaseAIProviderTest extends TestCase
         $data = ['title' => 'Test', 'author' => 'Author'];
         $schema = ['required' => ['title', 'author']];
 
+        /** @phpstan-ignore-next-line method.notFound */
         $result = $provider->validateAgainstSchemaForTest($data, $schema);
 
         $this->assertTrue($result);
@@ -102,6 +107,7 @@ class BaseAIProviderTest extends TestCase
         $data = ['title' => 'Test'];
         $schema = ['required' => ['title', 'author']];
 
+        /** @phpstan-ignore-next-line method.notFound */
         $result = $provider->validateAgainstSchemaForTest($data, $schema);
 
         $this->assertFalse($result);

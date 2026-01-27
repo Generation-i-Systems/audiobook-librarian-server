@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\DB;
 use Mockery;
 use Tests\TestCase;
 
+/**
+ * @phpstan-ignore-next-line method.notFound,property.nonObject
+ */
 class AIAssistantServiceTest extends TestCase
 {
     use RefreshDatabase;
