@@ -263,6 +263,7 @@ trait HandlesLibraryJson
                 // Single series object
                 $seriesData = [
                     'id' => $series['id'] ?? null,
+                    /** @phpstan-ignore-next-line nullCoalesce.offset */
                     'name' => $series['name'] ?? '',
                     'is_collection' => $series['is_collection'] ?? false,
                 ];

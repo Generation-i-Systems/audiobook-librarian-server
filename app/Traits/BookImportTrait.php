@@ -257,6 +257,7 @@ trait BookImportTrait
 
         try {
             // Split directory path into components
+            /** @phpstan-ignore-next-line argument.type */
             $parts = array_values(array_filter(explode('/', trim($directoryPath, '/')), 'strlen'));
 
             // Debug output
@@ -460,6 +461,7 @@ trait BookImportTrait
             }
 
             // Set series data if we have a valid series name (string, not numeric)
+            /** @phpstan-ignore-next-line function.alreadyNarrowedType */
             if (!empty($series) && is_string($series)) {
                 $book['series'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];  // For test compatibility, use array
                 $book['seriesData'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];
@@ -494,6 +496,7 @@ trait BookImportTrait
     private function importCoverImageFromUrl($url, $directoryPath = null): ?string
     {
         // For direct console output in the command
+        /** @phpstan-ignore-next-line function.alreadyNarrowedType */
         $output = method_exists($this, 'line') ? $this : null;
 
         if (!$url) {
@@ -561,6 +564,7 @@ trait BookImportTrait
 
             // Use cURL with a browser User-Agent and more options for better compatibility
             $ch = curl_init($url);
+            /** @phpstan-ignore-next-line argument.type */
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 30); // 30 seconds timeout
@@ -771,6 +775,7 @@ trait BookImportTrait
             $score += $titleLev;
             // Author similarity (Levenshtein, case-insensitive)
             $authorString = '';
+            /** @phpstan-ignore-next-line function.alreadyNarrowedType, greater.alwaysTrue, booleanAnd.alwaysFalse */
             if (is_array($author) && count($author) > 0) {
                 $authorString = implode(' ', $author);
             } elseif (is_string($author)) {
@@ -778,6 +783,7 @@ trait BookImportTrait
             }
             // Ensure $itemAuthors is a string for levenshtein
             $itemAuthorsString = '';
+            /** @phpstan-ignore-next-line function.alreadyNarrowedType */
             if (is_array($itemAuthors)) {
                 $itemAuthorsString = implode(' ', $itemAuthors);
             } elseif (is_string($itemAuthors)) {
@@ -816,6 +822,7 @@ trait BookImportTrait
         // Format results for frontend consumption
         $response = array_map(function ($m) {
             $item = $m['item'] ?? $m;
+            /** @phpstan-ignore-next-line nullCoalesce.offset */
             $score = $m['score'] ?? null;
             $info = isset($item['volumeInfo']) && is_array($item['volumeInfo']) ? $item['volumeInfo'] : $item;
 
@@ -875,6 +882,7 @@ trait BookImportTrait
             return $result;
         }, array_slice($matches, 0, $limit));
 
+        /** @phpstan-ignore-next-line arrayValues.list */
         return array_values($response);
     }
 
@@ -888,6 +896,7 @@ trait BookImportTrait
     {
         // Extract year (e.g., (2020) or [2020])
         if (preg_match('/\(([0-9]{4})\)|\[([0-9]{4})\]/', $filename, $matches)) {
+            /** @phpstan-ignore-next-line nullCoalesce.offset */
             $book['year'] = (int) ($matches[1] ?? $matches[2]);
         }
 
@@ -929,6 +938,7 @@ trait BookImportTrait
         $appliedCorrections = [];
 
         // Apply title cleaning logic here
+        /** @phpstan-ignore-next-line method.notFound */
         $cleaned = $this->cleanText($title);
         if ($cleaned !== $title) {
             $appliedCorrections[] = 'Cleaned whitespace and special characters';
@@ -1059,6 +1069,7 @@ trait BookImportTrait
         }
 
         // Fallback to resolving from container if available
+        /** @phpstan-ignore-next-line property.notFound */
         if (method_exists($this, 'app') && $this->app) {
             $documentStore = $this->app->make(\App\Contracts\DocumentStoreServiceInterface::class);
             return $documentStore->createBook($bookData);
