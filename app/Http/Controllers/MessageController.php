@@ -28,14 +28,19 @@ class MessageController extends Controller
         $request->validate(['content' => 'required|string']);
 
         try {
-            // Messages from mobile apps will not have an authenticated user
-            $userId = Auth::check() ? Auth::id() : null;
+            $admins = $this->documentStoreService->getAdminUsers();
+            $adminId = $admins[0]['id'] ?? null;
+
+            if (! is_int($adminId)) {
+                return back()->with('error', 'No admin user available');
+            }
+
+            $senderId = Auth::check() ? Auth::id() : null;
 
             $messageData = [
                 'content' => $request->input('content'),
-                'from_user_id' => $userId,
-                'is_from_admin' => false,
-                'is_read' => false,
+                'sender_id' => is_int($senderId) ? $senderId : null,
+                'recipient_id' => $adminId,
             ];
 
             $messageId = $this->documentStoreService->createMessage($messageData);
@@ -68,10 +73,8 @@ class MessageController extends Controller
         try {
             $messageData = [
                 'content' => $request->input('content'),
-                'from_user_id' => Auth::id(),
-                'to_user_id' => $request->input('to_user_id'),
-                'is_from_admin' => true,
-                'is_read' => false,
+                'sender_id' => Auth::id(),
+                'recipient_id' => (int) $request->input('to_user_id'),
             ];
 
             $messageId = $this->documentStoreService->createMessage($messageData);

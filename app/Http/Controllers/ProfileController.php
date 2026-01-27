@@ -100,14 +100,28 @@ class ProfileController extends Controller
             'content' => 'required|string',
         ]);
 
-        $userId = Auth::id();
+        $admins = $this->documentStoreService->getAdminUsers();
+        $adminId = $admins[0]['id'] ?? null;
+
+        if (! is_int($adminId)) {
+            return back()->with('error', 'No admin user available');
+        }
+
+        $senderId = Auth::id();
+
+        if (! is_int($senderId)) {
+            return back()->with('error', 'Unauthenticated');
+        }
+
+        $payload = [
+            'type' => 'admin_permission_request',
+            'content' => $request->input('content'),
+        ];
 
         $messageId = $this->documentStoreService->createMessage([
-            'user_id' => $userId,
-            'content' => $request->input('content'),
-            'is_from_admin' => false,
-            'created_at' => now()->toDateTimeString(),
-            'updated_at' => now()->toDateTimeString(),
+            'sender_id' => $senderId,
+            'recipient_id' => $adminId,
+            'content' => json_encode($payload),
         ]);
 
         if ($messageId) {

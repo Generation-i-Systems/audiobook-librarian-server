@@ -1018,11 +1018,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     $releaseDate = null;
 
                     if ($book->release_date) {
-                        if (is_object($book->release_date) && method_exists($book->release_date, 'toDateString')) {
-                            $releaseDate = $book->release_date->toDateString();
-                        } else {
-                            $releaseDate = (string) $book->release_date;
-                        }
+                        $releaseDate = $book->release_date->toDateString();
                     }
 
                     return [
@@ -1167,7 +1163,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 }
             }
 
-            $baseReasons = array_values(array_unique(array_filter($baseReasons)));
+            $baseReasons = array_values(array_unique($baseReasons));
             sort($baseReasons, SORT_NATURAL | SORT_FLAG_CASE);
 
             return $baseReasons;
@@ -3214,7 +3210,8 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     {
         try {
             $message = Message::create([
-                'user_id' => $messageData['user_id'],
+                'sender_id' => $messageData['sender_id'],
+                'recipient_id' => $messageData['recipient_id'],
                 'content' => $messageData['content'],
                 'created_at' => now(),
                 'updated_at' => now(),
