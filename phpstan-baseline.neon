@@ -1,56 +1,26 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:createToken\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ApiServiceClient.php
-
-		-
-			message: '#^Call to an undefined static method Laravel\\Sanctum\\PersonalAccessToken\:\:where\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Console/Commands/ApiServiceClient.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Console/Commands/AutoFavoriteExistingAuthors.php
-
-		-
-			message: '#^Method App\\Console\\Commands\\AutoFavoriteExistingAuthors\:\:determineUser\(\) should return App\\Models\\User\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
-			identifier: return.type
-			count: 3
-			path: app/Console/Commands/AutoFavoriteExistingAuthors.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Console/Commands/CheckCoverImages.php
 
 		-
-			message: '#^Parameter \#1 \$book of method App\\Console\\Commands\\CheckCoverImages\:\:attemptFetchFromAudible\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model\|stdClass given\.$#'
-			identifier: argument.type
+			message: '#^Call to function is_string\(\) with null will always evaluate to false\.$#'
+			identifier: function.impossibleType
 			count: 1
 			path: app/Console/Commands/CheckCoverImages.php
 
 		-
-			message: '#^Parameter \#1 \$book of method App\\Console\\Commands\\CheckCoverImages\:\:findBestCoverImage\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model\|stdClass given\.$#'
-			identifier: argument.type
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
 			path: app/Console/Commands/CheckCoverImages.php
 
 		-
-			message: '#^Cannot call method genres\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Console/Commands/CleanBadGoogleBooksData.php
-
-		-
-			message: '#^Cannot call method save\(\) on stdClass\.$#'
-			identifier: method.nonObject
+			message: '#^Parameter \#1 \$json of function json_decode expects string, array\<mixed\>\|null given\.$#'
+			identifier: argument.type
 			count: 1
 			path: app/Console/Commands/CleanBadGoogleBooksData.php
 
@@ -61,33 +31,15 @@ parameters:
 			path: app/Console/Commands/EnsureLibraryJson.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
-			path: app/Console/Commands/FixBookDirectoryPath.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Console/Commands/FixBookDirectoryPath.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Console/Commands/FixDuplicatedTitleDirectories.php
+			path: app/Console/Commands/FixBookDirectoryPaths.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Series\>\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
-			path: app/Console/Commands/FixGeneralFictionBooksCommand.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 2
 			path: app/Console/Commands/FixGeneralFictionBooksCommand.php
 
 		-
@@ -130,6 +82,12 @@ parameters:
 			message: '#^Call to function property_exists\(\) with \$this\(App\\Console\\Commands\\FixRemoteImageUrlsCommand\) and ''documentStore'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 2
+			path: app/Console/Commands/FixRemoteImageUrlsCommand.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: app/Console/Commands/FixRemoteImageUrlsCommand.php
 
 		-
@@ -191,42 +149,6 @@ parameters:
 			identifier: booleanAnd.rightAlwaysTrue
 			count: 2
 			path: app/Console/Commands/FixRemoteImageUrlsCommand.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Console/Commands/FixSeriesStartingWithNumberCommand.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Console/Commands/FixSeriesStartingWithNumberCommand.php
-
-		-
-			message: '#^Cannot call method books\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Console/Commands/FixSeriesStartingWithNumberCommand.php
-
-		-
-			message: '#^Cannot call method delete\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Console/Commands/FixSeriesStartingWithNumberCommand.php
-
-		-
-			message: '#^Cannot call method getOriginal\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Console/Commands/FixSeriesStartingWithNumberCommand.php
-
-		-
-			message: '#^Cannot call method save\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Console/Commands/FixSeriesStartingWithNumberCommand.php
 
 		-
 			message: '#^Call to an undefined method App\\Services\\BookImportService\:\:generateLibraryJson\(\)\.$#'
@@ -301,6 +223,12 @@ parameters:
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
+			message: '#^Call to function is_array\(\) with non\-empty\-array\<int, string\> will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Console/Commands/ImportBooksFromDownloads.php
+
+		-
 			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 2
@@ -322,6 +250,12 @@ parameters:
 			message: '#^Call to function method_exists\(\) with \$this\(App\\Console\\Commands\\ImportBooksFromDownloads\) and ''line'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
+			path: app/Console/Commands/ImportBooksFromDownloads.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 5
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
@@ -355,7 +289,7 @@ parameters:
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
-			message: '#^Parameter \#3 \$length of function array_slice expects int\|null, array\|string given\.$#'
+			message: '#^Parameter \#3 \$length of function array_slice expects int\|null, string given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Console/Commands/ImportBooksFromDownloads.php
@@ -379,32 +313,8 @@ parameters:
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Console/Commands/ImportCollectionCommand.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_collection\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/ImportCollectionCommand.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ImportCollectionCommand.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ImportCollectionCommand.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:series\(\)\.$#'
-			identifier: method.notFound
+			message: '#^Method App\\Console\\Commands\\ImportCollectionCommand\:\:importBook\(\) should return string\|null but returns int\.$#'
+			identifier: return.type
 			count: 1
 			path: app/Console/Commands/ImportCollectionCommand.php
 
@@ -427,19 +337,13 @@ parameters:
 			path: app/Console/Commands/InteractiveBookDirectoryRepair.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/InteractiveBookDirectoryRepair.php
-
-		-
 			message: '#^If condition is always true\.$#'
 			identifier: if.alwaysTrue
 			count: 1
 			path: app/Console/Commands/InteractiveBookDirectoryRepair.php
 
 		-
-			message: '#^Parameter \#1 \$value of method Illuminate\\Database\\Query\\Builder\:\:limit\(\) expects int, array\|string\|true given\.$#'
+			message: '#^Parameter \#1 \$value of method Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Book\>\:\:limit\(\) expects int, string given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Console/Commands/InteractiveBookDirectoryRepair.php
@@ -463,15 +367,15 @@ parameters:
 			path: app/Console/Commands/ManualEnrichmentTrait.php
 
 		-
-			message: '#^Cannot call method save\(\) on stdClass\.$#'
-			identifier: method.nonObject
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
 			count: 1
 			path: app/Console/Commands/MarkInvalidBookDirectories.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 4
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
 			path: app/Console/Commands/MoveBookDirectory.php
 
 		-
@@ -535,160 +439,34 @@ parameters:
 			path: app/Console/Commands/ParseBooksCommand.php
 
 		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 2
+			path: app/Console/Commands/ParseBooksCommand.php
+
+		-
 			message: '#^Variable \$paths in empty\(\) always exists and is not falsy\.$#'
 			identifier: empty.variable
 			count: 1
 			path: app/Console/Commands/ParseBooksCommand.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$authors\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cover_image\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$duration\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$genres\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$publisher\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$release_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 2
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Parameter \#2 \$book of method App\\Console\\Commands\\PrepareForReprocessing\:\:deleteGoogleBooksCover\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Parameter \#2 \$book of method App\\Console\\Commands\\PrepareForReprocessing\:\:flattenDirectory\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Parameter \#2 \$book of method App\\Console\\Commands\\PrepareForReprocessing\:\:removeAuthorSeriesPaths\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/PrepareForReprocessing.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Console/Commands/ProcessBooksWithAI.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 6
 			path: app/Console/Commands/ProcessTitlesInteractive.php
 
 		-
-			message: '#^Parameter \#1 \$book of method App\\Console\\Commands\\RepairBooks\:\:repairCover\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			message: '#^Parameter \#1 \$id of method App\\Contracts\\DocumentStoreServiceInterface\:\:deleteBook\(\) expects string, int given\.$#'
 			identifier: argument.type
 			count: 1
-			path: app/Console/Commands/RepairBooks.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Console\\Commands\\RepairBooks\:\:repairTitleAndSeries\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/RepairBooks.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ResolveDuplicateDirectoryPaths.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ResolveDuplicateDirectoryPaths.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:narrators\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ResolveDuplicateDirectoryPaths.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:series\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ResolveDuplicateDirectoryPaths.php
+			path: app/Console/Commands/RemoveDuplicateBooksCommand.php
 
 		-
 			message: '#^Comparison operation "\>" between int\<1, max\> and 0 is always true\.$#'
 			identifier: greater.alwaysTrue
 			count: 1
 			path: app/Console/Commands/ResolveDuplicateDirectoryPaths.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Console/Commands/SendDailyFavoriteNotifications.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Console/Commands/SendDailyFavoriteNotifications.php
-
-		-
-			message: '#^Parameter \#1 \$user of method App\\Console\\Commands\\SendDailyFavoriteNotifications\:\:getNewBooksForUser\(\) expects App\\Models\\User, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/SendDailyFavoriteNotifications.php
 
 		-
 			message: '#^Access to an undefined property \$this\(App\\Console\\Commands\\ShowBookInfo\)\:\:\$app\.$#'
@@ -733,9 +511,9 @@ parameters:
 			path: app/Console/Commands/ShowBookInfo.php
 
 		-
-			message: '#^Call to method Illuminate\\Support\\Collection\<\*NEVER\*,\*NEVER\*\>\:\:isEmpty\(\) will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 5
 			path: app/Console/Commands/ShowBookInfo.php
 
 		-
@@ -871,58 +649,10 @@ parameters:
 			path: app/Console/Commands/TestBookService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$coverImage\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$description\.$#'
-			identifier: property.notFound
+			message: '#^Parameter \#2 \$options of method App\\Services\\HardcoverService\:\:searchBooks\(\) expects array, string\|null given\.$#'
+			identifier: argument.type
 			count: 1
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$language\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$publisher\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$releaseDate\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/UpdateBookInfo.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Console/Commands/UpdateBookInfo.php
+			path: app/Console/Commands/TestHardcoverCommand.php
 
 		-
 			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
@@ -931,34 +661,28 @@ parameters:
 			path: app/Console/Commands/UpdateBookInfo.php
 
 		-
-			message: '#^Parameter \#1 \$book of method App\\Console\\Commands\\UpdateBookInfo\:\:updateLibraryJson\(\) expects App\\Models\\Book\|array, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
+			message: '#^Property App\\Models\\Book\:\:\$publisher \(App\\Models\\Publisher\|null\) does not accept string\.$#'
+			identifier: assign.propertyType
 			count: 1
 			path: app/Console/Commands/UpdateBookInfo.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Property App\\Models\\Book\:\:\$releaseDate \(Carbon\\CarbonInterface\|string\|null\) does not accept DateTime\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Console/Commands/UpdateBookInfo.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Console/Commands/UpdateGenresFromJson.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model&object\{pivot\: Illuminate\\Database\\Eloquent\\Relations\\Pivot\}\:\:\$name\.$#'
 			identifier: property.notFound
-			count: 2
-			path: app/Console/Commands/UpdateGenresFromJson.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: app/Console/Commands/UpdateGenresFromJson.php
-
-		-
-			message: '#^Cannot call method toArray\(\) on stdClass\.$#'
-			identifier: method.nonObject
 			count: 1
-			path: app/Console/Commands/UpdateLibraryJson.php
+			path: app/Console/Commands/UpdateGenresFromJson.php
 
 		-
 			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
@@ -973,24 +697,6 @@ parameters:
 			path: app/Console/Commands/UpdateLibraryJson.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/UpdateNarratorNormalizedNames.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$normalized_name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/UpdateNarratorNormalizedNames.php
-
-		-
-			message: '#^Cannot call method save\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Console/Commands/ValidateBookDirectoriesCommand.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\Book\:\:\$author\.$#'
 			identifier: property.notFound
 			count: 1
@@ -998,12 +704,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property App\\Models\\Book\:\:\$narrator\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Console/Commands/VerifyBookDirectories.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Console/Commands/VerifyBookDirectories.php
@@ -1027,21 +727,9 @@ parameters:
 			path: app/Facades/BookService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 8
-			path: app/Http/Controllers/Admin/AIReviewController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Query\\Builder\:\:with\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/AIReviewController.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Http\\Controllers\\Admin\\AIReviewController\:\:applyAllSuggestions\(\) expects App\\Models\\Book, stdClass given\.$#'
+			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: app/Http/Controllers/Admin/AIReviewController.php
 
 		-
@@ -1063,10 +751,10 @@ parameters:
 			path: app/Http/Controllers/Admin/AdminerController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Controllers/Admin/AuthorController.php
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Http/Controllers/Admin/AudioMetadataController.php
 
 		-
 			message: '#^Comparison operation "\>" between 25 and 0 is always true\.$#'
@@ -1082,12 +770,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property \$this\(App\\Http\\Controllers\\Admin\\BookController\)\:\:\$app\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/BookController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$path\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Admin/BookController.php
@@ -1135,6 +817,18 @@ parameters:
 			path: app/Http/Controllers/Admin/BookController.php
 
 		-
+			message: '#^Call to function method_exists\(\) with Illuminate\\Filesystem\\FilesystemAdapter and ''directoryExists'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Http/Controllers/Admin/BookController.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 5
+			path: app/Http/Controllers/Admin/BookController.php
+
+		-
 			message: '#^Comparison operation "\>" between \*NEVER\* and 0 results in an error\.$#'
 			identifier: greater.invalid
 			count: 1
@@ -1159,19 +853,7 @@ parameters:
 			path: app/Http/Controllers/Admin/BookController.php
 
 		-
-			message: '#^Offset ''author'' on non\-empty\-array in empty\(\) always exists and is not falsy\.$#'
-			identifier: empty.offset
-			count: 1
-			path: app/Http/Controllers/Admin/BookController.php
-
-		-
 			message: '#^Offset ''genre'' on array\{directoryPath\: mixed, author\: non\-empty\-array, genre\: non\-empty\-array, series\?\: array, title\?\: string, skipped\?\: bool, error\?\: string, narrator\?\: mixed, \.\.\.\}\|array\{directoryPath\: mixed, author\: non\-empty\-array, genre\: non\-empty\-array\<mixed\>, narrator\: mixed, series\: mixed, title\: mixed, description\: mixed, release_date\: mixed, \.\.\.\} in empty\(\) always exists and is not falsy\.$#'
-			identifier: empty.offset
-			count: 1
-			path: app/Http/Controllers/Admin/BookController.php
-
-		-
-			message: '#^Offset ''genre'' on non\-empty\-array in empty\(\) always exists and is not falsy\.$#'
 			identifier: empty.offset
 			count: 1
 			path: app/Http/Controllers/Admin/BookController.php
@@ -1231,12 +913,6 @@ parameters:
 			path: app/Http/Controllers/Admin/BookController.php
 
 		-
-			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Http/Controllers/Admin/BookController.php
-
-		-
 			message: '#^Parameter \#3 \$value of function curl_setopt expects bool, int given\.$#'
 			identifier: argument.type
 			count: 1
@@ -1273,48 +949,6 @@ parameters:
 			path: app/Http/Controllers/Admin/DirectoryConflictTrait.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$directory_exists\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/DirectoryValidationController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$directory_last_checked\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/DirectoryValidationController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/DirectoryValidationController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$book_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Admin/DirectoryValidationController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$new_path\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Admin/DirectoryValidationController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$old_path\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/DirectoryValidationController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$orphaned_path\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Admin/DirectoryValidationController.php
-
-		-
 			message: '#^Comparison operation "\>" between 25 and 0 is always true\.$#'
 			identifier: greater.alwaysTrue
 			count: 1
@@ -1324,6 +958,12 @@ parameters:
 			message: '#^Call to function method_exists\(\) with Symfony\\Component\\Finder\\SplFileInfo and ''getFilename'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
+			path: app/Http/Controllers/Admin/ImportFileController.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
 			path: app/Http/Controllers/Admin/ImportFileController.php
 
 		-
@@ -1357,30 +997,6 @@ parameters:
 			path: app/Http/Controllers/Admin/ImportFileController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Admin/JobController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\Admin\\JobController\:\:index\(\) should return Illuminate\\View\\View but returns Illuminate\\Contracts\\View\\View\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Admin/JobController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\Admin\\JobController\:\:show\(\) should return Illuminate\\View\\View but returns Illuminate\\Contracts\\View\\View\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Admin/JobController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\Admin\\LibraryRepairController\:\:index\(\) should return Illuminate\\View\\View but returns Illuminate\\Contracts\\View\\View\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Admin/LibraryRepairController.php
-
-		-
 			message: '#^Offset ''title'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -1393,22 +1009,22 @@ parameters:
 			path: app/Http/Controllers/Admin/ManageSeriesController.php
 
 		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Http/Controllers/Admin/ManageSeriesController.php
+
+		-
 			message: '#^Call to an undefined method App\\Contracts\\DocumentStoreServiceInterface\:\:acknowledgeMessage\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Admin/MessageController.php
 
 		-
-			message: '#^Method App\\Http\\Controllers\\Admin\\MessageController\:\:index\(\) should return Illuminate\\Http\\RedirectResponse\|Illuminate\\View\\View but returns Illuminate\\Contracts\\View\\View\.$#'
-			identifier: return.type
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
-			path: app/Http/Controllers/Admin/MessageController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Admin/MessagesController.php
+			path: app/Http/Controllers/Admin/ParsePathController.php
 
 		-
 			message: '#^Access to an undefined property \$this\(App\\Http\\Controllers\\Admin\\QueueController\)\:\:\$app\.$#'
@@ -1444,6 +1060,12 @@ parameters:
 			message: '#^Call to function is_string\(\) with non\-falsy\-string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
+			path: app/Http/Controllers/Admin/QueueController.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 5
 			path: app/Http/Controllers/Admin/QueueController.php
 
 		-
@@ -1507,7 +1129,7 @@ parameters:
 			path: app/Http/Controllers/Api/ApiHealthController.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\Guard\:\:fromUser\(\)\.$#'
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\StatefulGuard\:\:fromUser\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Api/AuthApiController.php
@@ -1519,33 +1141,9 @@ parameters:
 			path: app/Http/Controllers/Api/AuthApiController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/AuthController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$idToken\.$#'
-			identifier: property.notFound
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
-			path: app/Http/Controllers/Api/AuthController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/AuthController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$password\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/AuthController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$username\.$#'
-			identifier: property.notFound
-			count: 2
 			path: app/Http/Controllers/Api/AuthController.php
 
 		-
@@ -1555,38 +1153,32 @@ parameters:
 			path: app/Http/Controllers/Api/AuthController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\UserBadge\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$device_id\.$#'
+			message: '#^Access to an undefined property App\\Models\\UserBadge\:\:\$total_badges\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/BadgeController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\UserBadge\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$earned_at\.$#'
+			message: '#^Access to an undefined property App\\Models\\UserBadge\:\:\$total_points\.$#'
 			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/BadgeController.php
-
-		-
-			message: '#^Call to an undefined method App\\Models\\Badge\:\:map\(\)\.$#'
-			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Api/BadgeController.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\Factory\:\:id\(\)\.$#'
-			identifier: method.notFound
-			count: 7
-			path: app/Http/Controllers/Api/BadgeController.php
-
-		-
-			message: '#^Offset int on array\{listening\: ''Listening'', milestone\: ''Milestone'', streak\: ''Streak'', variety\: ''Variety'', social\: ''Social'', completion\: ''Completion'', speed\: ''Speed'', exploration\: ''Exploration'', \.\.\.\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
+			message: '#^Anonymous function should return array\{category\: \(int\|string\), category_name\: \(int\|string\), badges\: Illuminate\\Support\\Collection\<int, array\{id\: int, key\: string, name\: string, description\: string, icon\: string\|null, image_url\: string\|null, tier\: string, points\: int, \.\.\.\}\>, total_in_category\: int\<0, max\>, earned_in_category\: int\<0, max\>\} but returns array\{category\: \(int\|string\), category_name\: \(int\|string\), badges\: Illuminate\\Support\\Collection\<int, array\{id\: int, key\: string, name\: string, description\: string, icon\: string\|null, image_url\: string\|null, tier\: string, points\: int, \.\.\.\}\>, total_in_category\: int\<0, max\>, earned_in_category\: int\<0, max\>\}\.$#'
+			identifier: return.type
 			count: 1
 			path: app/Http/Controllers/Api/BadgeController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Badge\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Badge\>\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Badge\>, int\|string\)\: array\{category\: int\|string, category_name\: int\|string, badges\: Illuminate\\Support\\Collection\<int, array\{id\: int, key\: string, name\: string, description\: string, icon\: string\|null, image_url\: string\|null, tier\: string, points\: int, earned\: bool, earned_at\: string\|null, times_earned\: int\}\>, total_in_category\: int\<0, max\>, earned_in_category\: int\<0, max\>\}, Closure\(mixed, mixed\)\: array\{category\: int\|string, category_name\: int\|string, badges\: Illuminate\\Support\\Collection\<int, array\{id\: int, key\: string, name\: string, description\: string, icon\: string\|null, image_url\: string\|null, tier\: string, points\: int, earned\: bool, earned_at\: string\|null, times_earned\: int\}\>, total_in_category\: int\<0, max\>, earned_in_category\: int\<0, max\>\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/BadgeController.php
+
+		-
+			message: '#^Parameter \#1 \$string of function substr expects string, int given\.$#'
+			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Api/BadgeController.php
 
@@ -1603,26 +1195,32 @@ parameters:
 			path: app/Http/Controllers/Api/BadgeController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$email\.$#'
+			message: '#^Access to an undefined property App\\Models\\Author\:\:\$book_count\.$#'
 			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 14
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Query\\Builder\:\:withCount\(\)\.$#'
-			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Api/BookApiController.php
 
 		-
-			message: '#^Cannot call method books\(\) on stdClass\.$#'
-			identifier: method.nonObject
+			message: '#^Access to an undefined property App\\Models\\Author\:\:\$genres\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/BookApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Series\:\:\$authors\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/BookApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Series\:\:\$book_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/BookApiController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Series\:\:\$books_in_series\.$#'
+			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/BookApiController.php
 
@@ -1645,14 +1243,14 @@ parameters:
 			path: app/Http/Controllers/Api/BookApiController.php
 
 		-
-			message: '#^Method Illuminate\\Database\\Query\\Builder\:\:select\(\) invoked with 2 parameters, 0\-1 required\.$#'
-			identifier: arguments.count
+			message: '#^Parameter \#1 \$array \(list\<array\{id\: mixed, name\: mixed\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
 			count: 1
 			path: app/Http/Controllers/Api/BookApiController.php
 
 		-
-			message: '#^Parameter \#1 \$array \(list\<array\{id\: mixed, name\: mixed\}\>\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Series\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
 			count: 1
 			path: app/Http/Controllers/Api/BookApiController.php
 
@@ -1670,24 +1268,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property App\\Http\\Controllers\\Api\\BookRequestApiController\:\:\$documentStoreService\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookRequestApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$author\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookRequestApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookRequestApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$title\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/BookRequestApiController.php
@@ -1729,118 +1309,10 @@ parameters:
 			path: app/Http/Controllers/Api/ExternalReadApiController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$author_name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/FavoriteAuthorController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$notify_email\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/FavoriteAuthorController.php
-
-		-
 			message: '#^Access to an undefined property App\\Http\\Controllers\\Api\\MessageApiController\:\:\$documentStoreService\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/MessageApiController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\Factory\:\:check\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Api/MessageApiController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\Factory\:\:id\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Api/MessageApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$book_id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$completed\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$completed_at\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$current_chapter\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$current_chapter_name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$current_position_seconds\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$device_id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$formatted_duration\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$formatted_progress\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_listened_at\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$progress_percentage\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$total_duration_seconds\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:updateProgress\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
-			message: '#^Dead catch \- Illuminate\\Validation\\ValidationException is never thrown in the try block\.$#'
-			identifier: catch.neverThrown
-			count: 1
-			path: app/Http/Controllers/Api/ProgressController.php
 
 		-
 			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Support\\Carbon\. Use \-\> instead\.$#'
@@ -1849,70 +1321,10 @@ parameters:
 			path: app/Http/Controllers/Api/ProgressController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/QueueApiController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$current_position\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ReadingProgressApiController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:incrementDownloadCount\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Api/SkinController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\Api\\SkinController\:\:download\(\) should return Illuminate\\Http\\Response but returns Symfony\\Component\\HttpFoundation\\BinaryFileResponse\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Http/Controllers/Api/SkinController.php
-
-		-
-			message: '#^Anonymous function has an unused use \$endDate\.$#'
-			identifier: closure.unusedUse
-			count: 1
-			path: app/Http/Controllers/Api/StatisticsController.php
-
-		-
-			message: '#^Anonymous function has an unused use \$startDate\.$#'
-			identifier: closure.unusedUse
-			count: 1
-			path: app/Http/Controllers/Api/StatisticsController.php
-
-		-
-			message: '#^Call to static method warning\(\) on an unknown class Log\.$#'
-			identifier: class.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StatisticsController.php
-
-		-
-			message: '#^Dead catch \- Illuminate\\Validation\\ValidationException is never thrown in the try block\.$#'
-			identifier: catch.neverThrown
-			count: 1
-			path: app/Http/Controllers/Api/StatisticsController.php
-
-		-
-			message: '#^Negated boolean expression is always false\.$#'
-			identifier: booleanNot.alwaysFalse
-			count: 1
-			path: app/Http/Controllers/Api/StatisticsController.php
-
-		-
-			message: '#^Parameter \#1 \$seconds of method App\\Http\\Controllers\\Api\\StatisticsController\:\:formatSeconds\(\) expects int, float given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Api/StatisticsController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:incrementDownloadCount\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Api/ThemeController.php
 
 		-
 			message: '#^Using nullsafe property access "\?\-\>read_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
@@ -1921,44 +1333,8 @@ parameters:
 			path: app/Http/Controllers/Api/UserStatusController.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\Authenticatable\:\:getRawUser\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Auth/LoginController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$password\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/AuthController.php
-
-		-
 			message: '#^Call to an undefined method App\\Http\\Controllers\\BookController\:\:handleMainBooksAjaxRequest\(\)\.$#'
 			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/BookController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\Factory\:\:id\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/BookController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\BookController\:\:index\(\) should return Illuminate\\View\\View but returns Illuminate\\Contracts\\View\\View\.$#'
-			identifier: return.type
 			count: 1
 			path: app/Http/Controllers/BookController.php
 
@@ -1969,22 +1345,10 @@ parameters:
 			path: app/Http/Controllers/BookController.php
 
 		-
-			message: '#^Method App\\Http\\Controllers\\BookController\:\:show\(\) should return Illuminate\\View\\View but returns Illuminate\\Contracts\\View\\View\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/BookController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\BookController\:\:show\(\) should return Illuminate\\View\\View but returns Illuminate\\Http\\RedirectResponse\.$#'
 			identifier: return.type
 			count: 3
 			path: app/Http/Controllers/BookController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 5
-			path: app/Http/Controllers/BookQueueController.php
 
 		-
 			message: '#^Call to method App\\Http\\Controllers\\BookQueueController\:\:reorderQueue\(\) on a separate line has no effect\.$#'
@@ -1999,38 +1363,14 @@ parameters:
 			path: app/Http/Controllers/BookRequestController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$author\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/BookRequestController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/BookRequestController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$series\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/BookRequestController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/BookRequestController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 5
+			message: '#^Strict comparison using \!\=\= between int and string\|null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
 			path: app/Http/Controllers/FavoriteAuthorWebController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$author_name\.$#'
-			identifier: property.notFound
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
 			count: 2
 			path: app/Http/Controllers/FavoriteAuthorWebController.php
 
@@ -2065,58 +1405,10 @@ parameters:
 			path: app/Http/Controllers/PlayerController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$current_password\.$#'
-			identifier: property.notFound
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
-			path: app/Http/Controllers/ProfileController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/ProfileController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/ProfileController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$password\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/ProfileController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$book_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/ReadingProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$current_position\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/ReadingProgressController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$age_rating\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/ReviewController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$comment\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/ReviewController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$content_rating\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/ReviewController.php
+			path: app/Http/Controllers/PlayerController.php
 
 		-
 			message: '#^Access to property \$user_id on an unknown class App\\Http\\Controllers\\Review\.$#'
@@ -2125,7 +1417,7 @@ parameters:
 			path: app/Http/Controllers/ReviewController.php
 
 		-
-			message: '#^Call to an undefined method App\\Contracts\\DocumentStoreServiceInterface\:\:createReview\(\)\.$#'
+			message: '#^Call to an undefined method App\\Services\\MySqlService\:\:createReview\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/ReviewController.php
@@ -2143,63 +1435,33 @@ parameters:
 			path: app/Http/Controllers/ReviewController.php
 
 		-
-			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$expires_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/ApiAuth.php
+			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/SkinWebController.php
 
 		-
-			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Middleware/ApiAuth.php
+			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/ThemeWebController.php
 
 		-
-			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Http/Middleware/ApiAuth.php
-
-		-
-			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$tokenable\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/ApiAuth.php
-
-		-
-			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$tokenable_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/ApiAuth.php
-
-		-
-			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$tokenable_type\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/ApiAuth.php
-
-		-
-			message: '#^Call to function is_object\(\) with Illuminate\\Contracts\\Auth\\Authenticatable will always evaluate to true\.$#'
+			message: '#^Call to function is_object\(\) with App\\Auth\\DocumentstoreUser will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
 			path: app/Http/Middleware/ApiAuth.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$email\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/RequireLibraryRole.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Contracts\\Auth\\Authenticatable\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Middleware/RequireLibraryRole.php
-
-		-
 			message: '#^Call to an undefined method App\\Contracts\\DocumentStoreServiceInterface\:\:updateJobStatus\(\)\.$#'
 			identifier: method.notFound
 			count: 6
+			path: app/Jobs/CreateImportJobsForDirectory.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
 			path: app/Jobs/CreateImportJobsForDirectory.php
 
 		-
@@ -2209,16 +1471,16 @@ parameters:
 			path: app/Jobs/CreateImportJobsForDirectory.php
 
 		-
-			message: '#^Offset ''title'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
 			count: 1
 			path: app/Jobs/ImportBookFromDirectoryJob.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Log\\Logger\:\:getHandlers\(\)\.$#'
-			identifier: method.notFound
+			message: '#^Offset ''title'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
 			count: 1
-			path: app/Logging/CustomizeDailyLogName.php
+			path: app/Jobs/ImportBookFromDirectoryJob.php
 
 		-
 			message: '#^Call to function method_exists\(\) with Monolog\\Handler\\RotatingFileHandler and ''setFilenameFormat'' will always evaluate to true\.$#'
@@ -2263,12 +1525,6 @@ parameters:
 			path: app/Models/Author.php
 
 		-
-			message: '#^Method App\\Models\\Badge\:\:scopeOrdered\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Badge.php
-
-		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
 			identifier: class.notFound
 			count: 1
@@ -2289,6 +1545,12 @@ parameters:
 		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
 			identifier: class.notFound
+			count: 1
+			path: app/Models/Book.php
+
+		-
+			message: '#^PHPDoc type array of property App\\Models\\Book\:\:\$casts is not covariant with PHPDoc type array\<string, string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$casts\.$#'
+			identifier: property.phpDocType
 			count: 1
 			path: app/Models/Book.php
 
@@ -2425,6 +1687,30 @@ parameters:
 			path: app/Models/LibraryRepairIssue.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$first_listened\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/ListeningStatistic.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$first_session\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/ListeningStatistic.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$last_listened\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/ListeningStatistic.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$last_session\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/ListeningStatistic.php
+
+		-
 			message: '#^Method App\\Models\\ListeningStatistic\:\:__set\(\) with return type void returns null but should not return anything\.$#'
 			identifier: return.void
 			count: 2
@@ -2497,7 +1783,13 @@ parameters:
 			path: app/Models/Publisher.php
 
 		-
-			message: '#^PHPDoc type array of property App\\Models\\Publisher\:\:\$fillable is not covariant with PHPDoc type array\<int, string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$fillable\.$#'
+			message: '#^PHPDoc type array of property App\\Models\\Publisher\:\:\$casts is not covariant with PHPDoc type array\<string, string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$casts\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: app/Models/Publisher.php
+
+		-
+			message: '#^PHPDoc type array of property App\\Models\\Publisher\:\:\$fillable is not covariant with PHPDoc type list\<string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$fillable\.$#'
 			identifier: property.phpDocType
 			count: 1
 			path: app/Models/Publisher.php
@@ -2533,24 +1825,6 @@ parameters:
 			path: app/Models/Skin.php
 
 		-
-			message: '#^Method App\\Models\\Skin\:\:scopePopular\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Skin.php
-
-		-
-			message: '#^Method App\\Models\\Skin\:\:scopeRecent\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Skin.php
-
-		-
-			message: '#^Method App\\Models\\Skin\:\:scopeTopRated\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Skin.php
-
-		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
 			identifier: class.notFound
 			count: 1
@@ -2581,12 +1855,6 @@ parameters:
 			path: app/Models/SkinRating.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$value\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/SystemSetting.php
-
-		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
 			identifier: class.notFound
 			count: 1
@@ -2602,24 +1870,6 @@ parameters:
 			message: '#^Method App\\Models\\Theme\:\:__set\(\) with return type void returns null but should not return anything\.$#'
 			identifier: return.void
 			count: 2
-			path: app/Models/Theme.php
-
-		-
-			message: '#^Method App\\Models\\Theme\:\:scopePopular\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Theme.php
-
-		-
-			message: '#^Method App\\Models\\Theme\:\:scopeRecent\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Theme.php
-
-		-
-			message: '#^Method App\\Models\\Theme\:\:scopeTopRated\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
 			path: app/Models/Theme.php
 
 		-
@@ -2665,14 +1915,20 @@ parameters:
 			path: app/Models/User.php
 
 		-
-			message: '#^Method App\\Models\\User\:\:queuedBooks\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
+			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
+			identifier: class.notFound
 			count: 1
 			path: app/Models/User.php
 
 		-
-			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
-			identifier: class.notFound
+			message: '#^PHPDoc type array\<int, string\> of property App\\Models\\User\:\:\$fillable is not covariant with PHPDoc type list\<string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$fillable\.$#'
+			identifier: property.phpDocType
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^PHPDoc type array\<int, string\> of property App\\Models\\User\:\:\$hidden is not covariant with PHPDoc type list\<string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$hidden\.$#'
+			identifier: property.phpDocType
 			count: 1
 			path: app/Models/User.php
 
@@ -2681,36 +1937,6 @@ parameters:
 			identifier: staticMethod.void
 			count: 2
 			path: app/Models/User.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Builder\<static\(App\\Models\\UserBadge\)\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$badge\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/UserBadge.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Builder\<static\(App\\Models\\UserBadge\)\>\:\:forUserOrDevice\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Models/UserBadge.php
-
-		-
-			message: '#^Cannot call method toArray\(\) on int\.$#'
-			identifier: method.nonObject
-			count: 2
-			path: app/Models/UserBadge.php
-
-		-
-			message: '#^Method App\\Models\\UserBadge\:\:awardBadge\(\) should return App\\Models\\UserBadge but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/UserBadge.php
-
-		-
-			message: '#^Method App\\Models\\UserBadge\:\:scopeNewest\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/UserBadge.php
 
 		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
@@ -2755,12 +1981,6 @@ parameters:
 			path: app/Models/UserRecommendation.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$value\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/UserStatistic.php
-
-		-
 			message: '#^Method App\\Models\\UserStatistic\:\:__set\(\) with return type void returns null but should not return anything\.$#'
 			identifier: return.void
 			count: 2
@@ -2785,6 +2005,12 @@ parameters:
 			path: app/Observers/BookObserver.php
 
 		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
 			message: '#^Call to function method_exists\(\) with Illuminate\\Database\\Eloquent\\Model and ''touch'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -2797,39 +2023,27 @@ parameters:
 			path: app/Relations/TouchesParentBelongsToMany.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$authors\.$#'
 			identifier: property.notFound
-			count: 2
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cover_image\.$#'
-			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Services/AI/AIAssistantService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
 			identifier: property.notFound
-			count: 6
+			count: 2
 			path: app/Services/AI/AIAssistantService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 9
+			count: 4
 			path: app/Services/AI/AIAssistantService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Services/AI/AIAssistantService.php
 
 		-
@@ -2839,45 +2053,9 @@ parameters:
 			path: app/Services/AI/AIAssistantService.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Cannot call method books\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 4
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\AI\\AIAssistantService\:\:generateAuthorDirectoryPath\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/AI/AIAssistantService.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\AI\\AIAssistantService\:\:generateSeriesDirectoryPath\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
+			message: '#^Parameter \#1 \$array of function array_values contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
 			path: app/Services/AI/AIAssistantService.php
 
 		-
@@ -2893,49 +2071,13 @@ parameters:
 			path: app/Services/AI/Providers/ClaudeProvider.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$ai_processed\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$authors\.$#'
+			message: '#^Access to an undefined property App\\Models\\Book\:\:\$book_ids\.$#'
 			identifier: property.notFound
 			count: 2
 			path: app/Services/AI/ToolExecutor.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$cover_image\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 5
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$is_collection\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
+			message: '#^Access to an undefined property App\\Models\\Book\:\:\$count\.$#'
 			identifier: property.notFound
 			count: 2
 			path: app/Services/AI/ToolExecutor.php
@@ -2943,55 +2085,55 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$authors\.$#'
 			identifier: property.notFound
-			count: 2
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$books_count\.$#'
-			identifier: property.notFound
 			count: 1
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cover_image\.$#'
-			identifier: property.notFound
-			count: 2
 			path: app/Services/AI/ToolExecutor.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
 			identifier: property.notFound
-			count: 11
+			count: 1
+			path: app/Services/AI/ToolExecutor.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$duration\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/AI/ToolExecutor.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$genres\.$#'
+			identifier: property.notFound
+			count: 1
 			path: app/Services/AI/ToolExecutor.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 15
+			count: 1
 			path: app/Services/AI/ToolExecutor.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$narrators\.$#'
 			identifier: property.notFound
-			count: 9
+			count: 1
 			path: app/Services/AI/ToolExecutor.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pivot\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Services/AI/ToolExecutor.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
 			identifier: property.notFound
-			count: 5
+			count: 1
 			path: app/Services/AI/ToolExecutor.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Relations\\Pivot\:\:\$series_number\.$#'
 			identifier: property.notFound
-			count: 4
+			count: 5
 			path: app/Services/AI/ToolExecutor.php
 
 		-
@@ -3007,33 +2149,9 @@ parameters:
 			path: app/Services/AI/ToolExecutor.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:url\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:books\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:books\(\)\.$#'
-			identifier: method.notFound
-			count: 6
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Call to function is_array\(\) with array\<''authors_without…''\|''genres_without_books''\|''no_author''\|''no_description''\|''no_genre''\|''series_without_books''\|int\<0, max\>, array\<''id''\|''issue''\|''path''\|''title''\|int, mixed\>\> will always evaluate to true\.$#'
+			message: '#^Call to function is_array\(\) with array\<''authors_without…''\|''genres_without_books''\|''no_author''\|''no_description''\|''no_genre''\|''series_without_books''\|int\<0, max\>, array\<mixed\>\> will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Cannot call method books\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 4
 			path: app/Services/AI/ToolExecutor.php
 
 		-
@@ -3043,39 +2161,15 @@ parameters:
 			path: app/Services/AI/ToolExecutor.php
 
 		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\AI\\ToolExecutor\:\:applyCoverUpdate\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\AI\\ToolExecutor\:\:applyDatabaseUpdate\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\AI\\ToolExecutor\:\:generateNewAuthorDirectoryPath\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Services/AI/ToolExecutor.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\AI\\ToolExecutor\:\:generateNewSeriesDirectoryPath\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Services/AI/ToolExecutor.php
-
-		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Series\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
-			count: 2
+			count: 3
 			path: app/Services/AI/ToolExecutor.php
 
 		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
-			count: 4
+			count: 1
 			path: app/Services/AI/ToolExecutor.php
 
 		-
@@ -3133,50 +2227,8 @@ parameters:
 			path: app/Services/AIBookProcessor.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/AIQueryService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/AIQueryService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/AIQueryService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/AIQueryService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/AIQueryService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/AIQueryService.php
-
-		-
 			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/AIQueryService.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\AIQueryService\:\:moveBookFiles\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
 			count: 1
 			path: app/Services/AIQueryService.php
 
@@ -3313,12 +2365,6 @@ parameters:
 			path: app/Services/AudiobookBayCategoryScraperService.php
 
 		-
-			message: '#^Method App\\Services\\AudiobookBayCategoryScraperService\:\:saveDiscoveredBook\(\) should return App\\Models\\DiscoveredBook\|null but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/AudiobookBayCategoryScraperService.php
-
-		-
 			message: '#^Call to function is_array\(\) with non\-empty\-array will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
@@ -3343,56 +2389,20 @@ parameters:
 			path: app/Services/AutoPermissionsStorage.php
 
 		-
-			message: '#^Method App\\Services\\AutoPermissionsStorage\:\:disk\(\) should return Illuminate\\Filesystem\\FilesystemAdapter but returns Illuminate\\Contracts\\Filesystem\\Filesystem\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/AutoPermissionsStorage.php
-
-		-
-			message: '#^Property App\\Services\\AutoPermissionsStorage\:\:\$disk \(Illuminate\\Filesystem\\FilesystemAdapter\) does not accept Illuminate\\Contracts\\Filesystem\\Filesystem\.$#'
-			identifier: assign.propertyType
-			count: 1
-			path: app/Services/AutoPermissionsStorage.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$first_listening_date\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/BadgeService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_repeatable\.$#'
+			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$last_listening_date\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/BadgeService.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\UserBadge\>\:\:forUserOrDevice\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/BadgeService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:evaluateCriteria\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/BadgeService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:getProgressPercentage\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/BadgeService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:getTimesEarnedByUser\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/BadgeService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Query\\Builder\:\:unnotified\(\)\.$#'
-			identifier: method.notFound
+			message: '#^Called ''count'' on Laravel collection, but could have been retrieved as a query\.$#'
+			identifier: larastan.noUnnecessaryCollectionCall
 			count: 1
 			path: app/Services/BadgeService.php
 
@@ -3403,28 +2413,34 @@ parameters:
 			path: app/Services/BadgeService.php
 
 		-
-			message: '#^Parameter \#1 \$badge of method App\\Services\\BadgeService\:\:awardBadge\(\) expects App\\Models\\Badge, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/BadgeService.php
-
-		-
-			message: '#^Parameter \#1 \$badge of method App\\Services\\BadgeService\:\:shouldEvaluateBadge\(\) expects App\\Models\\Badge, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/BadgeService.php
-
-		-
 			message: '#^Parameter \#1 \$userId of method App\\Services\\BadgeService\:\:evaluateUserBadges\(\) expects string, int given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Services/BadgeService.php
 
 		-
+			message: '#^Parameter \#3 \$callback of static method Illuminate\\Cache\\Repository\:\:remember\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/BadgeService.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Illuminate\\Filesystem\\FilesystemAdapter and ''directoryExists'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/BookDeletionService.php
+
+		-
 			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Services/BookDeletionService.php
+
+		-
+			message: '#^Call to function method_exists\(\) with Illuminate\\Filesystem\\FilesystemAdapter and ''directoryExists'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Services/BookDirectoryMoveService.php
 
 		-
 			message: '#^Method App\\Services\\BookDirectoryMoveService\:\:directoryExistsOnDisk\(\) is unused\.$#'
@@ -3451,18 +2467,6 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
-			message: '#^Call to function array_key_exists\(\) with ''seriesIndex'' and array\<''publishedYear''\|''seriesNumber''\|string, array\|float\|int\|string\|null\> will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 2
-			path: app/Services/BookDirectoryParser.php
-
-		-
 			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 2
@@ -3471,13 +2475,7 @@ parameters:
 		-
 			message: '#^Call to function is_string\(\) with non\-falsy\-string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
-			count: 2
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 2
+			count: 1
 			path: app/Services/BookDirectoryParser.php
 
 		-
@@ -3487,27 +2485,15 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
+			path: app/Services/BookDirectoryParser.php
+
+		-
 			message: '#^Comparison operation "\>" between \*NEVER\* and 0 results in an error\.$#'
 			identifier: greater.invalid
 			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^If condition is always true\.$#'
-			identifier: if.alwaysTrue
-			count: 2
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Left side of && is always true\.$#'
-			identifier: booleanAnd.leftAlwaysTrue
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Offset ''author'' on \*NEVER\* on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
 			path: app/Services/BookDirectoryParser.php
 
 		-
@@ -3529,27 +2515,9 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
-			message: '#^Offset ''genre'' on array\{genre\: array, author\: array, series\?\: array, title\: string, directoryPath\: string, skipped\?\: bool, error\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: app/Services/BookDirectoryParser.php
-
-		-
 			message: '#^Offset ''score'' on array\{score\: int\<min, 215\>, item\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Offset ''seriesNumber'' on \*NEVER\* on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Offset ''title'' on array\{genre\: array, author\: array, series\?\: array, title\: string, directoryPath\: string, skipped\?\: bool, error\?\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
 			path: app/Services/BookDirectoryParser.php
 
 		-
@@ -3560,12 +2528,6 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<non\-empty\-array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1
 			path: app/Services/BookDirectoryParser.php
@@ -3585,24 +2547,6 @@ parameters:
 		-
 			message: '#^Result of && is always false\.$#'
 			identifier: booleanAnd.alwaysFalse
-			count: 2
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Result of \|\| is always false\.$#'
-			identifier: booleanOr.alwaysFalse
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Result of \|\| is always true\.$#'
-			identifier: booleanOr.alwaysTrue
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between non\-empty\-string and '''' will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: app/Services/BookDirectoryParser.php
 
@@ -3611,36 +2555,6 @@ parameters:
 			identifier: booleanAnd.rightAlwaysTrue
 			count: 1
 			path: app/Services/BookEditPlannedActionsService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 15
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_collection\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Services/BookImportService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Relations\\Pivot\:\:\$series_number\.$#'
@@ -3664,6 +2578,12 @@ parameters:
 			message: '#^Binary operation "\+" between \(array\|float\|int\) and string results in an error\.$#'
 			identifier: binaryOp.invalid
 			count: 1
+			path: app/Services/BookImportService.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
 			path: app/Services/BookImportService.php
 
 		-
@@ -3709,18 +2629,6 @@ parameters:
 			path: app/Services/BookImportService.php
 
 		-
-			message: '#^Method App\\Services\\BookImportService\:\:findExistingBook\(\) should return App\\Models\\Book\|null but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
-			count: 2
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Method App\\Services\\BookImportService\:\:findExistingBook\(\) should return App\\Models\\Book\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/BookImportService.php
-
-		-
 			message: '#^Negated boolean expression is always false\.$#'
 			identifier: booleanNot.alwaysFalse
 			count: 1
@@ -3752,12 +2660,6 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$string of function str_pad expects string, int\<1, 99\> given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Parameter \#2 \$existingBook of method App\\Services\\BookImportService\:\:getNarratorFromDirectory\(\) expects App\\Models\\Book\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Services/BookImportService.php
@@ -3847,6 +2749,12 @@ parameters:
 			path: app/Services/DirectoryMatchingService.php
 
 		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: app/Services/GenreMappingService.php
+
+		-
 			message: '#^Variable \$results in empty\(\) always exists and is not falsy\.$#'
 			identifier: empty.variable
 			count: 1
@@ -3883,30 +2791,6 @@ parameters:
 			path: app/Services/ImportUIService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$resolution_notes\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$resolved_at\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Query\\Builder\:\:whereDoesntHave\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/LibraryRepairService.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
@@ -3916,36 +2800,6 @@ parameters:
 			message: '#^Method App\\Services\\LibraryRepairService\:\:buildAudiobookBaySearchTerms\(\) is unused\.$#'
 			identifier: method.unused
 			count: 1
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Method Illuminate\\Database\\Query\\Builder\:\:select\(\) invoked with 2 parameters, 0\-1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\LibraryRepairService\:\:createOrUpdateIssue\(\) expects App\\Models\\Book\|null, stdClass given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\LibraryRepairService\:\:markBookNeedsReview\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\LibraryRepairService\:\:markBookNeedsReview\(\) expects App\\Models\\Book, stdClass given\.$#'
-			identifier: argument.type
-			count: 2
-			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:filter\(\) expects \(callable\(stdClass, int\)\: bool\)\|null, Closure\(App\\Models\\Book\)\: bool given\.$#'
-			identifier: argument.type
-			count: 2
 			path: app/Services/LibraryRepairService.php
 
 		-
@@ -3959,12 +2813,6 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/LibraryRepairService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MetadataProcessingService.php
 
 		-
 			message: '#^Offset ''author'' on array\{title\: mixed, author\: array\{\}, narrator\: array\{\}, genre\: array\{\}, year\: null, publisher\: null, description\: null, series\: null, \.\.\.\} in empty\(\) always exists and is always falsy\.$#'
@@ -4009,272 +2857,8 @@ parameters:
 			path: app/Services/MetadataProcessingService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$audible_info\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$audio_file_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$audiobook_bay_info\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$book_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$books\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cover_image\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$current_position_seconds\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$device_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$duration\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$file_tags\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$google_books_info\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$hardcover_info\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 23
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$language\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$last_listened_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$mongo_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$mongo_record\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 4
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$needs_review\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$needs_review_reasons\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$publisher\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$release_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Book\>\:\:withUserData\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 4
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:books\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:chapters\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 4
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:getAuthPassword\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:narrators\(\)\.$#'
-			identifier: method.notFound
-			count: 4
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:queuedBooks\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:series\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:setRememberToken\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Query\\Builder\:\:whereHas\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Query\\Builder\:\:with\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
 			message: '#^Call to function method_exists\(\) with Carbon\\CarbonInterface and ''toDateString'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Cannot call method getAttribute\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 7
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Method Illuminate\\Database\\Query\\Builder\:\:select\(\) invoked with 3 parameters, 0\-1 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Method Illuminate\\Database\\Query\\Builder\:\:select\(\) invoked with 5 parameters, 0\-1 required\.$#'
-			identifier: arguments.count
 			count: 1
 			path: app/Services/MySqlService.php
 
@@ -4287,36 +2871,6 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) to function array_filter does not contain falsy values, the array will always stay the same\.$#'
 			identifier: arrayFilter.same
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Parameter \#1 \$book of method App\\Services\\MySqlService\:\:updateLibraryJson\(\) expects App\\Models\\Book\|array, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:map\(\) expects callable\(stdClass, int\)\: array, Closure\(App\\Models\\LibraryRepairIssue\)\: array given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:map\(\) expects callable\(stdClass, int\)\: array\{date\: string, duration_seconds\: int, sessions\: int, books\: int\}, Closure\(App\\Models\\ReadingSession\)\: array\{date\: string, duration_seconds\: int, sessions\: int, books\: int\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:map\(\) expects callable\(stdClass, int\)\: array\{id\: lowercase\-string&numeric\-string&uppercase\-string, title\: string, directoryPath\: string, needsReviewReasons\: array, createdAt\: string\|null\}, Closure\(App\\Models\\Book\)\: array\{id\: lowercase\-string&numeric\-string&uppercase\-string, title\: string, directoryPath\: string, needsReviewReasons\: array, createdAt\: string\|null\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:map\(\) expects callable\(stdClass, int\)\: non\-empty\-array, Closure\(App\\Models\\Book\)\: non\-empty\-array given\.$#'
-			identifier: argument.type
 			count: 1
 			path: app/Services/MySqlService.php
 
@@ -4351,66 +2905,6 @@ parameters:
 			path: app/Services/OptimizedBookService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$author\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$file_path\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$file_size\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 9
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$manifest\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$preview_path\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$user_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$version\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/SkinService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:updateRating\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/SkinService.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 4
@@ -4427,48 +2921,6 @@ parameters:
 			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Services/TerminalImageService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$author\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/ThemeService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/ThemeService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/ThemeService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$theme_data\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/ThemeService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$user_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/ThemeService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$version\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/ThemeService.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:updateRating\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/ThemeService.php
 
 		-
 			message: '#^Strict comparison using \!\=\= between ''accent''\|''background''\|''primary''\|''progressActive''\|''progressInactive''\|''surface''\|''text''\|''timeText'' and ''darkModeOverride'' will always evaluate to true\.$#'
@@ -4489,28 +2941,10 @@ parameters:
 			path: tests/Api/Feature/AudibleApiIntegrationTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 3
 			path: tests/Api/Feature/AuthorsApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 7
-			path: tests/Api/Feature/BadgeApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$key\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Api/Feature/BadgeApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Api/Feature/BadgeApiTest.php
 
 		-
 			message: '#^Call to an undefined method Illuminate\\Contracts\\Cache\\Repository\:\:flush\(\)\.$#'
@@ -4555,7 +2989,7 @@ parameters:
 			path: tests/Api/Feature/BookApiOpenApiTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 3
 			path: tests/Api/Feature/BooksEnhancedApiTest.php
@@ -4567,40 +3001,10 @@ parameters:
 			path: tests/Api/Feature/BooksEnhancedApiTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$completed\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Api/Feature/ProgressControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$completed_at\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Api/Feature/ProgressControllerTest.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Api/Feature/ProgressControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$progress_percentage\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Api/Feature/ProgressControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 2
 			path: tests/Api/Feature/SeriesApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$metadata\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Api/Feature/StatisticsControllerTest.php
 
 		-
 			message: '#^Parameter \#1 \$request of method App\\Http\\Controllers\\Api\\UserApiController\:\:me\(\) expects Illuminate\\Http\\Request, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
@@ -4609,28 +3013,10 @@ parameters:
 			path: tests/Api/Unit/Controllers/UserApiControllerTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 1
 			path: tests/Cli/Feature/Commands/CheckCoverImagesCommandTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:assertExists\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Cli/Feature/Commands/CheckCoverImagesCommandTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Cli/Feature/Commands/MoveBookDirectoryCriticalTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Cli/Feature/Commands/MoveBookDirectoryCriticalTest.php
 
 		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
@@ -4639,20 +3025,8 @@ parameters:
 			path: tests/Cli/Feature/Commands/MoveBookDirectoryCriticalTest.php
 
 		-
-			message: '#^Method Tests\\Cli\\Feature\\Commands\\MoveBookDirectoryCriticalTest\:\:createTestBook\(\) should return App\\Models\\Book but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
-			count: 1
-			path: tests/Cli/Feature/Commands/MoveBookDirectoryCriticalTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Cli/Feature/Commands/MoveBookDirectoryMinorEdgeCasesTest.php
-
-		-
-			message: '#^Method Tests\\Cli\\Feature\\Commands\\MoveBookDirectoryMinorEdgeCasesTest\:\:createTestBook\(\) should return App\\Models\\Book but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
 			count: 1
 			path: tests/Cli/Feature/Commands/MoveBookDirectoryMinorEdgeCasesTest.php
 
@@ -4661,12 +3035,6 @@ parameters:
 			identifier: property.onlyWritten
 			count: 1
 			path: tests/Cli/Feature/Commands/MoveBookDirectoryTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 12
-			path: tests/Cli/Feature/Commands/UpdateLibraryJsonTest.php
 
 		-
 			message: '#^Method Tests\\Cli\\Unit\\Commands\\ImportBooksFromDownloadsLowConfidenceTestDouble\:\:getImportService\(\) should return App\\Services\\BookImportService but returns Mockery\\LegacyMockInterface&Mockery\\MockInterface\.$#'
@@ -4765,30 +3133,6 @@ parameters:
 			path: tests/Core/Unit/Services/BookImportServiceMoveNonAudioFilesToDirectoryTest.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 5
-			path: tests/Core/Unit/Services/BookImportServiceTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 5
-			path: tests/Core/Unit/Services/BookImportServiceTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:series\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Core/Unit/Services/BookImportServiceTest.php
-
-		-
-			message: '#^Method Tests\\Core\\Unit\\Services\\BookImportServiceTest\:\:createTempBook\(\) should return App\\Models\\Book but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
-			count: 1
-			path: tests/Core/Unit/Services/BookImportServiceTest.php
-
-		-
 			message: '#^Property Tests\\Core\\Unit\\Services\\BookMetadataServiceTest\:\:\$root is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -4817,18 +3161,6 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: tests/Core/Unit/Services/MetadataExtractionTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 9
-			path: tests/Core/Unit/Services/MetadataProcessingServiceTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 9
-			path: tests/Core/Unit/Services/MetadataProcessingServiceTest.php
 
 		-
 			message: '#^Offset ''series'' does not exist on array\{title\: ''Lover at Last \[The…'', series_number\: 11\}\.$#'
@@ -4873,12 +3205,6 @@ parameters:
 			path: tests/Core/Unit/Services/MetadataProcessingServiceTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Core/Unit/Services/MySqlServiceCoverImageNormalizationTest.php
-
-		-
 			message: '#^Access to an undefined property \$this\(Tests\\Core\\Unit\\Traits\\BookImportTraitTest\)\:\:\$app\.$#'
 			identifier: property.notFound
 			count: 1
@@ -4906,6 +3232,12 @@ parameters:
 			message: '#^Call to function is_string\(\) with non\-falsy\-string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
+			path: tests/Core/Unit/Traits/BookImportTraitTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Core/Unit/Traits/BookImportTraitTest.php
 
 		-
@@ -4951,6 +3283,24 @@ parameters:
 			path: tests/Core/Unit/Traits/BookImportTraitTest.php
 
 		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 3
+			path: tests/DuskTestCase.php
+
+		-
+			message: '#^Cannot access property \$conversation_history on array\<mixed\>\|object\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: tests/Feature/Admin/AIAssistantControllerTest.php
+
+		-
+			message: '#^Cannot access property \$status on array\<mixed\>\|object\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: tests/Feature/Admin/AIAssistantControllerTest.php
+
+		-
 			message: '#^Class App\\Services\\MongoService not found\.$#'
 			identifier: class.notFound
 			count: 1
@@ -4969,28 +3319,10 @@ parameters:
 			path: tests/Feature/Api/AudibleApiIntegrationTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 3
 			path: tests/Feature/Api/AuthorsApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 7
-			path: tests/Feature/Api/BadgeApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$key\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Api/BadgeApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Api/BadgeApiTest.php
 
 		-
 			message: '#^Call to an undefined method Illuminate\\Contracts\\Cache\\Repository\:\:flush\(\)\.$#'
@@ -5035,7 +3367,7 @@ parameters:
 			path: tests/Feature/Api/BookApiOpenApiTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 3
 			path: tests/Feature/Api/BooksEnhancedApiTest.php
@@ -5047,43 +3379,19 @@ parameters:
 			path: tests/Feature/Api/BooksEnhancedApiTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$completed\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$acknowledged_at\.$#'
 			identifier: property.notFound
 			count: 2
-			path: tests/Feature/Api/ProgressControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$completed_at\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Feature/Api/ProgressControllerTest.php
+			path: tests/Feature/Api/RecommendationControllerTest.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Api/ProgressControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$progress_percentage\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Api/ProgressControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$acknowledged_at\.$#'
-			identifier: property.notFound
 			count: 2
 			path: tests/Feature/Api/RecommendationControllerTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Feature/Api/RecommendationControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 2
 			path: tests/Feature/Api/SeriesApiTest.php
@@ -5107,24 +3415,6 @@ parameters:
 			path: tests/Feature/AudiobookBayTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$password\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Auth/AuthControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$role\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Auth/AuthControllerTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$username\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/Auth/AuthControllerTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsBool\(\) with bool will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 2
@@ -5141,18 +3431,6 @@ parameters:
 			identifier: arrayValues.list
 			count: 1
 			path: tests/Feature/BadgeSeederTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Feature/BookControllerIndexTest.php
-
-		-
-			message: '#^Parameter \#1 \$user of method Illuminate\\Foundation\\Testing\\TestCase\:\:actingAs\(\) expects Illuminate\\Contracts\\Auth\\Authenticatable, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Feature/BookControllerIndexTest.php
 
 		-
 			message: '#^Call to an undefined method \$this\(Tests\\Feature\\BookImportTest\)\:\:error\(\)\.$#'
@@ -5182,6 +3460,12 @@ parameters:
 			message: '#^Call to function property_exists\(\) with \$this\(Tests\\Feature\\BookImportTest\) and ''documentStore'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 2
+			path: tests/Feature/BookImportTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Feature/BookImportTest.php
 
 		-
@@ -5296,6 +3580,12 @@ parameters:
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
+			path: tests/Feature/Controllers/Admin/BookControllerGoogleBooksTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Feature/Controllers/Admin/BookControllerGoogleBooksTest.php
 
 		-
@@ -5419,27 +3709,9 @@ parameters:
 			path: tests/Feature/CreateAdminUserCommandTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 27
-			path: tests/Feature/LibraryJsonUpdateTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Feature/LibraryJsonUpdateTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
-			path: tests/Feature/LibraryJsonUpdateTest.php
-
-		-
-			message: '#^Parameter \#1 \$id of method App\\Contracts\\DocumentStoreServiceInterface\:\:updateBook\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 6
 			path: tests/Feature/LibraryJsonUpdateTest.php
 
 		-
@@ -5476,6 +3748,12 @@ parameters:
 			message: '#^Call to function property_exists\(\) with \$this\(Tests\\Import\\Feature\\BookImportTest\) and ''documentStore'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 2
+			path: tests/Import/Feature/BookImportTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Import/Feature/BookImportTest.php
 
 		-
@@ -5566,6 +3844,12 @@ parameters:
 			message: '#^Call to function is_string\(\) with non\-falsy\-string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
+			path: tests/Import/Unit/BookImportTraitTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Import/Unit/BookImportTraitTest.php
 
 		-
@@ -5719,18 +4003,6 @@ parameters:
 			path: tests/Import/Unit/ImportFileControllerTest.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:assertExists\(\)\.$#'
-			identifier: method.notFound
-			count: 5
-			path: tests/Unit/AudibleServiceUnitTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:assertMissing\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: tests/Unit/AudibleServiceUnitTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array\<string, mixed\> and ''Result should be an…'' will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -5794,6 +4066,12 @@ parameters:
 			message: '#^Call to function property_exists\(\) with \$this\(class@anonymous/tests/Unit/BookImportTraitTest\.php\:31\) and ''documentStore'' will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 2
+			path: tests/Unit/BookImportTraitTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Unit/BookImportTraitTest.php
 
 		-
@@ -6025,12 +4303,6 @@ parameters:
 			path: tests/Unit/Import/EnrichmentMergeTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$value\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Unit/Models/SystemSettingTest.php
-
-		-
 			message: '#^Call to an undefined method App\\Contracts\\AI\\AIProviderInterface\:\:shouldReceive\(\)\.$#'
 			identifier: method.notFound
 			count: 7
@@ -6040,6 +4312,18 @@ parameters:
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Cannot access property \$conversation_history on array\<mixed\>\|object\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Cannot access property \$status on array\<mixed\>\|object\.$#'
+			identifier: property.nonObject
+			count: 2
 			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
 
 		-
@@ -6139,30 +4423,6 @@ parameters:
 			path: tests/Unit/Services/BookImportServiceMoveNonAudioFilesToDirectoryTest.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 6
-			path: tests/Unit/Services/BookImportServiceTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 6
-			path: tests/Unit/Services/BookImportServiceTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:series\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Unit/Services/BookImportServiceTest.php
-
-		-
-			message: '#^Method Tests\\Unit\\Services\\BookImportServiceTest\:\:createTempBook\(\) should return App\\Models\\Book but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
-			count: 1
-			path: tests/Unit/Services/BookImportServiceTest.php
-
-		-
 			message: '#^Property Tests\\Unit\\Services\\BookMetadataServiceTest\:\:\$root is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -6179,48 +4439,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Unit/Services/EmbeddedCoverExtractionTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$auto_resolved\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Unit/Services/LibraryRepairServiceTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$book_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Unit/Services/LibraryRepairServiceTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 6
-			path: tests/Unit/Services/LibraryRepairServiceTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Unit/Services/LibraryRepairServiceTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$issue_type\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Unit/Services/LibraryRepairServiceTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$resolution_notes\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Unit/Services/LibraryRepairServiceTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 6
-			path: tests/Unit/Services/LibraryRepairServiceTest.php
 
 		-
 			message: '#^Parameter \#1 \$bookPathService of class App\\Services\\LibraryRepairService constructor expects App\\Services\\BookPathService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
@@ -6251,18 +4469,6 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: tests/Unit/Services/MetadataExtractionTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
-			identifier: method.notFound
-			count: 9
-			path: tests/Unit/Services/MetadataProcessingServiceTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 9
-			path: tests/Unit/Services/MetadataProcessingServiceTest.php
 
 		-
 			message: '#^Offset ''series'' does not exist on array\{title\: ''Lover at Last \[The…'', series_number\: 11\}\.$#'
@@ -6307,12 +4513,6 @@ parameters:
 			path: tests/Unit/Services/MetadataProcessingServiceTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Unit/Services/MySqlServiceCoverImageNormalizationTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6346,6 +4546,12 @@ parameters:
 			message: '#^Call to function is_string\(\) with non\-falsy\-string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
+			path: tests/Unit/Traits/BookImportTraitTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Unit/Traits/BookImportTraitTest.php
 
 		-
@@ -6454,6 +4660,12 @@ parameters:
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
+			path: tests/Web/Feature/Controllers/BookControllerGoogleBooksTest.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 4
 			path: tests/Web/Feature/Controllers/BookControllerGoogleBooksTest.php
 
 		-
