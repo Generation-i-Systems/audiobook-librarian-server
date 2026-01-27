@@ -54,6 +54,7 @@ class BadgeController extends Controller
         $userStats = null;
 
         $result = $badges->map(function ($badge) use ($userBadges, $userId, $deviceId, &$userStats, $validated) {
+            /** @var \App\Models\Badge $badge */
             $userBadge = $userBadges->get($badge->id);
             $hasEarned = $userBadge !== null;
 
@@ -87,14 +88,17 @@ class BadgeController extends Controller
                 'earned' => $hasEarned,
                 'earned_at' => $userBadge?->earned_at?->toISOString(),
                 'times_earned' => $badge->getTimesEarnedByUser($userId, $deviceId),
-                'tier_level' => $userBadge->tier_level ?? 0,
+                'tier_level' => $userBadge?->tier_level ?? 0,
                 'progress_percentage' => $hasEarned ? 100 : $progress,
                 'can_earn_again' => $badge->is_repeatable || !$hasEarned,
             ];
         })->filter(); // Remove null values from earned_only filter
 
+        // @phpstan-ignore-next-line
+        $badgesArray = $result->values();
+
         return response()->json([
-            'badges' => $result->values(),
+            'badges' => $badgesArray,
             // @phpstan-ignore-next-line
             'total_badges' => $badges->count(),
             'earned_badges' => $userBadges->count(),
@@ -185,6 +189,7 @@ class BadgeController extends Controller
 
         $categorizedBadges = $badges->map(function ($categoryBadges, $category) use ($userBadges) {
             $badgeData = $categoryBadges->map(function ($badge) use ($userBadges) {
+                /** @var \App\Models\Badge $badge */
                 $userBadge = $userBadges->get($badge->id);
                 $userId = $userBadges->first()->user_id ?? 'unknown';
 

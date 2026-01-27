@@ -486,7 +486,7 @@ class ApiHealthController extends Controller
                     continue;
                 }
 
-                if (!isset($seriesEntry['name']) || $seriesEntry['name'] === null) {
+                if (!isset($seriesEntry['name'])) {
                     $issues[] = "series[{$index}].name must not be null";
                 }
 

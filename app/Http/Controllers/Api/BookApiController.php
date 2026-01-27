@@ -126,15 +126,26 @@ class BookApiController extends Controller
             }, $booksArray);
         }
 
+        if ($booksData['total'] > 0) {
+            $from = (($page - 1) * $perPage) + 1;
+        } else {
+            $from = null;
+        }
+
+        // @phpstan-ignore-next-line
+        $total = (int) $booksData['total'] ?? 0;
+        $to = ($total > 0) ? min($page * $perPage, $total) : null;
+        $lastPage = $booksData['lastPage'] ?? max(1, ceil($total / $perPage));
+
         return response()->json([
             'data' => $transformedBooks,
             'meta' => [
                 'current_page' => $booksData['currentPage'] ?? $page,
-                'from' => ($booksData['total'] > 0) ? (($page - 1) * $perPage) + 1 : null,
-                'last_page' => $booksData['lastPage'] ?? max(1, ceil(($booksData['total'] ?? 0) / $perPage)),
+                'from' => $from,
+                'last_page' => $lastPage,
                 'per_page' => $perPage,
-                'to' => ($booksData['total'] > 0) ? min($page * $perPage, $booksData['total']) : null,
-                'total' => $booksData['total'] ?? 0,
+                'to' => $to,
+                'total' => $total,
             ],
         ]);
     }
@@ -1510,15 +1521,26 @@ class BookApiController extends Controller
         $books = $booksData['data'];
         $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
+        if ($booksData['total'] > 0) {
+            $from = (($page - 1) * $perPage) + 1;
+        } else {
+            $from = null;
+        }
+
+        // @phpstan-ignore-next-line
+        $total = (int) $booksData['total'] ?? 0;
+        $to = ($total > 0) ? min($page * $perPage, $total) : null;
+        $lastPage = $booksData['lastPage'] ?? max(1, ceil($total / $perPage));
+
         return response()->json([
             'data' => $transformedBooks,
             'meta' => [
-                'current_page' => $page,
-                'from' => ($booksData['total'] > 0) ? (($page - 1) * $perPage) + 1 : null,
-                'last_page' => $booksData['lastPage'],
+                'current_page' => $booksData['currentPage'] ?? $page,
+                'from' => $from,
+                'last_page' => $lastPage,
                 'per_page' => $perPage,
-                'to' => ($booksData['total'] > 0) ? min($page * $perPage, $booksData['total']) : null,
-                'total' => $booksData['total'],
+                'to' => $to,
+                'total' => $total,
             ],
         ]);
     }

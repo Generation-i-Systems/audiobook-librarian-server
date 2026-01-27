@@ -36,9 +36,9 @@ class RecommendationControllerTest extends TestCase
 
     public function test_can_send_a_book_recommendation(): void
     {
-        /** @var \Illuminate\Database\Eloquent\Model $book */
+        /** @var \App\Models\Book $book */
         $book = $this->book;
-        /** @var \Illuminate\Database\Eloquent\Model $recipient */
+        /** @var \App\Models\User $recipient */
         $recipient = $this->recipient;
 
         $response = $this->postJson('/api/v1/recommendations/' . $book->id, [
@@ -58,7 +58,7 @@ class RecommendationControllerTest extends TestCase
 
     public function test_cannot_recommend_a_book_to_self(): void
     {
-        /** @var \Illuminate\Database\Eloquent\Model $book */
+        /** @var \App\Models\Book $book */
         $book = $this->book;
 
         $this->postJson('/api/v1/recommendations/' . $book->id, [
@@ -70,9 +70,9 @@ class RecommendationControllerTest extends TestCase
 
     public function test_cannot_send_duplicate_unacknowledged_recommendation(): void
     {
-        /** @var \Illuminate\Database\Eloquent\Model $book */
+        /** @var \App\Models\Book $book */
         $book = $this->book;
-        /** @var \Illuminate\Database\Eloquent\Model $recipient */
+        /** @var \App\Models\User $recipient */
         $recipient = $this->recipient;
 
         UserRecommendation::factory()->create([
@@ -90,9 +90,9 @@ class RecommendationControllerTest extends TestCase
 
     public function test_can_send_recommendation_if_previous_one_was_acknowledged(): void
     {
-        /** @var \Illuminate\Database\Eloquent\Model $book */
+        /** @var \App\Models\Book $book */
         $book = $this->book;
-        /** @var \Illuminate\Database\Eloquent\Model $recipient */
+        /** @var \App\Models\User $recipient */
         $recipient = $this->recipient;
 
         UserRecommendation::factory()->create([
@@ -112,9 +112,9 @@ class RecommendationControllerTest extends TestCase
         /** @var \App\Models\Book $book2 */
         $book2 = Book::factory()->create();
 
-        /** @var Book $book */
+        /** @var \App\Models\Book $book */
         $book = $this->book;
-        /** @var User $recipient */
+        /** @var \App\Models\User $recipient */
         $recipient = $this->recipient;
 
         // Recommendation 1 (unacknowledged, should appear)
@@ -145,9 +145,9 @@ class RecommendationControllerTest extends TestCase
 
     public function test_can_acknowledge_a_recommendation(): void
     {
-        /** @var Book $book */
+        /** @var \App\Models\Book $book */
         $book = $this->book;
-        /** @var User $recipient */
+        /** @var \App\Models\User $recipient */
         $recipient = $this->recipient;
 
         /** @var UserRecommendation $recommendation */
@@ -168,12 +168,12 @@ class RecommendationControllerTest extends TestCase
 
     public function test_cannot_acknowledge_recommendation_not_addressed_to_user(): void
     {
-        /** @var Book $book */
+        /** @var \App\Models\Book $book */
         $book = $this->book;
-        /** @var User $recipient */
+        /** @var \App\Models\User $recipient */
         $recipient = $this->recipient;
 
-        /** @var User $otherUser */
+        /** @var \App\Models\User $otherUser */
         $otherUser = User::factory()->create();
         /** @var UserRecommendation $recommendation */
         $recommendation = UserRecommendation::factory()->create([
