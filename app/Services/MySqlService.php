@@ -281,6 +281,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return (int) $progress->current_position_seconds;
     }
 
+    public function getProgress(string $userId, string $bookId): ?int
+    {
+        $progress = $this->getReadingProgress($userId, $bookId);
+        return $progress > 0 ? $progress : null;
+    }
+
     public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array
     {
         if (!$this->ensureLibraryRepairIssuesTable()) {
@@ -2409,6 +2415,15 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         $job = Job::findOrFail($jobId);
 
         return $job->update($data);
+    }
+
+    public function updateJobStatus(string $jobId, string $type, string $status, array $metadata = []): bool
+    {
+        $job = Job::firstOrNew(['id' => $jobId]);
+        $job->type = $type;
+        $job->status = $status;
+        $job->metadata = array_merge($job->metadata ?? [], $metadata);
+        return $job->save();
     }
 
     public function getJobCount(): int
