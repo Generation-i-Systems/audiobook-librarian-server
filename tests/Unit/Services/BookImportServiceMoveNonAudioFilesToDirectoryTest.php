@@ -70,8 +70,6 @@ class BookImportServiceMoveNonAudioFilesToDirectoryTest extends TestCase
         File::shouldReceive('deleteDirectory')->once()->with('/src');
 
         $method->invoke($service, '/src', '/dst');
-
-        $this->assertTrue(true);
     }
 }
 

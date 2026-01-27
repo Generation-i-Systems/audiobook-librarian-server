@@ -58,7 +58,6 @@ class EmbeddedCoverExtractionTest extends TestCase
 
         // Assert book was created
         $this->assertNotNull($book);
-        $this->assertNotNull($book->id);
 
         // Create book directory before processing cover
         $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');

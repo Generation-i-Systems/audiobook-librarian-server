@@ -266,6 +266,7 @@ class MetadataProcessingServiceTest extends TestCase
         $method->invokeArgs($this->service, [&$metadata]);
 
         $this->assertEquals('The Great Adventure', $metadata['title']);
+        $this->assertArrayHasKey('series_number', $metadata);
         $this->assertEquals(5, $metadata['series_number']);
     }
 
@@ -284,6 +285,7 @@ class MetadataProcessingServiceTest extends TestCase
         $method->invokeArgs($this->service, [&$metadata]);
 
         $this->assertEquals('Epic Series', $metadata['title']);
+        $this->assertArrayHasKey('series_number', $metadata);
         $this->assertEquals(12, $metadata['series_number']);
     }
 
@@ -301,7 +303,9 @@ class MetadataProcessingServiceTest extends TestCase
         $method->invokeArgs($this->service, [&$metadata]);
 
         $this->assertEquals('Lover at Last', $metadata['title']);
+        $this->assertArrayHasKey('series', $metadata);
         $this->assertEquals('The Black Dagger Brotherhood', $metadata['series']);
+        $this->assertArrayHasKey('series_number', $metadata);
         $this->assertEquals(11, $metadata['series_number']);
     }
 
@@ -319,7 +323,9 @@ class MetadataProcessingServiceTest extends TestCase
         $method->invokeArgs($this->service, [&$metadata]);
 
         $this->assertEquals('Some Novella', $metadata['title']);
+        $this->assertArrayHasKey('series', $metadata);
         $this->assertEquals('Example Series', $metadata['series']);
+        $this->assertArrayHasKey('series_number', $metadata);
         $this->assertEquals(16.5, $metadata['series_number']);
     }
 
@@ -338,6 +344,7 @@ class MetadataProcessingServiceTest extends TestCase
         $method->invokeArgs($this->service, [&$metadata]);
 
         $this->assertEquals('Lover at Last', $metadata['title']);
+        $this->assertArrayHasKey('series', $metadata);
         $this->assertEquals('The Black Dagger Brotherhood', $metadata['series']);
         $this->assertEquals(11, $metadata['series_number']);
     }
