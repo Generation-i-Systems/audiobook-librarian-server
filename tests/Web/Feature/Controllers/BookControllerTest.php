@@ -27,7 +27,9 @@ class BookControllerTest extends TestCase
         $this->app->instance(DocumentStoreServiceInterface::class, $this->documentStoreServiceMock);
 
         $this->externalCoverServiceMock = Mockery::mock(ExternalCoverService::class);
-        $this->app->instance(ExternalCoverService::class, $this->externalCoverServiceMock);
+        /** @var ExternalCoverService $mock */
+        $mock = $this->externalCoverServiceMock;
+        $this->app->instance(ExternalCoverService::class, $mock);
 
         Event::fake();
 

@@ -84,7 +84,6 @@ class BookControllerGoogleBooksTest extends TestCase
         );
 
         // Verify the results
-        $this->assertIsArray($results);
         $this->assertNotEmpty($results);
 
         // Get the first result
