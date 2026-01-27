@@ -358,7 +358,7 @@ class ProgressController extends Controller
         $progress->completed = true;
         $progress->completed_at = now();
         $progress->progress_percentage = 100;
-        $progress->current_position_seconds = $progress->total_duration_seconds;
+        $progress->current_position_seconds = $progress->total_duration_seconds ?? $progress->current_position_seconds ?? 0;
         $progress->last_listened_at = now();
         $progress->save();
 
