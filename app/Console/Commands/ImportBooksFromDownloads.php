@@ -1487,6 +1487,11 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->formatFileTypes($fileTypes);
     }
 
+    protected function isTextOnWhiteCover(string $imagePath): bool
+    {
+        return $this->getImportService()->isTextOnWhiteCover($imagePath, $this->coverAnalysisService);
+    }
+
     /**
      * Show cost estimate for AI processing
      */
