@@ -45,7 +45,7 @@ class ParseBooksCommand extends Command
     public function handle(BookDirectoryParser $parser, DocumentStoreServiceInterface $documentStoreService)
     {
         $paths = $this->argument('paths');
-        $bookStoragePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $bookStoragePath = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         $expandedPaths = [];
         foreach ($paths as $path) {
             // Absolute path that exists directly
@@ -90,11 +90,6 @@ class ParseBooksCommand extends Command
         $maxDepth = $this->option('max-depth');
         $dryRun = $this->option('dry-run');
         $shouldSort = $this->option('sort');
-
-        // If no paths provided, use current directory
-        if (empty($paths)) {
-            $paths = [getcwd()];
-        }
 
         // Validate all paths using resolved storage path
         $validPaths = [];
@@ -153,7 +148,7 @@ class ParseBooksCommand extends Command
                 // Set dateAdded for each book from directory mtime or authoritative time
                 foreach ($books as &$book) {
                     $dirPath = $book['directoryPath'] ?? $book['path'] ?? null;
-                    $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+                    $storageRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
                     if ($dirPath && strpos($dirPath, '/') !== 0) {
                         $fullPath = $storageRoot . '/' . ltrim($dirPath, '/');
                     } else {
@@ -338,7 +333,7 @@ class ParseBooksCommand extends Command
 
                     $this->info("Extracting author from path: $pathToUse");
                     $author = $parser->extractAuthorFromPath($pathToUse);
-                    $book['author'] = is_array($author) ? $author : [$author];
+                    $book['author'] = array_filter((array) $author);
                 }
 
                 // Check if we still don't have a valid author
@@ -354,8 +349,8 @@ class ParseBooksCommand extends Command
                 if ($hasNoAuthor && !empty($book['full_path'])) {
                     $parentDir = dirname($book['full_path']);
                     $this->info("Trying parent directory for author: $parentDir");
-                    $author = $this->extractAuthorFromPath($parentDir);
-                    $book['author'] = is_array($author) ? $author : [$author];
+                    $author = $parser->extractAuthorFromPath($parentDir);
+                    $book['author'] = array_filter((array) $author);
                 }
 
                 // Clean up title
@@ -427,7 +422,7 @@ class ParseBooksCommand extends Command
             //         $book['seriesName'] = $seriesMap[$book['seriesName']];
             //     }
             // }
-            unset($book); // Break the reference
+            // (intentionally no unset here; loop above is commented out)
 
             // Sort the books if requested
             if ($shouldSort) {
