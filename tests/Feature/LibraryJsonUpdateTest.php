@@ -191,9 +191,12 @@ class LibraryJsonUpdateTest extends TestCase
 
     public function testLibraryJsonIsNotCreatedWhenDirectoryPathMissing()
     {
+        /** @var Author $author */
         $author = Author::factory()->create(['name' => 'Test Author']);
+        /** @var Genre $genre */
         $genre = Genre::factory()->create(['name' => 'Test Genre']);
 
+        /** @var Book $book */
         $book = Book::factory()->create([
             'title' => 'Test Book Without Directory',
             'directory_path' => null,
@@ -204,7 +207,7 @@ class LibraryJsonUpdateTest extends TestCase
 
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
-        $documentStore->updateBook($book->id, [
+        $documentStore->updateBook((string) $book->id, [
             'title' => 'Updated Book Without Directory',
         ]);
 
@@ -213,12 +216,15 @@ class LibraryJsonUpdateTest extends TestCase
 
     public function testLibraryJsonIsNotCreatedWhenDirectoryHasNoAudioFiles()
     {
+        /** @var Author $author */
         $author = Author::factory()->create(['name' => 'Test Author']);
+        /** @var Genre $genre */
         $genre = Genre::factory()->create(['name' => 'Test Genre']);
 
         $bookDir = 'test-author/empty-book';
         $this->createBookDirectory($bookDir, false);
 
+        /** @var Book $book */
         $book = Book::factory()->create([
             'title' => 'Test Book With Empty Directory',
             'directory_path' => $bookDir,
@@ -229,7 +235,7 @@ class LibraryJsonUpdateTest extends TestCase
 
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
-        $documentStore->updateBook($book->id, [
+        $documentStore->updateBook((string) $book->id, [
             'title' => 'Updated Book With Empty Directory',
         ]);
 
@@ -240,7 +246,9 @@ class LibraryJsonUpdateTest extends TestCase
 
     public function testLibraryJsonIsCreatedWhenDirectoryHasAudioFiles()
     {
+        /** @var Author $author */
         $author = Author::factory()->create(['name' => 'Test Author']);
+        /** @var Genre $genre */
         $genre = Genre::factory()->create(['name' => 'Test Genre']);
 
         $bookDir = 'test-author/book-with-audio';
@@ -249,6 +257,7 @@ class LibraryJsonUpdateTest extends TestCase
         $fullPath = Storage::disk('books')->path($bookDir);
         file_put_contents($fullPath . '/chapter01.mp3', 'dummy audio content');
 
+        /** @var Book $book */
         $book = Book::factory()->create([
             'title' => 'Test Book With Audio Files',
             'directory_path' => $bookDir,
@@ -259,7 +268,7 @@ class LibraryJsonUpdateTest extends TestCase
 
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
-        $documentStore->updateBook($book->id, [
+        $documentStore->updateBook((string) $book->id, [
             'title' => 'Updated Book With Audio Files',
         ]);
 
@@ -270,15 +279,21 @@ class LibraryJsonUpdateTest extends TestCase
 
     public function testLibraryJsonContainsAllNonUserSpecificData()
     {
+        /** @var Author $author */
         $author = Author::factory()->create(['name' => 'Test Author']);
+        /** @var Narrator $narrator */
         $narrator = Narrator::factory()->create(['name' => 'Test Narrator']);
+        /** @var Genre $genre */
         $genre = Genre::factory()->create(['name' => 'Science Fiction']);
+        /** @var Publisher $publisher */
         $publisher = Publisher::create(['name' => 'Test Publisher']);
+        /** @var Series $series */
         $series = Series::factory()->create(['name' => 'Test Series', 'is_collection' => false]);
 
         $bookDir = 'test-author/comprehensive-book';
         $this->createBookDirectory($bookDir);
 
+        /** @var Book $book */
         $book = Book::factory()->create([
             'title' => 'Comprehensive Test Book',
             'directory_path' => $bookDir,
@@ -298,7 +313,7 @@ class LibraryJsonUpdateTest extends TestCase
 
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
-        $documentStore->updateBook($book->id, [
+        $documentStore->updateBook((string) $book->id, [
             'title' => 'Comprehensive Test Book',
         ]);
 
@@ -307,6 +322,7 @@ class LibraryJsonUpdateTest extends TestCase
         $this->assertFileExists($jsonPath);
 
         $jsonContent = json_decode(file_get_contents($jsonPath), true);
+        $this->assertIsArray($jsonContent);
 
         $this->assertEquals($book->id, $jsonContent['id']);
         $this->assertEquals('Comprehensive Test Book', $jsonContent['title']);

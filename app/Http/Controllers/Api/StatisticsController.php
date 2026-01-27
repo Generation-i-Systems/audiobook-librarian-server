@@ -401,8 +401,8 @@ class StatisticsController extends Controller
                 'total_seconds' => $weeklyTotal,
                 'total_books' => $totalBooks,
                 'formatted_total_duration' => $this->formatSeconds((int) $weeklyTotal),
-                'daily_breakdown' => $stats->map(function ($stat) {
-                    /** @var \stdClass $stat */
+                'daily_breakdown' => $stats->map(function (object $stat) {
+                    /** @var \stdClass&object{listening_date: string, total_seconds: int|float, books_listened: int, session_count: int} $stat */
                     return [
                         'date' => $stat->listening_date,
                         'total_seconds' => $stat->total_seconds,
@@ -809,8 +809,8 @@ class StatisticsController extends Controller
         ->toBase()
         ->get();
 
-        return $stats->map(function ($stat) {
-            /** @var \stdClass $stat */
+        return $stats->map(function (object $stat) {
+            /** @var \stdClass&object{date: string, listening_time_ms: int|float, sessions_count: int, books_listened: string} $stat */
             return [
                 'date' => (string)($stat->date ?? ''),
                 'listening_time_ms' => (int) ($stat->listening_time_ms ?? 0),
