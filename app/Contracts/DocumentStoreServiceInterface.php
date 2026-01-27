@@ -526,6 +526,11 @@ interface DocumentStoreServiceInterface
 
     // JOBS
     /**
+     * Return all jobs.
+     */
+    public function getJobs(): array;
+
+    /**
      * List jobs with optional filtering and pagination.
      *
      * @param string|null $type Job type filter

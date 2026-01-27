@@ -2355,6 +2355,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $job ? $job->toArray() : null;
     }
 
+    public function getJobs(): array
+    {
+        return Job::query()
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function (Job $job): array {
+                return [
+                    'id' => (string) $job->id,
+                    'type' => (string) $job->type,
+                    'status' => (string) $job->status,
+                    'data' => $job->payload,
+                    'startedAt' => $job->created_at ? $job->created_at->toIso8601String() : null,
+                ];
+            })
+            ->toArray();
+    }
+
     public function listJobs(
         ?string $type = null,
         ?string $status = null,
