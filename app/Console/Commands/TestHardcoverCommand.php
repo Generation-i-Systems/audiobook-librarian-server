@@ -33,7 +33,7 @@ class TestHardcoverCommand extends Command
         $this->info("Searching for books with title: $title" . ($author ? " by $author" : ''));
 
         // Test search
-        $books = $hardcoverService->searchBooks($title, $author);
+        $books = $hardcoverService->searchBooks($title, ['author' => $author]);
 
         if (empty($books)) {
             $this->error('No books found or API request failed');
