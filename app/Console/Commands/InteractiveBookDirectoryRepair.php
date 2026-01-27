@@ -9,7 +9,7 @@ use App\Services\SafeLoggingService;
 
 class InteractiveBookDirectoryRepair extends Command
 {
-    protected $signature = 'books:repair-directories-interactive 
+    protected $signature = 'books:repair-directories-interactive
                           {--disk=books : Storage disk to use}
                           {--limit=0 : Limit number of books to process (0 for all)}
                           {--similarity-threshold=0.6 : Minimum similarity score for suggestions}
@@ -80,13 +80,14 @@ class InteractiveBookDirectoryRepair extends Command
 
     protected function getBooksToProcess()
     {
-        $query = Book::whereNotNull('directory_path');
+        $query = Book::with(['authors', 'narrators', 'series'])->whereNotNull('directory_path');
 
         if ($bookId = $this->option('book-id')) {
             $query->where('id', $bookId);
         }
 
-        if ($limit = $this->option('limit')) {
+        $limit = (int) $this->option('limit');
+        if ($limit > 0) {
             $query->limit($limit);
         }
 
@@ -113,10 +114,16 @@ class InteractiveBookDirectoryRepair extends Command
     protected function displayBookInfo(Book $book): void
     {
         $this->info("📖 Book: {$book->title}");
-        $this->line("   👤 Author: " . ($book->author ?: 'N/A'));
-        $this->line("   📚 Series: " . ($book->series ?: 'N/A'));
-        $this->line("   🎙️  Narrator: " . (is_array($book->narrator) ? implode(', ', $book->narrator) : ($book->narrator ?: 'N/A')));
-        $this->line("   📅 Year: " . ($book->publishedYear ?: 'N/A'));
+
+        $authorNames = $book->relationLoaded('authors') ? $book->authors->pluck('name')->implode(', ') : '';
+        $seriesNames = $book->relationLoaded('series') ? $book->series->pluck('name')->implode(', ') : '';
+        $narratorNames = $book->relationLoaded('narrators') ? $book->narrators->pluck('name')->implode(', ') : '';
+        $publishedYear = $book->getAttribute('published_year');
+
+        $this->line("   👤 Author: " . ($authorNames !== '' ? $authorNames : 'N/A'));
+        $this->line("   📚 Series: " . ($seriesNames !== '' ? $seriesNames : 'N/A'));
+        $this->line("   🎙️  Narrator: " . ($narratorNames !== '' ? $narratorNames : 'N/A'));
+        $this->line("   📅 Year: " . ($publishedYear !== null ? (string) $publishedYear : 'N/A'));
         $this->error("   ❌ Missing path: {$book->directory_path}");
         $this->newLine();
     }
@@ -440,23 +447,27 @@ class InteractiveBookDirectoryRepair extends Command
     {
         $terms = [];
 
-        if ($book->author) {
-            $terms[] = $this->normalizeForComparison($book->author);
+        if ($book->relationLoaded('authors') && $book->authors->isNotEmpty()) {
+            $authorNames = $book->authors->pluck('name')->filter()->toArray();
+            foreach ($authorNames as $authorName) {
+                $terms[] = $this->normalizeForComparison((string) $authorName);
+            }
         }
         if ($book->title) {
             $terms[] = $this->normalizeForComparison($book->title);
         }
-        if ($book->series) {
-            $terms[] = $this->normalizeForComparison($book->series);
+
+        if ($book->relationLoaded('series') && $book->series->isNotEmpty()) {
+            $seriesNames = $book->series->pluck('name')->filter()->toArray();
+            foreach ($seriesNames as $seriesName) {
+                $terms[] = $this->normalizeForComparison((string) $seriesName);
+            }
         }
 
-        if ($book->narrator) {
-            if (is_array($book->narrator)) {
-                foreach ($book->narrator as $narrator) {
-                    $terms[] = $this->normalizeForComparison($narrator);
-                }
-            } else {
-                $terms[] = $this->normalizeForComparison($book->narrator);
+        if ($book->relationLoaded('narrators') && $book->narrators->isNotEmpty()) {
+            $narratorNames = $book->narrators->pluck('name')->filter()->toArray();
+            foreach ($narratorNames as $narratorName) {
+                $terms[] = $this->normalizeForComparison((string) $narratorName);
             }
         }
 
