@@ -72,7 +72,7 @@ class CheckCoverImages extends Command
             $directoryPath = $book->directoryPath;
             // Handle needs_review_reasons as an array per model casts; tolerate legacy string JSON
             $rawReasons = $book->needs_review_reasons;
-            $needsReviewReasons = is_array($rawReasons) ? $rawReasons : (is_string($rawReasons) ? (json_decode($rawReasons, true) ?? []) : []);
+            $needsReviewReasons = $this->normalizeNeedsReviewReasons($rawReasons);
             $originalNeedsReview = $book->needs_review;
 
             $needsFix = false;
@@ -302,7 +302,9 @@ class CheckCoverImages extends Command
         $title = $book->title;
         $authorName = null;
         try {
-            $authorName = $book->authors()->exists() ? ($book->authors()->first()->name ?? null) : null;
+            /** @var \App\Models\Author|null $firstAuthor */
+            $firstAuthor = $book->authors()->select('authors.id', 'authors.name')->first();
+            $authorName = $firstAuthor?->name;
         } catch (\Throwable $e) {
             Log::debug('CheckCoverImages: failed to load authors for book', ['bookId' => $book->id, 'error' => $e->getMessage()]);
         }
@@ -327,6 +329,21 @@ class CheckCoverImages extends Command
 
         $result['error'] = 'No Audible match found';
         return $result;
+    }
+
+    protected function normalizeNeedsReviewReasons(mixed $rawReasons): array
+    {
+        if (is_array($rawReasons)) {
+            return $rawReasons;
+        }
+
+        if (is_string($rawReasons)) {
+            $decoded = json_decode($rawReasons, true);
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 
     /**
