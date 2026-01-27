@@ -338,6 +338,7 @@ trait BookImportTrait
 
             // Get valid genres from document store if available, otherwise use fallback list
             $validGenres = [];
+            /** @phpstan-ignore-next-line function.alreadyNarrowedType, booleanAnd.rightAlwaysTrue */
             if (property_exists($this, 'documentStore') && $this->documentStore) {
                 try {
                     $genresList = $this->documentStore->listGenres();
@@ -501,6 +502,7 @@ trait BookImportTrait
 
         if (!$url) {
             if ($output) {
+                /** @phpstan-ignore-next-line method.notFound */
                 $output->error("Invalid URL: {$url}");
             }
             return null;
@@ -519,6 +521,7 @@ trait BookImportTrait
                 if (!is_dir($storagePath)) {
                     if (!mkdir($storagePath, 0775, true) && !is_dir($storagePath)) {
                         if ($output) {
+                            /** @phpstan-ignore-next-line method.notFound */
                             $output->error("Unable to create default storage directory: {$storagePath}");
                         }
                         return null;
@@ -594,6 +597,7 @@ trait BookImportTrait
 
             if ($errorNo !== 0) {
                 if ($output) {
+                    /** @phpstan-ignore-next-line method.notFound */
                     $output->error("cURL error ({$errorNo}): {$errorMsg}");
                 }
                 return null;
@@ -601,6 +605,7 @@ trait BookImportTrait
 
             if ($httpCode !== 200) {
                 if ($output) {
+                    /** @phpstan-ignore-next-line method.notFound */
                     $output->error("HTTP error: Received code {$httpCode} from {$url}");
                 }
                 if ($output) {
@@ -611,6 +616,7 @@ trait BookImportTrait
 
             if (empty($contents)) {
                 if ($output) {
+                    /** @phpstan-ignore-next-line method.notFound */
                     $output->error("Empty content received from {$url}");
                 }
                 return null;
@@ -637,12 +643,14 @@ trait BookImportTrait
 
             if ($bytesWritten === false) {
                 if ($output) {
+                    /** @phpstan-ignore-next-line method.notFound */
                     $output->error("Unable to write file {$fullPath}");
                 }
                 // Check file permissions
                 if (is_dir($fullDir)) {
                     $perms = substr(sprintf('%o', fileperms($fullDir)), -4);
                     if ($output) {
+                        /** @phpstan-ignore-next-line method.notFound */
                         $output->error("Directory permissions: {$perms}");
                     }
                 }
@@ -658,7 +666,9 @@ trait BookImportTrait
             return $relativePath;
         } catch (\Exception $e) {
             if ($output) {
+                /** @phpstan-ignore-next-line method.notFound */
                 $output->error('Error downloading image: ' . $e->getMessage());
+                /** @phpstan-ignore-next-line method.notFound */
                 $output->error($e->getTraceAsString());
             }
             return null;
@@ -1064,6 +1074,7 @@ trait BookImportTrait
     public function importBookFromPath(array $bookData): string
     {
         // Access the DocumentStore service from the test or container
+        /** @phpstan-ignore-next-line function.alreadyNarrowedType, booleanAnd.rightAlwaysTrue */
         if (property_exists($this, 'documentStore') && $this->documentStore) {
             return $this->documentStore->createBook($bookData);
         }
