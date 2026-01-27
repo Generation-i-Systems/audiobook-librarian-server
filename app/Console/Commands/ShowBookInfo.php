@@ -20,8 +20,6 @@ class ShowBookInfo extends Command
     use BookImportTrait;
 
     private array $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'aac', 'wav', 'wma'];
-    private array $seriesCollection = [];
-    private ?string $resolvedBookRoot = null;
 
     protected $signature = 'books:info {directories?*}
                 {--compact : Use compact view instead of table}
@@ -475,8 +473,12 @@ class ShowBookInfo extends Command
         }
 
         if ($book->series()->count() > 0) {
-            $seriesInfo = $book->series()->get()->map(function ($series) {
-                $number = $series->pivot->series_number;
+            /** @var \Illuminate\Database\Eloquent\Collection<int, Series> $seriesCollection */
+            $seriesCollection = $book->series()->get();
+
+            $seriesInfo = $seriesCollection->map(function (Series $series): string {
+                $number = $series->pivot?->getAttribute('series_number');
+
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
             $this->addRow(
@@ -852,8 +854,12 @@ class ShowBookInfo extends Command
         }
 
         if ($book->series()->count() > 0) {
-            $seriesInfo = $book->series()->get()->map(function ($series) {
-                $number = $series->pivot->series_number;
+            /** @var \Illuminate\Database\Eloquent\Collection<int, Series> $seriesCollection */
+            $seriesCollection = $book->series()->get();
+
+            $seriesInfo = $seriesCollection->map(function (Series $series): string {
+                $number = $series->pivot?->getAttribute('series_number');
+
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
             $this->printField('Series', $seriesInfo, $leftWidth);
@@ -975,10 +981,11 @@ class ShowBookInfo extends Command
         $currentLine = '';
         $visibleLength = 0;
 
-        $flushLine = static function () use (&$lines, &$currentLine, &$visibleLength): void {
+        $flushLine = static function (array &$lines, string &$currentLine, int &$visibleLength): void {
             if ($currentLine !== '') {
                 $lines[] = rtrim($currentLine);
             }
+
             $currentLine = '';
             $visibleLength = 0;
         };
@@ -999,10 +1006,10 @@ class ShowBookInfo extends Command
                     );
                     foreach ($segments as $segment) {
                         if (preg_match("/\r\n|\r|\n/", $segment)) {
-                            $flushLine();
+                            $flushLine($lines, $currentLine, $visibleLength);
                         } elseif ($visibleLength > 0) {
                             if ($visibleLength + 1 > $maxWidth) {
-                                $flushLine();
+                                $flushLine($lines, $currentLine, $visibleLength);
                             }
                             $currentLine .= ' ';
                             $visibleLength += 1;
@@ -1010,7 +1017,7 @@ class ShowBookInfo extends Command
                     }
                 } elseif ($visibleLength > 0) {
                     if ($visibleLength + 1 > $maxWidth) {
-                        $flushLine();
+                        $flushLine($lines, $currentLine, $visibleLength);
                     }
                     $currentLine .= ' ';
                     $visibleLength += 1;
@@ -1023,7 +1030,7 @@ class ShowBookInfo extends Command
             while ($remaining !== '') {
                 $available = $maxWidth - $visibleLength;
                 if ($available <= 0) {
-                    $flushLine();
+                    $flushLine($lines, $currentLine, $visibleLength);
                     $available = $maxWidth;
                 }
 
@@ -1035,14 +1042,12 @@ class ShowBookInfo extends Command
                 $remaining = mb_substr($remaining, $chunkLength);
 
                 if ($remaining !== '') {
-                    $flushLine();
+                    $flushLine($lines, $currentLine, $visibleLength);
                 }
             }
         }
 
-        if ($currentLine !== '') {
-            $lines[] = rtrim($currentLine);
-        }
+        $flushLine($lines, $currentLine, $visibleLength);
 
         return implode("\n", $lines);
     }
