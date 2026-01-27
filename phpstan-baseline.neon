@@ -1,96 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Trait App\\Console\\Commands\\ManualEnrichmentTrait is used zero times and is not analysed\.$#'
-			identifier: trait.unused
-			count: 1
-			path: app/Console/Commands/ManualEnrichmentTrait.php
-
-		-
-			message: '#^Trait App\\Http\\Controllers\\Admin\\DirectoryConflictTrait is used zero times and is not analysed\.$#'
-			identifier: trait.unused
-			count: 1
-			path: app/Http/Controllers/Admin/DirectoryConflictTrait.php
-
-		-
-			message: '#^Call to function method_exists\(\) with Symfony\\Component\\Finder\\SplFileInfo and ''getFilename'' will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Http/Controllers/Admin/ImportFileController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\Admin\\ImportFileController\:\:moveSelected\(\) should return Illuminate\\Http\\JsonResponse but returns Illuminate\\Http\\RedirectResponse\.$#'
-			identifier: return.type
-			count: 2
-			path: app/Http/Controllers/Admin/ImportFileController.php
-
-		-
-			message: '#^Offset ''dirname'' on array\{dirname\: string, basename\: string, extension\?\: string, filename\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Http/Controllers/Admin/ImportFileController.php
-
-		-
-			message: '#^Offset ''filename'' on array\{dirname\: string, basename\: string, extension\?\: string, filename\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Http/Controllers/Admin/ImportFileController.php
-
-		-
-			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Http/Controllers/Admin/ImportFileController.php
-
-		-
-			message: '#^Offset ''title'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Http/Controllers/Admin/LibraryRepairController.php
-
-		-
-			message: '#^Strict comparison using \=\=\= between mixed and null will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: app/Http/Controllers/Api/ApiHealthController.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\StatefulGuard\:\:fromUser\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Api/AuthApiController.php
-
-		-
-			message: '#^Call to an undefined method Laravel\\Socialite\\Contracts\\Provider\:\:stateless\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Api/AuthApiController.php
-
-		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: app/Http/Controllers/Api/AuthController.php
-
-		-
-			message: '#^Variable \$createdId on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.variable
-			count: 1
-			path: app/Http/Controllers/Api/AuthController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\UserBadge\:\:\$total_badges\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BadgeController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\UserBadge\:\:\$total_points\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BadgeController.php
-
-		-
 			message: '#^Anonymous function should return array\{category\: \(int\|string\), category_name\: \(int\|string\), badges\: Illuminate\\Support\\Collection\<int, array\{id\: int, key\: string, name\: string, description\: string, icon\: string\|null, image_url\: string\|null, tier\: string, points\: int, \.\.\.\}\>, total_in_category\: int\<0, max\>, earned_in_category\: int\<0, max\>\} but returns array\{category\: \(int\|string\), category_name\: \(int\|string\), badges\: Illuminate\\Support\\Collection\<int, array\{id\: int, key\: string, name\: string, description\: string, icon\: string\|null, image_url\: string\|null, tier\: string, points\: int, \.\.\.\}\>, total_in_category\: int\<0, max\>, earned_in_category\: int\<0, max\>\}\.$#'
 			identifier: return.type
 			count: 1
@@ -103,68 +13,14 @@ parameters:
 			path: app/Http/Controllers/Api/BadgeController.php
 
 		-
-			message: '#^Parameter \#1 \$string of function substr expects string, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Api/BadgeController.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>tier_level" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Http/Controllers/Api/BadgeController.php
 
 		-
-			message: '#^Using nullsafe property access "\?\-\>user_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Http/Controllers/Api/BadgeController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Author\:\:\$book_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Author\:\:\$genres\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Series\:\:\$authors\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Series\:\:\$book_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Series\:\:\$books_in_series\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
 			message: '#^Comparison operation "\>" between int\<1, max\> and 0 is always true\.$#'
 			identifier: greater.alwaysTrue
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\Api\\BookApiController\:\:proxyRemoteCoverImage\(\) should return Illuminate\\Http\\Response but returns Illuminate\\Http\\JsonResponse\.$#'
-			identifier: return.type
-			count: 3
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\Api\\BookApiController\:\:resolveCoverImagePath\(\) never returns null so it can be removed from the return type\.$#'
-			identifier: return.unusedType
 			count: 1
 			path: app/Http/Controllers/Api/BookApiController.php
 
@@ -175,106 +31,16 @@ parameters:
 			path: app/Http/Controllers/Api/BookApiController.php
 
 		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Series\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
 			message: '#^Strict comparison using \!\=\= between numeric\-string and '''' will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: app/Http/Controllers/Api/BookApiController.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Relations\\Pivot\:\:\$series_number\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Api/BookImportApiController.php
-
-		-
-			message: '#^Cannot unset offset ''_id'' on array\{user_id\: int\|string\|null, book_id\: string, chapter\: int, position\: int, title\: mixed, note\: mixed, created_at\: string\|null, updated_at\: string\|null, \.\.\.\}\.$#'
-			identifier: unset.offset
-			count: 1
-			path: app/Http/Controllers/Api/BookmarkApiController.php
-
-		-
-			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Support\\Carbon\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Http/Controllers/Api/ProgressController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\Api\\SkinController\:\:download\(\) should return Illuminate\\Http\\Response but returns Symfony\\Component\\HttpFoundation\\BinaryFileResponse\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Http/Controllers/Api/SkinController.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>read_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Http/Controllers/Api/UserStatusController.php
-
-		-
-			message: '#^Call to an undefined method App\\Http\\Controllers\\BookController\:\:handleMainBooksAjaxRequest\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/BookController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\BookController\:\:loadMainBooks\(\) should return Illuminate\\Http\\JsonResponse but returns Illuminate\\Http\\RedirectResponse\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/BookController.php
-
-		-
-			message: '#^Method App\\Http\\Controllers\\BookController\:\:show\(\) should return Illuminate\\View\\View but returns Illuminate\\Http\\RedirectResponse\.$#'
-			identifier: return.type
-			count: 3
-			path: app/Http/Controllers/BookController.php
-
-		-
-			message: '#^Call to method App\\Http\\Controllers\\BookQueueController\:\:reorderQueue\(\) on a separate line has no effect\.$#'
-			identifier: method.resultUnused
-			count: 1
-			path: app/Http/Controllers/BookQueueController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between int and string\|null will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 2
-			path: app/Http/Controllers/FavoriteAuthorWebController.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 2
-			path: app/Http/Controllers/FavoriteAuthorWebController.php
-
-		-
-			message: '#^Access to property \$user_id on an unknown class App\\Models\\Review\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Http/Controllers/ReviewController.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\MySqlService\:\:createReview\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/ReviewController.php
-
-		-
-			message: '#^Call to method delete\(\) on an unknown class App\\Models\\Review\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Http/Controllers/ReviewController.php
-
-		-
-			message: '#^Parameter \$review of method App\\Http\\Controllers\\ReviewController\:\:destroy\(\) has invalid type App\\Models\\Review\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Http/Controllers/ReviewController.php
 
 		-
 			message: '#^Parameter \#1 \$view of function view expects view\-string\|null, string given\.$#'
@@ -334,25 +100,7 @@ parameters:
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
 			identifier: class.notFound
 			count: 1
-			path: app/Models/Author.php
-
-		-
-			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
-			identifier: class.notFound
-			count: 1
 			path: app/Models/Badge.php
-
-		-
-			message: '#^Method App\\Models\\Book\:\:newBelongsToMany\(\) should return Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany\<TRelatedModel of Illuminate\\Database\\Eloquent\\Model, TDeclaringModel of Illuminate\\Database\\Eloquent\\Model, Illuminate\\Database\\Eloquent\\Relations\\Pivot, ''pivot''\> but returns App\\Relations\\TouchesParentBelongsToMany\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Book.php
-
-		-
-			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Models/Book.php
 
 		-
 			message: '#^PHPDoc type array of property App\\Models\\Book\:\:\$casts is not covariant with PHPDoc type array\<string, string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$casts\.$#'
@@ -415,36 +163,6 @@ parameters:
 			path: app/Models/LibraryRepairIssue.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$first_listened\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/ListeningStatistic.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$first_session\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Models/ListeningStatistic.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$last_listened\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/ListeningStatistic.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\ListeningStatistic\:\:\$last_session\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Models/ListeningStatistic.php
-
-		-
-			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Models/ListeningStatistic.php
-
-		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
 			identifier: class.notFound
 			count: 1
@@ -469,12 +187,6 @@ parameters:
 			path: app/Models/Narrator.php
 
 		-
-			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Models/Publisher.php
-
-		-
 			message: '#^PHPDoc type array of property App\\Models\\Publisher\:\:\$casts is not covariant with PHPDoc type array\<string, string\> of overridden property Illuminate\\Database\\Eloquent\\Model\:\:\$casts\.$#'
 			identifier: property.phpDocType
 			count: 1
@@ -491,12 +203,6 @@ parameters:
 			identifier: class.notFound
 			count: 1
 			path: app/Models/ReadingSession.php
-
-		-
-			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Models/Series.php
 
 		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
@@ -557,12 +263,6 @@ parameters:
 			identifier: property.phpDocType
 			count: 1
 			path: app/Models/User.php
-
-		-
-			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
-			identifier: class.notFound
-			count: 1
-			path: app/Models/UserBadge.php
 
 		-
 			message: '#^PHPDoc tag @mixin contains unknown class Eloquent\.$#'
@@ -1369,24 +1069,6 @@ parameters:
 			path: app/Services/ThemeValidationService.php
 
 		-
-			message: '#^Trait App\\Traits\\OptimizedCamelCaseAccess is used zero times and is not analysed\.$#'
-			identifier: trait.unused
-			count: 1
-			path: app/Traits/OptimizedCamelCaseAccess.php
-
-		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Api/Feature/AudibleApiIntegrationTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Api/Feature/AuthorsApiTest.php
-
-		-
 			message: '#^Call to an undefined method Illuminate\\Contracts\\Cache\\Repository\:\:flush\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -1397,54 +1079,6 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: tests/Api/Feature/BaseApiTestCase.php
-
-		-
-			message: '#^Class App\\Http\\Middleware\\RequireStandardRole not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: tests/Api/Feature/BookApiAutocompleteAuthorsTest.php
-
-		-
-			message: '#^Class App\\Http\\Middleware\\RequireStandardRole not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: tests/Api/Feature/BookApiAutocompleteNarratorsTest.php
-
-		-
-			message: '#^Class App\\Http\\Middleware\\RequireStandardRole not found\.$#'
-			identifier: class.notFound
-			count: 1
-			path: tests/Api/Feature/BookApiAutocompleteSeriesTest.php
-
-		-
-			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: tests/Api/Feature/BookApiOpenApiTest.php
-
-		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsNumeric\(\) with float\|int\|numeric\-string will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 3
-			path: tests/Api/Feature/BookApiOpenApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Api/Feature/BooksEnhancedApiTest.php
-
-		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
-			path: tests/Api/Feature/BooksEnhancedApiTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: tests/Api/Feature/SeriesApiTest.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
