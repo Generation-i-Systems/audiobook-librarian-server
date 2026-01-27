@@ -44,6 +44,7 @@ class AudibleServiceUnitTest extends TestCase
         $this->loggerMock->shouldReceive('log')->withAnyArgs()->andReturnNull();
 
         // Create a log manager mock that returns our logger mock
+        /** @var \Mockery\MockInterface $logManagerMock */
         $logManagerMock = Mockery::mock(\Illuminate\Log\LogManager::class);
         $logManagerMock->shouldReceive('channel')->withAnyArgs()->andReturn($this->loggerMock);
         $logManagerMock->shouldReceive('stack')->withAnyArgs()->andReturn($this->loggerMock);

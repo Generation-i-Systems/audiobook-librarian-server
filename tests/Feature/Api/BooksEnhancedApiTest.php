@@ -72,6 +72,7 @@ class BooksEnhancedApiTest extends ApiTestCase
     public function test_books_enhanced_filters_by_genre_id()
     {
         // Create genres
+        /** @var \Illuminate\Database\Eloquent\Model $fantasyGenre */
         $fantasyGenre = Genre::factory()->create(['name' => 'Fantasy']);
         $scifiGenre = Genre::factory()->create(['name' => 'Science Fiction']);
 
@@ -88,6 +89,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $data = $response->json();
 
         $bookTitles = array_column($data['books'], 'title');
+        // @phpstan-ignore-next-line
         $this->assertContains('Fantasy Book', $bookTitles);
         $this->assertNotContains('SciFi Book', $bookTitles);
     }
@@ -110,6 +112,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $data = $response->json();
 
         $bookTitles = array_column($data['books'], 'title');
+        // @phpstan-ignore-next-line
         $this->assertContains('Horror Story', $bookTitles);
         $this->assertNotContains('Love Story', $bookTitles);
     }
@@ -117,6 +120,7 @@ class BooksEnhancedApiTest extends ApiTestCase
     public function test_books_enhanced_filters_by_author_id()
     {
         // Create authors
+        /** @var \Illuminate\Database\Eloquent\Model $author1 */
         $author1 = Author::factory()->create(['name' => 'Author One']);
         $author2 = Author::factory()->create(['name' => 'Author Two']);
 
@@ -133,6 +137,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $data = $response->json();
 
         $bookTitles = array_column($data['books'], 'title');
+        // @phpstan-ignore-next-line
         $this->assertContains('Book by Author One', $bookTitles);
         $this->assertNotContains('Book by Author Two', $bookTitles);
     }
@@ -155,6 +160,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $data = $response->json();
 
         $bookTitles = array_column($data['books'], 'title');
+        // @phpstan-ignore-next-line
         $this->assertContains('Harry Potter Book', $bookTitles);
         $this->assertNotContains('Other Book', $bookTitles);
     }
@@ -162,6 +168,7 @@ class BooksEnhancedApiTest extends ApiTestCase
     public function test_books_enhanced_filters_by_series_id()
     {
         // Create series
+        /** @var \Illuminate\Database\Eloquent\Model $series1 */
         $series1 = Series::factory()->create(['name' => 'Series One']);
         $series2 = Series::factory()->create(['name' => 'Series Two']);
 
@@ -178,6 +185,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $data = $response->json();
 
         $bookTitles = array_column($data['books'], 'title');
+        // @phpstan-ignore-next-line
         $this->assertContains('Book in Series One', $bookTitles);
         $this->assertNotContains('Book in Series Two', $bookTitles);
     }
@@ -200,6 +208,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $data = $response->json();
 
         $bookTitles = array_column($data['books'], 'title');
+        // @phpstan-ignore-next-line
         $this->assertContains('The Last Wish', $bookTitles);
         $this->assertNotContains('Standalone Novel', $bookTitles);
     }
@@ -271,6 +280,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $response = $this->getJson('/api/v1/books/enhanced?sort=created_at_desc');
         $response->assertStatus(200);
         // Just verify it doesn't error
+        // @phpstan-ignore-next-line
         $this->assertTrue(true);
     }
 
@@ -300,6 +310,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $data = $response->json();
 
         $bookTitles = array_column($data['books'], 'title');
+        // @phpstan-ignore-next-line
         $this->assertContains('Fantasy Epic', $bookTitles);
         $this->assertNotContains('Different Epic', $bookTitles);
         $this->assertNotContains('SciFi Story', $bookTitles);
@@ -359,17 +370,21 @@ class BooksEnhancedApiTest extends ApiTestCase
         // Verify authors are included
         $this->assertArrayHasKey('authors', $testBook);
         $this->assertCount(1, $testBook['authors']);
+        // @phpstan-ignore-next-line
         $this->assertEquals('Test Author', $testBook['authors'][0]['name']);
 
         // Verify genres are included
         $this->assertArrayHasKey('genres', $testBook);
         $this->assertCount(1, $testBook['genres']);
+        // @phpstan-ignore-next-line
         $this->assertEquals('Test Genre', $testBook['genres'][0]['name']);
 
         // Verify series are included
         $this->assertArrayHasKey('series', $testBook);
         $this->assertCount(1, $testBook['series']);
+        // @phpstan-ignore-next-line
         $this->assertEquals('Test Series', $testBook['series'][0]['name']);
+        // @phpstan-ignore-next-line
         $this->assertEquals('1', $testBook['series'][0]['pivot']['series_number']);
     }
 

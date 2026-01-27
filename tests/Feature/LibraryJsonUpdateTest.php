@@ -211,7 +211,7 @@ class LibraryJsonUpdateTest extends TestCase
             'title' => 'Updated Book Without Directory',
         ]);
 
-        $this->assertTrue(true);
+        // Verify implicitly by lack of error
     }
 
     public function testLibraryJsonIsNotCreatedWhenDirectoryHasNoAudioFiles()

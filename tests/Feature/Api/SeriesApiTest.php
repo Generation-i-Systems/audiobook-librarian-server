@@ -78,6 +78,7 @@ class SeriesApiTest extends ApiTestCase
         $book2->series()->attach($series2, ['series_number' => '1']);
 
         // Test filtering by author1
+        /** @var \Illuminate\Database\Eloquent\Model $author1 */
         $response = $this->getJson('/api/v1/series?author_id=' . $author1->id);
 
         $response->assertStatus(200);
@@ -308,6 +309,7 @@ class SeriesApiTest extends ApiTestCase
         }
 
         // Filter by target author
+        /** @var \Illuminate\Database\Eloquent\Model $targetAuthor */
         $response = $this->getJson('/api/v1/series?author_id=' . $targetAuthor->id);
 
         $response->assertStatus(200);

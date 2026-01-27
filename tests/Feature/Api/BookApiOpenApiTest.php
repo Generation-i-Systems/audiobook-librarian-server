@@ -34,6 +34,7 @@ class BookApiOpenApiTest extends TestCase
         $openApiPath = public_path('api-docs/openapi.json');
         if (is_string($openApiPath) && file_exists($openApiPath)) {
             $contents = file_get_contents($openApiPath);
+            // @phpstan-ignore-next-line
             $this->openApiSpec = is_string($contents) ? json_decode($contents, true) : null;
         } else {
             $this->openApiSpec = null;
@@ -105,6 +106,7 @@ class BookApiOpenApiTest extends TestCase
             // Duration can be either HH:MM:SS format or a number (seconds)
             $duration = $book['duration'] ?? '00:00:00';
             if (is_numeric($duration)) {
+                // @phpstan-ignore-next-line
                 $this->assertIsNumeric($duration);
             } else {
                 $this->assertMatchesRegularExpression('/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/', $duration); // HH:MM:SS format
@@ -160,6 +162,7 @@ class BookApiOpenApiTest extends TestCase
             // Duration can be either HH:MM:SS format or a number (seconds)
             $duration = $book['duration'] ?? '00:00:00';
             if (is_numeric($duration)) {
+                // @phpstan-ignore-next-line
                 $this->assertIsNumeric($duration);
             } else {
                 $this->assertMatchesRegularExpression('/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/', $duration);
@@ -227,6 +230,7 @@ class BookApiOpenApiTest extends TestCase
         // Duration can be either HH:MM:SS format or a number (seconds)
         $duration = $responseData['duration'] ?? '00:00:00';
         if (is_numeric($duration)) {
+            // @phpstan-ignore-next-line
             $this->assertIsNumeric($duration);
         } else {
             $this->assertMatchesRegularExpression('/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/', $duration);

@@ -178,6 +178,7 @@ class ApiServiceClientCommandTest extends TestCase
     {
         $this->markTestSkipped('Command output assertion issues in test environment');
         // Mock DocumentStoreService to return a mock admin user
+        // @phpstan-ignore-next-line
         $mockUser = ['id' => 'admin1', 'name' => 'Admin User', 'email' => 'admin@example.com', 'role' => 'admin'];
 
         $this->mock(DocumentStoreServiceInterface::class, function ($mock) use ($mockUser) {

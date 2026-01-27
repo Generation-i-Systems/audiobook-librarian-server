@@ -84,11 +84,14 @@ class BookControllerGoogleBooksTest extends TestCase
         );
 
         // Verify the results
+        // @phpstan-ignore-next-line
         $this->assertIsArray($results);
         $this->assertNotEmpty($results);
 
         // Get the first result
         $item = reset($results);
+        // @phpstan-ignore-next-line
+        $this->assertIsArray($item);
 
         // Check that specific camelCase keys exist
         $this->assertArrayHasKey('title', $item);

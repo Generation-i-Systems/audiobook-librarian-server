@@ -10,7 +10,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Http\UploadedFile;
 use Mockery;
-use Mockery\LegacyMockInterface;
 use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -19,8 +18,10 @@ class BookControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private MockInterface|LegacyMockInterface|DocumentStoreServiceInterface $documentStoreServiceMock;
-    private MockInterface|LegacyMockInterface|ExternalCoverService $externalCoverServiceMock;
+    /** @var MockInterface */
+    private MockInterface $documentStoreServiceMock;
+    /** @var MockInterface */
+    private MockInterface $externalCoverServiceMock;
     protected $admin;
 
     protected function setUp(): void

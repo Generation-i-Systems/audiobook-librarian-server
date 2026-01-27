@@ -22,16 +22,27 @@ class RecommendationControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::factory()->create(['email_verified_at' => now(), 'role' => 'admin']);
-        $this->recipient = User::factory()->create();
-        $this->book = Book::factory()->create();
+        /** @var User $user */
+        $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'admin']);
+        $this->user = $user;
+        /** @var User $recipient */
+        $recipient = User::factory()->create();
+        $this->recipient = $recipient;
+        /** @var Book $book */
+        $book = Book::factory()->create();
+        $this->book = $book;
         \Laravel\Sanctum\Sanctum::actingAs($this->user);
     }
 
     public function test_can_send_a_book_recommendation(): void
     {
-        $response = $this->postJson('/api/v1/recommendations/' . $this->book->id, [
-            'recipient_id' => $this->recipient->id,
+        /** @var \Illuminate\Database\Eloquent\Model $book */
+        $book = $this->book;
+        /** @var \Illuminate\Database\Eloquent\Model $recipient */
+        $recipient = $this->recipient;
+
+        $response = $this->postJson('/api/v1/recommendations/' . $book->id, [
+            'recipient_id' => $recipient->id,
             'message' => 'You should really listen to this!',
         ])->assertStatus(201);
 
@@ -39,15 +50,18 @@ class RecommendationControllerTest extends TestCase
 
         $this->assertDatabaseHas('user_recommendations', [
             'sender_id' => $this->user->id,
-            'recipient_id' => $this->recipient->id,
-            'book_id' => $this->book->id,
+            'recipient_id' => $recipient->id,
+            'book_id' => $book->id,
             'message' => 'You should really listen to this!',
         ]);
     }
 
     public function test_cannot_recommend_a_book_to_self(): void
     {
-        $this->postJson('/api/v1/recommendations/' . $this->book->id, [
+        /** @var \Illuminate\Database\Eloquent\Model $book */
+        $book = $this->book;
+
+        $this->postJson('/api/v1/recommendations/' . $book->id, [
             'recipient_id' => $this->user->id,
             'message' => 'Check this out!',
         ])->assertStatus(422)
@@ -56,49 +70,65 @@ class RecommendationControllerTest extends TestCase
 
     public function test_cannot_send_duplicate_unacknowledged_recommendation(): void
     {
+        /** @var \Illuminate\Database\Eloquent\Model $book */
+        $book = $this->book;
+        /** @var \Illuminate\Database\Eloquent\Model $recipient */
+        $recipient = $this->recipient;
+
         UserRecommendation::factory()->create([
             'sender_id' => $this->user->id,
-            'recipient_id' => $this->recipient->id,
-            'book_id' => $this->book->id,
+            'recipient_id' => $recipient->id,
+            'book_id' => $book->id,
             'acknowledged_at' => null,
         ]);
 
-        $this->postJson('/api/v1/recommendations/' . $this->book->id, [
-            'recipient_id' => $this->recipient->id,
+        $this->postJson('/api/v1/recommendations/' . $book->id, [
+            'recipient_id' => $recipient->id,
         ])->assertStatus(409)
             ->assertJson(['message' => 'You have already sent this user an unacknowledged recommendation for this book.']);
     }
 
     public function test_can_send_recommendation_if_previous_one_was_acknowledged(): void
     {
+        /** @var \Illuminate\Database\Eloquent\Model $book */
+        $book = $this->book;
+        /** @var \Illuminate\Database\Eloquent\Model $recipient */
+        $recipient = $this->recipient;
+
         UserRecommendation::factory()->create([
             'sender_id' => $this->user->id,
-            'recipient_id' => $this->recipient->id,
-            'book_id' => $this->book->id,
+            'recipient_id' => $recipient->id,
+            'book_id' => $book->id,
             'acknowledged_at' => now(),
         ]);
 
-        $this->postJson('/api/v1/recommendations/' . $this->book->id, [
-            'recipient_id' => $this->recipient->id,
+        $this->postJson('/api/v1/recommendations/' . $book->id, [
+            'recipient_id' => $recipient->id,
         ])->assertStatus(201);
     }
 
     public function test_can_view_unacknowledged_recommendations_in_inbox(): void
     {
+        /** @var \App\Models\Book $book2 */
         $book2 = Book::factory()->create();
+
+        /** @var Book $book */
+        $book = $this->book;
+        /** @var User $recipient */
+        $recipient = $this->recipient;
 
         // Recommendation 1 (unacknowledged, should appear)
         UserRecommendation::factory()->create([
-            'sender_id' => $this->recipient->id, // Sent from recipient to user
+            'sender_id' => $recipient->id, // Sent from recipient to user
             'recipient_id' => $this->user->id,
-            'book_id' => $this->book->id,
+            'book_id' => $book->id,
             'acknowledged_at' => null,
             'created_at' => now()->subDay(),
         ]);
 
         // Recommendation 2 (acknowledged, should not appear)
         UserRecommendation::factory()->create([
-            'sender_id' => $this->recipient->id,
+            'sender_id' => $recipient->id,
             'recipient_id' => $this->user->id,
             'book_id' => $book2->id,
             'acknowledged_at' => now(),
@@ -109,16 +139,22 @@ class RecommendationControllerTest extends TestCase
             ->assertStatus(200);
 
         $response->assertJsonCount(1);
-        $response->assertJsonPath('0.bookId', $this->book->id);
-        $response->assertJsonPath('0.sender.id', $this->recipient->id);
+        $response->assertJsonPath('0.bookId', $book->id);
+        $response->assertJsonPath('0.sender.id', $recipient->id);
     }
 
     public function test_can_acknowledge_a_recommendation(): void
     {
+        /** @var Book $book */
+        $book = $this->book;
+        /** @var User $recipient */
+        $recipient = $this->recipient;
+
+        /** @var UserRecommendation $recommendation */
         $recommendation = UserRecommendation::factory()->create([
-            'sender_id' => $this->recipient->id,
+            'sender_id' => $recipient->id,
             'recipient_id' => $this->user->id,
-            'book_id' => $this->book->id,
+            'book_id' => $book->id,
             'acknowledged_at' => null,
         ]);
 
@@ -132,11 +168,18 @@ class RecommendationControllerTest extends TestCase
 
     public function test_cannot_acknowledge_recommendation_not_addressed_to_user(): void
     {
+        /** @var Book $book */
+        $book = $this->book;
+        /** @var User $recipient */
+        $recipient = $this->recipient;
+
+        /** @var User $otherUser */
         $otherUser = User::factory()->create();
+        /** @var UserRecommendation $recommendation */
         $recommendation = UserRecommendation::factory()->create([
-            'sender_id' => $this->recipient->id,
+            'sender_id' => $recipient->id,
             'recipient_id' => $otherUser->id,
-            'book_id' => $this->book->id,
+            'book_id' => $book->id,
             'acknowledged_at' => null,
         ]);
 

@@ -105,16 +105,19 @@ class QueueControllerTest extends TestCase
             ]);
 
             // Debug validation errors
-            if ($response->getStatusCode() === 422) {
-                dump('Validation errors:', $response->json());
-            }
+            // if ($response->getStatusCode() === 422) {
+            //     dump('Validation errors:', $response->json());
+            // }
 
-            $response->assertStatus(200)
-                ->assertJsonStructure([
-                    'message',
-                    'skipped',
-                    'queued_dirs',
+            $response->assertStatus(200);
+
+            if ($response->status() === 200) {
+                $response->assertJsonStructure([
+                   'message',
+                   'skipped',
+                   'queued_dirs',
                 ]);
+            }
         } finally {
             // Clean up test directory
             if (file_exists($testDir . '/subdir/book1/metadata.abs')) {

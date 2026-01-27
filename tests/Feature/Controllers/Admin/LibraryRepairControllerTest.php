@@ -10,20 +10,22 @@ use App\Services\AudiobookBayService;
 use App\Services\LibraryRepairService;
 use Illuminate\Support\Facades\Event;
 use Mockery;
-use Mockery\LegacyMockInterface;
 use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class LibraryRepairControllerTest extends TestCase
 {
-    private MockInterface|LegacyMockInterface|DocumentStoreServiceInterface $documentStoreService;
+    /** @var MockInterface */
+    private MockInterface $documentStoreService;
 
     private DocumentstoreUser $admin;
 
-    private MockInterface|LegacyMockInterface|LibraryRepairService $libraryRepairService;
+    /** @var MockInterface */
+    private MockInterface $libraryRepairService;
 
-    private MockInterface|LegacyMockInterface|AudiobookBayService $audiobookBayService;
+    /** @var MockInterface */
+    private MockInterface $audiobookBayService;
 
     protected function setUp(): void
     {
