@@ -122,7 +122,7 @@ class ListMissingBookDirectories extends Command
         $aiSuggestions = null;
         $aiRawText = null;
         if ($useAi) {
-            $unrefList = $unrefBundle['list'] ?? [];
+            $unrefList = $unrefBundle['list'];
             // Build concise prompt asking for structured JSON suggestions
             $prompt = "You are an assistant helping reconcile audiobook directories.\n" .
                 "Given two lists: (1) DB-referenced directories that are missing on disk, and (2) on-disk unreferenced directories that contain audio files.\n" .
@@ -160,14 +160,14 @@ class ListMissingBookDirectories extends Command
                 'paths' => $missing,
                 'mode' => 'missing',
             ];
-            if ($includeUnref && $unrefBundle !== null) {
+            if ($includeUnref) {
                 $base['unreferenced'] = [
                     'count' => count($unrefBundle['list']),
                     'directories' => $unrefBundle['list'],
                     'root' => $unrefBundle['meta']['root'],
                 ];
             }
-            if ($useAi && $aiSuggestions !== null) {
+            if ($useAi) {
                 $base['ai_suggestions'] = $aiSuggestions;
             }
             $payload = json_encode($base, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
@@ -178,18 +178,18 @@ class ListMissingBookDirectories extends Command
                 $this->line($payload);
             }
             // If --ai-output specified, write ONLY raw AI text there
-            if ($useAi && $aiOut !== '' && $aiRawText !== null) {
+            if ($useAi && $aiOut !== '') {
                 file_put_contents($aiOut, (string) $aiRawText . PHP_EOL);
                 $this->info("Wrote raw AI response to {$aiOut} ({$diskName})");
             }
         } else {
             if ($outputPath !== '') {
                 $content = implode(PHP_EOL, $missing) . (count($missing) ? PHP_EOL : '');
-                if ($includeUnref && $unrefBundle !== null) {
+                if ($includeUnref) {
                     $content .= '# Unreferenced directories' . PHP_EOL;
                     $content .= implode(PHP_EOL, $unrefBundle['list']) . (count($unrefBundle['list']) ? PHP_EOL : '');
                 }
-                if ($useAi && $aiSuggestions !== null) {
+                if ($useAi) {
                     $content .= '# AI suggestions' . PHP_EOL;
                     $content .= json_encode($aiSuggestions, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . PHP_EOL;
                 }
@@ -199,20 +199,20 @@ class ListMissingBookDirectories extends Command
                 foreach ($missing as $p) {
                     $this->line($p);
                 }
-                if ($includeUnref && $unrefBundle !== null) {
+                if ($includeUnref) {
                     $this->line('# Unreferenced directories');
                     foreach ($unrefBundle['list'] as $p) {
                         $this->line($p);
                     }
                 }
-                if ($useAi && $aiSuggestions !== null) {
+                if ($useAi) {
                     $this->line('# AI suggestions');
                     $this->line(json_encode($aiSuggestions, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
                 }
             }
 
             // If --ai-output specified, write ONLY raw AI text there (txt mode as well)
-            if ($useAi && $aiOut !== '' && $aiRawText !== null) {
+            if ($useAi && $aiOut !== '') {
                 file_put_contents($aiOut, (string) $aiRawText . PHP_EOL);
                 $this->info("Wrote raw AI response to {$aiOut} ({$diskName})");
             }
