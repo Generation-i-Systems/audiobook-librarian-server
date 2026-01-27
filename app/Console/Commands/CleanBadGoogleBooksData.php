@@ -60,7 +60,18 @@ class CleanBadGoogleBooksData extends Command
             $this->info("📖 {$book->title}");
             $this->line("   Author: " . $book->authors->pluck('name')->implode(', '));
             $this->line("   Issues: " . implode(', ', $issues));
-            $this->line("   Google Books ID: " . (json_decode($book->google_books_info, true)['id'] ?? 'unknown'));
+            /** @var array<mixed>|string|null $googleBooksInfo */
+            $googleBooksInfo = $book->google_books_info;
+            $googleBooksId = 'unknown';
+            if (is_string($googleBooksInfo)) {
+                $decoded = json_decode($googleBooksInfo, true);
+                if (is_array($decoded) && isset($decoded['id'])) {
+                    $googleBooksId = (string) $decoded['id'];
+                }
+            } elseif (is_array($googleBooksInfo) && isset($googleBooksInfo['id'])) {
+                $googleBooksId = (string) $googleBooksInfo['id'];
+            }
+            $this->line("   Google Books ID: " . $googleBooksId);
 
             if ($this->option('dry-run')) {
                 $this->line("   [DRY RUN] Would clean Google Books data");

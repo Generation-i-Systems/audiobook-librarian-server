@@ -299,7 +299,7 @@ class ImportBooksFromDownloads extends Command
                 $text .= ' ' . $suffix;
             }
 
-            parent::line($text ?? '');
+            parent::line($text);
             return;
         }
 
@@ -310,7 +310,7 @@ class ImportBooksFromDownloads extends Command
 
         $text = is_string($message) ? $message : (is_array($message) ? json_encode($message, JSON_UNESCAPED_UNICODE) : (string) $message);
 
-        $this->uiService->logMessage($text ?? '');
+        $this->uiService->logMessage($text);
     }
 
     public function line($string, $style = null, $verbosity = null)
@@ -481,7 +481,7 @@ class ImportBooksFromDownloads extends Command
             $specificPaths = $this->argument('path');
             if (!empty($specificPaths)) {
                 // Ensure it's an array (Laravel may return string for single argument)
-                $specificPaths = is_array($specificPaths) ? $specificPaths : [$specificPaths];
+                $specificPaths = (array) $specificPaths;
                 $this->uiService->logMessage("📁 Processing specific paths: " . implode(', ', $specificPaths));
                 $audiobooks = $this->processSpecificPaths($specificPaths);
             } else {
@@ -509,8 +509,8 @@ class ImportBooksFromDownloads extends Command
 
             // Apply limit
             $limit = $this->option('limit');
-            if ($limit && $limit > 0 && $totalFound > $limit) {
-                $audiobooks = array_slice($audiobooks, 0, $limit);
+            if ($limit && $limit > 0 && $totalFound > (int) $limit) {
+                $audiobooks = array_slice($audiobooks, 0, (int) $limit);
                 $this->uiService->logMessage(
                     "⚠️  Processing limited to {$limit}/{$totalFound} books (--limit=0 for no limit)"
                 );
@@ -777,7 +777,7 @@ class ImportBooksFromDownloads extends Command
             fn ($files) => $this->getImportService()->analyzeFileTypes($files),
             fn ($name) => $this->getImportService()->analyzeDirectoryName($name),
             fn ($path) => $this->getImportService()->isMultiBookDirectory($path),
-            fn ($path) => $this->findCoverImage($path)
+            fn ($path) => $this->findCoverImageCandidate($path)[0]
         );
     }
 
@@ -796,7 +796,7 @@ class ImportBooksFromDownloads extends Command
     {
         return $this->getImportService()->checkDuplicatesInBackground(
             $audiobook,
-            fn ($data) => $this->findSimilarBooks($data)
+            fn ($data) => $this->getImportService()->findSimilarBooks($data)
         );
     }
 
@@ -827,7 +827,7 @@ class ImportBooksFromDownloads extends Command
     {
         return $this->getImportService()->prepareCoverImageInBackground(
             $audiobook,
-            fn ($path) => $this->findCoverImage($path)
+            fn ($path) => $this->findCoverImageCandidate($path)[0]
         );
     }
 
@@ -884,7 +884,7 @@ class ImportBooksFromDownloads extends Command
             $taskType,
             $result,
             $this->cacheEnabled,
-            fn ($data) => $this->getCacheKey($data),
+            fn ($data) => $this->getImportService()->getCacheKey($data),
             fn ($path) => $this->getDirectoryModificationTime($path)
         );
     }
@@ -1054,15 +1054,7 @@ class ImportBooksFromDownloads extends Command
     {
         $response = $this->uiService->ask($question, $default ?? '');
 
-        if (!is_string($response)) {
-            $this->inputInterrupted = true;
-            return '';
-        }
-
-        if (strtolower(trim($response)) === 'q') {
-            $this->handleUserQuit();
-        }
-
+        /** @var string $response */
         return $response;
     }
 
@@ -1070,7 +1062,8 @@ class ImportBooksFromDownloads extends Command
     {
         $response = $this->uiService->select($question, $options, $default);
 
-        if (is_string($response) && strtolower(trim($response)) === 'q') {
+        /** @var string $response */
+        if (strtolower(trim($response)) === 'q') {
             $this->handleUserQuit();
         }
 
