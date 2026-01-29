@@ -1794,8 +1794,8 @@ class BookApiController extends Controller
             ->select([
                 'authors.id',
                 'authors.name',
-                'authors.updated_at',
             ])
+            ->selectRaw('MAX(authors.updated_at) as updated_at')
             ->selectSub(function ($q) use ($includeNeedsReview) {
                 $q->from('author_book')
                     ->join('books', 'author_book.book_id', '=', 'books.id')
