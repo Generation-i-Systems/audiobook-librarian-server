@@ -70,7 +70,13 @@
                         '#authors-group .author-row:first input[name="author[]"]',
                     );
                     if (firstAuthorInput.length) {
-                        firstAuthorInput.val(data.author);
+                        // Normalize author name for DB (spaces between initials)
+                        // e.g. J.R.R. Tolkien -> J. R. R. Tolkien
+                        const normalizedAuthor = window.BookForm
+                            .normalizeAuthorName
+                            ? window.BookForm.normalizeAuthorName(data.author)
+                            : data.author;
+                        firstAuthorInput.val(normalizedAuthor);
                     }
                 }
                 if (data.genre) {
@@ -362,14 +368,25 @@
     }
 
     function updatePathFromFields() {
-        const genre = $('#genres-group .genre-row:first select[name="genre[]"]').val();
-        const author = $('#authors-group .author-row:first input[name="author[]"]').val();
-        const series = $('#series-group .series-row:first input[name*="[seriesName]"]').val();
-        const seriesNumber = $('#series-group .series-row:first input[name*="[number]"]').val();
-        const title = $('#title').val();
+        const genre = $(
+            '#genres-group .genre-row:first select[name="genre[]"]',
+        ).val();
+        const author = $(
+            '#authors-group .author-row:first input[name="author[]"]',
+        ).val();
+        const series = $(
+            '#series-group .series-row:first input[name*="[seriesName]"]',
+        ).val();
+        const seriesNumber = $(
+            '#series-group .series-row:first input[name*="[number]"]',
+        ).val();
+        const title = $("#title").val();
 
         if (!genre && !author && !series && !title) {
-            showToast("Please fill in at least one field (genre, author, series, or title)", "warning");
+            showToast(
+                "Please fill in at least one field (genre, author, series, or title)",
+                "warning",
+            );
             return;
         }
 
@@ -377,23 +394,27 @@
             url: window.BOOK_FORM_ROUTES.buildPathFromFields,
             method: "POST",
             data: {
-                genre: genre || '',
-                author: author || '',
-                series: series || '',
-                seriesNumber: seriesNumber || '',
-                title: title || '',
+                genre: genre || "",
+                author: author || "",
+                series: series || "",
+                seriesNumber: seriesNumber || "",
+                title: title || "",
                 _token: $('meta[name="csrf-token"]').attr("content"),
             },
             success(data) {
                 if (data.success && data.directoryPath) {
-                    $("#directoryPath").val(data.directoryPath).trigger("change");
+                    $("#directoryPath")
+                        .val(data.directoryPath)
+                        .trigger("change");
                     showToast("Directory path updated!", "success");
                 } else {
                     showToast(data.message || "Failed to build path", "danger");
                 }
             },
             error(xhr) {
-                const msg = (xhr.responseJSON && xhr.responseJSON.message) || "Unknown error";
+                const msg =
+                    (xhr.responseJSON && xhr.responseJSON.message) ||
+                    "Unknown error";
                 showToast("Error building path: " + msg, "danger");
             },
         });
@@ -402,32 +423,51 @@
     function registerUpdatePathFromFieldsHandler() {
         $(document)
             .off("click.updatePathFromFields", "#update-path-from-fields-btn")
-            .on("click.updatePathFromFields", "#update-path-from-fields-btn", function (e) {
-                e.preventDefault();
-                updatePathFromFields();
-            });
+            .on(
+                "click.updatePathFromFields",
+                "#update-path-from-fields-btn",
+                function (e) {
+                    e.preventDefault();
+                    updatePathFromFields();
+                },
+            );
     }
 
     function registerGenreChangeHandler() {
         $(document)
-            .off("change.genreUpdate", '#genres-group .genre-row:first select[name="genre[]"]')
-            .on("change.genreUpdate", '#genres-group .genre-row:first select[name="genre[]"]', function () {
-                const $updateBtn = $(".update-path-from-genre");
-                const originalGenre = $(this).closest('.genre-row').data('original-genre');
-                const currentGenre = $(this).val();
+            .off(
+                "change.genreUpdate",
+                '#genres-group .genre-row:first select[name="genre[]"]',
+            )
+            .on(
+                "change.genreUpdate",
+                '#genres-group .genre-row:first select[name="genre[]"]',
+                function () {
+                    const $updateBtn = $(".update-path-from-genre");
+                    const originalGenre = $(this)
+                        .closest(".genre-row")
+                        .data("original-genre");
+                    const currentGenre = $(this).val();
 
-                // Show button if genre changed from original
-                if (originalGenre && currentGenre && originalGenre !== currentGenre) {
-                    $updateBtn.css("display", "flex");
-                } else {
-                    $updateBtn.hide();
-                }
-            });
+                    // Show button if genre changed from original
+                    if (
+                        originalGenre &&
+                        currentGenre &&
+                        originalGenre !== currentGenre
+                    ) {
+                        $updateBtn.css("display", "flex");
+                    } else {
+                        $updateBtn.hide();
+                    }
+                },
+            );
     }
 
     function updatePathFromGenre() {
-        const genre = $('#genres-group .genre-row:first select[name="genre[]"]').val();
-        const currentPath = $('#directoryPath').val();
+        const genre = $(
+            '#genres-group .genre-row:first select[name="genre[]"]',
+        ).val();
+        const currentPath = $("#directoryPath").val();
 
         if (!genre) {
             showToast("Please select a genre first", "warning");
@@ -440,10 +480,10 @@
         }
 
         // Split current path and replace first part (genre) with new genre
-        const parts = currentPath.split('/');
+        const parts = currentPath.split("/");
         if (parts.length > 0) {
-            parts[0] = genre.replace(/[\\\/]/g, '-');
-            const newPath = parts.join('/');
+            parts[0] = genre.replace(/[\\\/]/g, "-");
+            const newPath = parts.join("/");
             $("#directoryPath").val(newPath).trigger("change");
             showToast("Directory path updated with new genre!", "success");
 
@@ -455,10 +495,14 @@
     function registerUpdatePathFromGenreHandler() {
         $(document)
             .off("click.updatePathFromGenre", ".update-path-from-genre")
-            .on("click.updatePathFromGenre", ".update-path-from-genre", function (e) {
-                e.preventDefault();
-                updatePathFromGenre();
-            });
+            .on(
+                "click.updatePathFromGenre",
+                ".update-path-from-genre",
+                function (e) {
+                    e.preventDefault();
+                    updatePathFromGenre();
+                },
+            );
     }
 
     function registerMetadataHandler() {

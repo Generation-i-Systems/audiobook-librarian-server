@@ -592,10 +592,15 @@
             authorsGroup.empty();
             if (typeof window.BookForm?.addAuthorRow === "function") {
                 authors.forEach(function (author) {
-                    window.BookForm.addAuthorRow(
-                        $("#book-form"),
-                        decodeHtmlEntities(author || ""),
-                    );
+                    let authorName = decodeHtmlEntities(author || "");
+                    if (
+                        typeof window.BookForm?.normalizeAuthorName ===
+                        "function"
+                    ) {
+                        authorName =
+                            window.BookForm.normalizeAuthorName(authorName);
+                    }
+                    window.BookForm.addAuthorRow($("#book-form"), authorName);
                 });
             } else {
                 console.error(
