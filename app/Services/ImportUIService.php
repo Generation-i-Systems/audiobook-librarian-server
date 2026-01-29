@@ -170,15 +170,38 @@ class ImportUIService implements ImportUIInterface
         $this->interrupted = true;
     }
 
-    public function restoreTerminalState(): void
+    public function setBusy(string $message): void
     {
-        if (function_exists('shell_exec')) {
-            @shell_exec('stty sane < /dev/tty');
+        if ($this->plainMode) {
+            echo "{$message}...\n";
+            return;
+        }
+        $this->promptLines = ["\e[1;33m{$message}...\e[0m"];
+        $this->renderFull();
+    }
+
+    public function flushInput(): void
+    {
+        if (!is_resource(STDIN)) {
+            return;
         }
 
-        // Show cursor + restore normal screen buffer
-        echo "\e[?25h\e[?1049l";
-        $this->alternateScreenEnabled = false;
+        // Only works for non-blocking streams
+        $oldBlocking = stream_get_meta_data(STDIN)['blocked'];
+        stream_set_blocking(STDIN, false);
+
+        while (fgetc(STDIN) !== false) {
+            // Keep reading until buffer is empty
+        }
+
+        stream_set_blocking(STDIN, $oldBlocking);
+    }
+
+    public function restoreTerminalState(): void
+    {
+        $this->disableAlternateScreen();
+        // Clear screen manually since Screen class might not have clear()
+        $this->screen->write("\e[H\e[J");
     }
 
     protected function disableAlternateScreen(): void
@@ -1215,6 +1238,7 @@ class ImportUIService implements ImportUIInterface
     public function setCurrentBook(array $metadata): void
     {
         $this->currentBook = $metadata;
+        $this->promptLines = [];
         $this->cacheCoverForCurrentBook();
 
         // Clear render state to force re-render for new book

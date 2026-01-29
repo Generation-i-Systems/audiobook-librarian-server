@@ -1252,14 +1252,17 @@ class ImportBooksFromDownloads extends Command
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
             fn ($question, $default) => $this->askInline($question, $default ?? ''),
             fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, $fileCount = 0) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, !empty($audiobook['is_multi_book_part']), $fileCount),
-            fn ($metadata) => $this->getImportService()->editMetadataFields(
+            fn ($metadata, $sequential = false) => $this->getImportService()->editMetadataFields(
                 $metadata,
                 $audiobook,
                 fn ($question, $default) => $this->askInline($question, $default ?? ''),
                 fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
                 fn ($metadata, $keys) => $this->getImportService()->getFirstNonEmptyMetadataValue($metadata, $keys),
                 fn (&$metadata) => $this->getImportService()->extractSeriesNumberFromTitle($metadata),
-                fn () => $this->getValidGenres()
+                fn () => $this->getValidGenres(),
+                fn ($message, $data = null) => $this->logUiMessage($message, $data),
+                fn ($metadata) => $this->buildUiMetadata($metadata),
+                $sequential
             ),
             fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
@@ -1299,7 +1302,7 @@ class ImportBooksFromDownloads extends Command
     /**
      * Edit metadata fields interactively
      */
-    protected function editMetadataFields(array $metadata, array $audiobook): array
+    protected function editMetadataFields(array $metadata, array $audiobook, bool $sequential = false): array
     {
         return $this->getImportService()->editMetadataFields(
             $metadata,
@@ -1308,7 +1311,10 @@ class ImportBooksFromDownloads extends Command
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
             fn ($metadata, $keys) => $this->getFirstNonEmptyMetadataValue($metadata, $keys),
             fn (&$metadata) => $this->extractSeriesNumberFromTitle($metadata),
-            fn () => $this->getValidGenres()
+            fn () => $this->getValidGenres(),
+            fn ($message, $data = null) => $this->logUiMessage($message, $data),
+            fn ($metadata) => $this->buildUiMetadata($metadata),
+            $sequential
         );
     }
 
