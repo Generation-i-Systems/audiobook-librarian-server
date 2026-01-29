@@ -1693,7 +1693,7 @@ class BookImportService
      */
     protected function findExistingCover(string $directoryPath): ?string
     {
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         $fullPath = $bookRoot . '/' . $directoryPath;
 
         if (!is_dir($fullPath)) {
@@ -1729,7 +1729,7 @@ class BookImportService
     {
         try {
             // CRITICAL: directoryPath is RELATIVE - convert to absolute
-            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            $bookRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
             $absoluteDir = $bookRoot . '/' . ltrim($directoryPath, '/');
 
             // Create directory if it doesn't exist
@@ -1770,8 +1770,8 @@ class BookImportService
             return null;
         }
 
-        // CRITICAL: Use the correct book storage path, not storage_path('app')
-        $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        // CRITICAL: Use the correct book storage path, prioritizing filesystems config
+        $bookStoragePath = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         $targetDirectory = $bookStoragePath . '/' . ltrim($directoryPath, '/');
 
         if (!File::exists($targetDirectory)) {
