@@ -2002,8 +2002,8 @@ class BookApiController extends Controller
             ->select([
                 'series.id',
                 'series.name',
-                'series.updated_at',
             ])
+            ->selectRaw('MAX(series.updated_at) as updated_at')
             ->withCount('books as book_count')
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
