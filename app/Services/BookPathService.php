@@ -8,7 +8,7 @@ class BookPathService
 {
     public function getBookRoot(): string
     {
-        $bookRoot = config('app.book_root');
+        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root');
         if (!is_string($bookRoot) || trim($bookRoot) === '') {
             throw new RuntimeException('app.book_root is not configured. Set BOOK_STORAGE_PATH in your environment.');
         }

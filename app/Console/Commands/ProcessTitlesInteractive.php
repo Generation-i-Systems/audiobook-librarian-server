@@ -182,7 +182,7 @@ class ProcessTitlesInteractive extends Command
 
         // Step 7: Check for structural issues (Multi-book or Part)
         if (!empty($directoryPath)) {
-            $storageRoot = rtrim(config('app.book_root'), '/');
+            $storageRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root'), '/');
             $fullPath = $storageRoot . '/' . ltrim($directoryPath, '/');
 
             if (is_dir($fullPath)) {
@@ -445,7 +445,7 @@ class ProcessTitlesInteractive extends Command
         $this->info("Reprocessing book ID {$book->id} as multi-book archive...");
         $this->info("Directory: {$path}");
 
-        $storageRoot = rtrim(config('app.book_root'), '/');
+        $storageRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root'), '/');
         $fullPath = $storageRoot . '/' . ltrim($path, '/');
 
         // Check for flat files

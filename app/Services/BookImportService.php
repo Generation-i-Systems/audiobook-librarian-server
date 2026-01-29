@@ -1650,7 +1650,8 @@ class BookImportService
      */
     public function formatAuthorsForDirectory(array $authors): string
     {
-        $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
+        // Use directory-specific normalization (no spaces between initials)
+        $normalizedAuthors = array_map([$this, 'normalizeAuthorNameForDirectory'], $authors);
         return implode(' & ', $normalizedAuthors);
     }
 
@@ -1682,6 +1683,25 @@ class BookImportService
         // Normalize initials
         $name = preg_replace('/\b([A-Z])\s+/', '$1. ', $name);
         $name = preg_replace('/\s+([A-Z])$/', ' $1.', $name);
+
+        // Ensure space between initials (DB format: J. R. R. Tolkien)
+        // Repeat to handle multiple initials (J. R. R.)
+        $name = preg_replace('/\b([A-Z]\.)([A-Z]\.)/', '$1 $2', $name);
+        $name = preg_replace('/\b([A-Z]\.)([A-Z]\.)/', '$1 $2', $name);
+
+        return trim($name);
+    }
+
+    /**
+     * Normalize author name for directory use (no spaces between initials)
+     * e.g., "J.R.R. Tolkien"
+     */
+    public function normalizeAuthorNameForDirectory(string $authorName): string
+    {
+        $name = $this->normalizeAuthorName($authorName);
+
+        // Remove spaces between initials for filesystem
+        // J. R. R. -> J.R.R.
         $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
         $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
 
@@ -1841,23 +1861,25 @@ class BookImportService
             return null;
         }
 
-        $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
+        // Generate combinations for both DB format (spaces) and Directory format (no spaces)
+        $normalizedAuthorsDb = array_map([$this, 'normalizeAuthorName'], $authors);
+        $normalizedAuthorsDir = array_map([$this, 'normalizeAuthorNameForDirectory'], $authors);
 
         $authorCombinations = [];
 
-        if (count($normalizedAuthors) > 1) {
-            $authorCombinations[] = $normalizedAuthors;
-            $authorCombinations[] = array_reverse($normalizedAuthors);
-
-            if (count($normalizedAuthors) >= 3) {
-                $authorCombinations[] = [$normalizedAuthors[0], $normalizedAuthors[1]];
-                $authorCombinations[] = [$normalizedAuthors[1], $normalizedAuthors[0]];
-            }
+        // Add combinations for DB format (legacy folder support)
+        $authorCombinations[] = implode(' & ', $normalizedAuthorsDb);
+        if (count($normalizedAuthorsDb) > 1) {
+            $authorCombinations[] = implode(' & ', array_reverse($normalizedAuthorsDb));
         }
 
-        if (count($normalizedAuthors) === 1) {
-            $authorCombinations[] = $normalizedAuthors;
+        // Add combinations for Directory format (preferred)
+        $authorCombinations[] = implode(' & ', $normalizedAuthorsDir);
+        if (count($normalizedAuthorsDir) > 1) {
+            $authorCombinations[] = implode(' & ', array_reverse($normalizedAuthorsDir));
         }
+
+        $authorCombinations = array_unique($authorCombinations);
 
         try {
             // Only scan 2 levels deep: [genre]/[author]
@@ -1870,9 +1892,7 @@ class BookImportService
                 foreach ($authorDirs as $authorDir) {
                     $authorDirName = basename($authorDir);
 
-                    foreach ($authorCombinations as $combination) {
-                        $expectedDirName = $this->formatAuthorsForDirectory($combination);
-
+                    foreach ($authorCombinations as $expectedDirName) {
                         if ($authorDirName === $expectedDirName) {
                             // If series name is specified, check if this author has that series
                             if ($seriesName) {
@@ -5780,7 +5800,6 @@ class BookImportService
         // CRITICAL: Try alternative book root paths
         // config('app.book_root') and config('filesystems.disks.books.root') might differ
         $alternativeRoots = [
-            config('app.book_root'),
             config('filesystems.disks.books.root'),
             config('app.book_root'),
         ];

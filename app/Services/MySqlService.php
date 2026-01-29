@@ -832,11 +832,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $durationFormatted = $book->duration ? gmdate('H:i:s', $book->duration) : null;
 
             $seriesData = $book->series->map(function (Series $series): array {
-                $pivot = $series->getAttribute('pivot');
                 $seriesNumber = null;
 
-                if (is_object($pivot) && property_exists($pivot, 'series_number')) {
-                    $seriesNumber = $pivot->series_number;
+                // Try to get series_number from pivot
+                if ($series->pivot) {
+                    $seriesNumber = $series->pivot->series_number ?? null;
                 }
 
                 return [

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\AIBookProcessor;
+use App\Services\BookImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -16,10 +17,14 @@ class ImportFileController extends Controller
 {
     use IsolatesErrorHandlers;
     protected DocumentStoreServiceInterface $documentStoreService;
+    protected BookImportService $bookImportService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        BookImportService $bookImportService
+    ) {
         $this->documentStoreService = $documentStoreService;
+        $this->bookImportService = $bookImportService;
     }
 
     /**
@@ -680,7 +685,8 @@ class ImportFileController extends Controller
         }
 
         if ($meta['author']) {
-            $parts[] = $meta['author'];
+            // Normalize author for directory (no spaces between initials)
+            $parts[] = $this->bookImportService->normalizeAuthorNameForDirectory($meta['author']);
         }
         if ($meta['seriesName'] ?? $meta['series'] ?? null) {
             $parts[] = $meta['seriesName'] ?? $meta['series'];
@@ -721,7 +727,7 @@ class ImportFileController extends Controller
     {
         $libraryRoot = rtrim((string) config('app.book_root', ''), '/');
         if ($libraryRoot === '') {
-            $libraryRoot = rtrim((string) config('app.book_root'), '/');
+            $libraryRoot = rtrim((string) (config('filesystems.disks.books.root') ?? config('app.book_root')), '/');
         }
         if (!is_dir($libraryRoot)) {
             Log::warning('[ImportFile] Library root directory not found', [
@@ -1511,7 +1517,7 @@ class ImportFileController extends Controller
             // Get the book storage root
             $bookStorageRoot = rtrim((string) config('app.book_root', ''), '/');
             if ($bookStorageRoot === '') {
-                $bookStorageRoot = rtrim((string) config('app.book_root'), '/');
+                $bookStorageRoot = rtrim((string) (config('filesystems.disks.books.root') ?? config('app.book_root')), '/');
             }
             if (!$bookStorageRoot || !is_dir($bookStorageRoot)) {
                 Log::error('[ImportFile] Book storage path not found or invalid', [
@@ -1668,7 +1674,7 @@ class ImportFileController extends Controller
 
         $destRoot = (string) config('app.book_root', '');
         if ($destRoot === '') {
-            $destRoot = (string) config('app.book_root');
+            $destRoot = (string) (config('filesystems.disks.books.root') ?? config('app.book_root'));
         }
         if ($destRoot === '') {
             $destRoot = (string) Config::get('audiobooks.root', '');
@@ -1953,7 +1959,9 @@ class ImportFileController extends Controller
         if (!empty($meta['author'])) {
             $authors = is_array($meta['author']) ? $meta['author'] : [$meta['author']];
             foreach ($authors as $index => $author) {
-                $formData["author[{$index}]"] = trim($author);
+                // Normalize for DB (ensure spaces between initials)
+                $normalizedAuthor = $this->bookImportService->normalizeAuthorName($author);
+                $formData["author[{$index}]"] = trim($normalizedAuthor);
             }
         }
 

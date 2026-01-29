@@ -18,7 +18,7 @@ trait BookImportTrait
      */
     private function scanDirectory(string $path): array
     {
-        $storagePath = (string) config('app.book_root');
+        $storagePath = (string) (config('filesystems.disks.books.root') ?? config('app.book_root'));
         if (!$storagePath) {
             throw new RuntimeException('BOOK_STORAGE_PATH is not defined in the config');
         }
@@ -39,7 +39,7 @@ trait BookImportTrait
      */
     private function extractTagData(string $filePath): array
     {
-        $storagePath = (string) config('app.book_root');
+        $storagePath = (string) (config('filesystems.disks.books.root') ?? config('app.book_root'));
         if (!$storagePath) {
             throw new RuntimeException('BOOK_STORAGE_PATH is not defined in the config');
         }
@@ -182,7 +182,7 @@ trait BookImportTrait
      */
     protected function findCoverImageCandidate(string $directoryPath): array
     {
-        $storagePath = (string) config('app.book_root');
+        $storagePath = (string) (config('filesystems.disks.books.root') ?? config('app.book_root'));
         $dir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
         if (!is_dir($dir)) {
             return [null, []];
@@ -518,7 +518,7 @@ trait BookImportTrait
                 $output->line("Downloading image from <comment>{$url}</comment>");
             }
 
-            $storagePath = (string) config('app.book_root'); // absolute path
+            $storagePath = (string) (config('filesystems.disks.books.root') ?? config('app.book_root')); // absolute path
             if (!$storagePath) {
                 $storagePath = storage_path('app/books');
 

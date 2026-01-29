@@ -19,7 +19,7 @@ class AudioMetadataController extends Controller
             return response()->json(['error' => 'File path required'], 400);
         }
 
-        $storagePath = rtrim(config('app.book_root'), '/');
+        $storagePath = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root'), '/');
         $fullPath = $storagePath . '/' . ltrim($filePath, '/');
 
         if (!file_exists($fullPath)) {

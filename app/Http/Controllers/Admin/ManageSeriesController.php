@@ -178,7 +178,7 @@ class ManageSeriesController extends Controller
      */
     private function flattenDirectories($primaryBook, $secondaryBooks)
     {
-        $storageRoot = rtrim(config('app.book_root'), '/');
+        $storageRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root'), '/');
         $primaryPath = $storageRoot . '/' . $primaryBook['directoryPath'];
 
         if (!is_dir($primaryPath)) {

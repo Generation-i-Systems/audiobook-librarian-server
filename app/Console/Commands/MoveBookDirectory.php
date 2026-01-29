@@ -665,7 +665,7 @@ class MoveBookDirectory extends Command
 
     private function resolveBookRoot(): string
     {
-        $configBookRoot = config('app.book_root');
+        $configBookRoot = config('filesystems.disks.books.root') ?? config('app.book_root');
         $diskRoot = config('filesystems.disks.books.root');
 
         $bookStoragePath = $diskRoot ?: $configBookRoot;

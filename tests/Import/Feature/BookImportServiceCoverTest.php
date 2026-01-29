@@ -24,6 +24,7 @@ class BookImportServiceCoverTest extends TestCase
         $this->testDirectory = storage_path('app/' . $this->relativeDirectory);
 
         $this->app['config']->set('app.book_root', storage_path('app'));
+        $this->app['config']->set('filesystems.disks.books.root', storage_path('app'));
 
         // Create test directory
         if (!File::exists($this->testDirectory)) {

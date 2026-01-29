@@ -1408,13 +1408,8 @@ class BookController extends Controller
                 $booksDisk = Storage::disk('books');
 
                 /** @phpstan-ignore-next-line function.alreadyNarrowedType */
-                if (method_exists($booksDisk, 'directoryExists')) {
-                    $oldExists = $booksDisk->directoryExists($oldDirectoryPath);
-                    $newExists = $booksDisk->directoryExists($newDirectoryPath);
-                } else {
-                    $oldExists = count($booksDisk->allFiles($oldDirectoryPath)) > 0;
-                    $newExists = count($booksDisk->allFiles($newDirectoryPath)) > 0;
-                }
+                $oldExists = count($booksDisk->allFiles($oldDirectoryPath)) > 0;
+                $newExists = count($booksDisk->allFiles($newDirectoryPath)) > 0;
 
                 $shouldSkipMove = !$oldExists && $newExists;
             } catch (\Exception $e) {
@@ -1481,7 +1476,7 @@ class BookController extends Controller
                 }
             }
 
-            $storageRoot = (string) config('app.book_root', config('app.book_root'));
+            $storageRoot = (string) (config('filesystems.disks.books.root') ?? config('app.book_root'));
             $storageRoot = rtrim($storageRoot, '/');
             if ($storageRoot !== '') {
                 $oldAbs = $storageRoot . '/' . ltrim($oldDirectoryPath, '/');

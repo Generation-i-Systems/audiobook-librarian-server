@@ -4,6 +4,7 @@ namespace Tests\Unit\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Admin\ImportFileController;
+use App\Services\BookImportService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Mockery;
@@ -19,9 +20,10 @@ class ImportFileControllerTest extends TestCase
 
         // Mock the DocumentStoreService
         $documentStoreMock = Mockery::mock(DocumentStoreServiceInterface::class);
+        $bookImportServiceMock = Mockery::mock(BookImportService::class);
 
         // Create the controller with the mock
-        $this->controller = new ImportFileController($documentStoreMock);
+        $this->controller = new ImportFileController($documentStoreMock, $bookImportServiceMock);
     }
 
     protected function tearDown(): void

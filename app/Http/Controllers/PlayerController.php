@@ -58,7 +58,7 @@ class PlayerController extends Controller
      */
     private function getAudioFiles(array $book): array
     {
-        $storagePath = rtrim(config('app.book_root'), '/');
+        $storagePath = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root'), '/');
         $directoryPath = $book['directoryPath'] ?? $book['path'] ?? null;
 
         if (!$directoryPath) {

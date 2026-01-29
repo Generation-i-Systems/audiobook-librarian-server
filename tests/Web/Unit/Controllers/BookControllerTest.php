@@ -7,6 +7,7 @@ use App\Events\NewBookAdded;
 use App\Http\Controllers\Admin\BookController;
 use App\Http\Controllers\Admin\ImportFileController;
 use App\Services\AudibleService;
+use App\Services\BookImportService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
@@ -704,9 +705,10 @@ class BookControllerTest extends TestCase
 
         // Create a mock DocumentStoreServiceInterface
         $documentStoreService = Mockery::mock(DocumentStoreServiceInterface::class);
+        $bookImportService = Mockery::mock(BookImportService::class);
 
         // Create a real ImportFileController instance with the mocked service
-        $importFileController = new ImportFileController($documentStoreService);
+        $importFileController = new ImportFileController($documentStoreService, $bookImportService);
 
         // Create a partial mock of the ImportFileController, only mocking moveSelected
         $importFileController = Mockery::mock($importFileController, ['makePartial' => true]);

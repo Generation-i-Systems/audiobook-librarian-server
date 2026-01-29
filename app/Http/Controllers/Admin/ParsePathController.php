@@ -27,7 +27,7 @@ class ParsePathController extends Controller
         $method->setAccessible(true);
 
         // Remove storage root if present and normalize path
-        $storageRoot = rtrim(config('app.book_root'), '/');
+        $storageRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root'), '/');
         $normalizedPath = trim(str_replace($storageRoot, '', $path), '/');
 
         $bookPathInfo = $method->invoke($this->parser, $normalizedPath);
