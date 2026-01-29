@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use App\Contracts\DocumentStoreServiceInterface;
 
 class UserController extends Controller
@@ -80,13 +81,19 @@ class UserController extends Controller
             'role' => 'required|string',
             'password' => 'nullable|string|min:6|confirmed',
         ]);
+
+        Log::info('UserController update called', [
+            'user_id' => $id,
+            'validated_data' => $validated,
+        ]);
+
         // Uniqueness check (ignore current user)
         $existingUser = $this->documentStoreService->getUserByUsername($validated['username']);
-        if ($existingUser && $existingUser['id'] !== $id) {
+        if ($existingUser && (string)$existingUser['id'] !== (string)$id) {
             return back()->withErrors(['username' => 'Username already exists.']);
         }
         $existingEmail = $this->documentStoreService->getUserByEmail($validated['email']);
-        if ($existingEmail && $existingEmail['id'] !== $id) {
+        if ($existingEmail && (string)$existingEmail['id'] !== (string)$id) {
             return back()->withErrors(['email' => 'Email already exists.']);
         }
         // Never store password_confirmation on user record
@@ -96,7 +103,19 @@ class UserController extends Controller
         } else {
             unset($validated['password']);
         }
+
+        Log::info('UserController update before updateUser', [
+            'user_id' => $id,
+            'data_to_update' => $validated,
+        ]);
+
         $this->documentStoreService->updateUser($id, $validated);
+
+        $updatedUser = $this->documentStoreService->getUserById($id);
+        Log::info('UserController update after updateUser call', [
+            'user_id' => $id,
+            'role_after_update' => $updatedUser['role'] ?? 'null',
+        ]);
 
         return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
     }
@@ -115,7 +134,7 @@ class UserController extends Controller
      * @param string $id The user ID to verify
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function verify($id)
+    public function verify(Request $request, $id)
     {
         $user = $this->documentStoreService->getUserById($id);
 
@@ -127,8 +146,13 @@ class UserController extends Controller
             return back()->with('info', 'User is already verified.');
         }
 
+        $role = $request->input('role', 'user');
+        if (!in_array($role, ['user', 'library-user', 'standard', 'admin', 'super-admin'], true)) {
+            return back()->with('error', 'Invalid role selected.');
+        }
+
         $this->documentStoreService->updateUser($id, [
-            'role' => 'user',
+            'role' => $role,
             'email_verified_at' => now()
         ]);
 

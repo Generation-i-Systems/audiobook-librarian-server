@@ -20,8 +20,12 @@
         <div class="mb-3">
             <label for="role" class="form-label">Role</label>
             <select name="role" id="role" class="form-control" required>
-                <option value="user" {{ old('role') == 'user' ? 'selected' : '' }}>User</option>
+                <option value="unverified" {{ old('role') == 'unverified' ? 'selected' : '' }}>Unverified</option>
+                <option value="user" {{ old('role') == 'user' ? 'selected' : '' }}>User (Player Access)</option>
+                <option value="library-user" {{ old('role') == 'library-user' ? 'selected' : '' }}>Library User (Library Access)</option>
+                <option value="standard" {{ old('role') == 'standard' ? 'selected' : '' }}>Standard</option>
                 <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Admin</option>
+                <option value="super-admin" {{ old('role') == 'super-admin' ? 'selected' : '' }}>Super Admin</option>
             </select>
         </div>
         <div class="mb-3">

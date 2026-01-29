@@ -68,13 +68,12 @@
                                     <td>
                                         <div class="btn-group" role="group">
                                             @if(($user['role'] ?? '') === 'unverified')
-                                                <form action="{{ route('admin.users.verify', $user['id']) }}" method="POST"
-                                                    class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-success btn-sm" title="Verify User">
-                                                        <i class="fas fa-check"></i> Verify
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="btn btn-success btn-sm" title="Verify User"
+                                                    data-bs-toggle="modal" data-bs-target="#verifyModal"
+                                                    data-user-id="{{ $user['id'] }}"
+                                                    data-user-name="{{ $user['name'] ?? $user['email'] }}">
+                                                    <i class="fas fa-check"></i> Verify
+                                                </button>
                                             @endif
 
                                             <a href="{{ route('admin.users.edit', $user['id']) }}"
@@ -104,5 +103,56 @@
                 </div>
             </div>
         </div>
+
+        <!-- Verify User Modal -->
+        <div class="modal fade" id="verifyModal" tabindex="-1" aria-labelledby="verifyModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="verifyModalLabel">Verify User</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>What type of access should <strong id="verifyUserName"></strong> have?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <form id="verifyPlayerForm" method="POST" class="d-inline">
+                            @csrf
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Player Access (User)
+                            </button>
+                        </form>
+                        <form id="verifyLibraryForm" method="POST" class="d-inline">
+                            @csrf
+                            <button type="submit" class="btn btn-info">
+                                <i class="fas fa-library"></i> Library Access (Library User)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script>
+        // Set up verify modal with user data
+        document.getElementById('verifyModal').addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const userId = button.getAttribute('data-user-id');
+            const userName = button.getAttribute('data-user-name');
+
+            document.getElementById('verifyUserName').textContent = userName;
+
+            // Set form actions
+            const playerForm = document.getElementById('verifyPlayerForm');
+            const libraryForm = document.getElementById('verifyLibraryForm');
+
+            playerForm.setAttribute('action', '/admin/users/' + userId + '/verify');
+            playerForm.innerHTML = '@csrf<input type="hidden" name="role" value="user"><button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> Player Access (User)</button>';
+
+            libraryForm.setAttribute('action', '/admin/users/' + userId + '/verify');
+            libraryForm.innerHTML = '@csrf<input type="hidden" name="role" value="library-user"><button type="submit" class="btn btn-info"><i class="fas fa-library"></i> Library Access (Library User)</button>';
+        });
+    </script>
 @endsection
