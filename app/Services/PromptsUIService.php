@@ -24,6 +24,28 @@ class PromptsUIService implements ImportUIInterface
     protected bool $plainMode = false;
     protected bool $interrupted = false;
 
+    public function __construct()
+    {
+        // Use a custom output to suppress the 2-newline padding Laravel Prompts adds by default
+        // and rtrim the output to avoid extra blank lines at the bottom.
+        // Also remove the 1-char indentation from the beginning of each line.
+        \Laravel\Prompts\Prompt::setOutput(new class () extends \Laravel\Prompts\Output\ConsoleOutput {
+            public function newLinesWritten(): int
+            {
+                return 2; // Pretend we've already written newlines to avoid automatic padding
+            }
+
+            public function write(string|iterable $messages, bool $newline = false, int $options = 0): void
+            {
+                if (is_string($messages)) {
+                    $messages = preg_replace('/^ /m', '', $messages);
+                    $messages = rtrim($messages, "\r\n");
+                }
+                parent::write($messages, false, $options);
+            }
+        });
+    }
+
     public function initialize(int $width, int $height): void
     {
         $this->width = max(40, $width);
@@ -272,7 +294,212 @@ class PromptsUIService implements ImportUIInterface
             echo "Title: {$title}\n";
             echo "Author: {$author}\n";
             echo "--------------------\n";
+            return;
         }
+
+        // Display cover if available
+        $this->displayCurrentBookCover();
+
+        // Display metadata table
+        $this->displayCurrentBookTable();
+    }
+
+    protected function displayCurrentBookCover(): void
+    {
+        $url = $this->currentBook['cover_url'] ?? null;
+        if (!$url) {
+            return;
+        }
+
+        // Check if we have cover data embedded or local file
+        if (!empty($this->currentBook['cover_data']) && isset($this->currentBook['cover_is_local_file'])) {
+            // It's already a local path from buildUiMetadata
+        }
+
+        $this->displayCoverImage($url);
+    }
+
+    protected function displayCurrentBookTable(): void
+    {
+        $metadata = $this->currentBook;
+
+        $arrayToString = function ($value) {
+            if (is_array($value)) {
+                $filtered = array_filter($value, function ($v) {
+                    return !is_array($v) && !is_object($v) && $v !== null && $v !== '';
+                });
+                return implode(', ', $filtered);
+            }
+            return (string)($value ?? 'N/A');
+        };
+
+        $formatAuthors = function ($authors) {
+            if (is_array($authors)) {
+                $filtered = array_filter($authors, function ($v) {
+                    return !is_array($v) && !is_object($v) && $v !== null && $v !== '';
+                });
+                return implode(' & ', $filtered);
+            }
+            return (string)($authors ?? 'N/A');
+        };
+
+        $displaySeries = '';
+        if (!empty($metadata['series'])) {
+            $seriesName = is_array($metadata['series']) ? implode(', ', $metadata['series']) : $metadata['series'];
+            // Simple cleaning since we don't have the full service logic here
+            $cleanedSeriesName = trim($seriesName);
+            $displaySeries = $cleanedSeriesName . (!empty($metadata['series_number']) ? " #{$metadata['series_number']}" : '');
+        }
+
+        $headers = ['Field', 'Value'];
+        $rows = [
+            ['Title', $arrayToString($metadata['title'] ?? null)],
+            ['Author', $formatAuthors($metadata['author'] ?? null)],
+            ['Narrator', $arrayToString($metadata['narrator'] ?? null)],
+            ['Series', $displaySeries],
+            ['Genre', $arrayToString($metadata['genre'] ?? null)],
+            ['Year', $metadata['year'] ?? 'N/A'],
+            ['Publisher', $arrayToString($metadata['publisher'] ?? null)],
+            ['Language', $metadata['language'] ?? 'N/A'],
+            ['ISBN', $metadata['isbn'] ?? 'N/A'],
+            ['Confidence', ($metadata['confidence'] ?? 0) . '%'],
+        ];
+
+        if (!empty($metadata['source_path'])) {
+            $rows[] = ['Source Path', $metadata['source_path']];
+        }
+
+        if (!empty($metadata['directory_path'])) {
+            $rows[] = ['Directory Path', $metadata['directory_path']];
+        }
+
+        if (!empty($metadata['description'])) {
+            $description = $metadata['description'];
+            if (strlen($description) > 80) {
+                $description = substr($description, 0, 80) . '...';
+            }
+            $rows[] = ['Description', $description];
+        }
+
+        if (!empty($metadata['cover_source'])) {
+            $rows[] = ['Cover Source', $metadata['cover_source']];
+        }
+
+        table($headers, $rows);
+    }
+
+    protected function displayCoverImage(string $imageUrl): void
+    {
+        $term = getenv('TERM_PROGRAM') ?: getenv('TERM');
+        $termEnv = getenv('TERM') ?: '';
+        $termProgram = getenv('TERM_PROGRAM') ?: '';
+
+        $kittySupport = $termEnv === 'xterm-kitty' ||
+            $termEnv === 'xterm-ghostty' ||
+            strpos($termEnv, 'kitty') !== false ||
+            $termProgram === 'ghostty';
+
+        if ($kittySupport || in_array($term, ['Ghostty', 'iTerm.app', 'WezTerm'])) {
+            try {
+                $imageData = @file_get_contents($imageUrl);
+
+                if ($imageData) {
+                    info("📸 Cover Preview: {$imageUrl}");
+
+                    if ($kittySupport) {
+                        $this->displayKittyImage($imageData);
+                    } elseif ($term === 'iTerm.app') {
+                        $base64Image = base64_encode($imageData);
+                        echo "\033]1337;File=inline=1;width=200px;height=150px:{$base64Image}\007\n";
+                    }
+                } else {
+                    info("📸 Cover available: {$imageUrl}");
+                }
+            } catch (\Exception $e) {
+                warning("📸 Cover available: {$imageUrl} (display error: {$e->getMessage()})");
+            }
+        } else {
+            info("📸 Cover available: {$imageUrl}");
+        }
+    }
+
+    protected function displayKittyImage(string $imageData): void
+    {
+        $tempFile = tempnam(sys_get_temp_dir(), 'cover_') . '.png';
+
+        try {
+            $tempOriginal = tempnam(sys_get_temp_dir(), 'orig_') . '.jpg';
+            file_put_contents($tempOriginal, $imageData);
+
+            $imageInfo = getimagesize($tempOriginal);
+            if (!$imageInfo) {
+                return;
+            }
+            $width = $imageInfo[0];
+            $height = $imageInfo[1];
+
+            $maxWidth = 200;
+            $scale = min($maxWidth / $width, $maxWidth / $height);
+            $thumbWidth = (int) ($width * $scale);
+            $thumbHeight = (int) ($height * $scale);
+
+            $thumb = $this->createThumbnail($tempOriginal, $thumbWidth, $thumbHeight);
+            if ($thumb) {
+                imagepng($thumb, $tempFile);
+                imagedestroy($thumb);
+
+                if (file_exists('/usr/bin/kitten') && is_executable('/usr/bin/kitten')) {
+                    system("kitten icat --align=left '$tempFile' 2>/dev/null");
+                } else {
+                    $base64Image = base64_encode(file_get_contents($tempFile));
+                    fwrite(STDOUT, "\033_Ga=T,f=100;{$base64Image}\033\\");
+                    echo "\n";
+                }
+            }
+
+            @unlink($tempOriginal);
+        } catch (\Exception $e) {
+            // Silently fail image display
+        } finally {
+            @unlink($tempFile);
+        }
+    }
+
+    protected function createThumbnail(string $imagePath, int $width, int $height)
+    {
+        if (!file_exists($imagePath)) {
+            return null;
+        }
+
+        $info = getimagesize($imagePath);
+        if (!$info) {
+            return null;
+        }
+
+        $mime = $info['mime'];
+        $src = null;
+
+        switch ($mime) {
+            case 'image/jpeg':
+                $src = imagecreatefromjpeg($imagePath);
+                break;
+            case 'image/png':
+                $src = imagecreatefrompng($imagePath);
+                break;
+            case 'image/webp':
+                $src = imagecreatefromwebp($imagePath);
+                break;
+        }
+
+        if (!$src) {
+            return null;
+        }
+
+        $dst = imagecreatetruecolor($width, $height);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $width, $height, $info[0], $info[1]);
+        imagedestroy($src);
+
+        return $dst;
     }
 
     protected function formatArrayOrString(mixed $value): string
@@ -286,9 +513,7 @@ class PromptsUIService implements ImportUIInterface
     public function drawInitialLayout(): void
     {
         if (!$this->plainMode) {
-            echo "\n";
             info("Audiobook Librarian Import");
-            echo "\n";
         }
     }
 

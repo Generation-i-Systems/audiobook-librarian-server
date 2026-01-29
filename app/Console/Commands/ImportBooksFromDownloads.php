@@ -51,10 +51,7 @@ class ImportBooksFromDownloads extends Command
                             {--force-audio : Force audio transcription even when AI confidence is high}
                             {--include-narrator : Include narrator in generated directory paths}
                             {--include-old : Include OpenAudible books_old directory when scanning}
-                            {--ui=prompts : UI layer (prompts|ncurses|plain)}';
-
-
-
+                            {--ui=hybrid : UI layer (prompts|ncurses|plain|hybrid)}';
 
     /**
      * The console command description.
@@ -413,14 +410,15 @@ class ImportBooksFromDownloads extends Command
      */
     public function handle()
     {
-        $uiMode = (string) ($this->option('ui') ?? 'prompts');
+        $uiMode = (string) ($this->option('ui') ?? 'hybrid');
 
         if (!$this->uiService) {
             $this->uiService = match ($uiMode) {
                 'prompts' => app(PromptsUIService::class),
                 'ncurses' => app(ImportUIService::class),
+                'hybrid' => app(\App\Services\HybridUIService::class),
                 'plain' => $this->createPlainUiService(),
-                default => app(PromptsUIService::class),
+                default => app(\App\Services\HybridUIService::class),
             };
         }
 

@@ -1,0 +1,178 @@
+<?php
+
+namespace App\Services;
+
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\select;
+use function Laravel\Prompts\text;
+
+class HybridUIService extends ImportUIService
+{
+    public function __construct()
+    {
+        // Use a custom output to suppress the 2-newline padding Laravel Prompts adds by default
+        // and rtrim the output to avoid extra blank lines at the bottom.
+        // Also remove the 1-char indentation from the beginning of each line.
+        \Laravel\Prompts\Prompt::setOutput(new class () extends \Laravel\Prompts\Output\ConsoleOutput {
+            public function newLinesWritten(): int
+            {
+                return 2; // Pretend we've already written newlines to avoid automatic padding
+            }
+
+            public function write(string|iterable $messages, bool $newline = false, int $options = 0): void
+            {
+                if (is_string($messages)) {
+                    $messages = preg_replace('/^ /m', '', $messages);
+                    $messages = rtrim($messages, "\r\n");
+                }
+                parent::write($messages, false, $options);
+            }
+        });
+    }
+
+    /**
+     * Override drawBox to use Laravel Prompts styling (thin borders)
+     */
+    protected function drawBox(int $x, int $y, int $w, int $h, string $title = "", string $color = "white"): void
+    {
+        $colors = [
+            'white' => "\e[37m",
+            'cyan' => "\e[36m",
+            'green' => "\e[32m",
+            'yellow' => "\e[33m",
+            'red' => "\e[31m",
+            'gray' => "\e[90m",
+            'reset' => "\e[0m",
+        ];
+
+        // Map colors to Prompts-style shades
+        if ($color === 'white') {
+            $color = 'gray';
+        }
+
+        $c = $colors[$color] ?? $colors['gray'];
+        $reset = $colors['reset'];
+
+        $title = trim($title);
+        $titleLen = mb_strwidth($title);
+        $titleLabel = $titleLen > 0 ? " {$title} " : '';
+        $labelWidth = mb_strwidth($titleLabel);
+
+        // Calculate top border to fit exactly within width $w
+        $topBorderWidth = max(0, $w - 2 - $labelWidth);
+        $topBorder = str_repeat('─', $topBorderWidth);
+
+        // Draw top border: ┌ Title ──────┐
+        $this->screen->write("\e[{$y};{$x}H{$c}┌{$titleLabel}{$topBorder}┐{$reset}");
+
+        // Draw sides
+        for ($i = 1; $i < $h - 1; $i++) {
+            $currentY = $y + $i;
+            $this->screen->write("\e[{$currentY};{$x}H{$c}│{$reset}");
+            $this->screen->write("\e[{$currentY};" . ($x + $w - 1) . "H{$c}│{$reset}");
+        }
+
+        // Draw bottom border
+        $this->screen->write("\e[" . ($y + $h - 1) . ";{$x}H{$c}└" . str_repeat('─', $w - 2) . "┘{$reset}");
+    }
+
+    /**
+     * Override drawFooter to remove the separator line and prompt
+     */
+    protected function drawFooter(): void
+    {
+        // No-op - line and '>' prompt removed as requested
+    }
+
+    /**
+     * Override prompt drawing to leave space for Laravel Prompts
+     */
+    protected function drawPrompt(): void
+    {
+        $separatorY = $this->getFooterSeparatorY();
+        // Clear from the separator line position downwards
+        for ($y = $separatorY; $y <= $this->height; $y++) {
+            $this->screen->write("\e[{$y};1H\e[K");
+        }
+    }
+
+    public function ask(string $question, string $default = '', bool $clearPrompt = true): string
+    {
+        // Ensure UI is up to date
+        $this->renderFull();
+
+        // Move cursor to prompt position (where the separator used to be)
+        $cursorY = $this->getFooterSeparatorY();
+        $cursorX = 1;
+
+        echo "\e[{$cursorY};{$cursorX}H";
+
+        $response = text(
+            label: $question,
+            default: $default,
+            required: false
+        );
+
+        if (strtolower(trim($response)) === 'q') {
+            return 'q';
+        }
+
+        // Restore layout
+        $this->renderFull();
+
+        return $response;
+    }
+
+    public function select(string $question, array $options, string $default = ''): string
+    {
+        $this->renderFull();
+
+        $cursorY = $this->getFooterSeparatorY();
+        $cursorX = 1;
+        echo "\e[{$cursorY};{$cursorX}H";
+
+        if (empty($options)) {
+            return '';
+        }
+
+        // Format options for Laravel Prompts
+        $formattedOptions = [];
+        foreach ($options as $key => $label) {
+            $formattedOptions[(string) $key] = $label;
+        }
+
+        // Check if default exists
+        $defaultKey = $default !== '' && isset($formattedOptions[$default]) ? $default : (string) array_key_first($formattedOptions);
+
+        $response = select(
+            label: $question,
+            options: $formattedOptions,
+            default: $defaultKey,
+            scroll: 8 // Increased scroll area for select
+        );
+
+        // Restore layout
+        $this->renderFull();
+
+        return (string) $response;
+    }
+
+    public function confirm(string $question, bool $default = false): bool
+    {
+        $this->renderFull();
+
+        $cursorY = $this->getFooterSeparatorY();
+        $cursorX = 1;
+        echo "\e[{$cursorY};{$cursorX}H";
+
+        $response = confirm(
+            label: $question,
+            default: $default
+        );
+
+        // Restore layout
+        $this->renderFull();
+
+        return $response;
+    }
+}
