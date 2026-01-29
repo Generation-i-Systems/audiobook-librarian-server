@@ -1650,13 +1650,13 @@ class BookImportService
      */
     public function formatAuthorsForDirectory(array $authors): string
     {
-        // Use directory-specific normalization (no spaces between initials)
-        $normalizedAuthors = array_map([$this, 'normalizeAuthorNameForDirectory'], $authors);
+        $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
         return implode(' & ', $normalizedAuthors);
     }
 
     /**
-     * Normalize author names for directory use
+     * Normalize author names for both database and directory use (unspaced initials)
+     * e.g., "J.R.R. Tolkien"
      *
      * CRITICAL: Author will NEVER contain "Graphic" AND "Audio" - this is always invalid
      */
@@ -1680,32 +1680,24 @@ class BookImportService
             return '';
         }
 
-        // Normalize initials
+        // Normalize initials (Ensure period and remove spaces between them)
+        // e.g. "J R R Tolkien" -> "J. R. R. Tolkien" -> "J.R.R. Tolkien"
         $name = preg_replace('/\b([A-Z])\s+/', '$1. ', $name);
         $name = preg_replace('/\s+([A-Z])$/', ' $1.', $name);
 
-        // Ensure space between initials (DB format: J. R. R. Tolkien)
-        // Repeat to handle multiple initials (J. R. R.)
-        $name = preg_replace('/\b([A-Z]\.)([A-Z]\.)/', '$1 $2', $name);
-        $name = preg_replace('/\b([A-Z]\.)([A-Z]\.)/', '$1 $2', $name);
+        // Remove spaces between initials
+        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
+        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
 
         return trim($name);
     }
 
     /**
-     * Normalize author name for directory use (no spaces between initials)
-     * e.g., "J.R.R. Tolkien"
+     * @deprecated Use normalizeAuthorName - now unified for both DB and Directory
      */
     public function normalizeAuthorNameForDirectory(string $authorName): string
     {
-        $name = $this->normalizeAuthorName($authorName);
-
-        // Remove spaces between initials for filesystem
-        // J. R. R. -> J.R.R.
-        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
-        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
-
-        return trim($name);
+        return $this->normalizeAuthorName($authorName);
     }
 
     /**
@@ -1861,22 +1853,24 @@ class BookImportService
             return null;
         }
 
-        // Generate combinations for both DB format (spaces) and Directory format (no spaces)
-        $normalizedAuthorsDb = array_map([$this, 'normalizeAuthorName'], $authors);
-        $normalizedAuthorsDir = array_map([$this, 'normalizeAuthorNameForDirectory'], $authors);
+        // Unified normalization (unspaced initials: J.R.R. Tolkien)
+        $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
 
         $authorCombinations = [];
-
-        // Add combinations for DB format (legacy folder support)
-        $authorCombinations[] = implode(' & ', $normalizedAuthorsDb);
-        if (count($normalizedAuthorsDb) > 1) {
-            $authorCombinations[] = implode(' & ', array_reverse($normalizedAuthorsDb));
+        $authorCombinations[] = implode(' & ', $normalizedAuthors);
+        if (count($normalizedAuthors) > 1) {
+            $authorCombinations[] = implode(' & ', array_reverse($normalizedAuthors));
         }
 
-        // Add combinations for Directory format (preferred)
-        $authorCombinations[] = implode(' & ', $normalizedAuthorsDir);
-        if (count($normalizedAuthorsDir) > 1) {
-            $authorCombinations[] = implode(' & ', array_reverse($normalizedAuthorsDir));
+        // For backward compatibility, also check the version with spaces
+        $spacedAuthors = array_map(function ($name) {
+            $name = $this->normalizeAuthorName($name);
+            return preg_replace('/\b([A-Z]\.)([A-Z]\.)/', '$1 $2', $name);
+        }, $authors);
+
+        $authorCombinations[] = implode(' & ', $spacedAuthors);
+        if (count($spacedAuthors) > 1) {
+            $authorCombinations[] = implode(' & ', array_reverse($spacedAuthors));
         }
 
         $authorCombinations = array_unique($authorCombinations);
