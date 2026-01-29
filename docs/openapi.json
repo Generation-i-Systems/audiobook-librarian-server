@@ -250,6 +250,11 @@
             "Error": {
                 "type": "object",
                 "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Error code for identifying the type of error",
+                        "example": "ACCOUNT_PENDING_APPROVAL"
+                    },
                     "error": {
                         "type": "string",
                         "description": "Error type",
@@ -1742,6 +1747,10 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "REGISTRATION_PENDING_APPROVAL"
+                                        },
                                         "message": {
                                             "type": "string",
                                             "example": "Account created. Waiting for admin approval."
@@ -1752,6 +1761,7 @@
                                     "successful_registration": {
                                         "summary": "Account created successfully",
                                         "value": {
+                                            "code": "REGISTRATION_PENDING_APPROVAL",
                                             "message": "Account created. Waiting for admin approval."
                                         }
                                     }
@@ -1934,6 +1944,7 @@
                                     "pending_approval": {
                                         "summary": "Account waiting for admin approval",
                                         "value": {
+                                            "code": "ACCOUNT_PENDING_APPROVAL",
                                             "message": "Account pending admin approval"
                                         }
                                     }
@@ -2539,7 +2550,8 @@
                                     "pending_approval": {
                                         "summary": "Account awaiting admin approval",
                                         "value": {
-                                            "error": "Account pending admin approval"
+                                            "code": "ACCOUNT_PENDING_APPROVAL",
+                                            "message": "Account pending admin approval"
                                         }
                                     }
                                 }

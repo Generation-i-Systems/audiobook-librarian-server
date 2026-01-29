@@ -25,7 +25,10 @@ class EnsureActiveUser
             $message = 'Your account has been disabled. Please contact support.';
 
             if ($request->expectsJson() || $request->wantsJson()) {
-                return response()->json(['message' => $message], 403);
+                return response()->json([
+                    'code' => 'ACCOUNT_DISABLED',
+                    'message' => $message,
+                ], 403);
             }
 
             return redirect()->route('login')->withErrors(['login' => $message]);

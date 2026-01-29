@@ -69,6 +69,9 @@ class AuthController extends Controller
             'content' => json_encode($payload),
         ]);
 
-        return response()->json(['message' => 'Account request submitted. Please wait for approval.'], 201); // Created
+        return response()->json([
+            'code' => 'REGISTRATION_PENDING_APPROVAL',
+            'message' => 'Account request submitted. Please wait for approval.',
+        ], 201); // Created
     }
 }

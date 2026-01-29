@@ -97,6 +97,7 @@ class AuthControllerTest extends TestCase
         // Assert the response
         $response->assertStatus(201)
             ->assertJson([
+                'code' => 'REGISTRATION_PENDING_APPROVAL',
                 'message' => 'Account created. Waiting for admin approval.',
             ]);
 
@@ -173,6 +174,7 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJson([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
                 'message' => 'Account pending admin approval',
             ]);
     }

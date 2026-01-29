@@ -91,6 +91,7 @@ class AuthController extends Controller
         $this->registrationNotifier->send($completeUserData, 'api', $request);
 
         return response()->json([
+            'code' => 'REGISTRATION_PENDING_APPROVAL',
             'message' => 'Account created. Waiting for admin approval.',
         ], 201);
     }
@@ -135,7 +136,10 @@ class AuthController extends Controller
 
         // Check if user is approved
         if (($user['role'] ?? '') === 'unverified') {
-            return response()->json(['message' => 'Account pending admin approval'], 403);
+            return response()->json([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
+                'message' => 'Account pending admin approval',
+            ], 403);
         }
 
         // Create an API token in the document store
@@ -252,7 +256,10 @@ class AuthController extends Controller
 
             // Check if user is approved
             if (($user['role'] ?? '') === 'unverified') {
-                return response()->json(['message' => 'Account pending admin approval'], 403);
+                return response()->json([
+                    'code' => 'ACCOUNT_PENDING_APPROVAL',
+                    'message' => 'Account pending admin approval',
+                ], 403);
             }
 
             // Create an API token

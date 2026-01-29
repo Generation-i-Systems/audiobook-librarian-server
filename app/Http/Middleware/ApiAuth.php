@@ -120,7 +120,10 @@ class ApiAuth
                     }
 
                     if ($user->role === 'unverified') {
-                        return response()->json(['error' => 'Account pending admin approval'], 403);
+                        return response()->json([
+                            'code' => 'ACCOUNT_PENDING_APPROVAL',
+                            'message' => 'Account pending admin approval',
+                        ], 403);
                     }
 
                     Log::info('API Auth successful via api_tokens fallback', [
@@ -204,7 +207,10 @@ class ApiAuth
                 'user_created_at' => $user->created_at->toISOString(),
                 'reason' => 'account_pending_approval'
             ]);
-            return response()->json(['error' => 'Account pending admin approval'], 403);
+            return response()->json([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
+                'message' => 'Account pending admin approval',
+            ], 403);
         }
 
         // Log successful authentication with token preview for comparison
