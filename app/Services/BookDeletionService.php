@@ -400,8 +400,6 @@ class BookDeletionService
 
         $trashFilesPath = $trashDisk->path($filesPath);
         @chmod($trashFilesPath, 0775);
-        @chown($trashFilesPath, 'eric');
-        @chgrp($trashFilesPath, 'audio');
 
         $files = $booksDisk->allFiles($directoryPath);
         $fileCount = 0;
@@ -418,8 +416,6 @@ class BookDeletionService
                     $targetAbsDir = $trashDisk->path($targetDir);
                     if (is_dir($targetAbsDir)) {
                         @chmod($targetAbsDir, 0775);
-                        @chown($targetAbsDir, 'eric');
-                        @chgrp($targetAbsDir, 'audio');
                     }
                 }
 
@@ -428,8 +424,6 @@ class BookDeletionService
 
                 if (rename($sourceAbsPath, $targetAbsPath)) {
                     @chmod($targetAbsPath, 0664);
-                    @chown($targetAbsPath, 'eric');
-                    @chgrp($targetAbsPath, 'audio');
                     $fileCount++;
                 } else {
                     Log::warning('Failed to move file to trash', [
