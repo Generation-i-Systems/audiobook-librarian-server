@@ -7433,12 +7433,12 @@ class BookImportService
             $isTitleGood = is_string($title) && strlen(trim($title)) > 0;
             $isAuthorGood = is_string($author) && strlen(trim($author)) > 0;
 
-            // Default to Accept all if title, author, and genres are all good
+            // Default to option 3 (Edit) when genre is invalid
             if ($isTitleGood && $isAuthorGood && $isGenreValid && $confidence > 80) {
                 $defaultChoice = '1';
             } elseif (!$isGenreValid) {
-                // Default to option 5 (Update genre) when genre is invalid
-                $defaultChoice = '5';
+                // Default to option 3 (Edit) when genre is invalid
+                $defaultChoice = '3';
             } else {
                 // Default to Edit if confidence is low or some fields are weak
                 $defaultChoice = $confidence > 80 ? '1' : '2';
