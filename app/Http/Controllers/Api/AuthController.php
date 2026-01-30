@@ -191,6 +191,7 @@ class AuthController extends Controller
             $name = $payload['name'] ?? null;
             $googleId = $payload['sub'] ?? null;
             $photoUrl = $payload['picture'] ?? null;
+            $emailVerified = $payload['email_verified'] ?? false;
 
             if (!$email || !$googleId) {
                 Log::error('Missing required fields from Google token', ['payload' => $payload]);
@@ -218,6 +219,7 @@ class AuthController extends Controller
                     'photo_url' => $photoUrl,
                     'role' => 'unverified',
                     'password' => null,
+                    'email_verified_at' => $emailVerified ? now() : null,
                 ];
 
                 $createdId = $this->documentStoreService->createUser($userData);
@@ -256,9 +258,15 @@ class AuthController extends Controller
 
             // Check if user is approved
             if (($user['role'] ?? '') === 'unverified') {
+                $isGoogleVerified = $payload['email_verified'] ?? false;
+                $message = $isGoogleVerified
+                    ? 'Google account verified. Waiting for admin approval.'
+                    : 'Account created. Waiting for admin approval.';
+
                 return response()->json([
                     'code' => 'ACCOUNT_PENDING_APPROVAL',
-                    'message' => 'Account pending admin approval',
+                    'message' => $message,
+                    'google_verified' => $isGoogleVerified,
                 ], 403);
             }
 
