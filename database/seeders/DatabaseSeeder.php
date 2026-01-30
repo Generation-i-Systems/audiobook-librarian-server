@@ -14,6 +14,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AdminUserSeeder::class,
             GenreSeeder::class,
+            BadgeSeeder::class,
+            ExpandedBadgeSeeder::class,
+            CanonicalBadgeSeeder::class,
         ]);
         // \App\Models\User::factory(10)->create();
 

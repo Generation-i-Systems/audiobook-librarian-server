@@ -258,6 +258,22 @@ interface DocumentStoreServiceInterface
      */
     public function getAllUsers(): array;
 
+    /**
+     * Get user activity data (progress, badges, reviews, etc.)
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getUserActivityData(string $userId): array;
+
+    /**
+     * Get badge tips for a user.
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getBadgeTips(string $userId): array;
+
     // GENRES
     public function createGenre(array $data);
 
@@ -795,6 +811,14 @@ interface DocumentStoreServiceInterface
      * @return array|null The account request data or null if not found
      */
     public function getAccountRequest(string $id): ?array;
+
+    /**
+     * Create a new review for a book.
+     *
+     * @param array $data
+     * @return string Review ID
+     */
+    public function createReview(array $data): string;
 
     /**
      * Approve an account request.

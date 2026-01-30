@@ -56,13 +56,15 @@ class HybridUIService extends ImportUIService
         $title = trim($title);
         $titleLen = mb_strwidth($title);
         $titleLabel = $titleLen > 0 ? " {$title} " : '';
-        $labelWidth = mb_strwidth($titleLabel);
 
-        // Calculate top border to fit exactly within width $w
-        $topBorderWidth = max(0, $w - 2 - $labelWidth);
-        $topBorder = str_repeat('─', $topBorderWidth);
+        // Prompts style: ┌ Title ──────┐
+        $innerW = $w - 2;
+        $topBorderWidth = $innerW - $titleLen - ($titleLen > 0 ? 0 : 0);
+        // If there's a title, Prompts usually puts it right after the corner: ┌ Title ───
+        // Let's match: ┌ Title ───────┐
+        $topBorder = str_repeat('─', max(0, $innerW - $titleLen - ($titleLen > 0 ? 1 : 0)));
 
-        // Draw top border: ┌ Title ──────┐
+        // Draw top border
         $this->screen->write("\e[{$y};{$x}H{$c}┌{$titleLabel}{$topBorder}┐{$reset}");
 
         // Draw sides
@@ -73,7 +75,7 @@ class HybridUIService extends ImportUIService
         }
 
         // Draw bottom border
-        $this->screen->write("\e[" . ($y + $h - 1) . ";{$x}H{$c}└" . str_repeat('─', $w - 2) . "┘{$reset}");
+        $this->screen->write("\e[" . ($y + $h - 1) . ";{$x}H{$c}└" . str_repeat('─', $innerW) . "┘{$reset}");
     }
 
     /**

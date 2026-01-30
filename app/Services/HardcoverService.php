@@ -492,8 +492,6 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
 
                 // Set directory ownership to eric:audio
                 if (is_dir($directoryPath)) {
-                    @chown($directoryPath, 'eric');
-                    @chgrp($directoryPath, 'audio');
                     @chmod($directoryPath, 0775);
                 }
             }
@@ -511,8 +509,6 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             // Set file permissions and ownership
             if (file_exists($targetPath)) {
                 @chmod($targetPath, 0664);
-                @chown($targetPath, 'eric');
-                @chgrp($targetPath, 'audio');
             }
 
             return $targetPath;

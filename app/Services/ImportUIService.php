@@ -114,20 +114,18 @@ class ImportUIService implements ImportUIInterface
 
     protected function getPromptHeight(): int
     {
-        // Reserve at least 12 lines for Hybrid mode prompts (Laravel Prompts)
-        // or the number of lines in promptLines for ncurses mode.
-        $linesNeeded = count($this->promptLines) ?: 12;
+        // Ensure we always have room for the main UI above
+        $max = max(3, $this->height - 18);
 
-        // Ensure we leave at least 15 lines for the top UI (Header + Details + Logs)
-        $max = max(5, $this->height - 15);
+        $linesNeeded = max(3, count($this->promptLines));
 
-        return min($linesNeeded, $max);
+        return min($linesNeeded, $this->promptHeight + 3, $max);
     }
 
     protected function getFooterSeparatorY(): int
     {
-        // The prompt area starts here. No separator line is drawn in Hybrid mode.
-        return $this->height - $this->getPromptHeight();
+        // One separator line above prompt area
+        return $this->height - ($this->getPromptHeight() + 1);
     }
 
     public function initialize(int $width, int $height): void
@@ -138,12 +136,10 @@ class ImportUIService implements ImportUIInterface
             return;
         }
         // Avoid writing to the last row/column of the terminal.
+        // Many terminals will auto-wrap when drawing the bottom-right corner, which causes a scroll.
         $this->width = max(40, $width - 1);
         $this->height = max(20, $height - 1);
-
-        // Dynamic log buffer size
         $this->maxLogs = max(5, $this->height - 25);
-
         $this->screen = new Screen($this->width, $this->height);
 
         $this->enableAlternateScreen();
@@ -170,38 +166,15 @@ class ImportUIService implements ImportUIInterface
         $this->interrupted = true;
     }
 
-    public function setBusy(string $message): void
-    {
-        if ($this->plainMode) {
-            echo "{$message}...\n";
-            return;
-        }
-        $this->promptLines = ["\e[1;33m{$message}...\e[0m"];
-        $this->renderFull();
-    }
-
-    public function flushInput(): void
-    {
-        if (!is_resource(STDIN)) {
-            return;
-        }
-
-        // Only works for non-blocking streams
-        $oldBlocking = stream_get_meta_data(STDIN)['blocked'];
-        stream_set_blocking(STDIN, false);
-
-        while (fgetc(STDIN) !== false) {
-            // Keep reading until buffer is empty
-        }
-
-        stream_set_blocking(STDIN, $oldBlocking);
-    }
-
     public function restoreTerminalState(): void
     {
-        $this->disableAlternateScreen();
-        // Clear screen manually since Screen class might not have clear()
-        $this->screen->write("\e[H\e[J");
+        if (function_exists('shell_exec')) {
+            @shell_exec('stty sane < /dev/tty');
+        }
+
+        // Show cursor + restore normal screen buffer
+        echo "\e[?25h\e[?1049l";
+        $this->alternateScreenEnabled = false;
     }
 
     protected function disableAlternateScreen(): void
@@ -851,25 +824,12 @@ class ImportUIService implements ImportUIInterface
     {
         $y = 5;
         $footerTop = $this->getFooterSeparatorY();
-
-        // Split the remaining space between Details and Logs.
-        // Details box needs more space generally (min 10).
-        $remaining = $footerTop - $y;
-
-        // Aim for a 60/40 split, but respect minimums
-        $detailsHeight = (int) max(8, floor($remaining * 0.6));
-        $logHeight = $remaining - $detailsHeight;
-
-        // If logs are too small, adjust
-        if ($logHeight < 5 && $remaining > 13) {
-            $logHeight = 5;
-            $detailsHeight = $remaining - $logHeight;
-        }
-
+        $logHeight = min(14, max(12, $this->height - 24));
+        $detailsHeight = max(10, $footerTop - $y - $logHeight);
         $this->drawBox(2, $y, $this->width - 2, $detailsHeight, " Current Book Details ", "green");
 
         if (empty($this->currentBook)) {
-            $this->screen->write("\e[" . ($y + 2) . ";10HNo book currently processing...");
+            $this->screen->write("\e[" . ($y + 5) . ";10HNo book currently processing...");
             return;
         }
 
@@ -988,22 +948,13 @@ class ImportUIService implements ImportUIInterface
 
     protected function drawLogs(): void
     {
-        $yHeader = 5;
         $footerTop = $this->getFooterSeparatorY();
-        $remaining = $footerTop - $yHeader;
-
-        $detailsHeight = (int) max(8, floor($remaining * 0.6));
-        $logHeight = $remaining - $detailsHeight;
-
-        if ($logHeight < 5 && $remaining > 13) {
-            $logHeight = 5;
-        }
-
-        $y = $footerTop - $logHeight;
-        $this->drawBox(2, $y, $this->width - 2, $logHeight, " Activity Log ", "yellow");
+        $h = min(14, max(12, $this->height - 24));
+        $y = $footerTop - $h;
+        $this->drawBox(2, $y, $this->width - 2, $h, " Activity Log ", "yellow");
 
         $row = $y + 1;
-        $displayLogs = array_slice($this->logs, -$logHeight + 2);
+        $displayLogs = array_slice($this->logs, -$h + 2);
         foreach ($displayLogs as $log) {
             $this->screen->write("\e[{$row};4H" . substr($log, 0, $this->width - 6));
             $row++;
@@ -1238,7 +1189,6 @@ class ImportUIService implements ImportUIInterface
     public function setCurrentBook(array $metadata): void
     {
         $this->currentBook = $metadata;
-        $this->promptLines = [];
         $this->cacheCoverForCurrentBook();
 
         // Clear render state to force re-render for new book

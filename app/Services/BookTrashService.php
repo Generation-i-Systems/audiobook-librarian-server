@@ -40,8 +40,6 @@ class BookTrashService
             $trashDisk->makeDirectory($backupId);
             $backupPath = $trashDisk->path($backupId);
             @chmod($backupPath, 0775);
-            @chown($backupPath, 'eric');
-            @chgrp($backupPath, 'audio');
 
             $metadata = [
                 'backup_at' => now()->toIso8601String(),

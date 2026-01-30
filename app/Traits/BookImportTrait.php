@@ -569,9 +569,7 @@ trait BookImportTrait
                     $output->line("Created directory: <info>{$directoryPath}</info>");
                 }
                 // Set directory ownership
-                if (function_exists('chown')) {
-                    @chown($fullDir, 'eric');
-                    @chgrp($fullDir, 'audio');
+                if (is_dir($fullDir)) {
                     @chmod($fullDir, 0775);
                 }
             }

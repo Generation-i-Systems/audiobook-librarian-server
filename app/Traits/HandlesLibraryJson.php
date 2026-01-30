@@ -65,8 +65,6 @@ trait HandlesLibraryJson
             @exec($fixPermsTool . ' ' . implode(' ', $args));
         } else {
             foreach ($validPaths as $path) {
-                @chown($path, 'eric');
-                @chgrp($path, 'audio');
                 @chmod($path, is_dir($path) ? 0775 : 0664);
             }
         }

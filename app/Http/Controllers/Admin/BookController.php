@@ -1484,16 +1484,6 @@ class BookController extends Controller
                 if (is_dir($oldAbs) && is_dir($newAbs)) {
                     $perms = @fileperms($oldAbs) & 0777;
                     @chmod($newAbs, $perms);
-                    if (function_exists('fileowner') && function_exists('filegroup') && function_exists('chown') && function_exists('chgrp')) {
-                        $owner = @fileowner($oldAbs);
-                        $group = @filegroup($oldAbs);
-                        if ($owner !== false) {
-                            @chown($newAbs, $owner);
-                        }
-                        if ($group !== false) {
-                            @chgrp($newAbs, $group);
-                        }
-                    }
                 }
             }
 

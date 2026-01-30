@@ -2004,4 +2004,28 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         return $affected;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function getUserActivityData(string $userId): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getBadgeTips(string $userId): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function createReview(array $data): string
+    {
+        return uniqid('review_');
+    }
 }

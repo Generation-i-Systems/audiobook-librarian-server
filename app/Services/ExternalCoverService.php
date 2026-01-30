@@ -128,11 +128,8 @@ class ExternalCoverService
                     try {
                         Storage::disk('books')->makeDirectory($directoryPath);
 
-                        // Set directory ownership to eric:audio with 775 permissions
                         $absoluteDir = Storage::disk('books')->path($directoryPath);
                         if (is_dir($absoluteDir)) {
-                            @chown($absoluteDir, 'eric');
-                            @chgrp($absoluteDir, 'audio');
                             @chmod($absoluteDir, 0775);
                         }
                     } catch (\Exception $e) {
@@ -169,8 +166,6 @@ class ExternalCoverService
                     // Set file ownership to eric:audio with 664 permissions
                     $absolutePath = Storage::disk('books')->path($storagePath);
                     if (file_exists($absolutePath)) {
-                        @chown($absolutePath, 'eric');
-                        @chgrp($absolutePath, 'audio');
                         @chmod($absolutePath, 0664);
                     }
 

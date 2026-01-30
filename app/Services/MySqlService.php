@@ -2610,6 +2610,172 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     }
 
     /**
+     * Get user activity data (progress, badges, reviews, etc.)
+     *
+     * @param string $userId
+     * @return array
+     */
+    /**
+     * Get user activity data (progress, badges, reviews, etc.)
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getUserActivityData(string $userId): array
+    {
+        try {
+            /** @var User|null $user */
+            $user = User::with([
+                'badges.badge',
+                'progress.book',
+                'reviews.book',
+                'recommendationsReceived.book',
+                'recommendationsReceived.sender',
+                'bookStatuses.book'
+            ])->find($userId);
+
+            if (!$user) {
+                return [];
+            }
+
+            // Get all badges to show unearned ones, sorted by progression
+            $allBadges = \App\Models\Badge::active()->get()->sort(function ($a, $b) {
+                if ($a->sort_order !== $b->sort_order) {
+                    return $a->sort_order <=> $b->sort_order;
+                }
+
+                // Tier weight for reliable progression (Bronze -> Silver -> Gold)
+                $tiers = ['bronze' => 1, 'silver' => 2, 'gold' => 3, 'platinum' => 4, 'diamond' => 5];
+                $weightA = $tiers[$a->tier] ?? 99;
+                $weightB = $tiers[$b->tier] ?? 99;
+
+                if ($weightA !== $weightB) {
+                    return $weightA <=> $weightB;
+                }
+
+                return strcmp($a->name, $b->name);
+            });
+            $earnedBadgeIds = $user->badges->pluck('badge_id')->toArray();
+
+            $badgesByCategory = $allBadges->groupBy('category')->map(function ($badges) use ($earnedBadgeIds, $user) {
+                // Filter to show all earned badges + the first unearned one (next level)
+                $filteredBadges = collect([]);
+                $foundNextUnearned = false;
+
+                foreach ($badges as $badge) {
+                    $isEarned = in_array($badge->id, $earnedBadgeIds);
+
+                    if ($isEarned) {
+                        $filteredBadges->push($badge);
+                    } elseif (!$foundNextUnearned) {
+                        $filteredBadges->push($badge);
+                        $foundNextUnearned = true;
+                    }
+                }
+
+                return $filteredBadges->map(function ($badge) use ($earnedBadgeIds, $user) {
+                    $isEarned = in_array($badge->id, $earnedBadgeIds);
+                    $userBadge = $isEarned ? $user->badges->firstWhere('badge_id', $badge->id) : null;
+
+                    $iconPath = "images/badges/{$badge->key}.svg";
+                    $hasIconFile = file_exists(public_path($iconPath));
+
+                    return [
+                        'id' => $badge->id,
+                        'name' => $badge->name,
+                        'icon' => $hasIconFile ? "/{$iconPath}" : null, // Use SVG if exists
+                        'emoji' => $badge->icon, // Original emoji
+                        'description' => $badge->description,
+                        'tier' => $badge->tier,
+                        'is_earned' => $isEarned,
+                        'earned_at' => $userBadge?->earned_at,
+                    ];
+                });
+            });
+
+            return [
+                'badges_by_category' => $badgesByCategory->toArray(),
+                'progress' => $user->progress->map(fn ($p) => [
+                    'book_id' => $p->book_id,
+                    'book_title' => $p->book?->title,
+                    'percentage' => $p->progress_percentage,
+                    'last_listened_at' => $p->last_listened_at,
+                    'completed' => $p->completed,
+                ])->toArray(),
+                'reviews' => $user->reviews->map(fn ($r) => [
+                    'book_id' => $r->book_id,
+                    'book_title' => $r->book?->title,
+                    'comment' => $r->comment,
+                    'age_rating' => $r->age_rating,
+                    'content_rating' => $r->content_rating,
+                    'created_at' => $r->created_at,
+                ])->toArray(),
+                'recommendations' => $user->recommendationsReceived->map(fn ($rec) => [
+                    'book_id' => $rec->book_id,
+                    'book_title' => $rec->book?->title,
+                    'sender_name' => $rec->sender?->name,
+                    'message' => $rec->message,
+                    'created_at' => $rec->created_at,
+                    'acknowledged_at' => $rec->acknowledged_at,
+                ])->toArray(),
+                'statuses' => $user->bookStatuses->map(fn ($s) => [
+                    'book_id' => $s->book_id,
+                    'book_title' => $s->book?->title,
+                    'status' => $s->status,
+                    'updated_at' => $s->updated_at,
+                ])->toArray(),
+                'tips' => $this->getBadgeTips($userId),
+            ];
+        } catch (\Exception $e) {
+            Log::error('MySqlService getUserActivityData failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get badge tips for a user.
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getBadgeTips(string $userId): array
+    {
+        $allBadges = \App\Models\Badge::active()->ordered()->get();
+        $earnedBadgeIds = \App\Models\UserBadge::where('user_id', $userId)->pluck('badge_id')->toArray();
+
+        $tips = [];
+        $categories = $allBadges->groupBy('category');
+
+        foreach ($categories as $category => $badges) {
+            // Filter out earned badges
+            $unearnedBadges = $badges->filter(function ($badge) use ($earnedBadgeIds) {
+                return !in_array($badge->id, $earnedBadgeIds);
+            });
+
+            if ($unearnedBadges->isEmpty()) {
+                continue;
+            }
+
+            // Get the first unearned badge in the sequence
+            $nextBadge = $unearnedBadges->first();
+
+            $iconPath = "images/badges/{$nextBadge->key}.svg";
+            $hasIconFile = file_exists(public_path($iconPath));
+
+            $tips[] = [
+                'category' => $category,
+                'badge_name' => $nextBadge->name,
+                'description' => $nextBadge->description,
+                'tip' => "Aim for the '{$nextBadge->name}' badge: {$nextBadge->description}",
+                'icon' => $hasIconFile ? "/{$iconPath}" : null,
+                'emoji' => $nextBadge->icon,
+            ];
+        }
+
+        return $tips;
+    }
+
+    /**
      * Get a user's book queue.
      *
      * @param string $userId The user ID
@@ -3727,5 +3893,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'last_active_date' => null,
             ];
         }
+    }
+
+    public function createReview(array $data): string
+    {
+        $review = \App\Models\Review::create($data);
+        return (string) $review->id;
     }
 }
