@@ -1789,6 +1789,9 @@ class BookApiController extends Controller
             $sort = 'name_asc';
         }
 
+        $isFavorite = $request->boolean('favorites', false);
+        $userId = Auth::id();
+
         // Build the base query
         $query = \App\Models\Author::query()
             ->select([
@@ -1805,8 +1808,17 @@ class BookApiController extends Controller
                 }
                 $q->selectRaw('COUNT(DISTINCT books.id)');
             }, 'book_count')
+            ->selectRaw('EXISTS(SELECT 1 FROM user_author_favorites WHERE user_id = ? AND author_id = authors.id) as isFavorite', [$userId])
             ->join('author_book', 'authors.id', '=', 'author_book.author_id')
             ->join('books', 'author_book.book_id', '=', 'books.id');
+
+        if ($isFavorite && $userId) {
+            $query->join('user_author_favorites', function ($join) use ($userId) {
+                $join->on('authors.id', '=', 'user_author_favorites.author_id')
+                    ->where('user_author_favorites.user_id', '=', $userId);
+            });
+        }
+
 
         if ($since) {
             $query->where('authors.updated_at', '>=', date('Y-m-d H:i:s', $since));
@@ -1871,6 +1883,14 @@ class BookApiController extends Controller
         if (!$includeNeedsReview) {
             $countQuery->where('books.needs_review', false);
         }
+
+        if ($isFavorite && $userId) {
+            $countQuery->join('user_author_favorites', function ($join) use ($userId) {
+                $join->on('authors.id', '=', 'user_author_favorites.author_id')
+                    ->where('user_author_favorites.user_id', '=', $userId);
+            });
+        }
+
 
         // Add same genre filtering as main query if present
         if ($genreId || $genreName) {
@@ -1953,6 +1973,7 @@ class BookApiController extends Controller
                 'image_url' => null, // Column doesn't exist in database
                 'genres' => $author->genres,
                 'series' => $authorSeries->toArray(),
+                'isFavorite' => (bool) $author->isFavorite,
             ];
         });
 
@@ -1990,6 +2011,8 @@ class BookApiController extends Controller
         $search = $request->input('search');
         $since = $request->input('since') ? (int) $request->input('since') : null;
         $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
+        $isFavorite = $request->boolean('favorites', false);
+        $userId = Auth::id();
 
         // Validate sort parameter
         $allowedSorts = ['name_asc', 'name_desc', 'book_count_asc', 'book_count_desc'];
@@ -2005,8 +2028,17 @@ class BookApiController extends Controller
             ])
             ->selectRaw('MAX(series.updated_at) as updated_at')
             ->withCount('books as book_count')
+            ->selectRaw('EXISTS(SELECT 1 FROM user_series_favorites WHERE user_id = ? AND series_id = series.id) as isFavorite', [$userId])
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
+
+        if ($isFavorite && $userId) {
+            $query->join('user_series_favorites', function ($join) use ($userId) {
+                $join->on('series.id', '=', 'user_series_favorites.series_id')
+                    ->where('user_series_favorites.user_id', '=', $userId);
+            });
+        }
+
 
         if ($since) {
             $query->where('series.updated_at', '>=', date('Y-m-d H:i:s', $since));
@@ -2071,6 +2103,14 @@ class BookApiController extends Controller
             $countQuery->where('books.needs_review', false);
         }
 
+        if ($isFavorite && $userId) {
+            $countQuery->join('user_series_favorites', function ($join) use ($userId) {
+                $join->on('series.id', '=', 'user_series_favorites.series_id')
+                    ->where('user_series_favorites.user_id', '=', $userId);
+            });
+        }
+
+
         // Add same author filtering as main query if present
         if ($authorId || $authorName) {
             $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
@@ -2127,6 +2167,7 @@ class BookApiController extends Controller
                 'book_count' => $totalBookCount,
                 'book_count_by_author' => $series->book_count_by_author ?? $series->book_count,
                 'authors' => $series->authors,
+                'isFavorite' => (bool) $series->isFavorite,
             ];
         });
 

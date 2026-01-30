@@ -278,4 +278,70 @@ class AuthorsApiTest extends ApiTestCase
         $this->assertEquals(5, $testAuthor['book_count']); // Total books
         $this->assertEquals(3, $testAuthor['book_count_in_genre']); // Books in fantasy genre
     }
+
+    public function test_toggle_author_favorite()
+    {
+        $user = $this->user;
+        $author = Author::factory()->create();
+        $book = Book::factory()->create();
+        $book->authors()->attach($author);
+
+        // Mark as favorite
+        $response = $this->postJson("/api/v1/authors/{$author->id}/favorite", ['is_favorite' => true]);
+        $response->assertStatus(200)
+            ->assertJson([
+                'id' => $author->id,
+                'name' => $author->name,
+                'isFavorite' => true,
+            ]);
+
+        $this->assertTrue($user->favoritedAuthors()->where('author_id', $author->id)->exists());
+
+        // Unmark as favorite
+        $response = $this->postJson("/api/v1/authors/{$author->id}/favorite", ['is_favorite' => false]);
+        $response->assertStatus(200)
+            ->assertJson([
+                'id' => $author->id,
+                'name' => $author->name,
+                'isFavorite' => false,
+            ]);
+
+        $this->assertFalse($user->favoritedAuthors()->where('author_id', $author->id)->exists());
+    }
+
+    public function test_authors_endpoint_filters_by_favorites()
+    {
+        $user = $this->user;
+        $favoritedAuthor = Author::factory()->create();
+        $nonFavoritedAuthor = Author::factory()->create();
+
+        // Attach books to authors so they appear in results
+        $book1 = Book::factory()->create();
+        $book1->authors()->attach($favoritedAuthor);
+        $book2 = Book::factory()->create();
+        $book2->authors()->attach($nonFavoritedAuthor);
+
+        $user->favoritedAuthors()->attach($favoritedAuthor);
+
+        $response = $this->getJson('/api/v1/authors?favorites=true');
+
+        $response->assertStatus(200)
+            ->assertJsonFragment([
+                'id' => $favoritedAuthor->id,
+                'name' => $favoritedAuthor->name,
+                'isFavorite' => true,
+            ]);
+
+        $authorsInResponse = collect($response->json('authors'));
+        $this->assertCount(1, $authorsInResponse);
+        $this->assertEquals($favoritedAuthor->id, $authorsInResponse->first()['id']);
+
+        // Test that is_favorite is true when requesting all authors
+        $responseAll = $this->getJson('/api/v1/authors');
+        $responseAll->assertStatus(200);
+        $authorsAll = collect($responseAll->json('authors'));
+
+        $this->assertTrue($authorsAll->firstWhere('id', $favoritedAuthor->id)['isFavorite']);
+        $this->assertFalse($authorsAll->firstWhere('id', $nonFavoritedAuthor->id)['isFavorite']);
+    }
 }

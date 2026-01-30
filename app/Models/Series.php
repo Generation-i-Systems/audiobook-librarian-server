@@ -37,6 +37,7 @@ use App\Traits\Auditable;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Series withTrashed(bool $withTrashed = true)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Series withoutTrashed()
  * @mixin \Illuminate\Database\Eloquent\Model
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $favoritedByUsers
  */
 class Series extends Model
 {
@@ -64,5 +65,10 @@ class Series extends Model
         return $this->belongsToMany(Book::class, 'book_series')
             ->withPivot('series_number')
             ->withTimestamps();
+    }
+
+    public function favoritedByUsers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_series_favorites');
     }
 }

@@ -1955,6 +1955,111 @@
                 }
             }
         },
+        "/check-status": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Check account approval status",
+                "description": "Check if an account is still pending approval or has been verified. Returns 403 if pending, 200 if account is ready for login.",
+                "operationId": "checkStatus",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["email"],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "description": "User's email address"
+                                    }
+                                }
+                            },
+                            "examples": {
+                                "check_status": {
+                                    "summary": "Check account status",
+                                    "value": {
+                                        "email": "john@example.com"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Account is ready for login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                "examples": {
+                                    "account_ready": {
+                                        "summary": "Account is no longer pending",
+                                        "value": {
+                                            "message": "Please use the login endpoint"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiValidationError"
+                                },
+                                "examples": {
+                                    "missing_email": {
+                                        "summary": "Missing email field",
+                                        "value": {
+                                            "email": [
+                                                "The email field is required."
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Account pending approval",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "pending_approval": {
+                                        "summary": "Account waiting for admin approval",
+                                        "value": {
+                                            "code": "ACCOUNT_PENDING_APPROVAL",
+                                            "message": "Account pending admin approval",
+                                            "status": "unverified"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/forgot-password": {
             "post": {
                 "tags": ["Authentication"],
