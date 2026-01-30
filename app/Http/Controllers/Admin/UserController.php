@@ -68,7 +68,34 @@ class UserController extends Controller
             abort(404);
         }
 
-        return view('admin.users.edit', compact('user'));
+        $activityData = $this->documentStoreService->getUserActivityData($id);
+
+        return view('admin.users.edit', compact('user', 'activityData'));
+    }
+
+    public function show($id)
+    {
+        $user = $this->documentStoreService->getUserById($id);
+        if (!$user) {
+            abort(404);
+        }
+
+        $activityData = $this->documentStoreService->getUserActivityData($id);
+
+        return view('admin.users.show', compact('user', 'activityData'));
+    }
+
+    public function profile()
+    {
+        $id = auth()->id();
+        $user = $this->documentStoreService->getUserById($id);
+        if (!$user) {
+            abort(404);
+        }
+
+        $activityData = $this->documentStoreService->getUserActivityData($id);
+
+        return view('admin.users.show', compact('user', 'activityData'));
     }
 
 

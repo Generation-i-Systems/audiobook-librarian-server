@@ -174,6 +174,12 @@ class StatisticsController extends Controller
             'end_position_ms' => 'required|integer|min:0',
             'playback_speed' => 'nullable|numeric|min:0.1|max:5.0',
             'pauses_count' => 'nullable|integer|min:0',
+            'actual_duration_ms' => 'nullable|integer|min:0', // Now nullable
+            'events' => 'nullable|array', // Now nullable
+            'events.*.timestamp' => 'required|integer',
+            'events.*.type' => 'required|string',
+            'events.*.position_ms' => 'required|integer|min:0',
+            'events.*.metadata' => 'nullable|array',
         ]);
 
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
@@ -182,15 +188,13 @@ class StatisticsController extends Controller
         $sessionEnd = Carbon::parse($validated['session_end']);
         $sessionDuration = $sessionEnd->diffInSeconds($sessionStart);
 
-        // Calculate actual listening time based on position change and playback speed
-        $positionChange = ($validated['end_position_ms'] - $validated['start_position_ms']) / 1000;
+        $secondsListened = (int) floor($validated['end_position_ms'] / 1000);
         $playbackSpeed = $validated['playback_speed'] ?? 1.0;
-        $actualListeningTime = min($sessionDuration, $positionChange / $playbackSpeed);
 
         $statistic = ListeningStatistic::createSession(
             $validated['book_id'],
             $userId,
-            (int) $actualListeningTime,
+            $secondsListened,
             (int) ($validated['start_position_ms'] / 1000),
             (int) ($validated['end_position_ms'] / 1000),
             'listening',
@@ -200,9 +204,10 @@ class StatisticsController extends Controller
                 'playback_speed' => $playbackSpeed,
                 'pauses_count' => $validated['pauses_count'] ?? 0,
             ],
-            auth('api')->id()
+            auth('api')->id(),
+            $validated['actual_duration_ms'],
+            $validated['events'] ?? []
         );
-
         // Check for badge achievements after recording the session
         try {
             $badgeService = app(\App\Services\BadgeService::class);
@@ -715,6 +720,8 @@ class StatisticsController extends Controller
 
         return response()->json($stats);
     }
+
+
 
     /**
      * Calculate current listening streak

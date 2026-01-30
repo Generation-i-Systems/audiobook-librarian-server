@@ -8,7 +8,6 @@ use App\Http\Controllers\Api\BookApiController;
 use App\Http\Controllers\Api\BookmarkApiController;
 use App\Http\Controllers\Api\BookRequestApiController;
 use App\Http\Controllers\Api\ExternalReadApiController;
-use App\Http\Controllers\Api\FavoriteAuthorController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\ProgressController;
@@ -20,7 +19,10 @@ use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\UserStatusController;
+use App\Http\Controllers\Api\AuthorController;
+use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\BookImportApiController;
+use App\Http\Controllers\Api\AnalyticsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -79,10 +81,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/series', [BookApiController::class, 'series']);
         // Series Autocomplete
         Route::get('/series/autocomplete', [BookApiController::class, 'autocompleteSeries']);
+        // Toggle Series Favorite
+        Route::post('/series/{series}/favorite', [SeriesController::class, 'toggleFavorite']);
+
         // Authors Route - with genre filtering and pagination
         Route::get('/authors', [BookApiController::class, 'authors']);
         // Author Autocomplete
         Route::get('/authors/autocomplete', [BookApiController::class, 'autocompleteAuthors']);
+        // Toggle Author Favorite
+        Route::post('/authors/{author}/favorite', [AuthorController::class, 'toggleFavorite']);
         // Narrator Autocomplete
         Route::get('/narrators/autocomplete', [BookApiController::class, 'autocompleteNarrators']);
 
@@ -197,14 +204,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/leaderboard', [BadgeController::class, 'leaderboard']);
         });
 
-        // Favorite Authors routes
-        Route::get('/favorites/new-books', [FavoriteAuthorController::class, 'getNewBooks']);
-        Route::get('/favorites', [FavoriteAuthorController::class, 'index'])->name('api.favorites.index');
-        Route::post('/favorites', [FavoriteAuthorController::class, 'store'])->name('api.favorites.store');
-        Route::get('/favorites/{favorite}', [FavoriteAuthorController::class, 'show'])->name('api.favorites.show');
-        Route::put('/favorites/{favorite}', [FavoriteAuthorController::class, 'update'])->name('api.favorites.update');
-        Route::delete('/favorites/{favorite}', [FavoriteAuthorController::class, 'destroy'])
-            ->name('api.favorites.destroy');
+
+
+        // Analytics Routes
+        Route::post('/analytics/event', [AnalyticsController::class, 'recordEvent']);
 
         // Skin Routes (authenticated)
         Route::post('/skins/upload', [SkinController::class, 'store']);

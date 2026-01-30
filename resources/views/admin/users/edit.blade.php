@@ -8,14 +8,14 @@
             $fallbackSvg = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2264%22%20height%3D%2264%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2232%22%20ry%3D%2232%22%20fill%3D%22%236c757d%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2232%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%20dominant-baseline%3D%22middle%22%3E' . $initial . '%3C%2Ftext%3E%3C%2Fsvg%3E';
         @endphp
         @if(!empty($user['photo_url']))
-            <img src="{{ $user['photo_url'] }}" 
-                 alt="Profile Photo" 
-                 class="rounded-circle me-3" 
+            <img src="{{ $user['photo_url'] }}"
+                 alt="Profile Photo"
+                 class="rounded-circle me-3"
                  style="width: 64px; height: 64px; object-fit: cover;"
                  onerror="this.onerror=null; this.src='{{ $fallbackSvg }}';">
         @else
-            <img src="{{ $fallbackSvg }}" 
-                 alt="{{ $initial }}" 
+            <img src="{{ $fallbackSvg }}"
+                 alt="{{ $initial }}"
                  class="rounded-circle me-3">
         @endif
         <div>
@@ -25,7 +25,7 @@
                 @else
                     <span class="badge bg-success">Verified</span>
                 @endif
-                
+
                 @if(!empty($user['google_id']))
                     <span class="badge bg-info">
                         <i class="fab fa-google"></i> Google Sign-In
@@ -42,7 +42,7 @@
             </div>
         </div>
     </div>
-    
+
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
@@ -80,7 +80,7 @@
                 <option value="super-admin" {{ old('role', $user['role'] ?? '') == 'super-admin' ? 'selected' : '' }}>Super Admin</option>
             </select>
         </div>
-        
+
         @if(($user['role'] ?? '') === 'unverified')
             <div class="alert alert-warning">
                 <div class="d-flex justify-content-between align-items-center">
@@ -114,12 +114,15 @@
                 </div>
                 @if(($user['role'] ?? '') !== 'unverified')
                     <div class="text-muted">
-                        <i class="fas fa-check-circle text-success"></i> 
+                        <i class="fas fa-check-circle text-success"></i>
                         Account verified on {{ !empty($user['email_verified_at']) ? \Carbon\Carbon::parse($user['email_verified_at'])->format('M j, Y') : 'N/A' }}
                     </div>
                 @endif
             </div>
         </div>
     </form>
+    @if(isset($activityData))
+        @include('partials.activity-summary', ['activityData' => $activityData])
+    @endif
 </div>
 @endsection

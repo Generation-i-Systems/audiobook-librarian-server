@@ -63,6 +63,9 @@ class ListeningStatistic extends Model
         'end_position_seconds',
         'session_type',
         'metadata',
+        'actual_duration_ms',
+        'events',
+
     ];
 
     protected $casts = [
@@ -73,6 +76,9 @@ class ListeningStatistic extends Model
         'start_position_seconds' => 'integer',
         'end_position_seconds' => 'integer',
         'metadata' => 'array',
+        'actual_duration_ms' => 'integer',
+        'events' => 'array',
+
     ];
 
     public function book(): BelongsTo
@@ -99,6 +105,8 @@ class ListeningStatistic extends Model
 
     /**
      * Create a new listening session
+     *
+     * @param array<int, array<string, mixed>> $events
      */
     public static function createSession(
         int $bookId,
@@ -108,7 +116,9 @@ class ListeningStatistic extends Model
         ?int $endPosition = null,
         string $sessionType = 'listening',
         array $metadata = [],
-        ?string $userId = null
+        ?string $userId = null,
+        int $actualDurationMs = 0,
+        array $events = []
     ): self {
         /** @var self $session */
         $session = self::create([
@@ -123,6 +133,8 @@ class ListeningStatistic extends Model
             'end_position_seconds' => $endPosition,
             'session_type' => $sessionType,
             'metadata' => $metadata,
+            'actual_duration_ms' => $actualDurationMs,
+            'events' => $events,
         ]);
 
         return $session;

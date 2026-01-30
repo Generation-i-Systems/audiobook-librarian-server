@@ -31,7 +31,9 @@ class ProfileController extends Controller
             Log::warning("User {$userId} not found in document store");
         }
 
-        return view('profile.index', compact('user'));
+        $activityData = $this->documentStoreService->getUserActivityData($userId);
+
+        return view('profile.index', compact('user', 'activityData'));
     }
 
 

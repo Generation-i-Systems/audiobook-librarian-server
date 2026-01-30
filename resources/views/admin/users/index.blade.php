@@ -13,9 +13,12 @@
             <div class="alert alert-info">{{ session('info') }}</div>
         @endif
 
-        <div class="mb-3">
+        <div class="mb-3 d-flex gap-2">
             <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add User
+            </a>
+            <a href="{{ route('admin.badges.index') }}" class="btn btn-info text-white">
+                <i class="fas fa-medal"></i> All Badges
             </a>
         </div>
 
@@ -53,7 +56,11 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <div class="fw-bold">{{ $user['name'] ?? 'N/A' }}</div>
+                                        <div class="fw-bold">
+                                            <a href="{{ route('admin.users.show', $user['id']) }}" class="text-decoration-none text-dark">
+                                                {{ $user['name'] ?? 'N/A' }}
+                                            </a>
+                                        </div>
                                         <small class="text-muted">{{ $user['username'] ?? '' }}</small>
                                     </td>
                                     <td>{{ $user['email'] ?? 'N/A' }}</td>
