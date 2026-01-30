@@ -188,7 +188,7 @@ class ImportCollectionCommand extends Command
      */
     protected function calculateTargetPath(array $parsed): string
     {
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('library.paths.books', '/media/lyra_data1/audiobooks/books'), '/');
 
         // Determine genre (for this collection, it's Science Fiction)
         $genre = 'Science Fiction';
