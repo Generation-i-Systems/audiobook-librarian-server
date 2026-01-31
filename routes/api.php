@@ -32,6 +32,14 @@ Route::prefix('v1')->group(function () {
     Route::get('/health', [ApiHealthController::class, 'health']);
     Route::get('/health/validate', [ApiHealthController::class, 'validateSpec']);
 
+    Route::get('/openapi.json', function () {
+        $path = base_path('docs/openapi.json');
+        if (!file_exists($path)) {
+            return response()->json(['error' => 'OpenAPI spec not found'], 404);
+        }
+        return response()->file($path, ['Content-Type' => 'application/json']);
+    });
+
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
     // Public Skin Routes (no authentication required)
