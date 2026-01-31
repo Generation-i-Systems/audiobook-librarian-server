@@ -2028,4 +2028,12 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         return uniqid('review_');
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function linkNonLibraryBooks(): int
+    {
+        return 0;
+    }
 }
