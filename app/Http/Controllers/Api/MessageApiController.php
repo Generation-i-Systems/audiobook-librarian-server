@@ -17,6 +17,21 @@ class MessageApiController extends Controller
         $this->documentStoreService = $documentStoreService;
     }
 
+    public function index(Request $request)
+    {
+        $userId = auth()->id();
+        if (!$userId) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $messages = \App\Models\Message::where('recipient_id', $userId)
+            ->whereNull('acknowledged_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json(['data' => $messages]);
+    }
+
     public function store(Request $request)
     {
         $request->validate(['content' => 'required|string']);
@@ -37,6 +52,7 @@ class MessageApiController extends Controller
         $messageId = $this->documentStoreService->createMessage([
             'sender_id' => $senderId,
             'recipient_id' => $adminId,
+            'type' => 'general',
             'content' => $request->input('content'),
         ]);
 
@@ -45,5 +61,21 @@ class MessageApiController extends Controller
         }
 
         return response()->json(['id' => $messageId], 201);
+    }
+
+    public function acknowledge(Request $request, int $id)
+    {
+        $userId = auth()->id();
+        $message = \App\Models\Message::where('recipient_id', $userId)
+            ->where('id', $id)
+            ->first();
+
+        if (!$message) {
+            return response()->json(['error' => 'Message not found'], 404);
+        }
+
+        $message->update(['acknowledged_at' => now()]);
+
+        return response()->json(['success' => true]);
     }
 }

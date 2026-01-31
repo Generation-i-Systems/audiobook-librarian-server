@@ -8,7 +8,9 @@ use App\Traits\CamelCaseAttributeAccess;
 
 /**
  * @property int $id
- * @property int $book_id
+ * @property int|null $book_id
+ * @property string|null $title
+ * @property string|null $author
  * @property int|null $user_id
  * @property string $device_id
  * @property \Illuminate\Support\Carbon $listening_date
@@ -26,7 +28,7 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property \Illuminate\Support\Carbon|null $first_listened
  * @property \Illuminate\Support\Carbon|null $last_listened
  * @mixin \Illuminate\Database\Eloquent\Builder
- * @property-read \App\Models\Book $book
+ * @property-read \App\Models\Book|null $book
  * @property-read string $formatted_duration
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic newQuery()
@@ -53,6 +55,8 @@ class ListeningStatistic extends Model
 
     protected $fillable = [
         'book_id',
+        'title',
+        'author',
         'user_id',
         'device_id',
         'listening_date',
@@ -109,7 +113,7 @@ class ListeningStatistic extends Model
      * @param array<int, array<string, mixed>> $events
      */
     public static function createSession(
-        int $bookId,
+        ?int $bookId,
         string $deviceId,
         int $secondsListened,
         ?int $startPosition = null,
@@ -118,11 +122,15 @@ class ListeningStatistic extends Model
         array $metadata = [],
         ?string $userId = null,
         int $actualDurationMs = 0,
-        array $events = []
+        array $events = [],
+        ?string $title = null,
+        ?string $author = null
     ): self {
         /** @var self $session */
         $session = self::create([
             'book_id' => $bookId,
+            'title' => $title,
+            'author' => $author,
             'user_id' => $userId,
             'device_id' => $deviceId,
             'listening_date' => now()->toDateString(),

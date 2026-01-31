@@ -8,7 +8,8 @@ use App\Traits\CamelCaseAttributeAccess;
 
 /**
  * @property int $id
- * @property int $book_id
+ * @property int|null $book_id
+ * @property int|null $client_book_id
  * @property int $user_id
  * @property string|null $device_id
  * @property int $current_position_seconds
@@ -21,7 +22,8 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property \Illuminate\Support\Carbon|null $completed_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \App\Models\Book $book
+ * @property-read \App\Models\Book|null $book
+ * @property-read \App\Models\ClientBook|null $clientBook
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property-read string $formatted_duration
  * @property-read string $formatted_progress
@@ -52,6 +54,7 @@ class BookProgress extends Model
 
     protected $fillable = [
         'book_id',
+        'client_book_id',
         'user_id',
         'device_id',
         'current_position_seconds',
@@ -77,6 +80,11 @@ class BookProgress extends Model
     public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class);
+    }
+
+    public function clientBook(): BelongsTo
+    {
+        return $this->belongsTo(ClientBook::class);
     }
 
     /**

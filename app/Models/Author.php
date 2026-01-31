@@ -21,6 +21,7 @@ use App\Traits\Auditable;
  * @property string|null $image_url
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property-read int|null $books_count
+ * @property bool $isFavorite
  * @method static \Database\Factories\AuthorFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author newQuery()

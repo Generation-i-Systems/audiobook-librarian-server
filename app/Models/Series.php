@@ -13,6 +13,7 @@ use App\Traits\Auditable;
  * @property int $id
  * @property string $name
  * @property bool $is_collection
+ * @property bool $isFavorite
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books

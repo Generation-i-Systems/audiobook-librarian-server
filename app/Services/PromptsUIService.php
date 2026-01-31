@@ -391,8 +391,8 @@ class PromptsUIService implements ImportUIInterface
     protected function displayCoverImage(string $imageUrl): void
     {
         $term = getenv('TERM_PROGRAM') ?: getenv('TERM');
-        $termEnv = getenv('TERM') ?? '';
-        $termProgram = getenv('TERM_PROGRAM') ?? '';
+        $termEnv = getenv('TERM') ?: '';
+        $termProgram = getenv('TERM_PROGRAM') ?: '';
 
         $kittySupport = $termEnv === 'xterm-kitty' ||
             $termEnv === 'xterm-ghostty' ||

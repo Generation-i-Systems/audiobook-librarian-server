@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $user_id
- * @property int $book_id
+ * @property int|null $book_id
+ * @property string|null $title
+ * @property string|null $author
  * @property int|null $order
  * @property string $status
  * @property array|null $status_detail
@@ -20,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
- * @property-read \App\Models\Book $book
+ * @property-read \App\Models\Book|null $book
  * @property-read \App\Models\User $user
  * @method static \Database\Factories\UserBookStatusFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus newModelQuery()
@@ -51,6 +53,8 @@ class UserBookStatus extends Model
     protected $fillable = [
         'user_id',
         'book_id',
+        'title',
+        'author',
         'order',
         'status',
         'status_detail',

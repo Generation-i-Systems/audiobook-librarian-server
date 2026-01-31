@@ -87,6 +87,53 @@ class ExternalReadApiController extends Controller
         return response()->json($this->formatEntry($created), 201);
     }
 
+    public function createExternalReadNonLibrary(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255',
+            'author' => 'required|string|max:255',
+            'origin' => 'sometimes|string|in:external,previous',
+            'source' => 'sometimes|nullable|string|max:255',
+            'note' => 'sometimes|nullable|string',
+            'started_at' => 'sometimes|nullable|date',
+            'finished_at' => 'sometimes|nullable|date',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $userId = auth('api')->id();
+
+        $data = [
+            'user_id' => $userId,
+            'book_id' => null,
+            'title' => $request->input('title'),
+            'author' => $request->input('author'),
+            'origin' => $request->input('origin', 'external'),
+            'source' => $request->input('source'),
+            'note' => $request->input('note'),
+        ];
+
+        if ($request->filled('started_at')) {
+            $data['started_at'] = Carbon::parse($request->input('started_at'));
+        }
+        if ($request->filled('finished_at')) {
+            $data['finished_at'] = Carbon::parse($request->input('finished_at'));
+        }
+
+        $id = $this->documentStoreService->createExternalRead($data);
+
+        // Since it's non-library, we can't use getExternalRead that filters by book_id easily
+        // But createExternalRead returns the ID
+        $created = array_merge($data, ['id' => (string) $id]);
+
+        return response()->json($this->formatEntry($created), 201);
+    }
+
     /**
      * Get a specific external/previously-read entry
      */
@@ -182,6 +229,8 @@ class ExternalReadApiController extends Controller
         return [
             'id' => $id,
             'book_id' => $entry['book_id'] ?? null,
+            'title' => $entry['title'] ?? null,
+            'author' => $entry['author'] ?? null,
             'origin' => $entry['origin'] ?? 'external',
             'source' => $entry['source'] ?? null,
             'note' => $entry['note'] ?? null,

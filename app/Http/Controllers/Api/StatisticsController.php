@@ -167,7 +167,9 @@ class StatisticsController extends Controller
     public function reportSession(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'book_id' => 'required|integer|exists:books,id',
+            'book_id' => 'nullable|integer|exists:books,id',
+            'title' => 'required_without:book_id|string|max:255',
+            'author' => 'required_without:book_id|string|max:255',
             'session_start' => 'required|date_format:Y-m-d\TH:i:s\Z',
             'session_end' => 'required|date_format:Y-m-d\TH:i:s\Z|after:session_start',
             'start_position_ms' => 'required|integer|min:0',
@@ -192,7 +194,7 @@ class StatisticsController extends Controller
         $playbackSpeed = $validated['playback_speed'] ?? 1.0;
 
         $statistic = ListeningStatistic::createSession(
-            $validated['book_id'],
+            $validated['book_id'] ?? null,
             $userId,
             $secondsListened,
             (int) ($validated['start_position_ms'] / 1000),
@@ -206,7 +208,9 @@ class StatisticsController extends Controller
             ],
             auth('api')->id(),
             $validated['actual_duration_ms'],
-            $validated['events'] ?? []
+            $validated['events'] ?? [],
+            $validated['title'] ?? null,
+            $validated['author'] ?? null
         );
         // Check for badge achievements after recording the session
         try {
@@ -257,7 +261,9 @@ class StatisticsController extends Controller
     {
         try {
             $validated = $request->validate([
-                'book_id' => 'required|integer|exists:books,id',
+                'book_id' => 'nullable|integer|exists:books,id',
+                'title' => 'required_without:book_id|string|max:255',
+                'author' => 'required_without:book_id|string|max:255',
                 'device_id' => 'required|string|max:255',
                 'seconds_listened' => 'required|integer|min:1',
                 'start_position_seconds' => 'nullable|integer|min:0',
@@ -275,14 +281,18 @@ class StatisticsController extends Controller
         }
 
         $statistic = ListeningStatistic::createSession(
-            $validated['book_id'],
+            $validated['book_id'] ?? null,
             $validated['device_id'],
             $validated['seconds_listened'],
             $validated['start_position_seconds'] ?? null,
             $validated['end_position_seconds'] ?? null,
             $validated['session_type'] ?? 'listening',
             $validated['metadata'] ?? [],
-            $validated['user_id'] ?? null
+            $validated['user_id'] ?? null,
+            0,
+            [],
+            $validated['title'] ?? null,
+            $validated['author'] ?? null
         );
 
         // Check for badge achievements after recording the session

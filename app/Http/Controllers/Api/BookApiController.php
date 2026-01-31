@@ -70,6 +70,100 @@ class BookApiController extends Controller
         $this->documentStoreService = $documentStoreService;
     }
 
+    /**
+     * Batch fetch book metadata
+     */
+    public function batch(Request $request)
+    {
+        $validated = $request->validate([
+            'bookIds' => 'nullable|array',
+            'bookIds.*' => 'integer',
+            'queries' => 'nullable|array',
+            'queries.*.title' => 'required_with:queries|string',
+            'queries.*.author' => 'nullable|string',
+        ]);
+
+        $bookIds = $validated['bookIds'] ?? [];
+        $queries = $validated['queries'] ?? [];
+
+        $results = [];
+        $processedIds = [];
+
+        // 1. Fetch by IDs
+        if (!empty($bookIds)) {
+            $books = \App\Models\Book::whereIn('id', $bookIds)->get();
+            foreach ($books as $book) {
+                // @phpstan-ignore-next-line
+                $results[] = $this->transformBookForBatch($book);
+                $processedIds[] = $book->id;
+            }
+
+            // Find missing IDs in ClientBooks
+            $missingIds = array_diff($bookIds, $processedIds);
+            if (!empty($missingIds)) {
+                $clientBooks = \App\Models\ClientBook::whereIn('id', $missingIds)->get();
+                foreach ($clientBooks as $clientBook) {
+                    $results[] = $this->transformClientBookForBatch($clientBook);
+                }
+            }
+        }
+
+        // 2. Process Queries
+        foreach ($queries as $query) {
+            $title = $query['title'];
+            $author = $query['author'] ?? null;
+
+            // Try main books
+            $q = \App\Models\Book::where('title', 'LIKE', $title);
+            if ($author) {
+                $q->whereHas('authors', function ($sq) use ($author) {
+                    $sq->where('name', 'LIKE', "%{$author}%");
+                });
+            }
+            $book = $q->first();
+
+            if ($book) {
+                // Avoid duplicates if we already found it by ID
+                if (!in_array($book->id, $processedIds)) {
+                    // @phpstan-ignore-next-line
+                    $results[] = $this->transformBookForBatch($book);
+                    $processedIds[] = $book->id;
+                }
+                continue;
+            }
+
+            // Try Client Books
+            $q = \App\Models\ClientBook::where('title', $title);
+            if ($author) {
+                $q->where('author', $author);
+            }
+            $clientBook = $q->first();
+
+            if ($clientBook) {
+                $results[] = $this->transformClientBookForBatch($clientBook);
+            }
+        }
+
+        return response()->json($results);
+    }
+
+    private function transformBookForBatch($book)
+    {
+        return $this->getBookWithCover($book->toArray(), true, false);
+    }
+
+    private function transformClientBookForBatch($clientBook)
+    {
+        return [
+            'id' => $clientBook->id,
+            'title' => $clientBook->title,
+            'author' => $clientBook->author,
+            'coverImage' => $clientBook->cover_url, // Map to expected field
+            'is_client_book' => true,
+            'source' => 'client',
+        ];
+    }
+
     public function index(Request $request)
     {
         $perPage = $request->input('per_page', 15);
@@ -631,7 +725,6 @@ class BookApiController extends Controller
         }
         $orderedFiles = array_merge($orderedFiles, $audioFiles, $otherFiles);
 
-        // Generate download manifest
         $manifest = [
             'book_id' => (int) $id,
             'title' => $book['title'] ?? '',
@@ -646,7 +739,47 @@ class BookApiController extends Controller
             'generated_at' => now()->toISOString(),
         ];
 
-        return response()->json($manifest);
+        // Ensure temp directory exists
+        if (!file_exists(storage_path('app/temp'))) {
+            mkdir(storage_path('app/temp'), 0755, true);
+        }
+
+        // Create ZIP file
+        $zipFileName = 'book_' . $id . '_' . Str::slug($book['title'] ?? 'unknown') . '.zip';
+        $zipPath = storage_path('app/temp/' . $zipFileName);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+            // Add metadata.json
+            $zip->addFromString('metadata.json', json_encode($orderedFiles, JSON_PRETTY_PRINT));
+
+            // Add cover image
+            if ($coverFile) {
+                $zip->addFile(Storage::disk('books')->path($coverFile['path']), 'cover.' . pathinfo($coverFile['path'], PATHINFO_EXTENSION));
+            }
+
+            // Add audio files
+            foreach ($audioFiles as $file) {
+                $zip->addFile(Storage::disk('books')->path($file['path']), $file['filename']);
+            }
+
+            // Add other files
+            foreach ($otherFiles as $file) {
+                if ($coverFile && $file['path'] === $coverFile['path']) {
+                    continue;
+                } // Skip if already added as cover
+                $zip->addFile(Storage::disk('books')->path($file['path']), $file['filename']);
+            }
+
+            $zip->close();
+        } else {
+            return response()->json([
+               'error' => 'Zip creation failed',
+               'message' => 'Could not create zip file',
+            ], 500);
+        }
+
+        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
     }
 
     /**

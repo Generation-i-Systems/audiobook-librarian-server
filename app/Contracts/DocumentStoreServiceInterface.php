@@ -794,6 +794,13 @@ interface DocumentStoreServiceInterface
      */
     public function deleteExternalRead(string $externalReadId, string $userId, string $bookId): bool;
 
+    /**
+     * Link statistical data that has no book_id to matching books by title/author.
+     *
+     * @return int Number of records linked
+     */
+    public function linkNonLibraryBooks(): int;
+
     // ACCOUNT REQUESTS
 
     /**

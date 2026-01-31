@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int $user_id
- * @property int $book_id
+ * @property int|null $book_id
+ * @property string|null $title
+ * @property string|null $author
  * @property string $origin
  * @property string|null $source
  * @property string|null $note
@@ -19,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
- * @property-read \App\Models\Book $book
+ * @property-read \App\Models\Book|null $book
  * @property-read \App\Models\User $user
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead newQuery()
@@ -44,6 +46,8 @@ class ExternalRead extends Model
     protected $fillable = [
         'user_id',
         'book_id',
+        'title',
+        'author',
         'origin', // 'previous' | 'external'
         'source', // optional free-form source e.g. 'Audible', 'Libby'
         'note',   // optional note/label

@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property int $id
  * @property int $user_id
- * @property int $book_id
+ * @property int|null $book_id
+ * @property string|null $title
+ * @property string|null $author
  * @property \Illuminate\Support\Carbon|null $started_at
  * @property \Illuminate\Support\Carbon|null $ended_at
  * @property int $duration_seconds
@@ -20,7 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
- * @property-read \App\Models\Book $book
+ * @property-read \App\Models\Book|null $book
  * @property-read \App\Models\User $user
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession newQuery()
@@ -44,6 +46,8 @@ class ReadingSession extends Model
     protected $fillable = [
         'user_id',
         'book_id',
+        'title',
+        'author',
         'started_at',
         'ended_at',
         'duration_seconds',

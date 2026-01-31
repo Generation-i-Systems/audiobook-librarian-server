@@ -10,7 +10,9 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property int $id
  * @property int|null $sender_id
  * @property int $recipient_id
+ * @property string $type
  * @property string $content
+ * @property array|null $payload
  * @property \Illuminate\Support\Carbon|null $acknowledged_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -37,11 +39,14 @@ class Message extends Model
     protected $fillable = [
         'sender_id',
         'recipient_id',
+        'type',
         'content',
+        'payload',
         'acknowledged_at',
     ];
 
     protected $casts = [
+        'payload' => 'array',
         'acknowledged_at' => 'datetime',
     ];
 

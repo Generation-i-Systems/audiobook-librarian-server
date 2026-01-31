@@ -14,6 +14,7 @@ use App\Models\ExternalRead;
 use App\Models\Genre;
 use App\Models\Job;
 use App\Models\LibraryRepairIssue;
+use App\Models\ListeningStatistic;
 use App\Models\Message;
 use App\Models\Narrator;
 use App\Models\ReadingSession;
@@ -3899,5 +3900,63 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     {
         $review = \App\Models\Review::create($data);
         return (string) $review->id;
+    }
+
+    public function linkNonLibraryBooks(): int
+    {
+        $linkedCount = 0;
+        $models = [
+            ExternalRead::class,
+            ListeningStatistic::class,
+            ReadingSession::class,
+            UserBookStatus::class,
+        ];
+
+        foreach ($models as $modelClass) {
+            $records = $modelClass::whereNull('book_id')
+                ->whereNotNull('title')
+                ->whereNotNull('author')
+                ->get();
+
+            foreach ($records as $record) {
+                $book = Book::where('title', $record->title)
+                    ->whereHas('authors', function ($query) use ($record) {
+                        $query->where('name', 'like', '%' . $record->author . '%');
+                    })
+                    ->first();
+
+                if ($book) {
+                    $record->book_id = $book->id;
+                    $record->save();
+                    $linkedCount++;
+
+                    // Create a message for the user if user_id is available
+                    $recipientId = null;
+                    if (isset($record->user_id) && is_numeric($record->user_id)) {
+                        $recipientId = (int) $record->user_id;
+                    } elseif (isset($record->deviceId) && is_numeric($record->deviceId)) {
+                        // In some models user_id might be stored in device_id field temporarily or vice versa
+                        $recipientId = (int) $record->deviceId;
+                    }
+
+                    if ($recipientId) {
+                        Message::create([
+                            'sender_id' => null, // System message
+                            'recipient_id' => $recipientId,
+                            'type' => 'book_linked',
+                            'content' => "Your statistical data for '{$record->title}' has been linked to '{$book->title}' in the library.",
+                            'payload' => [
+                                'book_id' => $book->id,
+                                'title' => $book->title,
+                                'original_title' => $record->title,
+                                'original_author' => $record->author,
+                            ],
+                        ]);
+                    }
+                }
+            }
+        }
+
+        return $linkedCount;
     }
 }

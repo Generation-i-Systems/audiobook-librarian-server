@@ -19,7 +19,7 @@ class SendDailyFavoriteNotifications extends Command
     {
         $this->info('Sending favorite author notifications...');
 
-        $users = User::has('favoriteAuthors')->get();
+        $users = User::has('favoritedAuthors')->get();
 
         if ($users->isEmpty()) {
             $this->info('No users with favorite authors found');
@@ -63,7 +63,7 @@ class SendDailyFavoriteNotifications extends Command
 
     protected function getNewBooksForUser(User $user)
     {
-        $favoriteAuthors = $user->favoriteAuthors()
+        $favoriteAuthors = $user->favoritedAuthors()
             ->where('notify_email', true)
             ->pluck('author_name')
             ->map(fn ($name) => strtolower(trim($name)))
