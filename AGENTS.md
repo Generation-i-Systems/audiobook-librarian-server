@@ -145,6 +145,7 @@ npm run test:coverage
 - Use `declare(strict_types=1);` at file top
 - Use PHPStan level 5 analysis (baseline allowed in `phpstan-baseline.neon`)
 - **MUST NOT** introduce any new PHPStan issues with any change.
+- **MUST NOT** update the PHPStan baseline without the express request of the USER.
 - Use null safety: `?string` for nullable, never omit nullability
 
 #### Testing
