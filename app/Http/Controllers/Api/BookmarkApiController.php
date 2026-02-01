@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class BookmarkApiController extends Controller
@@ -15,7 +16,6 @@ class BookmarkApiController extends Controller
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
-        $this->middleware('auth:api');
     }
 
 
@@ -31,7 +31,7 @@ class BookmarkApiController extends Controller
         }
 
         // Get user ID from authenticated user
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         // Get bookmarks from the document store
         $bookmarks = $this->documentStoreService->getBookmarks($userId, $bookId);
@@ -40,14 +40,14 @@ class BookmarkApiController extends Controller
         $formattedBookmarks = [];
         foreach ($bookmarks as $bookmark) {
             $formattedBookmarks[] = [
-                'id' => (int) ($bookmark['_id'] ?? $bookmark['id']),
-                'book_id' => (int) $bookmark['book_id'],
+                'id' => (int) ($bookmark['id'] ?? $bookmark['_id']),
+                'book_id' => (int) ($bookmark['bookId'] ?? $bookmark['book_id']),
                 // @phpstan-ignore-next-line
                 'position_ms' => ((int) ($bookmark['position'] ?? 0)) * 1000, // Convert to milliseconds
                 'title' => $bookmark['title'] ?? null,
-                'note' => $bookmark['note'] ?? null,
-                'is_auto' => (bool) ($bookmark['is_auto'] ?? false),
-                'created_at' => $bookmark['created_at'] ?? now()->toISOString(),
+                'note' => $bookmark['notes'] ?? $bookmark['note'] ?? null,
+                'is_auto' => (bool) ($bookmark['isAuto'] ?? $bookmark['is_auto'] ?? false),
+                'created_at' => $bookmark['createdAt'] ?? $bookmark['created_at'] ?? now()->toISOString(),
             ];
         }
 
@@ -78,16 +78,16 @@ class BookmarkApiController extends Controller
         }
 
         // Get user ID from authenticated user
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         // Create bookmark data
         $bookmarkData = [
             'user_id' => $userId,
             'book_id' => (int) $bookId,
-            'chapter' => 1, // Default chapter for compatibility
+            'chapter' => '1', // Default chapter for compatibility
             'position' => (int) ($request->input('position_ms') / 1000), // Convert from milliseconds
             'title' => $request->input('title'),
-            'note' => $request->input('note'),
+            'notes' => $request->input('note'),
             'is_auto' => $request->input('is_auto', false),
             'created_at' => now()->toISOString(),
             'updated_at' => now()->toISOString(),
@@ -122,7 +122,7 @@ class BookmarkApiController extends Controller
         }
 
         // Get user ID from authenticated user
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         // Get bookmarks from the document store
         $bookmarks = $this->documentStoreService->getBookmarks($userId, $bookId);
@@ -131,14 +131,14 @@ class BookmarkApiController extends Controller
         $formattedBookmarks = [];
         foreach ($bookmarks as $bookmark) {
             $formattedBookmarks[] = [
-                'id' => (string) $bookmark['_id'],
-                'book_id' => $bookmark['book_id'],
+                'id' => (string) ($bookmark['id'] ?? $bookmark['_id'] ?? ''),
+                'book_id' => $bookmark['bookId'] ?? $bookmark['book_id'] ?? 0,
                 'chapter' => $bookmark['chapter'] ?? 1,
                 'position' => $bookmark['position'] ?? 0,
                 'title' => $bookmark['title'] ?? '',
-                'note' => $bookmark['note'] ?? '',
-                'created_at' => $bookmark['created_at'] ?? now()->toISOString(),
-                'updated_at' => $bookmark['updated_at'] ?? now()->toISOString(),
+                'note' => $bookmark['notes'] ?? $bookmark['note'] ?? '',
+                'created_at' => $bookmark['createdAt'] ?? $bookmark['created_at'] ?? now()->toISOString(),
+                'updated_at' => $bookmark['updatedAt'] ?? $bookmark['updated_at'] ?? now()->toISOString(),
             ];
         }
 
@@ -172,7 +172,7 @@ class BookmarkApiController extends Controller
         }
 
         // Get user ID from authenticated user
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         // Create bookmark data
         $bookmarkData = [
@@ -206,7 +206,7 @@ class BookmarkApiController extends Controller
     public function getBookmark(Request $request, string $bookId, string $bookmarkId)
     {
         // Get user ID from authenticated user
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         // Get bookmark from document store
         $bookmark = $this->documentStoreService->getBookmark($bookmarkId, $userId, $bookId);
@@ -217,14 +217,14 @@ class BookmarkApiController extends Controller
 
         // Format response
         $formattedBookmark = [
-            'id' => (string) $bookmark['_id'],
-            'book_id' => $bookmark['book_id'],
+            'id' => (string) ($bookmark['id'] ?? $bookmark['_id'] ?? ''),
+            'book_id' => $bookmark['bookId'] ?? $bookmark['book_id'] ?? 0,
             'chapter' => $bookmark['chapter'] ?? 1,
             'position' => $bookmark['position'] ?? 0,
             'title' => $bookmark['title'] ?? '',
-            'note' => $bookmark['note'] ?? '',
-            'created_at' => $bookmark['created_at'] ?? now()->toISOString(),
-            'updated_at' => $bookmark['updated_at'] ?? now()->toISOString(),
+            'note' => $bookmark['notes'] ?? $bookmark['note'] ?? '',
+            'created_at' => $bookmark['createdAt'] ?? $bookmark['created_at'] ?? now()->toISOString(),
+            'updated_at' => $bookmark['updatedAt'] ?? $bookmark['updated_at'] ?? now()->toISOString(),
         ];
 
         return response()->json($formattedBookmark);
@@ -251,7 +251,7 @@ class BookmarkApiController extends Controller
         }
 
         // Get user ID from authenticated user
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         // Get bookmark from document store
         $bookmark = $this->documentStoreService->getBookmark($bookmarkId, $userId, $bookId);
@@ -289,14 +289,14 @@ class BookmarkApiController extends Controller
 
         // Format response
         $formattedBookmark = [
-            'id' => (string) $updatedBookmark['_id'],
-            'book_id' => $updatedBookmark['book_id'],
+            'id' => (string) ($updatedBookmark['id'] ?? $updatedBookmark['_id'] ?? ''),
+            'book_id' => $updatedBookmark['bookId'] ?? $updatedBookmark['book_id'] ?? 0,
             'chapter' => $updatedBookmark['chapter'] ?? 1,
             'position' => $updatedBookmark['position'] ?? 0,
             'title' => $updatedBookmark['title'] ?? '',
-            'note' => $updatedBookmark['note'] ?? '',
-            'created_at' => $updatedBookmark['created_at'] ?? now()->toISOString(),
-            'updated_at' => $updatedBookmark['updated_at'] ?? now()->toISOString(),
+            'note' => $updatedBookmark['notes'] ?? $updatedBookmark['note'] ?? '',
+            'created_at' => $updatedBookmark['createdAt'] ?? $updatedBookmark['created_at'] ?? now()->toISOString(),
+            'updated_at' => $updatedBookmark['updatedAt'] ?? $updatedBookmark['updated_at'] ?? now()->toISOString(),
         ];
 
         return response()->json($formattedBookmark);
@@ -311,7 +311,7 @@ class BookmarkApiController extends Controller
     public function deleteBookmark(Request $request, string $bookId, string $bookmarkId)
     {
         // Get user ID from authenticated user
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         // Delete bookmark from the document store
         $result = $this->documentStoreService->deleteBookmark($bookmarkId, $userId, $bookId);
