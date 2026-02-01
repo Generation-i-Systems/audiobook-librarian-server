@@ -106,7 +106,6 @@ class QueueControllerTest extends TestCase
 
             // Debug validation errors
             // if ($response->getStatusCode() === 422) {
-            //     dump('Validation errors:', $response->json());
             // }
 
             $response->assertStatus(200);

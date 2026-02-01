@@ -1,4 +1,5 @@
 <?php
+
 /* @noinspection ALL */
 // @formatter:off
 // phpcs:ignoreFile
@@ -12,11 +13,13 @@
  * @author Barry vd. Heuvel <barryvdh@gmail.com>
  * @see https://github.com/barryvdh/laravel-ide-helper
  */
+
 namespace Illuminate\Support\Facades {
     /**
      * @see \Illuminate\Filesystem\Filesystem
      */
-    class File {
+    class File
+    {
         /**
          * Determine if a file or directory exists.
          *
@@ -631,7 +634,7 @@ namespace Illuminate\Support\Facades {
 
         /**
          * Recursively delete a directory.
-         * 
+         *
          * The directory itself may be optionally preserved.
          *
          * @param string $directory
@@ -755,13 +758,13 @@ namespace Illuminate\Support\Facades {
         {
             \Illuminate\Filesystem\Filesystem::flushMacros();
         }
-
-            }
+    }
     /**
      * @see \Illuminate\Auth\AuthManager
      * @see \Illuminate\Auth\SessionGuard
      */
-    class Auth {
+    class Auth
+    {
         /**
          * Attempt to get the guard from the local cache.
          *
@@ -1135,7 +1138,7 @@ namespace Illuminate\Support\Facades {
 
         /**
          * Log the user out of the application on their current device only.
-         * 
+         *
          * This method does not cycle the "remember" token.
          *
          * @return void
@@ -1149,7 +1152,7 @@ namespace Illuminate\Support\Facades {
 
         /**
          * Invalidate other sessions for the current user.
-         * 
+         *
          * The application must be using the AuthenticateSession middleware.
          *
          * @param string $password
@@ -1498,14 +1501,14 @@ namespace Illuminate\Support\Facades {
         {
             \Illuminate\Auth\SessionGuard::flushMacros();
         }
-
-            }
+    }
     /**
      * @see \Illuminate\Queue\QueueManager
      * @see \Illuminate\Queue\Queue
      * @see \Illuminate\Support\Testing\Fakes\QueueFake
      */
-    class Queue {
+    class Queue
+    {
         /**
          * Register an event listener for the before job event.
          *
@@ -1682,7 +1685,7 @@ namespace Illuminate\Support\Facades {
 
         /**
          * Indicate that queue workers should not poll for restart or pause signals.
-         * 
+         *
          * This prevents the workers from hitting the application cache to determine if they need to pause or restart.
          *
          * @return void
@@ -2285,7 +2288,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function clear($queue)
         {
-            //Method inherited from \Illuminate\Queue\RedisQueue 
+            //Method inherited from \Illuminate\Queue\RedisQueue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->clear($queue);
         }
@@ -2299,7 +2302,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getQueue($queue)
         {
-            //Method inherited from \Illuminate\Queue\RedisQueue 
+            //Method inherited from \Illuminate\Queue\RedisQueue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getQueue($queue);
         }
@@ -2312,7 +2315,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getConnection()
         {
-            //Method inherited from \Illuminate\Queue\RedisQueue 
+            //Method inherited from \Illuminate\Queue\RedisQueue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getConnection();
         }
@@ -2325,7 +2328,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getRedis()
         {
-            //Method inherited from \Illuminate\Queue\RedisQueue 
+            //Method inherited from \Illuminate\Queue\RedisQueue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getRedis();
         }
@@ -2339,7 +2342,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getJobTries($job)
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getJobTries($job);
         }
@@ -2353,7 +2356,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getJobBackoff($job)
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getJobBackoff($job);
         }
@@ -2367,7 +2370,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getJobExpiration($job)
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getJobExpiration($job);
         }
@@ -2381,7 +2384,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function createPayloadUsing($callback)
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             \Laravel\Horizon\RedisQueue::createPayloadUsing($callback);
         }
 
@@ -2393,7 +2396,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getConfig()
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getConfig();
         }
@@ -2407,7 +2410,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function setConfig($config)
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->setConfig($config);
         }
@@ -2420,7 +2423,7 @@ namespace Illuminate\Support\Facades {
          */
         public static function getContainer()
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             return $instance->getContainer();
         }
@@ -2434,18 +2437,18 @@ namespace Illuminate\Support\Facades {
          */
         public static function setContainer($container)
         {
-            //Method inherited from \Illuminate\Queue\Queue 
+            //Method inherited from \Illuminate\Queue\Queue
             /** @var \Laravel\Horizon\RedisQueue $instance */
             $instance->setContainer($container);
         }
-
-            }
     }
+}
 
 namespace Laravel\Socialite\Facades {
     /**
      */
-    class Socialite extends \Illuminate\Support\Manager {
+    class Socialite extends \Illuminate\Support\Manager
+    {
         /**
          * Get a driver instance.
          *
@@ -2534,7 +2537,7 @@ namespace Laravel\Socialite\Facades {
          */
         public static function driver($driver = null)
         {
-            //Method inherited from \Illuminate\Support\Manager 
+            //Method inherited from \Illuminate\Support\Manager
             /** @var \Laravel\Socialite\SocialiteManager $instance */
             return $instance->driver($driver);
         }
@@ -2549,7 +2552,7 @@ namespace Laravel\Socialite\Facades {
          */
         public static function extend($driver, $callback)
         {
-            //Method inherited from \Illuminate\Support\Manager 
+            //Method inherited from \Illuminate\Support\Manager
             /** @var \Laravel\Socialite\SocialiteManager $instance */
             return $instance->extend($driver, $callback);
         }
@@ -2562,7 +2565,7 @@ namespace Laravel\Socialite\Facades {
          */
         public static function getDrivers()
         {
-            //Method inherited from \Illuminate\Support\Manager 
+            //Method inherited from \Illuminate\Support\Manager
             /** @var \Laravel\Socialite\SocialiteManager $instance */
             return $instance->getDrivers();
         }
@@ -2575,18 +2578,18 @@ namespace Laravel\Socialite\Facades {
          */
         public static function getContainer()
         {
-            //Method inherited from \Illuminate\Support\Manager 
+            //Method inherited from \Illuminate\Support\Manager
             /** @var \Laravel\Socialite\SocialiteManager $instance */
             return $instance->getContainer();
         }
-
-            }
     }
+}
 
 namespace Illuminate\Http {
     /**
      */
-    class Request extends \Symfony\Component\HttpFoundation\Request {
+    class Request extends \Symfony\Component\HttpFoundation\Request
+    {
         /**
          * @see \Illuminate\Foundation\Providers\FoundationServiceProvider::registerRequestValidation()
          * @param array $rules
@@ -2649,15 +2652,15 @@ namespace Illuminate\Http {
         {
             return \Illuminate\Http\Request::hasValidRelativeSignatureWhileIgnoring($ignoreQuery);
         }
-
-            }
     }
+}
 
 namespace Illuminate\Routing {
     /**
      * @mixin \Illuminate\Routing\RouteRegistrar
      */
-    class Router {
+    class Router
+    {
         /**
          * @see \Laravel\Ui\AuthRouteMethods::auth()
          * @param mixed $options
@@ -2694,20 +2697,23 @@ namespace Illuminate\Routing {
         {
             return \Illuminate\Routing\Router::emailVerification();
         }
-
-            }
     }
-
-
-namespace  {
-    class File extends \Illuminate\Support\Facades\File {}
-    class Auth extends \Illuminate\Support\Facades\Auth {}
-    class Queue extends \Illuminate\Support\Facades\Queue {}
-    class Horizon extends \Laravel\Horizon\Horizon {}
-    class Socialite extends \Laravel\Socialite\Facades\Socialite {}
 }
 
-
-
-
-
+namespace {
+    class File extends \Illuminate\Support\Facades\File
+    {
+    }
+    class Auth extends \Illuminate\Support\Facades\Auth
+    {
+    }
+    class Queue extends \Illuminate\Support\Facades\Queue
+    {
+    }
+    class Horizon extends \Laravel\Horizon\Horizon
+    {
+    }
+    class Socialite extends \Laravel\Socialite\Facades\Socialite
+    {
+    }
+}

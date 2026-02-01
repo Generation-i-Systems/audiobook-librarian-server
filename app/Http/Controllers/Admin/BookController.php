@@ -1189,7 +1189,7 @@ class BookController extends Controller
      */
     public function update(Request $request, $book)
     {
-        Log::info('Updating book: ' . $book . ' ' . print_r($request->all(), true));
+        Log::info('Updating book: ' . $book . ' ' . json_encode($request->all()));
         $documentStore = $this->documentStoreService;
         $id = $book; // Store the ID before overwriting $book variable
         $book = $documentStore->getBook($book);

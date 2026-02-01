@@ -192,7 +192,7 @@ class QueueController extends Controller
         Log::info("Bulk importing books from directory: $dir");
 
         $out = CreateImportJobsForDirectory::dispatch($dir, $this->documentStoreService);
-        Log::info('Bulk import job dispatched: ' . print_r($out, true));
+        Log::info('Bulk import job dispatched: ' . json_encode($out));
 
         return response()->json(
             [

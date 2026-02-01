@@ -515,7 +515,6 @@ class ParseBooksCommand extends Command
                 break;
 
             case 'array':
-                dump($books);
                 break;
 
             case 'table':
