@@ -20,7 +20,8 @@ class BookStatusListenerTest extends TestCase
 
     protected User $user;
     protected Book $book;
-    protected Mockery\MockInterface $badgeServiceMock;
+    /** @var \Mockery\MockInterface */
+    protected $badgeServiceMock;
     protected BookStatusListener $listener;
 
     protected function setUp(): void
@@ -30,11 +31,15 @@ class BookStatusListenerTest extends TestCase
         $this->book = Book::factory()->create();
 
         // Mock BadgeService
-        $this->badgeServiceMock = Mockery::mock(BadgeService::class);
+        /** @var \Mockery\MockInterface $badgeServiceMock */
+        $badgeServiceMock = Mockery::mock(BadgeService::class);
+        $this->badgeServiceMock = $badgeServiceMock;
         $this->app->instance(BadgeService::class, $this->badgeServiceMock);
 
         // Initialize listener with the mock
-        $this->listener = new BookStatusListener($this->badgeServiceMock);
+        /** @var BadgeService $badgeService */
+        $badgeService = $this->badgeServiceMock;
+        $this->listener = new BookStatusListener($badgeService);
     }
 
     protected function tearDown(): void

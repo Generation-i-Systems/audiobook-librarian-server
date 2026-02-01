@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Contracts\DocumentStatsServiceInterface;
 use App\Models\Author;
+use App\Models\Badge;
 use App\Models\Book;
 use App\Models\Bookmark;
 use App\Models\BookProgress;
@@ -14,6 +15,7 @@ use App\Models\ExternalRead;
 use App\Models\Genre;
 use App\Models\Job;
 use App\Models\LibraryRepairIssue;
+use App\Models\ListeningStatistic;
 use App\Models\Message;
 use App\Models\Narrator;
 use App\Models\ReadingSession;
@@ -279,6 +281,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
 
         return (int) $progress->current_position_seconds;
+    }
+
+    public function getProgress(string $userId, string $bookId): ?int
+    {
+        $progress = $this->getReadingProgress($userId, $bookId);
+        return $progress > 0 ? $progress : null;
     }
 
     public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array
@@ -826,11 +834,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $durationFormatted = $book->duration ? gmdate('H:i:s', $book->duration) : null;
 
             $seriesData = $book->series->map(function (Series $series): array {
-                $pivot = $series->getAttribute('pivot');
                 $seriesNumber = null;
 
-                if (is_object($pivot) && property_exists($pivot, 'series_number')) {
-                    $seriesNumber = $pivot->series_number;
+                // Try to get series_number from pivot
+                if ($series->pivot) {
+                    $seriesNumber = $series->pivot->series_number ?? null;
                 }
 
                 return [
@@ -945,7 +953,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $userData;
     }
 
-    public function getAllBooks($limit = null, $offset = 0)
+    public function getAllBooks(?int $limit = null, int $offset = 0): array
     {
         $query = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters']);
 
@@ -956,6 +964,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $query->get()->map(function (Book $book) {
             $bookArray = $book->toArray();
             $bookArray['_id'] = (string) $book->id;
+
+            if (!isset($bookArray['directoryPath']) && isset($bookArray['directory_path'])) {
+                $bookArray['directoryPath'] = $bookArray['directory_path'];
+            }
 
             // Transform series to canonical format
             if (!empty($bookArray['series'])) {
@@ -1018,11 +1030,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     $releaseDate = null;
 
                     if ($book->release_date) {
-                        if (is_object($book->release_date) && method_exists($book->release_date, 'toDateString')) {
-                            $releaseDate = $book->release_date->toDateString();
-                        } else {
-                            $releaseDate = (string) $book->release_date;
-                        }
+                        $releaseDate = $book->release_date->toDateString();
                     }
 
                     return [
@@ -1167,7 +1175,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 }
             }
 
-            $baseReasons = array_values(array_unique(array_filter($baseReasons)));
+            $baseReasons = array_values(array_unique($baseReasons));
             sort($baseReasons, SORT_NATURAL | SORT_FLAG_CASE);
 
             return $baseReasons;
@@ -2182,13 +2190,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getUserByCredentials($credentials)
     {
-        if (empty($credentials['email']) || empty($credentials['password'])) {
+        if (empty($credentials['password'])) {
             return null;
         }
 
-        $user = User::where('email', $credentials['email'])->first();
+        // Support both email and username login
+        $user = null;
+        if (!empty($credentials['email'])) {
+            $user = User::where('email', $credentials['email'])->first();
+        } elseif (!empty($credentials['username'])) {
+            $user = User::where('username', $credentials['username'])->first();
+        }
 
-        if ($user && Hash::check($credentials['password'], $user->getAuthPassword())) {
+        if (!$user) {
+            return null;
+        }
+
+        if (Hash::check($credentials['password'], $user->getAuthPassword())) {
             return $user->toArray();
         }
 
@@ -2355,6 +2373,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $job ? $job->toArray() : null;
     }
 
+    public function getJobs(): array
+    {
+        return Job::query()
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function (Job $job): array {
+                return [
+                    'id' => (string) $job->id,
+                    'type' => (string) $job->type,
+                    'status' => (string) $job->status,
+                    'data' => $job->payload,
+                    'startedAt' => $job->created_at ? $job->created_at->toIso8601String() : null,
+                ];
+            })
+            ->toArray();
+    }
+
     public function listJobs(
         ?string $type = null,
         ?string $status = null,
@@ -2392,6 +2427,15 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         $job = Job::findOrFail($jobId);
 
         return $job->update($data);
+    }
+
+    public function updateJobStatus(string $jobId, string $type, string $status, array $metadata = []): bool
+    {
+        $job = Job::firstOrNew(['id' => $jobId]);
+        $job->type = $type;
+        $job->status = $status;
+        $job->metadata = array_merge($job->metadata ?? [], $metadata);
+        return $job->save();
     }
 
     public function getJobCount(): int
@@ -2565,6 +2609,172 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return [];
         }
+    }
+
+    /**
+     * Get user activity data (progress, badges, reviews, etc.)
+     *
+     * @param string $userId
+     * @return array
+     */
+    /**
+     * Get user activity data (progress, badges, reviews, etc.)
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getUserActivityData(string $userId): array
+    {
+        try {
+            /** @var User|null $user */
+            $user = User::with([
+                'badges.badge',
+                'progress.book',
+                'reviews.book',
+                'recommendationsReceived.book',
+                'recommendationsReceived.sender',
+                'bookStatuses.book'
+            ])->find($userId);
+
+            if (!$user) {
+                return [];
+            }
+
+            // Get all badges to show unearned ones, sorted by progression
+            $allBadges = \App\Models\Badge::active()->get()->sort(function ($a, $b) {
+                if ($a->sort_order !== $b->sort_order) {
+                    return $a->sort_order <=> $b->sort_order;
+                }
+
+                // Tier weight for reliable progression (Bronze -> Silver -> Gold)
+                $tiers = ['bronze' => 1, 'silver' => 2, 'gold' => 3, 'platinum' => 4, 'diamond' => 5];
+                $weightA = $tiers[$a->tier] ?? 99;
+                $weightB = $tiers[$b->tier] ?? 99;
+
+                if ($weightA !== $weightB) {
+                    return $weightA <=> $weightB;
+                }
+
+                return strcmp($a->name, $b->name);
+            });
+            $earnedBadgeIds = $user->badges->pluck('badge_id')->toArray();
+
+            $badgesByCategory = $allBadges->groupBy('category')->map(function ($badges) use ($earnedBadgeIds, $user) {
+                // Filter to show all earned badges + the first unearned one (next level)
+                $filteredBadges = collect([]);
+                $foundNextUnearned = false;
+
+                foreach ($badges as $badge) {
+                    $isEarned = in_array($badge->id, $earnedBadgeIds);
+
+                    if ($isEarned) {
+                        $filteredBadges->push($badge);
+                    } elseif (!$foundNextUnearned) {
+                        $filteredBadges->push($badge);
+                        $foundNextUnearned = true;
+                    }
+                }
+
+                return $filteredBadges->map(function (\App\Models\Badge $badge) use ($earnedBadgeIds, $user): array {
+                    $isEarned = in_array($badge->id, $earnedBadgeIds);
+                    $userBadge = $isEarned ? $user->badges->firstWhere('badge_id', $badge->id) : null;
+
+                    $iconPath = "images/badges/{$badge->key}.svg";
+                    $hasIconFile = file_exists(public_path($iconPath));
+
+                    return [
+                        'id' => $badge->id,
+                        'name' => $badge->name,
+                        'icon' => $hasIconFile ? "/{$iconPath}" : null, // Use SVG if exists
+                        'emoji' => $badge->icon, // Original emoji
+                        'description' => $badge->description,
+                        'tier' => $badge->tier,
+                        'is_earned' => $isEarned,
+                        'earned_at' => $userBadge?->earned_at,
+                    ];
+                })->all();
+            });
+
+            return [
+                'badges_by_category' => $badgesByCategory->toArray(),
+                'progress' => $user->progress->map(fn ($p) => [
+                    'book_id' => $p->book_id,
+                    'book_title' => $p->book->title,
+                    'percentage' => $p->progress_percentage,
+                    'last_listened_at' => $p->last_listened_at,
+                    'completed' => $p->completed,
+                ])->toArray(),
+                'reviews' => $user->reviews->map(fn ($r) => [
+                    'book_id' => $r->book_id,
+                    'book_title' => $r->book->title,
+                    'comment' => $r->comment,
+                    'age_rating' => $r->age_rating,
+                    'content_rating' => $r->content_rating,
+                    'created_at' => $r->created_at,
+                ])->toArray(),
+                'recommendations' => $user->recommendationsReceived->map(fn ($rec) => [
+                    'book_id' => $rec->book_id,
+                    'book_title' => $rec->book->title,
+                    'sender_name' => $rec->sender?->name,
+                    'message' => $rec->message,
+                    'created_at' => $rec->created_at,
+                    'acknowledged_at' => $rec->acknowledged_at,
+                ])->toArray(),
+                'statuses' => $user->bookStatuses->map(fn ($s) => [
+                    'book_id' => $s->book_id,
+                    'book_title' => $s->book?->title,
+                    'status' => $s->status,
+                    'updated_at' => $s->updated_at,
+                ])->toArray(),
+                'tips' => $this->getBadgeTips($userId),
+            ];
+        } catch (\Exception $e) {
+            Log::error('MySqlService getUserActivityData failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get badge tips for a user.
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getBadgeTips(string $userId): array
+    {
+        $allBadges = \App\Models\Badge::active()->ordered()->get();
+        $earnedBadgeIds = \App\Models\UserBadge::where('user_id', $userId)->pluck('badge_id')->toArray();
+
+        $tips = [];
+        $categories = $allBadges->groupBy('category');
+
+        foreach ($categories as $category => $badges) {
+            // Filter out earned badges
+            $unearnedBadges = $badges->filter(function ($badge) use ($earnedBadgeIds) {
+                return !in_array($badge->id, $earnedBadgeIds);
+            });
+
+            if ($unearnedBadges->isEmpty()) {
+                continue;
+            }
+
+            // Get the first unearned badge in the sequence
+            $nextBadge = $unearnedBadges->first();
+
+            $iconPath = "images/badges/{$nextBadge->key}.svg";
+            $hasIconFile = file_exists(public_path($iconPath));
+
+            $tips[] = [
+                'category' => $category,
+                'badge_name' => $nextBadge->name,
+                'description' => $nextBadge->description,
+                'tip' => "Aim for the '{$nextBadge->name}' badge: {$nextBadge->description}",
+                'icon' => $hasIconFile ? "/{$iconPath}" : null,
+                'emoji' => $nextBadge->icon,
+            ];
+        }
+
+        return $tips;
     }
 
     /**
@@ -3214,7 +3424,8 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     {
         try {
             $message = Message::create([
-                'user_id' => $messageData['user_id'],
+                'sender_id' => $messageData['sender_id'],
+                'recipient_id' => $messageData['recipient_id'],
                 'content' => $messageData['content'],
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -3225,6 +3436,28 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             Log::error('MySqlService createMessage failed: ' . $e->getMessage());
 
             return null;
+        }
+    }
+
+    public function acknowledgeMessage(string $messageId): bool
+    {
+        $id = (int) $messageId;
+
+        if ($id <= 0) {
+            return false;
+        }
+
+        try {
+            $updated = Message::query()
+                ->whereKey($id)
+                ->whereNull('acknowledged_at')
+                ->update(['acknowledged_at' => now()]);
+
+            return $updated > 0;
+        } catch (\Exception $e) {
+            Log::error('MySqlService acknowledgeMessage failed: ' . $e->getMessage());
+
+            return false;
         }
     }
 
@@ -3662,5 +3895,69 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'last_active_date' => null,
             ];
         }
+    }
+
+    public function createReview(array $data): string
+    {
+        $review = \App\Models\Review::create($data);
+        return (string) $review->id;
+    }
+
+    public function linkNonLibraryBooks(): int
+    {
+        $linkedCount = 0;
+        $models = [
+            ExternalRead::class,
+            ListeningStatistic::class,
+            ReadingSession::class,
+            UserBookStatus::class,
+        ];
+
+        foreach ($models as $modelClass) {
+            $records = $modelClass::whereNull('book_id')
+                ->whereNotNull('title')
+                ->whereNotNull('author')
+                ->get();
+
+            foreach ($records as $record) {
+                $book = Book::where('title', $record->title)
+                    ->whereHas('authors', function ($query) use ($record) {
+                        $query->where('name', 'like', '%' . $record->author . '%');
+                    })
+                    ->first();
+
+                if ($book) {
+                    $record->book_id = $book->id;
+                    $record->save();
+                    $linkedCount++;
+
+                    // Create a message for the user if user_id is available
+                    $recipientId = null;
+                    if (isset($record->user_id)) {
+                        $recipientId = (int) $record->user_id;
+                    } elseif (isset($record->deviceId)) {
+                        // In some models user_id might be stored in device_id field temporarily or vice versa
+                        $recipientId = (int) $record->deviceId;
+                    }
+
+                    if ($recipientId) {
+                        Message::create([
+                            'sender_id' => null, // System message
+                            'recipient_id' => $recipientId,
+                            'type' => 'book_linked',
+                            'content' => "Your statistical data for '{$record->title}' has been linked to '{$book->title}' in the library.",
+                            'payload' => [
+                                'book_id' => $book->id,
+                                'title' => $book->title,
+                                'original_title' => $record->title,
+                                'original_author' => $record->author,
+                            ],
+                        ]);
+                    }
+                }
+            }
+        }
+
+        return $linkedCount;
     }
 }

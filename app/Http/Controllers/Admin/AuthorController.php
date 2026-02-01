@@ -109,7 +109,7 @@ class AuthorController extends Controller
 
         $books = $booksResult['data'] ?? [];
         $total = $booksResult['total'] ?? 0;
-        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 1;
+        $totalPages = (int) ceil($total / $perPage);
 
         return view('admin.authors.edit', [
             'author' => $author,
@@ -163,7 +163,7 @@ class AuthorController extends Controller
         $authors = array_slice($authors, 0, 20);
         usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
 
-        return response()->json(['data' => array_values($authors)]);
+        return response()->json(['data' => $authors]);
     }
 
     public function browse($id, Request $request)

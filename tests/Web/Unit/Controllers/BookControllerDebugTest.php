@@ -102,15 +102,6 @@ class BookControllerDebugTest extends TestCase
         // Call the store method
         $response = $this->controller->store($request);
 
-        // Output debug info
-        // echo 'Response: ' . json_encode($response) . "\n";
-
-        // Output logs
-        $logs = Log::logged();
-        // echo 'Logs: ' . json_encode($logs) . "\n";
-        // echo 'Books after controller store: ' . json_encode($this->documentStore->getAllBooks()) . "\n";
-        // echo 'Raw books array: ' . json_encode($this->documentStore->dumpAllBooks()) . "\n";
-
         // Get all books from the mock store
         $books = $this->documentStore->getAllBooks();
 

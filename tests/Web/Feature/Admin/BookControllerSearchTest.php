@@ -72,7 +72,9 @@ class BookControllerSearchTest extends TestCase
                 ],
             ]);
 
-        $this->app->instance(AudibleService::class, $mockAudibleService);
+        /** @var AudibleService $audibleMock */
+        $audibleMock = $mockAudibleService;
+        $this->app->instance(AudibleService::class, $audibleMock);
 
         // Make the request with source=audible
         $response = $this->getJson('/admin/books/search?source=audible&title=Test+Book&author=Test+Author');
@@ -119,7 +121,9 @@ class BookControllerSearchTest extends TestCase
                 ],
             ]);
 
-        $this->app->instance(GoogleBooksApiService::class, $mockGoogleBooksService);
+        /** @var GoogleBooksApiService $googleMock */
+        $googleMock = $mockGoogleBooksService;
+        $this->app->instance(GoogleBooksApiService::class, $googleMock);
 
         // Make the request with source=googlebooks
         $response = $this->getJson('/admin/books/search?source=googlebooks&title=Test+Book&author=Test+Author');
@@ -179,7 +183,9 @@ class BookControllerSearchTest extends TestCase
             ->with('Test Book', '', ['limit' => 10])
             ->andThrow(new \Exception('API Error'));
 
-        $this->app->instance(AudibleService::class, $mockAudibleService);
+        /** @var AudibleService $audibleErrorMock */
+        $audibleErrorMock = $mockAudibleService;
+        $this->app->instance(AudibleService::class, $audibleErrorMock);
 
         // Make the request
         $response = $this->getJson('/admin/books/search?source=audible&title=Test+Book');

@@ -12,13 +12,16 @@ use Tests\TestCase;
 
 class LibraryRepairScanCommandTest extends TestCase
 {
+    /** @var \Mockery\MockInterface */
     private MockInterface $repairService;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->repairService = Mockery::mock(LibraryRepairService::class);
+        /** @var \Mockery\MockInterface $repairService */
+        $repairService = Mockery::mock(LibraryRepairService::class);
+        $this->repairService = $repairService;
         $this->app->instance(LibraryRepairService::class, $this->repairService);
     }
 

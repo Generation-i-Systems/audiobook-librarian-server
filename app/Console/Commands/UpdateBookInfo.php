@@ -152,24 +152,26 @@ class UpdateBookInfo extends Command
 
         // Update publisher
         if ($this->option('publisher')) {
-            $book->publisher = $this->option('publisher');
-            $this->info("✓ Updated publisher: {$book->publisher}");
+            $publisherName = (string) $this->option('publisher');
+            $publisher = \App\Models\Publisher::firstOrCreate(['name' => $publisherName]);
+            $book->publisher()->associate($publisher);
+            $this->info("✓ Updated publisher: {$publisherName}");
             $updated = true;
         }
 
         // Update language
         if ($this->option('language')) {
-            $book->language = $this->option('language');
+            $book->language = (string) $this->option('language');
             $this->info("✓ Updated language: {$book->language}");
             $updated = true;
         }
 
         // Update release date
         if ($this->option('release-date')) {
-            $date = $this->option('release-date');
+            $date = (string) $this->option('release-date');
             try {
-                $book->releaseDate = new \DateTime($date);
-                $this->info("✓ Updated release date: {$book->releaseDate->format('Y-m-d')}");
+                $book->release_date = $date;
+                $this->info("✓ Updated release date: {$date}");
                 $updated = true;
             } catch (\Exception $e) {
                 $this->error("Invalid date format: {$date}");

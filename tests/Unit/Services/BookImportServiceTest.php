@@ -63,6 +63,9 @@ class BookImportServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function reviewAndApproveAllowsAcceptAfterGenreFix(): void
     {
+        // Ensure Science Fiction is a valid genre
+        Genre::create(['name' => 'Science Fiction']);
+
         $metadata = [
             'title' => 'Test Book',
             'author' => ['Author'],
@@ -76,7 +79,8 @@ class BookImportServiceTest extends TestCase
         ];
 
         $logs = [];
-        $selectResponses = ['5', '1', '1'];
+        // Select '3' (Edit), then '1' (Accept)
+        $selectResponses = ['3', '1'];
         $inputInterrupted = false;
 
         $result = $this->service->reviewAndApprove(
@@ -91,7 +95,10 @@ class BookImportServiceTest extends TestCase
             },
             fn ($question, $default = '') => $default,
             fn ($cover, $genre, $directory, $isFinal) => [],
-            fn ($data, $book) => $data,
+            function ($data, $isAll) {
+                $data['genre'] = 'Science Fiction';
+                return $data;
+            },
             fn ($data, $book, $service) => $data,
             fn () => null,
             fn () => $this->service->getValidGenres(),

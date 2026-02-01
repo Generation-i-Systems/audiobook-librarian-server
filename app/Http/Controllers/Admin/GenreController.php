@@ -128,7 +128,7 @@ class GenreController extends Controller
 
             $books = $booksResult['data'] ?? [];
             $total = $booksResult['total'] ?? 0;
-            $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 1;
+            $totalPages = (int) ceil($total / $perPage);
 
             return view('admin.genres.edit', [
                 'genre' => $genre,

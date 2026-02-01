@@ -97,6 +97,7 @@ class AuthControllerTest extends TestCase
         // Assert the response
         $response->assertStatus(201)
             ->assertJson([
+                'code' => 'REGISTRATION_PENDING_APPROVAL',
                 'message' => 'Account created. Waiting for admin approval.',
             ]);
 
@@ -173,10 +174,88 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJson([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
                 'message' => 'Account pending admin approval',
             ]);
     }
 
+
+    #[Test]
+    public function testCheckStatusForUnverifiedUser(): void
+    {
+        $uniqueSuffix = uniqid('', true);
+        $testEmail = 'unverified' . $uniqueSuffix . '@example.com';
+
+        User::create([
+            'name' => 'Test User',
+            'username' => 'testuser' . $uniqueSuffix,
+            'email' => $testEmail,
+            'password' => Hash::make('password'),
+            'role' => 'unverified',
+        ]);
+
+        $response = $this->postJson('/api/v1/check-status', [
+            'email' => $testEmail,
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
+                'message' => 'Account pending admin approval',
+                'status' => 'unverified',
+            ]);
+    }
+
+    #[Test]
+    public function testCheckStatusForVerifiedUser(): void
+    {
+        $uniqueSuffix = uniqid('', true);
+        $testEmail = 'verified' . $uniqueSuffix . '@example.com';
+
+        User::create([
+            'name' => 'Test User',
+            'username' => 'testuser' . $uniqueSuffix,
+            'email' => $testEmail,
+            'password' => Hash::make('password'),
+            'role' => 'user',
+        ]);
+
+        $response = $this->postJson('/api/v1/check-status', [
+            'email' => $testEmail,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Please use the login endpoint',
+            ]);
+    }
+
+    #[Test]
+    public function testCheckStatusForNonExistentUser(): void
+    {
+        $uniqueSuffix = uniqid('', true);
+        $testEmail = 'nonexistent' . $uniqueSuffix . '@example.com';
+
+        $response = $this->postJson('/api/v1/check-status', [
+            'email' => $testEmail,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Please use the login endpoint',
+            ]);
+    }
+
+    #[Test]
+    public function testCheckStatusWithMissingEmail(): void
+    {
+        $response = $this->postJson('/api/v1/check-status', []);
+
+        $response->assertStatus(400)
+            ->assertJsonStructure([
+                'email',
+            ]);
+    }
 
     #[Test]
     public function testUserCanLogout(): void

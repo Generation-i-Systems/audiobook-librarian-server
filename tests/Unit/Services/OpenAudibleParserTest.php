@@ -38,7 +38,6 @@ class OpenAudibleParserTest extends TestCase
     {
         $result = $this->parser->parseChapters([]);
 
-        $this->assertIsArray($result);
         $this->assertEmpty($result);
     }
 

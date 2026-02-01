@@ -14,7 +14,7 @@ class ImportBooksMultiBookSeriesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        /** @var ImportUIInterface $uiService */
+        /** @var ImportUIInterface&\Mockery\MockInterface $uiService */
         $uiService = \Mockery::mock(ImportUIInterface::class);
         $uiService->shouldReceive('logMessage')->zeroOrMoreTimes();
         $uiService->shouldReceive('setCurrentBook')->zeroOrMoreTimes();

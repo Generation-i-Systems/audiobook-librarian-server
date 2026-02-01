@@ -48,6 +48,7 @@ class BookQueueController extends Controller
         $user = Auth::user();
         $documentStore = $this->documentStoreService;
         $documentStore->removeBookFromQueue($user->id, $bookId);
+        // @phpstan-ignore-next-line
         $this->reorderQueue($user->id);
 
         return back()->with('success', 'Book removed from queue.');

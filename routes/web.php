@@ -577,6 +577,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     ])->name('books.bulkImportDir');
 
     // User management
+    Route::get('/badges', [Admin\BadgeController::class, 'index'])->name('badges.index');
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
         ->name('users.verify');

@@ -31,14 +31,17 @@ use App\Traits\Auditable;
  * @property-read int|null $book_statuses_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
  * @property-read int|null $books_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\FavoriteAuthor> $favoriteAuthors
- * @property-read int|null $favorite_authors_count
+
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBookStatus> $queuedBooks
  * @property-read int|null $queued_books_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \Laravel\Sanctum\PersonalAccessToken> $tokens
  * @property-read int|null $tokens_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBadge> $badges
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\BookProgress> $progress
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Review> $reviews
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserRecommendation> $recommendationsReceived
  * @method static \Database\Factories\UserFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User newQuery()
@@ -127,9 +130,40 @@ class User extends Authenticatable
         return $this->bookStatuses()->where('status', 'queue')->orderBy('order');
     }
 
-    public function favoriteAuthors(): HasMany
+
+    public function favoritedAuthors(): BelongsToMany
     {
-        return $this->hasMany(FavoriteAuthor::class);
+        return $this->belongsToMany(Author::class, 'user_author_favorites')->withTimestamps();
+    }
+
+    public function favoritedSeries(): BelongsToMany
+    {
+        return $this->belongsToMany(Series::class, 'user_series_favorites')->withTimestamps();
+    }
+
+    public function badges(): HasMany
+    {
+        return $this->hasMany(UserBadge::class);
+    }
+
+    public function progress(): HasMany
+    {
+        return $this->hasMany(BookProgress::class);
+    }
+
+    public function recommendationsSent(): HasMany
+    {
+        return $this->hasMany(UserRecommendation::class, 'sender_id');
+    }
+
+    public function recommendationsReceived(): HasMany
+    {
+        return $this->hasMany(UserRecommendation::class, 'recipient_id');
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(\App\Models\Review::class);
     }
 
     /**

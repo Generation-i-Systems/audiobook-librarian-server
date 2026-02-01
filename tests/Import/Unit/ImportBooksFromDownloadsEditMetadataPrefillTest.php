@@ -116,12 +116,12 @@ class ImportBooksFromDownloadsEditMetadataPrefillTestDouble extends ImportBooksF
         }
 
         $title = $metadata['title'];
-        if (preg_match('/\b(\d+(?:\.\d+)?)\b/', $title, $matches) && isset($matches[1])) {
+        if (preg_match('/\b(\d+(?:\.\d+)?)\b/', $title, $matches)) {
             $metadata['series_number'] = $matches[1];
         }
     }
 
-    protected function editMetadataFields(array $metadata, array $audiobook): array
+    protected function editMetadataFields(array $metadata, array $audiobook, bool $sequential = false): array
     {
         $currentTitle = $this->getFirstNonEmptyMetadataValue($metadata, ['title', 'book_title', 'name']);
         $metadata['title'] = $this->askInline('Title', is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? ''));

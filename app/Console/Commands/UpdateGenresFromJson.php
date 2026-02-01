@@ -85,6 +85,7 @@ class UpdateGenresFromJson extends Command
                 $validGenre = $this->genreMappingService->mapToPrimaryGenre($jsonGenre);
 
                 // Get current primary genre
+                /** @var \App\Models\Genre|null $currentPrimaryGenre */
                 $currentPrimaryGenre = $book->genres()->wherePivot('is_primary', true)->first();
                 $currentGenreName = $currentPrimaryGenre ? $currentPrimaryGenre->name : 'NONE';
 

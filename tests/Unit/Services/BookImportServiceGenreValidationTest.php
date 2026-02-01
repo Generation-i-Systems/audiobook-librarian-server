@@ -130,12 +130,15 @@ class BookImportServiceGenreValidationTest extends TestCase
         // Check that first genre is primary
         $primaryGenre = $book->genres()->wherePivot('is_primary', true)->first();
         $this->assertNotNull($primaryGenre);
+        /** @var \App\Models\Genre $primaryGenre */
         $this->assertEquals('Science Fiction', $primaryGenre->name);
 
         // Check that second genre is not primary
         $secondaryGenres = $book->genres()->wherePivot('is_primary', false)->get();
         $this->assertCount(1, $secondaryGenres);
-        $this->assertEquals('Action', $secondaryGenres->first()->name);
+        $secondaryGenre = $secondaryGenres->first();
+        /** @var \App\Models\Genre $secondaryGenre */
+        $this->assertEquals('Action', $secondaryGenre->name);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

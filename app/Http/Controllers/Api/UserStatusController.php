@@ -83,7 +83,7 @@ class UserStatusController extends Controller
         if ($data['status'] === 'completed' && $previousStatus !== 'completed') {
             $updateData['finished_at'] = now();
             // Increment read count
-            $updateData['read_count'] = ($currentStatus?->read_count ?? 0) + 1;
+            $updateData['read_count'] = ($currentStatus ? $currentStatus->read_count : 0) + 1;
         }
 
         if ($currentStatus) {
@@ -102,6 +102,60 @@ class UserStatusController extends Controller
         // Dispatch event for Badge/Stats integration (Phase 3)
         if ($data['status'] !== $previousStatus) {
             BookStatusUpdated::dispatch($user, $book, $data['status'], $previousStatus);
+        }
+
+        return response()->json([
+            'message' => "Book status updated to {$data['status']}.",
+            'status' => $statusModel,
+        ], 200);
+    }
+
+    public function setNonLibrary(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'author' => ['required', 'string', 'max:255'],
+            'status' => ['required', 'string', Rule::in(self::VALID_STATUSES)],
+            'order' => ['nullable', 'integer', 'min:1'],
+            'status_detail' => ['nullable', 'array'],
+            'target_date' => ['nullable', 'date'],
+        ]);
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        /** @var UserBookStatus|null $currentStatus */
+        $currentStatus = UserBookStatus::where('user_id', $user->id)
+            ->where('title', $data['title'])
+            ->where('author', $data['author'])
+            ->whereNull('book_id')
+            ->first();
+        $previousStatus = $currentStatus?->status;
+
+        $updateData = [
+            'status' => $data['status'],
+            'order' => $data['order'] ?? 0,
+            'status_detail' => $data['status_detail'] ?? null,
+            'target_date' => $data['target_date'] ?? null,
+        ];
+
+        if ($data['status'] === 'in_progress' && $previousStatus !== 'in_progress') {
+            $updateData['started_at'] = now();
+        }
+
+        if ($data['status'] === 'completed' && $previousStatus !== 'completed') {
+            $updateData['finished_at'] = now();
+            $updateData['read_count'] = ($currentStatus ? $currentStatus->read_count : 0) + 1;
+        }
+
+        if ($currentStatus) {
+            $currentStatus->update($updateData);
+            $statusModel = $currentStatus;
+        } else {
+            $updateData['user_id'] = $user->id;
+            $updateData['title'] = $data['title'];
+            $updateData['author'] = $data['author'];
+            $statusModel = UserBookStatus::create($updateData);
         }
 
         return response()->json([

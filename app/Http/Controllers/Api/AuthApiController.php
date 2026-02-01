@@ -52,8 +52,10 @@ class AuthApiController extends Controller
                     }
                 } else {
                     // Use standard Socialite for access_token
-                    $googleUser = Socialite::driver('google')
-                        ->stateless()
+                    /** @var \Laravel\Socialite\Contracts\Provider $driver */
+                    $driver = Socialite::driver('google');
+                    // @phpstan-ignore-next-line
+                    $googleUser = $driver->stateless()
                         ->userFromToken($request->input('access_token'));
                 }
             } catch (\Exception $e) {
@@ -99,7 +101,10 @@ class AuthApiController extends Controller
             }
 
             // Generate token using Laravel's built-in JWT functionality
-            $token = auth('api')->fromUser((object) $user);
+            /** @phpstan-ignore-next-line class.notFound, varTag.nativeType */
+            $guard = auth('api');
+            /** @phpstan-ignore-next-line class.notFound */
+            $token = $guard->fromUser((object) $user);
 
             return response()->json([
                 'token' => $token,

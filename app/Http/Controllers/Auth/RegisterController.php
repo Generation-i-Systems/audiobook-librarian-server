@@ -135,15 +135,13 @@ class RegisterController extends Controller
 
             foreach ($admins as $admin) {
                 $messageData = [
-                    'from_user_id' => $userData['id'],
-                    'to_user_id' => $admin['id'],
+                    'sender_id' => $userData['id'],
+                    'recipient_id' => $admin['id'],
                     'content' => sprintf(
                         'New user registered: %s (%s). Please verify their account.',
                         $userData['name'],
                         $userData['email']
                     ),
-                    'is_from_admin' => false,
-                    'is_read' => false,
                 ];
 
                 // Create the message through the document store service

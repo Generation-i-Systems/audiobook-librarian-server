@@ -144,7 +144,7 @@ class GenreMappingService
      */
     public function getExistingGenres(): array
     {
-        $bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $bookRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root'), '/');
 
         if (!is_dir($bookRoot)) {
             return [];

@@ -564,9 +564,19 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $this->books;
     }
 
-    public function getAllBooks(): array
+    public function getAllBooks(?int $limit = null, int $offset = 0): array
     {
-        return array_values($this->books);
+        $books = array_values($this->books);
+
+        if ($offset > 0) {
+            $books = array_slice($books, $offset);
+        }
+
+        if ($limit !== null) {
+            $books = array_slice($books, 0, $limit);
+        }
+
+        return $books;
     }
 
     // dumpAllBooks method already exists above
@@ -683,6 +693,48 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $key = $userId . '_' . $bookId;
 
         return (int) ($this->readingProgress[$key] ?? 0);
+    }
+
+    public function getProgress(string $userId, string $bookId): ?int
+    {
+        $progress = $this->getReadingProgress($userId, $bookId);
+        return $progress > 0 ? $progress : null;
+    }
+
+    public function updateJobStatus(string $jobId, string $type, string $status, array $metadata = []): bool
+    {
+        if (!isset($this->jobs[$jobId])) {
+            $this->jobs[$jobId] = ['id' => $jobId, 'type' => $type, 'status' => $status, 'metadata' => []];
+        }
+        $this->jobs[$jobId]['type'] = $type;
+        $this->jobs[$jobId]['status'] = $status;
+        $this->jobs[$jobId]['metadata'] = array_merge($this->jobs[$jobId]['metadata'] ?? [], $metadata);
+        return true;
+    }
+
+    public function getExternalReads(string $userId, string $bookId): array
+    {
+        return [];
+    }
+
+    public function getExternalRead(string $externalReadId, string $userId, string $bookId): ?array
+    {
+        return null;
+    }
+
+    public function createExternalRead(array $data): string
+    {
+        return '1';
+    }
+
+    public function updateExternalRead(string $externalReadId, array $data): bool
+    {
+        return true;
+    }
+
+    public function deleteExternalRead(string $externalReadId, string $userId, string $bookId): bool
+    {
+        return true;
     }
 
     /**
@@ -1178,6 +1230,17 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->messages[$id] = $messageData;
 
         return $id;
+    }
+
+    public function acknowledgeMessage(string $messageId): bool
+    {
+        if (! isset($this->messages[$messageId])) {
+            return false;
+        }
+
+        $this->messages[$messageId]['acknowledged_at'] = now()->toIso8601String();
+
+        return true;
     }
 
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
@@ -1940,5 +2003,37 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         return $affected;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getUserActivityData(string $userId): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getBadgeTips(string $userId): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function createReview(array $data): string
+    {
+        return uniqid('review_');
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function linkNonLibraryBooks(): int
+    {
+        return 0;
     }
 }

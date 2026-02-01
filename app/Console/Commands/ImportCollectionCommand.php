@@ -20,7 +20,7 @@ class ImportCollectionCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'books:import-collection 
+    protected $signature = 'books:import-collection
                             {--collection=Top 100-ish Sci-Fi Books : Collection name}
                             {--path=/media/lyra_data1/audiobooks/books/Science Fiction/VA/Top 100-ish Sci-Fi Books : Source directory path}
                             {--dry-run : Show what would be done without making changes}
@@ -188,7 +188,7 @@ class ImportCollectionCommand extends Command
      */
     protected function calculateTargetPath(array $parsed): string
     {
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('library.paths.books', '/media/lyra_data1/audiobooks/books'), '/');
 
         // Determine genre (for this collection, it's Science Fiction)
         $genre = 'Science Fiction';
@@ -314,7 +314,7 @@ class ImportCollectionCommand extends Command
 
             $this->info("Book created with enriched metadata");
 
-            return $book->id;
+            return (string) $book->id;
         } catch (\Exception $e) {
             Log::error('Failed to import book', [
                 'path' => $path,

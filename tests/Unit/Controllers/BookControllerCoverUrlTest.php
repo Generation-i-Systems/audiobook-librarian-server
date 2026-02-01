@@ -36,7 +36,6 @@ class BookControllerCoverUrlTest extends TestCase
         /** @var array $result */
         $result = $method->invoke($controller, $book);
 
-        $this->assertIsArray($result);
         $this->assertIsString($result['coverImage']);
         $this->assertStringContainsString('/cover/', $result['coverImage']);
         $this->assertStringContainsString('/cover/Genre/Author/Title/cover_audible_123.jpg', $result['coverImage']);

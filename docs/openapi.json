@@ -247,9 +247,304 @@
                     }
                 }
             },
+            "SyncRequest": {
+                "type": "object",
+                "properties": {
+                    "clientTimestamp": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Timestamp of the sync request from client"
+                    },
+                    "progress": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "bookId": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "author": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "positionMs": {
+                                    "type": "integer",
+                                    "format": "int64"
+                                },
+                                "progressPercentage": {
+                                    "type": "number",
+                                    "format": "float"
+                                },
+                                "lastUpdated": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                }
+                            },
+                            "required": ["positionMs", "progressPercentage", "lastUpdated"]
+                        }
+                    }
+                },
+                "required": ["progress"]
+            },
+            "SyncResponse": {
+                "type": "object",
+                "properties": {
+                    "serverTimestamp": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updates": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "bookId": {
+                                    "type": "integer"
+                                },
+                                "positionMs": {
+                                    "type": "integer",
+                                    "format": "int64"
+                                },
+                                "progressPercentage": {
+                                    "type": "number",
+                                    "format": "float"
+                                },
+                                "source": {
+                                    "type": "string",
+                                    "enum": ["server"]
+                                },
+                                "lastUpdated": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "BatchRequest": {
+                "type": "object",
+                "properties": {
+                    "bookIds": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of Book IDs to fetch"
+                    },
+                    "queries": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string"
+                                },
+                                "author": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": ["title"]
+                        }
+                    }
+                }
+            },
+            "BatchBookResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "author": {
+                        "type": "string"
+                    },
+                    "coverImage": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "is_client_book": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": ["library", "client"]
+                    }
+                },
+                "required": ["id", "title", "author"]
+            },
+            "Bookmark": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Bookmark ID",
+                        "example": 1
+                    },
+                    "book_id": {
+                        "type": "integer",
+                        "description": "Relationship to book",
+                        "example": 123
+                    },
+                    "position_ms": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Position in the book in milliseconds",
+                        "example": 120000
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional title for the bookmark",
+                        "example": "Start of Chapter 2"
+                    },
+                    "note": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional note",
+                        "example": "Important plot point here"
+                    },
+                    "is_auto": {
+                        "type": "boolean",
+                        "description": "Whether this was an automatically created bookmark",
+                        "example": false
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Creation timestamp",
+                        "example": "2024-01-01T12:00:00Z"
+                    }
+                },
+                "required": [
+                    "id",
+                    "book_id",
+                    "position_ms",
+                    "created_at"
+                ]
+            },
+            "CreateBookmarkRequest": {
+                "type": "object",
+                "properties": {
+                    "position_ms": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Position in the book in milliseconds",
+                        "example": 120000
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional title",
+                        "example": "Interesting quote"
+                    },
+                    "note": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional note",
+                        "example": "I should revisit this"
+                    },
+                    "is_auto": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Whether this is an automatic bookmark"
+                    }
+                },
+                "required": [
+                    "position_ms"
+                ]
+            },
+            "MessageItem": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "sender_id": {"type": "integer"},
+                    "recipient_id": {"type": "integer"},
+                    "content": {"type": "string"},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "acknowledged_at": {"type": "string", "format": "date-time", "nullable": true}
+                }
+            },
+            "MessageRequest": {
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string"}
+                },
+                "required": ["content"]
+            },
+            "UserBookStatus": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "user_id": {"type": "integer"},
+                    "book_id": {"type": "integer", "nullable": true},
+                    "status": {"type": "string", "enum": ["queue", "wishlist", "completed", "in_progress", "paused", "dropped"]},
+                    "order": {"type": "integer"},
+                    "started_at": {"type": "string", "format": "date-time", "nullable": true},
+                    "finished_at": {"type": "string", "format": "date-time", "nullable": true},
+                    "target_date": {"type": "string", "format": "date", "nullable": true},
+                    "book": {"$ref": "#/components/schemas/Book"}
+                }
+            },
+            "BookStatusUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["queue", "wishlist", "completed", "in_progress", "paused", "dropped"]},
+                    "order": {"type": "integer", "nullable": true},
+                    "target_date": {"type": "string", "format": "date", "nullable": true},
+                    "status_detail": {"type": "array"}
+                },
+                "required": ["status"]
+            },
+            "NonLibraryStatusUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "author": {"type": "string"},
+                    "status": {"type": "string", "enum": ["queue", "wishlist", "completed", "in_progress", "paused", "dropped"]},
+                    "order": {"type": "integer", "nullable": true},
+                    "target_date": {"type": "string", "format": "date", "nullable": true}
+                },
+                "required": ["title", "author", "status"]
+            },
+            "StatisticsOverview": {
+                "type": "object",
+                "properties": {
+                    "total_listening_time_ms": {"type": "integer"},
+                    "books_started": {"type": "integer"},
+                    "books_finished": {"type": "integer"},
+                    "average_session_duration_ms": {"type": "integer"},
+                    "current_streak": {"type": "integer"},
+                    "longest_streak": {"type": "integer"},
+                    "daily_stats": {"type": "array", "items": {"$ref": "#/components/schemas/DailyStat"}}
+                }
+            },
+            "DailyStat": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "format": "date"},
+                    "listening_time_ms": {"type": "integer"},
+                    "sessions_count": {"type": "integer"},
+                    "books_listened": {"type": "array", "items": {"type": "integer"}}
+                }
+            },
             "Error": {
                 "type": "object",
                 "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Error code for identifying the type of error",
+                        "example": "ACCOUNT_PENDING_APPROVAL"
+                    },
                     "error": {
                         "type": "string",
                         "description": "Error type",
@@ -1469,6 +1764,591 @@
         }
     },
     "paths": {
+        "/sync/progress": {
+            "post": {
+                "tags": ["Sync"],
+                "summary": "Bulk sync reading progress",
+                "description": "Synchronize reading progress for multiple books. Handles both library books and client-only books...",
+                "operationId": "syncProgress",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SyncRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sync successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SyncResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/books/batch": {
+            "post": {
+                "tags": ["Books"],
+                "summary": "Batch fetch book metadata",
+                "description": "Retrieve metadata for multiple books by ID or query...",
+                "operationId": "batchBooks",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BatchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Batch fetch successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BatchBookResponse"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/bookmarks/{bookId}": {
+            "get": {
+                "tags": ["Bookmarks"],
+                "summary": "Get bookmarks for a book",
+                "description": "Returns all bookmarks for the specified book belonging to the authenticated user.",
+                "operationId": "getBookmarks",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "bookId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the book"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of bookmarks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "bookmarks": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Bookmark"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Book not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            },
+            "post": {
+                "tags": ["Bookmarks"],
+                "summary": "Create a bookmark",
+                "description": "Creates a new bookmark for the specified book.",
+                "operationId": "createBookmark",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "bookId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the book"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateBookmarkRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bookmark created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Bookmark"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Book not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/messages": {
+            "get": {
+                "tags": ["Messages"],
+                "summary": "Get unacknowledged messages",
+                "operationId": "getMessages",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "List of messages",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/MessageItem"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            },
+            "post": {
+                "tags": ["Messages"],
+                "summary": "Send a message",
+                "operationId": "sendMessage",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/MessageRequest"}
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Message created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "string"}}
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/messages/{id}/acknowledge": {
+            "post": {
+                "tags": ["Messages"],
+                "summary": "Acknowledge a message",
+                "operationId": "acknowledgeMessage",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Acknowledged successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}}
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/status/list/{statusType}": {
+            "get": {
+                "tags": ["Status"],
+                "summary": "List books by status",
+                "operationId": "listStatus",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "statusType", "in": "path", "required": true, "schema": {"type": "string", "enum": ["queue", "wishlist", "completed", "in_progress", "paused", "dropped"]}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of statuses",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/components/schemas/UserBookStatus"}
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/status/history": {
+            "get": {
+                "tags": ["Status"],
+                "summary": "Get reading history",
+                "operationId": "getHistory",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "page", "in": "query", "schema": {"type": "integer"}},
+                    {"name": "per_page", "in": "query", "schema": {"type": "integer"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reading history",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/UserBookStatus"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/status/goals": {
+            "get": {
+                "tags": ["Status"],
+                "summary": "Get reading goals",
+                "operationId": "getGoals",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Reading goals",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/components/schemas/UserBookStatus"}
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/status/{book}/set": {
+            "post": {
+                "tags": ["Status"],
+                "summary": "Set book status",
+                "operationId": "setBookStatus",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "integer"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/BookStatusUpdateRequest"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {"type": "string"},
+                                        "status": {"$ref": "#/components/schemas/UserBookStatus"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/status/non-library/set": {
+            "post": {
+                "tags": ["Status"],
+                "summary": "Set non-library book status",
+                "operationId": "setNonLibraryStatus",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/NonLibraryStatusUpdateRequest"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {"type": "string"},
+                                        "status": {"$ref": "#/components/schemas/UserBookStatus"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/status/queue/reorder": {
+            "post": {
+                "tags": ["Status"],
+                "summary": "Reorder queue",
+                "operationId": "reorderQueue",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "book_orders": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "book_id": {"type": "integer"},
+                                                "order": {"type": "integer"}
+                                            },
+                                            "required": ["book_id", "order"]
+                                        }
+                                    }
+                                },
+                                "required": ["book_orders"]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Queue reordered",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MessageResponse"}}}
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/statistics/overview": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get statistics overview",
+                "operationId": "getStatsOverview",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "period", "in": "query", "schema": {"type": "string", "enum": ["week", "month", "quarter", "year", "all_time"]}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Statistics overview",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/StatisticsOverview"}
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/statistics/daily": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get daily statistics",
+                "operationId": "getDailyStats",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "start_date", "in": "query", "schema": {"type": "string", "format": "date"}},
+                    {"name": "end_date", "in": "query", "schema": {"type": "string", "format": "date"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Daily statistics",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "daily_stats": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/DailyStat"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/statistics/reading-history": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get reading history timeline",
+                "operationId": "getReadingHistoryStats",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "group_by", "in": "query", "schema": {"type": "string", "enum": ["month", "year"]}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reading history stats",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "period": {"type": "string"},
+                                            "count": {"type": "integer"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
+        "/statistics/report": {
+            "post": {
+                "tags": ["Statistics"],
+                "summary": "Report listening session",
+                "operationId": "reportSession",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "session_start": {"type": "string", "format": "date-time"},
+                                    "session_end": {"type": "string", "format": "date-time"},
+                                    "start_position_ms": {"type": "integer"},
+                                    "end_position_ms": {"type": "integer"},
+                                    "actual_duration_ms": {"type": "integer"},
+                                    "book_id": {"type": "integer", "nullable": true},
+                                    "title": {"type": "string", "nullable": true},
+                                    "author": {"type": "string", "nullable": true},
+                                    "events": {"type": "array", "items": {"type": "object"}}
+                                },
+                                "required": ["session_start", "session_end", "start_position_ms", "end_position_ms"]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Session reported",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "badges_earned": {"type": "array", "items": {"type": "object"}}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"$ref": "#/components/responses/Unauthorized"}
+                }
+            }
+        },
         "/health/ping": {
             "get": {
                 "tags": ["Health"],
@@ -1742,6 +2622,10 @@
                                 "schema": {
                                     "type": "object",
                                     "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "example": "REGISTRATION_PENDING_APPROVAL"
+                                        },
                                         "message": {
                                             "type": "string",
                                             "example": "Account created. Waiting for admin approval."
@@ -1752,6 +2636,7 @@
                                     "successful_registration": {
                                         "summary": "Account created successfully",
                                         "value": {
+                                            "code": "REGISTRATION_PENDING_APPROVAL",
                                             "message": "Account created. Waiting for admin approval."
                                         }
                                     }
@@ -1934,7 +2819,113 @@
                                     "pending_approval": {
                                         "summary": "Account waiting for admin approval",
                                         "value": {
+                                            "code": "ACCOUNT_PENDING_APPROVAL",
                                             "message": "Account pending admin approval"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/check-status": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Check account approval status",
+                "description": "Check if an account is still pending approval or has been verified. Returns 403 if pending, 200 if account is ready for login.",
+                "operationId": "checkStatus",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["email"],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "description": "User's email address"
+                                    }
+                                }
+                            },
+                            "examples": {
+                                "check_status": {
+                                    "summary": "Check account status",
+                                    "value": {
+                                        "email": "john@example.com"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Account is ready for login",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                "examples": {
+                                    "account_ready": {
+                                        "summary": "Account is no longer pending",
+                                        "value": {
+                                            "message": "Please use the login endpoint"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiValidationError"
+                                },
+                                "examples": {
+                                    "missing_email": {
+                                        "summary": "Missing email field",
+                                        "value": {
+                                            "email": [
+                                                "The email field is required."
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Account pending approval",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "pending_approval": {
+                                        "summary": "Account waiting for admin approval",
+                                        "value": {
+                                            "code": "ACCOUNT_PENDING_APPROVAL",
+                                            "message": "Account pending admin approval",
+                                            "status": "unverified"
                                         }
                                     }
                                 }
@@ -2539,7 +3530,8 @@
                                     "pending_approval": {
                                         "summary": "Account awaiting admin approval",
                                         "value": {
-                                            "error": "Account pending admin approval"
+                                            "code": "ACCOUNT_PENDING_APPROVAL",
+                                            "message": "Account pending admin approval"
                                         }
                                     }
                                 }
@@ -2974,54 +3966,26 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Download manifest generated successfully",
+                        "description": "Book download file (ZIP format)",
                         "content": {
-                            "application/json": {
+                            "application/zip": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/DownloadManifest"
-                                },
-                                "examples": {
-                                    "download_manifest": {
-                                        "summary": "Complete download manifest with files",
-                                        "value": {
-                                            "book_id": 1,
-                                            "title": "The Fellowship of the Ring",
-                                            "total_files": 13,
-                                            "total_size": 687194112,
-                                            "files": [
-                                                {
-                                                    "filename": "cover.jpg",
-                                                    "size": 256000,
-                                                    "type": "cover",
-                                                    "download_url": "https://books.thelin.org/api/v1/books/1/download/cover.jpg"
-                                                },
-                                                {
-                                                    "filename": "01 - Chapter 1.mp3",
-                                                    "size": 58720000,
-                                                    "type": "audio",
-                                                    "download_url": "https://books.thelin.org/api/v1/books/1/download/01%20-%20Chapter%201.mp3"
-                                                },
-                                                {
-                                                    "filename": "02 - Chapter 2.mp3",
-                                                    "size": 61440000,
-                                                    "type": "audio",
-                                                    "download_url": "https://books.thelin.org/api/v1/books/1/download/02%20-%20Chapter%202.mp3"
-                                                },
-                                                {
-                                                    "filename": "12 - Epilogue.mp3",
-                                                    "size": 34560000,
-                                                    "type": "audio",
-                                                    "download_url": "https://books.thelin.org/api/v1/books/1/download/12%20-%20Epilogue.mp3"
-                                                }
-                                            ],
-                                            "download_instructions": {
-                                                "order": "Files should be downloaded in the provided order",
-                                                "recommended_start": "Start with cover image, then first audio file",
-                                                "resume": "Use Range headers to resume interrupted downloads"
-                                            },
-                                            "generated_at": "2024-01-15T10:30:00Z"
-                                        }
-                                    }
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "attachment; filename=\"book_123_title.zip\""
+                                }
+                            },
+                            "Content-Length": {
+                                "schema": {
+                                    "type": "integer",
+                                    "description": "Size of the download file in bytes"
                                 }
                             }
                         }

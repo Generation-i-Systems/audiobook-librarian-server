@@ -212,8 +212,8 @@ class FixGeneralFictionBooksCommand extends Command
 
         $parts = [$primaryGenre, $authorPath];
 
-        if ($book->series && method_exists($book->series, 'getAttribute')) {
-            $parts[] = $book->series->name;
+        if ($book->series->isNotEmpty()) {
+            $parts[] = $book->series->first()->name;
         }
 
         $parts[] = $book->title;

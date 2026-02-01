@@ -270,8 +270,6 @@ class FileSystemService
             }
 
             if (is_dir($target)) {
-                @chown($target, 'eric');
-                @chgrp($target, 'audio');
                 @chmod($target, 0775);
             }
         }
@@ -287,8 +285,6 @@ class FileSystemService
                 if (!File::isDirectory($targetSubDir)) {
                     File::makeDirectory($targetSubDir, 0775, true);
                     if (is_dir($targetSubDir)) {
-                        @chown($targetSubDir, 'eric');
-                        @chgrp($targetSubDir, 'audio');
                         @chmod($targetSubDir, 0775);
                     }
                 }
@@ -301,10 +297,6 @@ class FileSystemService
 
                 // Set appropriate permissions and ownership
                 chmod($targetFile, 0664);
-                if (file_exists($targetFile)) {
-                    @chown($targetFile, 'eric');
-                    @chgrp($targetFile, 'audio');
-                }
             }
 
             return true;

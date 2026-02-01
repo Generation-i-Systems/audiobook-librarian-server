@@ -1,13 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class BookRequestApiController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
+
     /**
      * Normalize legacy or incorrect series input to canonical format.
      * Accepts string, array of strings, or old key-value object.
@@ -63,17 +73,38 @@ class BookRequestApiController extends Controller
             'book_id' => 'required',
         ]);
 
-        $userId = Auth::id();
-        $bookRequest = $this->documentStoreService->createBookRequest([
-            'user_id' => $userId,
+        $admins = $this->documentStoreService->getAdminUsers();
+        $adminId = $admins[0]['id'] ?? null;
+
+        if (! is_int($adminId)) {
+            return response()->json(['error' => 'No admin user available'], 500);
+        }
+
+        $senderId = Auth::id();
+
+        if (! is_int($senderId)) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $payload = [
+            'type' => 'book_request',
             'book_id' => $request->input('book_id'),
             'title' => $request->title,
             'author' => $request->author,
             'series' => self::normalizeSeriesInput($request->input('series')),
             'description' => $request->description,
-            'status' => 'pending',
+        ];
+
+        $messageId = $this->documentStoreService->createMessage([
+            'sender_id' => $senderId,
+            'recipient_id' => $adminId,
+            'content' => json_encode($payload),
         ]);
 
-        return response()->json($bookRequest, 201); // 201 Created
+        if (! is_string($messageId) || $messageId === '') {
+            return response()->json(['error' => 'Failed to create book request'], 500);
+        }
+
+        return response()->json(['id' => $messageId], 201);
     }
 }

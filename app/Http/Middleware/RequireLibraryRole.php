@@ -22,6 +22,14 @@ class RequireLibraryRole
         $requestUri = $request->getRequestUri();
         $requestMethod = $request->getMethod();
 
+        Log::error('RequireLibraryRole middleware START', [
+            'uri' => $requestUri,
+            'user_id' => $user->id ?? 'null',
+            'user_email' => $user->email ?? 'null',
+            'user_role' => $user->role ?? 'null_role',
+            'authenticated' => (bool) $user,
+        ]);
+
         // If not logged in or role is not set, block
         if (!$user || !isset($user->role)) {
             Log::warning('Library role access denied: User not authenticated or missing role', [

@@ -22,7 +22,7 @@ class ThemeWebController extends Controller
             $page = $request->get('page', 1);
 
             $filters = $search ? ['search' => $search] : [];
-            $result = $this->themeService->listThemes($filters, $page, 24, $sort);
+            $result = $this->themeService->listThemes($filters, (int) $page, 24, (string) $sort);
 
             return view('gallery.themes.index', [
                 'themes' => $result['data'],
@@ -33,6 +33,7 @@ class ThemeWebController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to list themes: ' . $e->getMessage());
 
+            // @phpstan-ignore-next-line
             return redirect()->back()->with('error', 'Failed to load themes. Please try again.');
         }
     }

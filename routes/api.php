@@ -8,7 +8,6 @@ use App\Http\Controllers\Api\BookApiController;
 use App\Http\Controllers\Api\BookmarkApiController;
 use App\Http\Controllers\Api\BookRequestApiController;
 use App\Http\Controllers\Api\ExternalReadApiController;
-use App\Http\Controllers\Api\FavoriteAuthorController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\ProgressController;
@@ -20,7 +19,10 @@ use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\UserStatusController;
+use App\Http\Controllers\Api\AuthorController;
+use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\BookImportApiController;
+use App\Http\Controllers\Api\AnalyticsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +31,14 @@ Route::prefix('v1')->group(function () {
     Route::get('/health/ping', [ApiHealthController::class, 'ping']);
     Route::get('/health', [ApiHealthController::class, 'health']);
     Route::get('/health/validate', [ApiHealthController::class, 'validateSpec']);
+
+    Route::get('/openapi.json', function () {
+        $path = base_path('docs/openapi.json');
+        if (!file_exists($path)) {
+            return response()->json(['error' => 'OpenAPI spec not found'], 404);
+        }
+        return response()->file($path, ['Content-Type' => 'application/json']);
+    });
 
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
@@ -55,11 +65,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/history', [UserStatusController::class, 'history']);
             Route::get('/goals', [UserStatusController::class, 'goals']);
             Route::post('/{book}/set', [UserStatusController::class, 'set']);
+            Route::post('/non-library/set', [UserStatusController::class, 'setNonLibrary']);
             Route::post('/queue/reorder', [UserStatusController::class, 'reorder']);
+        });
+
+        // Sync Routes
+        Route::prefix('sync')->middleware('idempotency')->group(function () {
+            Route::post('/progress', [\App\Http\Controllers\Api\SyncController::class, 'progress']);
         });
 
         // Book Routes
         Route::get('/books', [BookApiController::class, 'index']);
+        Route::post('/books/batch', [BookApiController::class, 'batch']);
         Route::get('/books/enhanced', [BookApiController::class, 'booksEnhanced']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/download', [BookApiController::class, 'download']);
@@ -79,10 +96,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/series', [BookApiController::class, 'series']);
         // Series Autocomplete
         Route::get('/series/autocomplete', [BookApiController::class, 'autocompleteSeries']);
+        // Toggle Series Favorite
+        Route::post('/series/{series}/favorite', [SeriesController::class, 'toggleFavorite']);
+
         // Authors Route - with genre filtering and pagination
         Route::get('/authors', [BookApiController::class, 'authors']);
         // Author Autocomplete
         Route::get('/authors/autocomplete', [BookApiController::class, 'autocompleteAuthors']);
+        // Toggle Author Favorite
+        Route::post('/authors/{author}/favorite', [AuthorController::class, 'toggleFavorite']);
         // Narrator Autocomplete
         Route::get('/narrators/autocomplete', [BookApiController::class, 'autocompleteNarrators']);
 
@@ -125,11 +147,9 @@ Route::prefix('v1')->group(function () {
 
         // External/Previously Read Routes
         Route::get('/books/{book}/external-reads', [ExternalReadApiController::class, 'getExternalReads']);
+        Route::post('/external-reads', [ExternalReadApiController::class, 'createExternalReadNonLibrary']);
         Route::post('/books/{book}/external-reads', [ExternalReadApiController::class, 'createExternalRead']);
-        Route::get('/books/{book}/external-reads/{externalRead}', [
-            ExternalReadApiController::class,
-            'getExternalRead',
-        ]);
+        Route::get('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'getExternalRead']);
         Route::put('/books/{book}/external-reads/{externalRead}', [
             ExternalReadApiController::class,
             'updateExternalRead',
@@ -154,7 +174,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/progress/device', [ProgressController::class, 'getDeviceProgress']);
         Route::get('/progress', [ProgressController::class, 'getAllProgress']);
         Route::get('/progress/{book}', [ProgressController::class, 'getBookProgress']);
-        Route::put('/progress/{book}', [ProgressController::class, 'updateBookProgress']);
+        Route::put('/progress/{book}', [ProgressController::class, 'updateBookProgress'])->middleware('idempotency');
 
         // Book Progress Routes (cross-device listening continuity) - legacy routes
         Route::get('/books/{book}/progress', [ProgressController::class, 'getProgress']);
@@ -197,14 +217,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/leaderboard', [BadgeController::class, 'leaderboard']);
         });
 
-        // Favorite Authors routes
-        Route::get('/favorites/new-books', [FavoriteAuthorController::class, 'getNewBooks']);
-        Route::get('/favorites', [FavoriteAuthorController::class, 'index'])->name('api.favorites.index');
-        Route::post('/favorites', [FavoriteAuthorController::class, 'store'])->name('api.favorites.store');
-        Route::get('/favorites/{favorite}', [FavoriteAuthorController::class, 'show'])->name('api.favorites.show');
-        Route::put('/favorites/{favorite}', [FavoriteAuthorController::class, 'update'])->name('api.favorites.update');
-        Route::delete('/favorites/{favorite}', [FavoriteAuthorController::class, 'destroy'])
-            ->name('api.favorites.destroy');
+
+
+        // Analytics Routes
+        Route::post('/analytics/event', [AnalyticsController::class, 'recordEvent']);
 
         // Skin Routes (authenticated)
         Route::post('/skins/upload', [SkinController::class, 'store']);
@@ -222,8 +238,10 @@ Route::prefix('v1')->group(function () {
         Route::patch('/themes/{id}', [ThemeController::class, 'update']);
         Route::delete('/themes/{id}', [ThemeController::class, 'destroy']);
 
-        // Message Route
+        // Message Routes
+        Route::get('/messages', [MessageApiController::class, 'index']);
         Route::post('/messages', [MessageApiController::class, 'store']);
+        Route::post('/messages/{id}/acknowledge', [MessageApiController::class, 'acknowledge']);
 
         // Import Support Routes (for NativePHP desktop app)
         Route::prefix('imports')->group(function () {
@@ -249,6 +267,7 @@ Route::prefix('v1')->group(function () {
     // Authentication Routes (outside the auth:sanctum middleware)
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/check-status', [AuthController::class, 'checkStatus']);
     Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
     Route::post('/auth/google', [AuthController::class, 'googleLogin']);
@@ -257,6 +276,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/check-status', [AuthController::class, 'checkStatus']);
         Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
         Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
         Route::post('/google', [AuthController::class, 'googleLogin']);

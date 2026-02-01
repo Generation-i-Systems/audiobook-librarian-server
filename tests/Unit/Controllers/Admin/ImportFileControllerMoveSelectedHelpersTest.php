@@ -4,6 +4,7 @@ namespace Tests\Unit\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Admin\ImportFileController;
+use App\Services\BookImportService;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -12,7 +13,10 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function normalizeSourcePathForMoveSelectedUnwrapsSingleRootDirectory(): void
     {
-        $controller = new ImportFileControllerMoveSelectedHelpersTestDouble($this->createMock(DocumentStoreServiceInterface::class));
+        $controller = new ImportFileControllerMoveSelectedHelpersTestDouble(
+            $this->createMock(DocumentStoreServiceInterface::class),
+            $this->createMock(BookImportService::class)
+        );
 
         File::shouldReceive('isDirectory')->with('/src')->andReturn(true);
         File::shouldReceive('files')->with('/src')->andReturn([]);
@@ -29,7 +33,10 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function moveDirectoryContentsToTargetMovesFilesIntoDestWithoutNesting(): void
     {
-        $controller = new ImportFileControllerMoveSelectedHelpersTestDouble($this->createMock(DocumentStoreServiceInterface::class));
+        $controller = new ImportFileControllerMoveSelectedHelpersTestDouble(
+            $this->createMock(DocumentStoreServiceInterface::class),
+            $this->createMock(BookImportService::class)
+        );
 
         $file1 = new class () {
             public function getPathname(): string
@@ -61,8 +68,6 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
         File::shouldReceive('deleteDirectory')->with('/src');
 
         $controller->exposeMoveDirectoryContentsToTarget('/src', '/dest');
-
-        $this->assertTrue(true);
     }
 }
 

@@ -26,7 +26,7 @@ class StatisticsController extends Controller
         ]);
 
         $period = $validated['period'] ?? 'month';
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         // Calculate date ranges based on period
         switch ($period) {
@@ -95,7 +95,7 @@ class StatisticsController extends Controller
             'limit' => 'nullable|integer|min:1|max:365',
         ]);
 
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         $startDate = ($validated['start_date'] ?? null) ? Carbon::parse($validated['start_date']) : now()->subDays(29);
         $endDate = ($validated['end_date'] ?? null) ? Carbon::parse($validated['end_date']) : now();
@@ -119,6 +119,7 @@ class StatisticsController extends Controller
                 ->get();
 
             // Get book IDs separately for each date
+            /** @var \Illuminate\Support\Collection<int, object> $rawStats */
             $dailyStats = $rawStats->map(function ($stat) use ($userId) {
                 /** @var \stdClass $stat */
                 $bookIds = ListeningStatistic::where('device_id', $userId)
@@ -166,30 +167,36 @@ class StatisticsController extends Controller
     public function reportSession(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'book_id' => 'required|integer|exists:books,id',
+            'book_id' => 'nullable|integer|exists:books,id',
+            'title' => 'required_without:book_id|string|max:255',
+            'author' => 'required_without:book_id|string|max:255',
             'session_start' => 'required|date_format:Y-m-d\TH:i:s\Z',
             'session_end' => 'required|date_format:Y-m-d\TH:i:s\Z|after:session_start',
             'start_position_ms' => 'required|integer|min:0',
             'end_position_ms' => 'required|integer|min:0',
             'playback_speed' => 'nullable|numeric|min:0.1|max:5.0',
             'pauses_count' => 'nullable|integer|min:0',
+            'actual_duration_ms' => 'nullable|integer|min:0', // Now nullable
+            'events' => 'nullable|array', // Now nullable
+            'events.*.timestamp' => 'required|integer',
+            'events.*.type' => 'required|string',
+            'events.*.position_ms' => 'required|integer|min:0',
+            'events.*.metadata' => 'nullable|array',
         ]);
 
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         $sessionStart = Carbon::parse($validated['session_start']);
         $sessionEnd = Carbon::parse($validated['session_end']);
         $sessionDuration = $sessionEnd->diffInSeconds($sessionStart);
 
-        // Calculate actual listening time based on position change and playback speed
-        $positionChange = ($validated['end_position_ms'] - $validated['start_position_ms']) / 1000;
+        $secondsListened = (int) floor($validated['end_position_ms'] / 1000);
         $playbackSpeed = $validated['playback_speed'] ?? 1.0;
-        $actualListeningTime = min($sessionDuration, $positionChange / $playbackSpeed);
 
         $statistic = ListeningStatistic::createSession(
-            $validated['book_id'],
+            $validated['book_id'] ?? null,
             $userId,
-            (int) $actualListeningTime,
+            $secondsListened,
             (int) ($validated['start_position_ms'] / 1000),
             (int) ($validated['end_position_ms'] / 1000),
             'listening',
@@ -199,9 +206,12 @@ class StatisticsController extends Controller
                 'playback_speed' => $playbackSpeed,
                 'pauses_count' => $validated['pauses_count'] ?? 0,
             ],
-            auth('api')->id()
+            Auth::id(),
+            $validated['actual_duration_ms'],
+            $validated['events'] ?? [],
+            $validated['title'] ?? null,
+            $validated['author'] ?? null
         );
-
         // Check for badge achievements after recording the session
         try {
             $badgeService = app(\App\Services\BadgeService::class);
@@ -251,7 +261,9 @@ class StatisticsController extends Controller
     {
         try {
             $validated = $request->validate([
-                'book_id' => 'required|integer|exists:books,id',
+                'book_id' => 'nullable|integer|exists:books,id',
+                'title' => 'required_without:book_id|string|max:255',
+                'author' => 'required_without:book_id|string|max:255',
                 'device_id' => 'required|string|max:255',
                 'seconds_listened' => 'required|integer|min:1',
                 'start_position_seconds' => 'nullable|integer|min:0',
@@ -269,14 +281,18 @@ class StatisticsController extends Controller
         }
 
         $statistic = ListeningStatistic::createSession(
-            $validated['book_id'],
+            $validated['book_id'] ?? null,
             $validated['device_id'],
             $validated['seconds_listened'],
             $validated['start_position_seconds'] ?? null,
             $validated['end_position_seconds'] ?? null,
             $validated['session_type'] ?? 'listening',
             $validated['metadata'] ?? [],
-            $validated['user_id'] ?? null
+            $validated['user_id'] ?? null,
+            0,
+            [],
+            $validated['title'] ?? null,
+            $validated['author'] ?? null
         );
 
         // Check for badge achievements after recording the session
@@ -401,8 +417,8 @@ class StatisticsController extends Controller
                 'total_seconds' => $weeklyTotal,
                 'total_books' => $totalBooks,
                 'formatted_total_duration' => $this->formatSeconds((int) $weeklyTotal),
-                'daily_breakdown' => $stats->map(function ($stat) {
-                    /** @var \stdClass $stat */
+                'daily_breakdown' => $stats->map(function (object $stat) {
+                    /** @var \stdClass&object{listening_date: string, total_seconds: int|float, books_listened: int, session_count: int} $stat */
                     return [
                         'date' => $stat->listening_date,
                         'total_seconds' => $stat->total_seconds,
@@ -571,8 +587,9 @@ class StatisticsController extends Controller
 
         return response()->json([
             'success' => true,
+            // @phpstan-ignore-next-line
             'data' => $topBooks->map(function ($stat) {
-                /** @var \App\Models\ListeningStatistic&object{book_id: int, total_seconds: int|float, session_count: int, days_listened: int, first_listened: string, last_listened: string} $stat */
+                /** @var \App\Models\ListeningStatistic $stat */
                 return [
                     'book_id' => $stat->book_id,
                     'book' => [
@@ -580,11 +597,17 @@ class StatisticsController extends Controller
                         'title' => $stat->book->title,
                         'cover_image' => $stat->book->cover_image,
                     ],
+                    // @phpstan-ignore-next-line
                     'total_seconds' => (int) $stat->total_seconds,
+                    // @phpstan-ignore-next-line
                     'session_count' => $stat->session_count,
+                    // @phpstan-ignore-next-line
                     'days_listened' => $stat->days_listened,
+                    // @phpstan-ignore-next-line
                     'first_listened' => $stat->first_listened,
+                    // @phpstan-ignore-next-line
                     'last_listened' => $stat->last_listened,
+                    // @phpstan-ignore-next-line
                     'formatted_duration' => $this->formatSeconds((int) $stat->total_seconds),
                 ];
             })
@@ -597,7 +620,7 @@ class StatisticsController extends Controller
     public function getDashboardStats(Request $request): JsonResponse
     {
         $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         if (!$deviceId && !$userId) {
             return response()->json(['message' => 'device_id or authentication required.'], 400);
@@ -708,6 +731,8 @@ class StatisticsController extends Controller
         return response()->json($stats);
     }
 
+
+
     /**
      * Calculate current listening streak
      */
@@ -809,8 +834,8 @@ class StatisticsController extends Controller
         ->toBase()
         ->get();
 
-        return $stats->map(function ($stat) {
-            /** @var \stdClass $stat */
+        return $stats->map(function (object $stat) {
+            /** @var \stdClass&object{date: string, listening_time_ms: int|float, sessions_count: int, books_listened: string} $stat */
             return [
                 'date' => (string)($stat->date ?? ''),
                 'listening_time_ms' => (int) ($stat->listening_time_ms ?? 0),

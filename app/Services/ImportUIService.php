@@ -119,13 +119,13 @@ class ImportUIService implements ImportUIInterface
 
         $linesNeeded = max(3, count($this->promptLines));
 
-        return min($linesNeeded, $this->promptHeight, $max);
+        return min($linesNeeded, $this->promptHeight + 3, $max);
     }
 
     protected function getFooterSeparatorY(): int
     {
-        // One separator line above prompt area + input line
-        return $this->height - ($this->getPromptHeight() + 2);
+        // One separator line above prompt area
+        return $this->height - ($this->getPromptHeight() + 1);
     }
 
     public function initialize(int $width, int $height): void

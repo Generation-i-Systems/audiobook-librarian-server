@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\AIBookProcessor;
+use App\Services\BookImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -16,10 +17,14 @@ class ImportFileController extends Controller
 {
     use IsolatesErrorHandlers;
     protected DocumentStoreServiceInterface $documentStoreService;
+    protected BookImportService $bookImportService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        BookImportService $bookImportService
+    ) {
         $this->documentStoreService = $documentStoreService;
+        $this->bookImportService = $bookImportService;
     }
 
     /**
@@ -421,6 +426,10 @@ class ImportFileController extends Controller
                 $details = 'The system does not have permission to read the selected file or directory.';
             }
 
+            if ($request->input('redirectToForm', false)) {
+                return redirect()->back()->with('error', $userMessage . ': ' . $details);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => $userMessage,
@@ -429,6 +438,7 @@ class ImportFileController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Extract metadata from a file or directory using AI enhancement and redirect to import form.
@@ -652,7 +662,7 @@ class ImportFileController extends Controller
         $parts = [];
         foreach (['genre', 'author', 'series', 'seriesNumber', 'title'] as $key) {
             if (!empty($meta[$key])) {
-                $parts[] = preg_replace('/[\\\/]/', '-', trim($meta[$key]));
+                $parts[] = preg_replace('~[\\\\/]~', '-', trim($meta[$key]));
             }
         }
 
@@ -675,7 +685,8 @@ class ImportFileController extends Controller
         }
 
         if ($meta['author']) {
-            $parts[] = $meta['author'];
+            // Normalize author for directory (no spaces between initials)
+            $parts[] = $this->bookImportService->normalizeAuthorNameForDirectory($meta['author']);
         }
         if ($meta['seriesName'] ?? $meta['series'] ?? null) {
             $parts[] = $meta['seriesName'] ?? $meta['series'];
@@ -716,7 +727,7 @@ class ImportFileController extends Controller
     {
         $libraryRoot = rtrim((string) config('app.book_root', ''), '/');
         if ($libraryRoot === '') {
-            $libraryRoot = rtrim((string) env('BOOK_STORAGE_PATH', ''), '/');
+            $libraryRoot = rtrim((string) (config('filesystems.disks.books.root') ?? config('app.book_root')), '/');
         }
         if (!is_dir($libraryRoot)) {
             Log::warning('[ImportFile] Library root directory not found', [
@@ -810,7 +821,7 @@ class ImportFileController extends Controller
             if (count($topGenres) > 1) {
                 // Rule 3: Use the one with the most books
                 $mostBooks = 0;
-                $bestGenre = $topGenres[0] ?? null;
+                $bestGenre = $topGenres[0];
 
                 foreach ($topGenres as $genre) {
                     if ($genreBookCounts[$genre] > $mostBooks) {
@@ -1506,7 +1517,7 @@ class ImportFileController extends Controller
             // Get the book storage root
             $bookStorageRoot = rtrim((string) config('app.book_root', ''), '/');
             if ($bookStorageRoot === '') {
-                $bookStorageRoot = rtrim((string) env('BOOK_STORAGE_PATH', ''), '/');
+                $bookStorageRoot = rtrim((string) (config('filesystems.disks.books.root') ?? config('app.book_root')), '/');
             }
             if (!$bookStorageRoot || !is_dir($bookStorageRoot)) {
                 Log::error('[ImportFile] Book storage path not found or invalid', [
@@ -1627,9 +1638,9 @@ class ImportFileController extends Controller
 
 
     /**
-     * Move the selected file or directory to the composed directoryPath under the import destination root.
+     * Move selected files/directories to a target directory.
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
      */
     public function moveSelected(Request $request)
     {
@@ -1663,7 +1674,7 @@ class ImportFileController extends Controller
 
         $destRoot = (string) config('app.book_root', '');
         if ($destRoot === '') {
-            $destRoot = (string) env('BOOK_STORAGE_PATH', '');
+            $destRoot = (string) (config('filesystems.disks.books.root') ?? config('app.book_root'));
         }
         if ($destRoot === '') {
             $destRoot = (string) Config::get('audiobooks.root', '');
@@ -1766,9 +1777,7 @@ class ImportFileController extends Controller
             }
             $relativePath = ltrim($relativePath, '/');
             if ($relativePath === '') {
-                $relativePath = method_exists($file, 'getFilename')
-                    ? $file->getFilename()
-                    : basename($sourceFilePath);
+                $relativePath = $file->getFilename();
             }
             $targetFile = rtrim($destDir, '/') . '/' . $relativePath;
             $targetDirPath = dirname($targetFile);
@@ -1787,7 +1796,7 @@ class ImportFileController extends Controller
                 $counter = 1;
                 while (true) {
                     $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
-                    $candidate = ($pathInfo['dirname'] ?? '') . '/' . ($pathInfo['filename'] ?? 'file') . $suffix;
+                    $candidate = $pathInfo['dirname'] . '/' . $pathInfo['filename'] . $suffix;
                     if (!empty($pathInfo['extension'])) {
                         $candidate .= '.' . $pathInfo['extension'];
                     }
@@ -1950,7 +1959,9 @@ class ImportFileController extends Controller
         if (!empty($meta['author'])) {
             $authors = is_array($meta['author']) ? $meta['author'] : [$meta['author']];
             foreach ($authors as $index => $author) {
-                $formData["author[{$index}]"] = trim($author);
+                // Normalize for DB (ensure spaces between initials)
+                $normalizedAuthor = $this->bookImportService->normalizeAuthorName($author);
+                $formData["author[{$index}]"] = trim($normalizedAuthor);
             }
         }
 

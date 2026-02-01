@@ -54,7 +54,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
         ]);
         echo '[DIRECTORY_IMPORT] Starting import for directory: ' . $this->dir . "\n";
 
-        $storagePath = env('BOOK_STORAGE_PATH');
+        $storagePath = config('filesystems.disks.books.root') ?? config('app.book_root');
         if (empty($storagePath)) {
             $error = 'BOOK_STORAGE_PATH is not set in environment';
             Log::error('[DIRECTORY_IMPORT] ' . $error);

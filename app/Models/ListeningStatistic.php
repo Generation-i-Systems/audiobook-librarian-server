@@ -8,7 +8,9 @@ use App\Traits\CamelCaseAttributeAccess;
 
 /**
  * @property int $id
- * @property int $book_id
+ * @property int|null $book_id
+ * @property string|null $title
+ * @property string|null $author
  * @property int|null $user_id
  * @property string $device_id
  * @property \Illuminate\Support\Carbon $listening_date
@@ -21,8 +23,12 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property array|null $metadata
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $first_session
+ * @property \Illuminate\Support\Carbon|null $last_session
+ * @property \Illuminate\Support\Carbon|null $first_listened
+ * @property \Illuminate\Support\Carbon|null $last_listened
  * @mixin \Illuminate\Database\Eloquent\Builder
- * @property-read \App\Models\Book $book
+ * @property-read \App\Models\Book|null $book
  * @property-read string $formatted_duration
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic newQuery()
@@ -41,7 +47,7 @@ use App\Traits\CamelCaseAttributeAccess;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereStartPositionSeconds($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereUserId($value)
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 class ListeningStatistic extends Model
 {
@@ -49,6 +55,8 @@ class ListeningStatistic extends Model
 
     protected $fillable = [
         'book_id',
+        'title',
+        'author',
         'user_id',
         'device_id',
         'listening_date',
@@ -59,6 +67,9 @@ class ListeningStatistic extends Model
         'end_position_seconds',
         'session_type',
         'metadata',
+        'actual_duration_ms',
+        'events',
+
     ];
 
     protected $casts = [
@@ -69,6 +80,9 @@ class ListeningStatistic extends Model
         'start_position_seconds' => 'integer',
         'end_position_seconds' => 'integer',
         'metadata' => 'array',
+        'actual_duration_ms' => 'integer',
+        'events' => 'array',
+
     ];
 
     public function book(): BelongsTo
@@ -95,20 +109,28 @@ class ListeningStatistic extends Model
 
     /**
      * Create a new listening session
+     *
+     * @param array<int, array<string, mixed>> $events
      */
     public static function createSession(
-        int $bookId,
+        ?int $bookId,
         string $deviceId,
         int $secondsListened,
         ?int $startPosition = null,
         ?int $endPosition = null,
         string $sessionType = 'listening',
         array $metadata = [],
-        ?string $userId = null
+        ?string $userId = null,
+        int $actualDurationMs = 0,
+        array $events = [],
+        ?string $title = null,
+        ?string $author = null
     ): self {
         /** @var self $session */
         $session = self::create([
             'book_id' => $bookId,
+            'title' => $title,
+            'author' => $author,
             'user_id' => $userId,
             'device_id' => $deviceId,
             'listening_date' => now()->toDateString(),
@@ -119,6 +141,8 @@ class ListeningStatistic extends Model
             'end_position_seconds' => $endPosition,
             'session_type' => $sessionType,
             'metadata' => $metadata,
+            'actual_duration_ms' => $actualDurationMs,
+            'events' => $events,
         ]);
 
         return $session;

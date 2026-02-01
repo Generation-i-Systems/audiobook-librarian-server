@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
  * @property string $name
  * @property string $description
  * @property string|null $icon
+ * @property string|null $icon_path
  * @property string|null $image_url
  * @property string $category
  * @property string $tier
@@ -147,6 +148,12 @@ class Badge extends Model
         'indie_discovery' => 'Independent/self-published books found',
         'first_time_author' => 'Debut author books completed',
         'community_engagement' => 'Community interactions and contributions',
+        'listening_time_weekly' => 'Listening time in a single week (seconds)',
+        'listening_time_monthly' => 'Listening time in a single month (seconds)',
+        'current_streak' => 'Current listening streak (days)',
+        'books_completed_this_week' => 'Books completed in the current week',
+        'books_completed_this_month' => 'Books completed in the current month',
+        'total_listening_days' => 'Total number of days with listening activity',
     ];
 
     /**

@@ -45,7 +45,7 @@
 
                 <script>
                     $(document).ready(function () {
-                        var storagePath = "{{ env('BOOK_STORAGE_PATH') }}";
+                        var storagePath = "{{ config('app.book_root') }}";
 
                         function escapeHtml(text) {
                             var map = {

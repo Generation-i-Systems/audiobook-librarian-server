@@ -19,6 +19,49 @@
         return div.innerHTML;
     }
 
+    /**
+     * Normalize author name for both database and directory (unspaced initials)
+     * e.g., "J. R. R. Tolkien" -> "J.R.R. Tolkien"
+     */
+    function normalizeAuthorName(name) {
+        if (!name) return "";
+        let normalized = name.trim();
+
+        // Ensure period after single initials
+        normalized = normalized.replace(/\b([A-Z])\s+/, "$1. ");
+        normalized = normalized.replace(/\s+([A-Z])$/, " $1.");
+
+        // Remove spaces between initials
+        // "J. R. R." -> "J.R.R."
+        normalized = normalized.replace(/\b([A-Z]\.)\s+([A-Z]\.)/g, "$1$2");
+        normalized = normalized.replace(/\b([A-Z]\.)\s+([A-Z]\.)/g, "$1$2");
+
+        return normalized.trim();
+    }
+
+    /**
+     * @deprecated Use normalizeAuthorName - now unified
+     */
+    function normalizeAuthorNameForDirectory(name) {
+        return normalizeAuthorName(name);
+    }
+
+    /**
+     * Normalize author name for directory (NO spaces between initials)
+     * e.g., "J. R. R. Tolkien" -> "J.R.R. Tolkien"
+     */
+    function normalizeAuthorNameForDirectory(name) {
+        if (!name) return "";
+        let normalized = normalizeAuthorName(name); // First ensure it's clean
+
+        // Remove spaces between initials
+        // "J. R. R." -> "J.R.R."
+        normalized = normalized.replace(/\b([A-Z]\.)\s+([A-Z]\.)/g, "$1$2");
+        normalized = normalized.replace(/\b([A-Z]\.)\s+([A-Z]\.)/g, "$1$2");
+
+        return normalized.trim();
+    }
+
     function clearAuthorRow(row) {
         const input = row.querySelector('input[name="author[]"]');
         if (input) {
@@ -294,6 +337,8 @@
     }
 
     bookForm.escapeHtml = escapeHtml;
+    bookForm.normalizeAuthorName = normalizeAuthorName;
+    bookForm.normalizeAuthorNameForDirectory = normalizeAuthorNameForDirectory;
     bookForm.clearAuthorRow = clearAuthorRow;
     bookForm.clearNarratorRow = clearNarratorRow;
     bookForm.clearSeriesRow = clearSeriesRow;

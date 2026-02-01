@@ -53,6 +53,47 @@ class BookImportService
         $this->config = $config;
     }
 
+    public function getAllBooks(bool $processAll = false): array
+    {
+        $query = Book::with(['authors', 'narrators', 'genres', 'series', 'publisher']);
+
+        if (!$processAll) {
+            $query->where(function ($q) {
+                $q->whereNull('last_library_json_update')
+                    ->orWhereNull('directory_path');
+            });
+        }
+
+        return $query->get()->map(static function (Book $book): array {
+            return $book->toArray();
+        })->toArray();
+    }
+
+    public function previewLibraryJson(array $book): array
+    {
+        return $this->prepareBookDataForJson($book);
+    }
+
+    public function generateLibraryJson(array $book, bool $dryRun = false): bool
+    {
+        if ($dryRun) {
+            return true;
+        }
+
+        return $this->updateLibraryJson($book);
+    }
+
+    public function resolveBookDirectoryPath(array $book): ?string
+    {
+        $relativePath = $book['directory_path'] ?? $book['directoryPath'] ?? null;
+
+        if (!is_string($relativePath) || $relativePath === '') {
+            return null;
+        }
+
+        return (string) \Illuminate\Support\Facades\Storage::disk('books')->path($relativePath);
+    }
+
     /**
      * Look up book metadata from OpenAudible books.json if available
      *
@@ -1614,7 +1655,8 @@ class BookImportService
     }
 
     /**
-     * Normalize author names for directory use
+     * Normalize author names for both database and directory use (unspaced initials)
+     * e.g., "J.R.R. Tolkien"
      *
      * CRITICAL: Author will NEVER contain "Graphic" AND "Audio" - this is always invalid
      */
@@ -1638,9 +1680,12 @@ class BookImportService
             return '';
         }
 
-        // Normalize initials
+        // Normalize initials (Ensure period and remove spaces between them)
+        // e.g. "J R R Tolkien" -> "J. R. R. Tolkien" -> "J.R.R. Tolkien"
         $name = preg_replace('/\b([A-Z])\s+/', '$1. ', $name);
         $name = preg_replace('/\s+([A-Z])$/', ' $1.', $name);
+
+        // Remove spaces between initials
         $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
         $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
 
@@ -1648,11 +1693,19 @@ class BookImportService
     }
 
     /**
+     * @deprecated Use normalizeAuthorName - now unified for both DB and Directory
+     */
+    public function normalizeAuthorNameForDirectory(string $authorName): string
+    {
+        return $this->normalizeAuthorName($authorName);
+    }
+
+    /**
      * Find existing cover image in directory
      */
     protected function findExistingCover(string $directoryPath): ?string
     {
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         $fullPath = $bookRoot . '/' . $directoryPath;
 
         if (!is_dir($fullPath)) {
@@ -1688,7 +1741,7 @@ class BookImportService
     {
         try {
             // CRITICAL: directoryPath is RELATIVE - convert to absolute
-            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            $bookRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
             $absoluteDir = $bookRoot . '/' . ltrim($directoryPath, '/');
 
             // Create directory if it doesn't exist
@@ -1729,8 +1782,8 @@ class BookImportService
             return null;
         }
 
-        // CRITICAL: Use the correct book storage path, not storage_path('app')
-        $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        // CRITICAL: Use the correct book storage path, prioritizing filesystems config
+        $bookStoragePath = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         $targetDirectory = $bookStoragePath . '/' . ltrim($directoryPath, '/');
 
         if (!File::exists($targetDirectory)) {
@@ -1795,28 +1848,32 @@ class BookImportService
             return null;
         }
 
-        $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+        $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
         if (!$bookStoragePath || !File::isDirectory($bookStoragePath)) {
             return null;
         }
 
+        // Unified normalization (unspaced initials: J.R.R. Tolkien)
         $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
 
         $authorCombinations = [];
-
+        $authorCombinations[] = implode(' & ', $normalizedAuthors);
         if (count($normalizedAuthors) > 1) {
-            $authorCombinations[] = $normalizedAuthors;
-            $authorCombinations[] = array_reverse($normalizedAuthors);
-
-            if (count($normalizedAuthors) >= 3) {
-                $authorCombinations[] = [$normalizedAuthors[0], $normalizedAuthors[1]];
-                $authorCombinations[] = [$normalizedAuthors[1], $normalizedAuthors[0]];
-            }
+            $authorCombinations[] = implode(' & ', array_reverse($normalizedAuthors));
         }
 
-        if (count($normalizedAuthors) === 1) {
-            $authorCombinations[] = $normalizedAuthors;
+        // For backward compatibility, also check the version with spaces
+        $spacedAuthors = array_map(function ($name) {
+            $name = $this->normalizeAuthorName($name);
+            return preg_replace('/\b([A-Z]\.)([A-Z]\.)/', '$1 $2', $name);
+        }, $authors);
+
+        $authorCombinations[] = implode(' & ', $spacedAuthors);
+        if (count($spacedAuthors) > 1) {
+            $authorCombinations[] = implode(' & ', array_reverse($spacedAuthors));
         }
+
+        $authorCombinations = array_unique($authorCombinations);
 
         try {
             // Only scan 2 levels deep: [genre]/[author]
@@ -1829,9 +1886,7 @@ class BookImportService
                 foreach ($authorDirs as $authorDir) {
                     $authorDirName = basename($authorDir);
 
-                    foreach ($authorCombinations as $combination) {
-                        $expectedDirName = $this->formatAuthorsForDirectory($combination);
-
+                    foreach ($authorCombinations as $expectedDirName) {
                         if ($authorDirName === $expectedDirName) {
                             // If series name is specified, check if this author has that series
                             if ($seriesName) {
@@ -3827,118 +3882,175 @@ class BookImportService
     /**
      * Edit metadata fields interactively
      */
-    public function editMetadataFields(array $metadata, array $audiobook, callable $askInlineCallback, callable $selectWithImmediateInterruptCallback, callable $getFirstNonEmptyMetadataValueCallback, callable $extractSeriesNumberFromTitleCallback, callable $getValidGenresCallback): array
-    {
-        $currentTitle = $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']);
-        $defaultTitle = is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? '');
-        $newTitle = $askInlineCallback('Title', $defaultTitle);
-        $trimmedTitle = trim($newTitle);
-        if ($trimmedTitle === '') {
-            unset($metadata['title']);
-        } else {
-            $metadata['title'] = $newTitle;
-        }
+    public function editMetadataFields(
+        array $metadata,
+        array $audiobook,
+        callable $askInlineCallback,
+        callable $selectWithImmediateInterruptCallback,
+        callable $getFirstNonEmptyMetadataValueCallback,
+        callable $extractSeriesNumberFromTitleCallback,
+        callable $getValidGenresCallback,
+        callable $uiServiceLogCallback,
+        callable $buildUiMetadataCallback,
+        bool $forceSequential = false
+    ): array {
+        if ($forceSequential) {
+            $currentTitle = $metadata['title'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']) ?? '';
+            $metadata['title'] = $askInlineCallback('Title', (string) $currentTitle);
 
-        $currentAuthor = $getFirstNonEmptyMetadataValueCallback($metadata, ['author', 'authors', 'authorName', 'author_name']);
-        if (is_array($currentAuthor)) {
-            $currentAuthor = implode(', ', $currentAuthor);
-        }
-        $newAuthor = $askInlineCallback("Author(s) (comma-separated)", $currentAuthor);
-        $trimmedAuthor = trim($newAuthor);
-        if ($trimmedAuthor === '') {
-            unset($metadata['author']);
-        } else {
+            $currentAuthor = $metadata['author'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['author', 'authors', 'authorName', 'author_name']) ?? '';
+            $displayAuthor = is_array($currentAuthor) ? implode(', ', $currentAuthor) : $currentAuthor;
+            $newAuthor = $askInlineCallback('Author(s) (comma-separated)', (string) $displayAuthor);
             $metadata['author'] = array_map('trim', explode(',', $newAuthor));
-        }
 
-        $currentNarrator = $getFirstNonEmptyMetadataValueCallback($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']);
-        if (is_array($currentNarrator)) {
-            $currentNarrator = implode(', ', $currentNarrator);
-        }
-        $defaultNarrator = is_string($currentNarrator) ? $currentNarrator : '';
-        $newNarrator = $askInlineCallback('Narrator(s) (comma-separated)', $defaultNarrator);
-        $trimmedNarrator = trim($newNarrator);
-        if ($trimmedNarrator === '') {
-            unset($metadata['narrator']);
-        } else {
+            $currentNarrator = $metadata['narrator'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']) ?? '';
+            $displayNarrator = is_array($currentNarrator) ? implode(', ', $currentNarrator) : $currentNarrator;
+            $newNarrator = $askInlineCallback('Narrator(s) (comma-separated)', (string) $displayNarrator);
             $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
-        }
 
-        $currentSeries = $getFirstNonEmptyMetadataValueCallback($metadata, ['series', 'seriesName', 'series_name']);
-        $defaultSeries = is_string($currentSeries) ? $currentSeries : '';
-        $newSeries = $askInlineCallback('Series', $defaultSeries);
-        $trimmedSeries = trim($newSeries);
-        if ($trimmedSeries === '') {
-            unset($metadata['series']);
-            $metadata['series_number'] = '';
-        } else {
-            $metadata['series'] = $newSeries;
-
+            $currentSeries = $metadata['series'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['series', 'seriesName', 'series_name']) ?? '';
+            $metadata['series'] = $askInlineCallback('Series', (string) $currentSeries);
             if (!empty($metadata['series'])) {
-                $currentSeriesNumber = $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
-                $defaultSeriesNumber = is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : '';
-                $newSeriesNumber = $askInlineCallback(
-                    'Series Number',
-                    $defaultSeriesNumber
-                );
-                $trimmedSeriesNumber = trim($newSeriesNumber);
-                if ($trimmedSeriesNumber === '') {
-                    unset($metadata['series_number']);
-                } else {
-                    $metadata['series_number'] = $newSeriesNumber;
-                }
+                $currentSeriesNumber = $metadata['series_number'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']) ?? '';
+                $metadata['series_number'] = $askInlineCallback('Series Number', (string) $currentSeriesNumber);
             } else {
+                unset($metadata['series']);
                 $metadata['series_number'] = '';
             }
+
+            $currentYear = $metadata['year'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['year', 'publishedYear', 'published_year', 'published_date']) ?? '';
+            if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
+                $currentYear = substr($currentYear, 0, 4);
+            }
+            $metadata['year'] = $askInlineCallback('Year', (string) $currentYear);
+
+            $validGenres = $getValidGenresCallback();
+            $genreOptions = [];
+            foreach ($validGenres as $idx => $g) {
+                $genreOptions[(string) ($idx + 1)] = $g;
+            }
+            $currentGenre = $metadata['genre'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
+            $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
+            $currentGenreIdx = array_search($displayGenre, $validGenres, true);
+            $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
+            $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
+            $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
+            if (is_array($metadata['genre'] ?? null)) {
+                $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
+                $metadata['genre'] = array_values(array_merge([$newGenre], $others));
+            } else {
+                $metadata['genre'] = $newGenre;
+            }
+
+            $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
+            if ($currentDirectory === '') {
+                $currentDirectory = $this->generateDirectoryPath($metadata, [
+                    'include_title' => true,
+                ]);
+            }
+            $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
+
+            $extractSeriesNumberFromTitleCallback($metadata);
+            $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+
+            return $metadata;
         }
 
-        $currentYear = $getFirstNonEmptyMetadataValueCallback($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
-        if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
-            $currentYear = substr($currentYear, 0, 4);
+        while (true) {
+            $currentTitle = $metadata['title'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']) ?? '';
+            $currentAuthor = $metadata['author'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['author', 'authors', 'authorName', 'author_name']) ?? '';
+            $displayAuthor = is_array($currentAuthor) ? implode(', ', $currentAuthor) : $currentAuthor;
+
+            $currentNarrator = $metadata['narrator'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']) ?? '';
+            $displayNarrator = is_array($currentNarrator) ? implode(', ', $currentNarrator) : $currentNarrator;
+
+            $currentSeries = $metadata['series'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['series', 'seriesName', 'series_name']) ?? '';
+            $currentSeriesNumber = $metadata['series_number'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']) ?? '';
+
+            $currentYear = $metadata['year'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['year', 'publishedYear', 'published_year', 'published_date']) ?? '';
+            if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
+                $currentYear = substr($currentYear, 0, 4);
+            }
+
+            $currentGenre = $metadata['genre'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
+            $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
+
+            $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
+            if ($currentDirectory === '') {
+                $currentDirectory = $this->generateDirectoryPath($metadata, [
+                    'include_title' => true,
+                ]);
+            }
+
+            $options = [
+                '1' => 'Title: ' . $currentTitle,
+                '2' => 'Author(s): ' . $displayAuthor,
+                '3' => 'Narrator(s): ' . $displayNarrator,
+                '4' => 'Series: ' . $currentSeries,
+                '5' => 'Series Number: ' . $currentSeriesNumber,
+                '6' => 'Year: ' . $currentYear,
+                '7' => 'Genre: ' . $displayGenre,
+                '8' => 'Directory Path: ' . $currentDirectory,
+                '9' => "\e[1;32mDone\e[0m",
+            ];
+
+            $choice = $selectWithImmediateInterruptCallback('Select field to edit', $options, '9');
+
+            if ($choice === '9' || $choice === 'd' || $choice === 'done' || $choice === '') {
+                break;
+            }
+
+            switch ($choice) {
+                case '1':
+                    $metadata['title'] = $askInlineCallback('Title', (string) $currentTitle);
+                    break;
+                case '2':
+                    $newAuthor = $askInlineCallback('Author(s) (comma-separated)', (string) $displayAuthor);
+                    $metadata['author'] = array_map('trim', explode(',', $newAuthor));
+                    break;
+                case '3':
+                    $newNarrator = $askInlineCallback('Narrator(s) (comma-separated)', (string) $displayNarrator);
+                    $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
+                    break;
+                case '4':
+                    $metadata['series'] = $askInlineCallback('Series', (string) $currentSeries);
+                    if (empty($metadata['series'])) {
+                        unset($metadata['series']);
+                        $metadata['series_number'] = '';
+                    }
+                    break;
+                case '5':
+                    $metadata['series_number'] = $askInlineCallback('Series Number', (string) $currentSeriesNumber);
+                    break;
+                case '6':
+                    $metadata['year'] = $askInlineCallback('Year', (string) $currentYear);
+                    break;
+                case '7':
+                    $validGenres = $getValidGenresCallback();
+                    $genreOptions = [];
+                    foreach ($validGenres as $idx => $g) {
+                        $genreOptions[(string) ($idx + 1)] = $g;
+                    }
+                    $currentGenreIdx = array_search($displayGenre, $validGenres, true);
+                    $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
+                    $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
+                    $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
+
+                    if (is_array($metadata['genre'] ?? null)) {
+                        $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
+                        $metadata['genre'] = array_values(array_merge([$newGenre], $others));
+                    } else {
+                        $metadata['genre'] = $newGenre;
+                    }
+                    break;
+                case '8':
+                    $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
+                    break;
+            }
+
+            $extractSeriesNumberFromTitleCallback($metadata);
+            $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
         }
-        $defaultYear = is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? '');
-        $newYear = $askInlineCallback('Year', $defaultYear);
-        $trimmedYear = trim($newYear);
-        if ($trimmedYear === '') {
-            unset($metadata['year']);
-        } else {
-            $metadata['year'] = $newYear;
-        }
-
-        $validGenres = $getValidGenresCallback();
-        $genreOptions = [];
-        foreach ($validGenres as $idx => $g) {
-            $genreOptions[$idx + 1] = $g;
-        }
-
-        $currentGenre = $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
-        if (is_array($currentGenre)) {
-            $currentGenre = $currentGenre[0] ?? 'Other';
-        }
-        $currentGenreIdx = array_search($currentGenre, $validGenres);
-        $defaultGenreIdx = ($currentGenreIdx !== false) ? $currentGenreIdx + 1 : count($validGenres);
-
-        $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, (string) $defaultGenreIdx);
-        $newGenre = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-
-        // If we have an array of genres, replace the first one (primary) or add to front
-        if (is_array($metadata['genre'] ?? null)) {
-            $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
-            $metadata['genre'] = array_values(array_merge([$newGenre], $others));
-        } else {
-            $metadata['genre'] = $newGenre;
-        }
-
-        $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
-        if ($currentDirectory === '') {
-            $currentDirectory = $this->generateDirectoryPath($metadata, [
-                'include_title' => true,
-            ]);
-        }
-
-        $metadata['custom_directory_path'] = $askInlineCallback('Directory', $currentDirectory);
-
-        $extractSeriesNumberFromTitleCallback($metadata);
 
         return $metadata;
     }
@@ -3977,22 +4089,21 @@ class BookImportService
 
         $options = [
             '1' => $acceptLabel,
-            '2' => $isFinalConfirmation ? 'Edit again' : 'Edit individual fields',
-            '3' => $isFinalConfirmation ? 'Skip' : 'Skip this book',
-            '4' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
-            '5' => 'Update genre (' . $displayGenre . ')',
-            '6' => 'Update directory (' . $displayDirectory . ')',
-            '7' => 'Request enrichment (Audible/Google Books)',
+            '2' => 'Edit all fields',
+            '3' => 'Edit individual fields',
+            '4' => $isFinalConfirmation ? 'Skip' : 'Skip this book',
+            '5' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
+            '6' => 'Request enrichment (Audible/Google Books)',
         ];
 
         // Only show "Reprocess as Multi-Book Archive" if NOT already a multi-book part AND has more than 1 file
         if (!$isMultiBookPart && $fileCount > 1) {
-            $options['8'] = 'Reprocess as Multi-Book Archive (Split)';
+            $options['7'] = 'Reprocess as Multi-Book Archive (Split)';
         }
 
         // Only show "Merge into Parent Book" if this IS a multi-book part
         if ($isMultiBookPart) {
-            $options['9'] = 'Merge into Parent Book';
+            $options['8'] = 'Merge into Parent Book';
         }
 
         return $options;
@@ -5683,9 +5794,8 @@ class BookImportService
         // CRITICAL: Try alternative book root paths
         // config('app.book_root') and config('filesystems.disks.books.root') might differ
         $alternativeRoots = [
-            config('app.book_root'),
             config('filesystems.disks.books.root'),
-            env('BOOK_STORAGE_PATH'),
+            config('app.book_root'),
         ];
 
         foreach ($alternativeRoots as $altRoot) {
@@ -7056,7 +7166,7 @@ class BookImportService
             $warnCallback("⚠️  Book already exists (detected after AI processing)");
             $lineCallback("  Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
 
-            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
             if ($bookStoragePath && $existingBook->directory_path) {
                 $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
 
@@ -7323,12 +7433,12 @@ class BookImportService
             $isTitleGood = is_string($title) && strlen(trim($title)) > 0;
             $isAuthorGood = is_string($author) && strlen(trim($author)) > 0;
 
-            // Default to Accept all if title, author, and genres are all good
+            // Default to option 3 (Edit) when genre is invalid
             if ($isTitleGood && $isAuthorGood && $isGenreValid && $confidence > 80) {
                 $defaultChoice = '1';
             } elseif (!$isGenreValid) {
-                // Default to option 5 (Update genre) when genre is invalid
-                $defaultChoice = '5';
+                // Default to option 3 (Edit) when genre is invalid
+                $defaultChoice = '3';
             } else {
                 // Default to Edit if confidence is low or some fields are weak
                 $defaultChoice = $confidence > 80 ? '1' : '2';
@@ -7349,16 +7459,54 @@ class BookImportService
                 $choice = strtolower(trim($choice));
                 if (in_array($choice, ['1', 'a', 'accept'], true)) {
                     if (!$isGenreValid) {
-                        $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first');
+                        $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 3)');
                         continue;
                     }
                     return true;
                 }
-                if (in_array($choice, ['3', 's', 'skip'], true)) {
+                if (in_array($choice, ['4', 's', 'skip'], true)) {
                     return false;
                 }
 
-                if ($choice === '4') {
+                if ($choice === '2' || $choice === 'a' || $choice === 'all') {
+                    $metadata = $editMetadataFieldsCallback($metadata, true);
+                    if ($inputInterrupted) {
+                        return false;
+                    }
+
+                    $currentGenre = $metadata['genre'] ?? $currentGenre;
+                    if (is_array($currentGenre)) {
+                        $currentGenre = $currentGenre[0] ?? 'Other';
+                    }
+                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                    if ($isGenreValid) {
+                        $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
+                    }
+                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    continue;
+                }
+
+                if ($choice === '3' || $choice === 'e' || $choice === 'edit') {
+                    $metadata = $editMetadataFieldsCallback($metadata, false);
+                    if ($inputInterrupted) {
+                        return false;
+                    }
+
+                    $currentGenre = $metadata['genre'] ?? $currentGenre;
+                    if (is_array($currentGenre)) {
+                        $currentGenre = $currentGenre[0] ?? 'Other';
+                    }
+                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                    if ($isGenreValid) {
+                        $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
+                    }
+                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    continue;
+                }
+
+                if ($choice === '5') {
                     $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
                     if ($inputInterrupted) {
                         $metadata['cover_url'] = $currentCoverUrl;
@@ -7370,49 +7518,7 @@ class BookImportService
                     continue;
                 }
 
-                if ($choice === '5') {
-                    $validGenres = $getValidGenresCallback();
-                    $genreOptions = [];
-                    foreach ($validGenres as $idx => $g) {
-                        $genreOptions[(string) ($idx + 1)] = $g;
-                    }
-
-                    $currentGenreIdx = array_search($currentGenre, $validGenres, true);
-                    if ($currentGenreIdx !== false) {
-                        $defaultGenreIdx = (string) ($currentGenreIdx + 1);
-                    } else {
-                        $defaultGenreIdx = (string) count($validGenres);
-                    }
-
-                    $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
-                    $newGenre = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-
-                    // If we have an array of genres, replace the first one (primary) or add to front
-                    if (is_array($metadata['genre'] ?? null)) {
-                        $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
-                        $metadata['genre'] = array_values(array_merge([$newGenre], $others));
-                    } else {
-                        $metadata['genre'] = $newGenre;
-                    }
-
-                    $currentGenre = $newGenre;
-                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                    if ($isGenreValid) {
-                        $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
-                    }
-                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                    continue;
-                }
-
                 if ($choice === '6') {
-                    $metadata['custom_directory_path'] = $askInlineCallback('Directory', $currentDirectoryPath);
-                    $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? $currentDirectoryPath);
-                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                    continue;
-                }
-
-                if ($choice === '7') {
                     $metadata = $manualEnrichmentWithComparisonCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
                     $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
                     $currentGenre = $metadata['genre'] ?? 'Other';
@@ -7425,12 +7531,12 @@ class BookImportService
                     continue;
                 }
 
-                if ($choice === '8') {
+                if ($choice === '7') {
                     $metadata['_action'] = 'reprocess_multi';
                     return true;
                 }
 
-                if ($choice === '9') {
+                if ($choice === '8') {
                     $metadata['_action'] = 'merge_parent';
                     return true;
                 }
@@ -7439,123 +7545,7 @@ class BookImportService
             }
         }
 
-        $uiServiceLogCallback("📝 Editing individual fields...");
-        $metadata = $editMetadataFieldsCallback($metadata, $audiobook);
-        if ($inputInterrupted) {
-            return false;
-        }
-
-        $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-        $currentGenre = $metadata['genre'] ?? $currentGenre;
-        if (is_array($currentGenre)) {
-            $currentGenre = $currentGenre[0] ?? 'Other';
-        }
-        $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-        $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-        if ($isGenreValid) {
-            $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
-        }
-
-        while (true) {
-            $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, true, count($audiobook['files'] ?? []));
-
-            $finalDefaultChoice = $isGenreValid ? '1' : '2';
-            $choice = $selectWithImmediateInterruptCallback("Final confirmation", $options, $finalDefaultChoice);
-
-            $choice = strtolower(trim($choice));
-            if ($choice === '1' || $choice === 'a' || $choice === 'accept') {
-                if (!$isGenreValid) {
-                    $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first');
-                    continue;
-                }
-                return true;
-            }
-            if ($choice === '2' || $choice === 'e' || $choice === 'edit') {
-                $metadata = $editMetadataFieldsCallback($metadata, $audiobook);
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                $currentGenre = $metadata['genre'] ?? $currentGenre;
-                if (is_array($currentGenre)) {
-                    $currentGenre = $currentGenre[0] ?? 'Other';
-                }
-                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                if ($isGenreValid) {
-                    $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
-                }
-                continue;
-            }
-            if ($choice === '3' || $choice === 's' || $choice === 'skip') {
-                return false;
-            }
-
-            if ($choice === '4') {
-                $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
-                if ($inputInterrupted) {
-                    $metadata['cover_url'] = $currentCoverUrl;
-                } else {
-                    $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
-                }
-                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                continue;
-            }
-
-            if ($choice === '5') {
-                $validGenres = $getValidGenresCallback();
-                $genreOptions = [];
-                foreach ($validGenres as $idx => $g) {
-                    $genreOptions[(string) ($idx + 1)] = $g;
-                }
-
-                $currentGenreIdx = array_search($currentGenre, $validGenres, true);
-                if ($currentGenreIdx !== false) {
-                    $defaultGenreIdx = (string) ($currentGenreIdx + 1);
-                } else {
-                    $defaultGenreIdx = (string) count($validGenres);
-                }
-
-                $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
-                $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-                $currentGenre = $metadata['genre'] ?? $currentGenre;
-                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                if ($isGenreValid) {
-                    $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
-                }
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                continue;
-            }
-
-            if ($choice === '6') {
-                $metadata['custom_directory_path'] = $askInlineCallback('Directory', $currentDirectoryPath);
-                $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? $currentDirectoryPath);
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                continue;
-            }
-
-            if ($choice === '7') {
-                $metadata = $manualEnrichmentWithComparisonCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
-                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                $currentGenre = $metadata['genre'] ?? 'Other';
-                if (is_array($currentGenre)) {
-                    $currentGenre = $currentGenre[0] ?? 'Other';
-                }
-                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                continue;
-            }
-
-            if ($choice === '8') {
-                $metadata['_action'] = 'reprocess_multi';
-                return true;
-            }
-
-            if ($choice === '9') {
-                $metadata['_action'] = 'merge_parent';
-                return true;
-            }
-        }
+        return true;
     }
 
     /**

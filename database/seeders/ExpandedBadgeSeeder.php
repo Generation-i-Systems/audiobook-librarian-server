@@ -285,7 +285,7 @@ class ExpandedBadgeSeeder extends Seeder
                 'tier' => 'diamond',
                 'points' => 200,
                 'criteria' => [
-                    'total_listening_time' => 360000 // 100 hours
+                    'listening_time_monthly' => 360000 // 100 hours
                 ],
                 'is_repeatable' => true,
                 'sort_order' => 1500,

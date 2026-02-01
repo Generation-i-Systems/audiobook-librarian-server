@@ -41,11 +41,14 @@ trait CamelCaseAttributeAccess
         // If the snake_case key exists as a fillable attribute or in the attributes array,
         // set it using the snake_case key.
         if ($this->isFillable($snakeCaseKey) || array_key_exists($snakeCaseKey, $this->attributes)) {
-            return parent::__set($snakeCaseKey, $value);
+            /** @phpstan-ignore-next-line return.void */
+            parent::__set($snakeCaseKey, $value);
+            return;
         }
 
         // Otherwise, fall back to default Laravel behavior (e.g., mutators)
-        return parent::__set($key, $value);
+        /** @phpstan-ignore-next-line return.void */
+        parent::__set($key, $value);
     }
 
     /**

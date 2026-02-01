@@ -11,9 +11,11 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property int $id
  * @property int $user_id
  * @property int $book_id
+ * @property string|null $title
  * @property string|null $chapter
  * @property int $position
  * @property string|null $notes
+ * @property bool $is_auto
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
@@ -26,8 +28,10 @@ use App\Traits\CamelCaseAttributeAccess;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereChapter($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereIsAuto($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereNotes($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark wherePosition($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereTitle($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Bookmark whereUserId($value)
  * @mixin \Eloquent
@@ -40,9 +44,11 @@ class Bookmark extends Model
     protected $fillable = [
         'user_id',
         'book_id',
+        'title',
         'chapter',
         'position',
         'notes',
+        'is_auto',
     ];
 
     public function user(): BelongsTo

@@ -455,8 +455,7 @@ class BadgeSeeder extends Seeder
                 'tier' => 'silver',
                 'points' => 35,
                 'criteria' => [
-                    // This would require more complex tracking of session times
-                    'session_count' => 5 // Simplified for now
+                    'time_of_day_listening' => 5
                 ],
                 'sort_order' => 800,
             ],
@@ -469,8 +468,7 @@ class BadgeSeeder extends Seeder
                 'tier' => 'silver',
                 'points' => 35,
                 'criteria' => [
-                    // This would require more complex tracking of session times
-                    'session_count' => 5 // Simplified for now
+                    'time_of_day_listening' => 5
                 ],
                 'sort_order' => 801,
             ],
@@ -485,7 +483,7 @@ class BadgeSeeder extends Seeder
                 'tier' => 'bronze',
                 'points' => 15,
                 'criteria' => [
-                    'total_listening_time' => 25200 // 7 hours (simplified check)
+                    'listening_time_weekly' => 25200 // 7 hours
                 ],
                 'is_repeatable' => true,
                 'sort_order' => 900,
@@ -499,7 +497,7 @@ class BadgeSeeder extends Seeder
                 'tier' => 'gold',
                 'points' => 50,
                 'criteria' => [
-                    'total_listening_time' => 108000 // 30 hours (simplified check)
+                    'listening_time_monthly' => 108000 // 30 hours
                 ],
                 'is_repeatable' => true,
                 'sort_order' => 901,

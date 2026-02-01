@@ -72,9 +72,24 @@ class MessagesController extends Controller
             'body' => 'required|string',
             'to_user_id' => 'nullable|exists:users,id',
         ]);
-        $data['from_user_id'] = Auth::id();
-        $data['is_read'] = false;
-        $this->documentStoreService->createMessage($data);
+
+        $recipientId = $data['to_user_id'] ?? null;
+
+        if (! is_int($recipientId)) {
+            return redirect()->route('admin.messages.index')->with('error', 'Recipient is required.');
+        }
+
+        $content = $data['subject'] . "\n\n" . $data['body'];
+
+        $messageId = $this->documentStoreService->createMessage([
+            'sender_id' => Auth::id(),
+            'recipient_id' => $recipientId,
+            'content' => $content,
+        ]);
+
+        if (! is_string($messageId) || $messageId === '') {
+            return redirect()->route('admin.messages.index')->with('error', 'Failed to send message.');
+        }
 
         return redirect()->route('admin.messages.index')->with('success', 'Message sent.');
     }

@@ -123,8 +123,10 @@ class VerifyBookDirectories extends Command
             $this->newLine();
             $this->error("❌ Missing directory for book: {$book->title}");
             $this->line("   Author: " . ($book->authors->isNotEmpty() ? $book->authors->pluck('name')->implode(', ') : 'N/A'));
-            $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function ($s) {
-                return $s->name . ($s->pivot && $s->pivot->series_number ? ' #' . $s->pivot->series_number : '');
+            $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function (\App\Models\Series $s) {
+                $seriesNumber = $s->pivot ? $s->pivot->getAttribute('series_number') : null;
+
+                return $s->name . ($seriesNumber ? ' #' . $seriesNumber : '');
             })->implode(', ') : 'N/A'));
             $this->line("   Current path: {$directoryPath}");
             $this->line("   Full path checked: {$fullPath}");
@@ -136,8 +138,10 @@ class VerifyBookDirectories extends Command
             $this->newLine();
             $this->error("❌ Path is not a directory for book: {$book->title}");
             $this->line("   Author: " . ($book->authors->isNotEmpty() ? $book->authors->pluck('name')->implode(', ') : 'N/A'));
-            $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function ($s) {
-                return $s->name . ($s->pivot && $s->pivot->series_number ? ' #' . $s->pivot->series_number : '');
+            $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function (\App\Models\Series $s) {
+                $seriesNumber = $s->pivot ? $s->pivot->getAttribute('series_number') : null;
+
+                return $s->name . ($seriesNumber ? ' #' . $seriesNumber : '');
             })->implode(', ') : 'N/A'));
             $this->line("   Current path: {$directoryPath}");
             $this->line("   Full path checked: {$fullPath}");
@@ -331,26 +335,20 @@ class VerifyBookDirectories extends Command
     {
         $terms = [];
 
-        if ($book->author) {
-            $terms[] = $this->normalizeForComparison($book->author);
+        if ($book->authors->isNotEmpty()) {
+            $terms[] = $this->normalizeForComparison($book->authors->pluck('name')->implode(' '));
         }
 
-        if ($book->title) {
+        if (!empty($book->title)) {
             $terms[] = $this->normalizeForComparison($book->title);
         }
 
-        if ($book->series) {
-            $terms[] = $this->normalizeForComparison($book->series);
+        if ($book->series->isNotEmpty()) {
+            $terms[] = $this->normalizeForComparison($book->series->pluck('name')->implode(' '));
         }
 
-        if ($book->narrator) {
-            if (is_array($book->narrator)) {
-                foreach ($book->narrator as $narrator) {
-                    $terms[] = $this->normalizeForComparison($narrator);
-                }
-            } else {
-                $terms[] = $this->normalizeForComparison($book->narrator);
-            }
+        if ($book->narrators->isNotEmpty()) {
+            $terms[] = $this->normalizeForComparison($book->narrators->pluck('name')->implode(' '));
         }
 
         return array_filter($terms);
@@ -562,8 +560,10 @@ class VerifyBookDirectories extends Command
         $this->warn("⚠️ You are about to {$action} the following book:");
         $this->line("   Title: {$book->title}");
         $this->line("   Author: " . ($book->authors->isNotEmpty() ? $book->authors->pluck('name')->implode(', ') : 'N/A'));
-        $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function ($s) {
-            return $s->name . ($s->pivot && $s->pivot->series_number ? ' #' . $s->pivot->series_number : '');
+        $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function (\App\Models\Series $s) {
+            $seriesNumber = $s->pivot ? $s->pivot->getAttribute('series_number') : null;
+
+            return $s->name . ($seriesNumber ? ' #' . $seriesNumber : '');
         })->implode(', ') : 'N/A'));
         $this->line("   Current Path: {$book->directory_path}");
         $this->line("   Description: " . substr($book->description, 0, 100) . (strlen($book->description) > 100 ? '...' : ''));

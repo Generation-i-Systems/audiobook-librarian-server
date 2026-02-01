@@ -72,11 +72,17 @@
 
                 <button type="submit" class="btn btn-primary">Change Password</button>
             </form>
-        @else
+    @else
             <div class="alert alert-warning">
                 <p>You must be logged in to view your profile.</p>
                 <a href="{{ route('login') }}" class="btn btn-primary">Login</a>
             </div>
         @endauth
+
+        @if(isset($activityData))
+            <hr class="my-5">
+
+            @include('partials.activity-summary', ['activityData' => $activityData])
+        @endif
     </div>
 @endsection

@@ -286,6 +286,7 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         $this->assertEquals('renamed', $result);
         $this->assertContains('📁 Will import with renamed file to avoid conflict', $infoMessages);
         $this->assertArrayHasKey('_force_rename_directory', $aiMetadata, 'Force rename flag should be set');
+        /** @phpstan-ignore-next-line offsetAccess.notFound */
         $this->assertTrue($aiMetadata['_force_rename_directory'], 'Force rename flag should be true');
     }
 }

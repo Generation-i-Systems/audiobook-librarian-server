@@ -73,7 +73,7 @@ class TestBookService extends Command
                 $this->displayResults($serviceResults, $name);
 
                 // Fetch details for first result if requested
-                if ($fetchDetails && !empty($serviceResults)) {
+                if ($fetchDetails) {
                     $firstResult = $serviceResults[0];
                     $this->info("\nFetching details for: " . ($firstResult['title'] ?? 'Unknown Title'));
 
@@ -142,9 +142,7 @@ class TestBookService extends Command
 
         $this->line('Authors: ' . $this->formatPeople($book['authors'] ?? []));
 
-        if (!empty($book['narrators'])) {
-            $this->line('Narrators: ' . $this->formatPeople($book['narrators'] ?? []));
-        }
+        $this->line('Narrators: ' . $this->formatPeople($book['narrators'] ?? []));
 
         if (!empty($book['publisher']['name'])) {
             $this->line("Publisher: {$book['publisher']['name']}");
@@ -173,8 +171,14 @@ class TestBookService extends Command
         $names = [];
 
         foreach ($people as $person) {
-            if (isset($person['author']['name'])) {
-                $names[] = $person['author']['name'];
+            // Handle different structure variations
+            $name = $person['author']['name'] ??
+                    $person['narrator']['name'] ??
+                    $person['name'] ??
+                    null;
+
+            if ($name) {
+                $names[] = $name;
             }
         }
 

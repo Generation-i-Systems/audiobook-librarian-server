@@ -13,12 +13,15 @@ use App\Traits\Auditable;
  * @property string $name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Genre>|array $genres
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
+ * @property-read int|null $book_count
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property string|null $biography
  * @property string|null $image_url
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property-read int|null $books_count
+ * @property bool $isFavorite
  * @method static \Database\Factories\AuthorFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author newQuery()
@@ -33,7 +36,8 @@ use App\Traits\Auditable;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author withTrashed(bool $withTrashed = true)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Author withoutTrashed()
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $favoritedByUsers
  */
 class Author extends Model
 {
@@ -47,5 +51,10 @@ class Author extends Model
     public function books(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Book::class);
+    }
+
+    public function favoritedByUsers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_author_favorites');
     }
 }

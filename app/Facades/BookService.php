@@ -75,7 +75,7 @@ class BookService extends Facade
                 }
             } catch (\Exception $e) {
                 // Log error but continue with other services
-                \Log::error("Search failed for service {$serviceName}", [
+                Log::error("Search failed for service {$serviceName}", [
                     'error' => $e->getMessage(),
                     'query' => $query,
                 ]);
@@ -106,7 +106,7 @@ class BookService extends Facade
                 }
             } catch (\Exception $e) {
                 // Log error but continue with other services
-                \Log::error('Failed to get book details from service', [
+                Log::error('Failed to get book details from service', [
                     'error' => $e->getMessage(),
                     'id' => $id,
                 ]);

@@ -117,7 +117,7 @@ class RemoveDuplicateBooksCommand extends Command
                         try {
                             if ($permanent) {
                                 // Permanently delete without trash
-                                $result = $this->documentStore->deleteBook($book->id);
+                                $result = $this->documentStore->deleteBook((string) $book->id);
 
                                 if ($result) {
                                     $this->info(sprintf('Successfully removed book ID: %d (permanent)', $book->id));

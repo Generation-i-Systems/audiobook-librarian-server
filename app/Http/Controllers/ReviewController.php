@@ -2,12 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Contracts\DocumentStoreServiceInterface;
 
 class ReviewController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
     public function store(Request $request, $bookId)
     {
         $request->validate([
@@ -16,8 +23,7 @@ class ReviewController extends Controller
             'content_rating' => 'required|string',
         ]);
 
-        $documentStore = app(DocumentStoreServiceInterface::class);
-        $documentStore->createReview([
+        $this->documentStoreService->createReview([
             'book_id' => $bookId,
             'user_id' => Auth::id(),
             'comment' => $request->comment,
@@ -30,7 +36,6 @@ class ReviewController extends Controller
 
     public function destroy(Review $review)
     {
-        // Authorization logic:  Only allow the review's author to delete it.
         if (Auth::id() !== $review->user_id) {
             abort(403, 'Unauthorized action.');
         }

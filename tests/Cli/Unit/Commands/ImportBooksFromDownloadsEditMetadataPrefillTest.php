@@ -121,7 +121,7 @@ class ImportBooksFromDownloadsEditMetadataPrefillTestDouble extends ImportBooksF
         }
     }
 
-    protected function editMetadataFields(array $metadata, array $audiobook): array
+    protected function editMetadataFields(array $metadata, array $audiobook, bool $sequential = false): array
     {
         $currentTitle = $this->getFirstNonEmptyMetadataValue($metadata, ['title', 'book_title', 'name']);
         $metadata['title'] = $this->askInline('Title', is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? ''));

@@ -264,37 +264,31 @@ class FixRemoteImageUrlsCommand extends Command
                     continue;
                 }
 
-                if ($dryRun) {
-                    $this->warn("Would download image from {$coverUrl} to {$directoryPath}");
-                    $this->warn("Would update book {$id} with normalized filename");
+                $downloadResult = $this->externalCoverService->downloadCoverImage(
+                    $coverUrl,
+                    $directoryPath,
+                    'remote',
+                    null
+                );
+
+                if (!$downloadResult['success']) {
+                    $this->error("Failed to download image from remote URL: {$coverUrl}. Error: {$downloadResult['error']}");
+                    $errors++;
+                    $progressBar->advance();
+                    continue;
+                }
+
+                // Update the book in the database with just the filename (normalize the path)
+                $newCoverPath = $downloadResult['path'];
+                $normalizedCoverPath = basename($newCoverPath); // Store just filename
+                $result = $this->documentStore->updateBook($id, ['coverImage' => $normalizedCoverPath]);
+
+                if ($result) {
+                    $this->info("Downloaded and updated book {$id} with coverImage: {$normalizedCoverPath}");
                     $fixed++;
                 } else {
-                    $downloadResult = $this->externalCoverService->downloadCoverImage(
-                        $coverUrl,
-                        $directoryPath,
-                        'remote',
-                        null
-                    );
-
-                    if (!$downloadResult['success']) {
-                        $this->error("Failed to download image from remote URL: {$coverUrl}. Error: {$downloadResult['error']}");
-                        $errors++;
-                        $progressBar->advance();
-                        continue;
-                    }
-
-                    // Update the book in the database with just the filename (normalize the path)
-                    $newCoverPath = $downloadResult['path'];
-                    $normalizedCoverPath = basename($newCoverPath); // Store just filename
-                    $result = $this->documentStore->updateBook($id, ['coverImage' => $normalizedCoverPath]);
-
-                    if ($result) {
-                        $this->info("Downloaded and updated book {$id} with coverImage: {$normalizedCoverPath}");
-                        $fixed++;
-                    } else {
-                        $this->error("Downloaded image but failed to update book {$id} in database");
-                        $errors++;
-                    }
+                    $this->error("Downloaded image but failed to update book {$id} in database");
+                    $errors++;
                 }
 
                 $progressBar->advance();
@@ -313,19 +307,14 @@ class FixRemoteImageUrlsCommand extends Command
                     $normalizedCoverPath = basename($fullCoverPath);
 
                     // Update the book in the database with normalized filename
-                    if (!$dryRun) {
-                        $result = $this->documentStore->updateBook($id, ['coverImage' => $normalizedCoverPath]);
+                    $result = $this->documentStore->updateBook($id, ['coverImage' => $normalizedCoverPath]);
 
-                        if ($result) {
-                            $this->info("Updated book {$id} with coverImage: {$normalizedCoverPath}");
-                            $fixed++;
-                        } else {
-                            $this->error("Failed to update book {$id} in database");
-                            $errors++;
-                        }
-                    } else {
-                        $this->warn("Would update book {$id} with coverImage: {$normalizedCoverPath}");
+                    if ($result) {
+                        $this->info("Updated book {$id} with coverImage: {$normalizedCoverPath}");
                         $fixed++;
+                    } else {
+                        $this->error("Failed to update book {$id} in database");
+                        $errors++;
                     }
                 } else {
                     $this->warn("File does not exist at {$fullCoverPath}, checking if available remotely");
@@ -336,37 +325,31 @@ class FixRemoteImageUrlsCommand extends Command
                     if ($remoteUrl && $this->isRemoteUrl($remoteUrl)) {
                         $this->info("Found remote URL for book {$id}: {$remoteUrl}");
 
-                        if (!$dryRun) {
-                            // Download the image using ExternalCoverService
-                            $downloadResult = $this->externalCoverService->downloadCoverImage(
-                                $remoteUrl,
-                                $directoryPath,
-                                'remote',
-                                null
-                            );
+                        // Download the image using ExternalCoverService
+                        $downloadResult = $this->externalCoverService->downloadCoverImage(
+                            $remoteUrl,
+                            $directoryPath,
+                            'remote',
+                            null
+                        );
 
-                            if ($downloadResult['success']) {
-                                $this->info("Downloaded and saved image to {$downloadResult['path']}");
+                        if ($downloadResult['success']) {
+                            $this->info("Downloaded and saved image to {$downloadResult['path']}");
 
-                                // Update the book in the database with just the filename
-                                $normalizedPath = basename($downloadResult['path']);
-                                $result = $this->documentStore->updateBook($id, ['coverImage' => $normalizedPath]);
+                            // Update the book in the database with just the filename
+                            $normalizedPath = basename($downloadResult['path']);
+                            $result = $this->documentStore->updateBook($id, ['coverImage' => $normalizedPath]);
 
-                                if ($result) {
-                                    $this->info("Updated book {$id} with coverImage: {$normalizedPath}");
-                                    $fixed++;
-                                } else {
-                                    $this->error("Failed to update book {$id} in database");
-                                    $errors++;
-                                }
+                            if ($result) {
+                                $this->info("Updated book {$id} with coverImage: {$normalizedPath}");
+                                $fixed++;
                             } else {
-                                $this->error("Failed to download image from {$remoteUrl}. Error: {$downloadResult['error']}");
+                                $this->error("Failed to update book {$id} in database");
                                 $errors++;
                             }
                         } else {
-                            $this->warn("Would download image from {$remoteUrl} and save to {$directoryPath}");
-                            $this->warn("Would update book {$id} with new coverImage path");
-                            $fixed++;
+                            $this->error("Failed to download image from {$remoteUrl}. Error: {$downloadResult['error']}");
+                            $errors++;
                         }
                     } else {
                         $this->warn("No remote URL found for book {$id}, skipping");

@@ -34,12 +34,14 @@ class EnrichmentMergeTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_does_not_override_existing_year()
     {
+        /** @var array<string, mixed> $metadata */
         $metadata = [
             'title' => 'Test Book',
             'author' => ['Test Author'],
             'year' => 2021,
         ];
 
+        /** @var array<string, mixed> $enrichedData */
         $enrichedData = [
             'published_year' => 2000, // Wrong year from enrichment
             'description' => 'Good description',
@@ -63,6 +65,7 @@ class EnrichmentMergeTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_fills_in_missing_fields()
     {
+        /** @var array<string, mixed> $metadata */
         $metadata = [
             'title' => 'Test Book',
             'author' => ['Test Author'],
@@ -88,6 +91,7 @@ class EnrichmentMergeTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_does_not_override_genre()
     {
+        /** @var array<string, mixed> $metadata */
         $metadata = [
             'title' => 'Test Book',
             'author' => ['Test Author'],
@@ -110,6 +114,7 @@ class EnrichmentMergeTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_does_not_override_publisher()
     {
+        /** @var array<string, mixed> $metadata */
         $metadata = [
             'title' => 'Test Book',
             'author' => ['Test Author'],

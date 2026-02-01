@@ -96,6 +96,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'library' => \App\Http\Middleware\RequireLibraryRole::class,
             'active' => \App\Http\Middleware\EnsureActiveUser::class,
             'api.auth' => \App\Http\Middleware\ApiAuth::class,
+            'idempotency' => \App\Http\Middleware\CheckIdempotency::class,
         ]);
     })
     ->withProviders([

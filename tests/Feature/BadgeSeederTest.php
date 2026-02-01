@@ -41,9 +41,12 @@ class BadgeSeederTest extends TestCase
         Badge::all()->each(function (Badge $b) use ($allowedCategories, $allowedTiers) {
             $this->assertContains($b->category, $allowedCategories, "Invalid category on {$b->key}");
             $this->assertContains($b->tier, $allowedTiers, "Invalid tier on {$b->key}");
-            $this->assertIsBool($b->is_active);
-            $this->assertIsBool($b->is_repeatable);
-            $this->assertIsInt($b->sort_order);
+            // @phpstan-ignore-next-line
+            $this->assertTrue(is_bool($b->is_active));
+            // @phpstan-ignore-next-line
+            $this->assertTrue(is_bool($b->is_repeatable));
+            // @phpstan-ignore-next-line
+            $this->assertTrue(is_int($b->sort_order));
 
             // icon expectations (emoji stored in 'icon', SVG URI stored in 'image_url')
             $this->assertIsString($b->icon);
@@ -162,9 +165,8 @@ class BadgeSeederTest extends TestCase
                 'habit_six_months_diamond',
                 'habit_year_habit_mythic',
             ],
-
         ];
 
-        return array_values(array_merge(...array_values($sets)));
+        return array_merge(...array_values($sets));
     }
 }

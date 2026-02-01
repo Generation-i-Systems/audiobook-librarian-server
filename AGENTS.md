@@ -144,6 +144,8 @@ npm run test:coverage
 - Always use strict types in method signatures
 - Use `declare(strict_types=1);` at file top
 - Use PHPStan level 5 analysis (baseline allowed in `phpstan-baseline.neon`)
+- **MUST NOT** introduce any new PHPStan issues with any change.
+- **MUST NOT** update the PHPStan baseline without the express request of the USER.
 - Use null safety: `?string` for nullable, never omit nullability
 
 #### Testing
@@ -266,6 +268,7 @@ php artisan test tests/Path/To/Module/
 - **MUST** use conventional commit format: `type(scope): description`
 - **MUST NEVER add AI attribution in commit messages**
 - **SHOULD** split large commits into smaller, focused pieces when reasonable
+- **MUST NOT** use `--no-verify` to bypass pre-commit hooks unless explicitly requested by the user.
 - **MUST** ensure all changes are added before retrying failed commits
 
 ### Pre-commit Hooks

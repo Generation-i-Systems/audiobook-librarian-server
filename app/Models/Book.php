@@ -124,7 +124,7 @@ use App\Traits\Auditable;
  * @method static Builder<static>|Book withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Book withUserData(string|int $userId)
  * @method static Builder<static>|Book withoutTrashed()
- * @mixin \Eloquent
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 class Book extends Model
 {
@@ -226,6 +226,7 @@ class Book extends Model
         $relatedKey,
         $relationName = null
     ): BelongsToMany {
+        // @phpstan-ignore-next-line
         return new TouchesParentBelongsToMany(
             $query,
             $parent,

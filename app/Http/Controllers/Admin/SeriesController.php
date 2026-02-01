@@ -29,7 +29,7 @@ class SeriesController extends Controller
 
             $books = $this->documentStoreService->getBooksInSeries($id);
             $total = count($books);
-            $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 1;
+            $totalPages = (int) ceil($total / $perPage);
             $offset = ($page - 1) * $perPage;
             $paginatedBooks = array_slice($books, $offset, $perPage);
 

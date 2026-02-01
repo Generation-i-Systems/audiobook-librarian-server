@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class GenerateLibraryJson extends Command
 {
-    protected $signature = 'books:generate-json 
+    protected $signature = 'books:generate-json
         {--all : Process all books, not just those missing librarian.json}
         {--book-id= : Process only the book with this ID}
         {--dry-run : Show what would be done without making any changes}
@@ -109,18 +109,16 @@ class GenerateLibraryJson extends Command
                 $this->showFieldDiffs($book, $previewData, $skipFields);
 
                 // Generate the actual JSON
-                $result = $this->importService->generateLibraryJson($book, $dryRun || $validateOnly);
+                $result = $this->importService->generateLibraryJson($book, $dryRun);
 
-                if ($result === true) {
+                if ($result) {
                     $success++;
-                } elseif ($result === null) {
-                    $skipped++;
                 } else {
                     $errors++;
                 }
 
                 // Skip validation during dry run
-                if (!$dryRun && !$validateOnly) {
+                if (!$dryRun) {
                     $validationResult = $this->validateGeneratedJson($book);
                     if (!$validationResult['valid']) {
                         $validationIssues[$bookId] = $validationResult['issues'];

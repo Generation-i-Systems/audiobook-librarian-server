@@ -91,6 +91,7 @@ class AuthController extends Controller
         $this->registrationNotifier->send($completeUserData, 'api', $request);
 
         return response()->json([
+            'code' => 'REGISTRATION_PENDING_APPROVAL',
             'message' => 'Account created. Waiting for admin approval.',
         ], 201);
     }
@@ -135,7 +136,10 @@ class AuthController extends Controller
 
         // Check if user is approved
         if (($user['role'] ?? '') === 'unverified') {
-            return response()->json(['message' => 'Account pending admin approval'], 403);
+            return response()->json([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
+                'message' => 'Account pending admin approval',
+            ], 403);
         }
 
         // Create an API token in the document store
@@ -175,7 +179,7 @@ class AuthController extends Controller
 
         try {
             // Verify the Google ID token
-            $client = new \Google_Client(['client_id' => env('GOOGLE_CLIENT_ID')]);
+            $client = new \Google_Client(['client_id' => config('services.google.client_id')]);
             $payload = $client->verifyIdToken($request->idToken);
 
             if (!$payload) {
@@ -187,6 +191,7 @@ class AuthController extends Controller
             $name = $payload['name'] ?? null;
             $googleId = $payload['sub'] ?? null;
             $photoUrl = $payload['picture'] ?? null;
+            $emailVerified = $payload['email_verified'] ?? false;
 
             if (!$email || !$googleId) {
                 Log::error('Missing required fields from Google token', ['payload' => $payload]);
@@ -214,6 +219,7 @@ class AuthController extends Controller
                     'photo_url' => $photoUrl,
                     'role' => 'unverified',
                     'password' => null,
+                    'email_verified_at' => $emailVerified ? now() : null,
                 ];
 
                 $createdId = $this->documentStoreService->createUser($userData);
@@ -243,6 +249,7 @@ class AuthController extends Controller
             }
 
             if ($isNewUser) {
+                // @phpstan-ignore-next-line
                 $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
                 $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
 
@@ -251,7 +258,14 @@ class AuthController extends Controller
 
             // Check if user is approved
             if (($user['role'] ?? '') === 'unverified') {
-                return response()->json(['message' => 'Account pending admin approval'], 403);
+                $isGoogleVerified = $payload['email_verified'] ?? false;
+                $message = $isGoogleVerified ? 'Google account verified. Waiting for admin approval.' : 'Account created. Waiting for admin approval.';
+
+                return response()->json([
+                    'code' => 'ACCOUNT_PENDING_APPROVAL',
+                    'message' => $message,
+                    'google_verified' => $isGoogleVerified,
+                ], 403);
             }
 
             // Create an API token
@@ -282,6 +296,35 @@ class AuthController extends Controller
             ]);
             return response()->json(['message' => 'Google authentication failed: ' . $e->getMessage()], 500);
         }
+    }
+
+    public function checkStatus(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        // Look up user by email
+        $user = $this->documentStoreService->getUserByEmail($request->input('email'));
+
+        // If user doesn't exist or is already verified, return generic response
+        // This prevents account enumeration
+        if (!$user || ($user['role'] ?? '') !== 'unverified') {
+            return response()->json([
+                'message' => 'Please use the login endpoint',
+            ], 200);
+        }
+
+        // User exists and is still unverified
+        return response()->json([
+            'code' => 'ACCOUNT_PENDING_APPROVAL',
+            'message' => 'Account pending admin approval',
+            'status' => 'unverified',
+        ], 403);
     }
 
     public function logout(Request $request)

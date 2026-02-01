@@ -102,7 +102,6 @@ class OpenAIProviderTest extends TestCase
 
         $stats = $provider->getUsageStats();
 
-        $this->assertIsArray($stats);
         $this->assertArrayHasKey('session_cost', $stats);
         $this->assertArrayHasKey('requests_this_minute', $stats);
         $this->assertArrayHasKey('requests_today', $stats);

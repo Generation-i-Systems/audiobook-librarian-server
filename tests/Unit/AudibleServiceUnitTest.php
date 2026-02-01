@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Storage;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\Test;
-use Psr\Log\LoggerInterface;
 use Tests\TestCase;
 
 /**
@@ -23,7 +22,7 @@ class AudibleServiceUnitTest extends TestCase
 {
     protected AudibleService $audibleService;
 
-    protected MockInterface|LoggerInterface $loggerMock;
+    protected MockInterface $loggerMock;
 
     protected function setUp(): void
     {
@@ -31,7 +30,9 @@ class AudibleServiceUnitTest extends TestCase
         Http::preventStrayRequests();
 
         // Create a mock logger that allows any method calls
-        $this->loggerMock = Mockery::mock(\Psr\Log\LoggerInterface::class);
+        /** @var \Psr\Log\LoggerInterface&\Mockery\MockInterface $loggerMock */
+        $loggerMock = Mockery::mock(\Psr\Log\LoggerInterface::class);
+        $this->loggerMock = $loggerMock;
         $this->loggerMock->shouldReceive('emergency')->withAnyArgs()->andReturnNull();
         $this->loggerMock->shouldReceive('alert')->withAnyArgs()->andReturnNull();
         $this->loggerMock->shouldReceive('critical')->withAnyArgs()->andReturnNull();
@@ -43,6 +44,7 @@ class AudibleServiceUnitTest extends TestCase
         $this->loggerMock->shouldReceive('log')->withAnyArgs()->andReturnNull();
 
         // Create a log manager mock that returns our logger mock
+        /** @var \Mockery\MockInterface $logManagerMock */
         $logManagerMock = Mockery::mock(\Illuminate\Log\LogManager::class);
         $logManagerMock->shouldReceive('channel')->withAnyArgs()->andReturn($this->loggerMock);
         $logManagerMock->shouldReceive('stack')->withAnyArgs()->andReturn($this->loggerMock);
@@ -57,7 +59,7 @@ class AudibleServiceUnitTest extends TestCase
         $logManagerMock->shouldReceive('log')->withAnyArgs()->andReturn($this->loggerMock);
 
         // Replace the Log facade with our mock
-        $this->app->instance('log', $logManagerMock);
+        $this->app->instance(\Illuminate\Log\LogManager::class, $logManagerMock);
         Log::swap($logManagerMock);
 
         $this->audibleService = new AudibleService();

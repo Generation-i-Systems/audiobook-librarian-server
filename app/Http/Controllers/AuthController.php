@@ -51,16 +51,27 @@ class AuthController extends Controller
             'created_at' => new \DateTime(),
         ];
 
-        // Use a generic create method or add a specific createAccountRequest method to the interface
-        // For now, we'll use a temporary solution with createMessage as it has similar signature
-        $this->documentStore->createMessage([
+        $admins = $this->documentStore->getAdminUsers();
+        $adminId = $admins[0]['id'] ?? null;
+
+        if (! is_int($adminId)) {
+            return response()->json(['error' => 'No admin user available.'], 500);
+        }
+
+        $payload = [
             'type' => 'account_request',
-            'recipient_id' => 'admin', // Admin will receive this message
+            'account_request' => $accountRequestData,
+        ];
+
+        $this->documentStore->createMessage([
             'sender_id' => null,
-            'content' => json_encode($accountRequestData),
-            'created_at' => new \DateTime(),
+            'recipient_id' => $adminId,
+            'content' => json_encode($payload),
         ]);
 
-        return response()->json(['message' => 'Account request submitted. Please wait for approval.'], 201); // Created
+        return response()->json([
+            'code' => 'REGISTRATION_PENDING_APPROVAL',
+            'message' => 'Account request submitted. Please wait for approval.',
+        ], 201); // Created
     }
 }

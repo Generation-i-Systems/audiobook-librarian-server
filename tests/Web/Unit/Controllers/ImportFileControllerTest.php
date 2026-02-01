@@ -4,6 +4,7 @@ namespace Tests\Web\Unit\Controllers;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Admin\ImportFileController;
+use App\Services\BookImportService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Mockery;
@@ -19,9 +20,10 @@ class ImportFileControllerTest extends TestCase
 
         // Mock the DocumentStoreService
         $documentStoreMock = Mockery::mock(DocumentStoreServiceInterface::class);
+        $bookImportServiceMock = Mockery::mock(BookImportService::class);
 
         // Create the controller with the mock
-        $this->controller = new ImportFileController($documentStoreMock);
+        $this->controller = new ImportFileController($documentStoreMock, $bookImportServiceMock);
     }
 
     protected function tearDown(): void
@@ -206,8 +208,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock
@@ -286,8 +286,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock
@@ -358,8 +356,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock
@@ -432,8 +428,6 @@ class ImportFileControllerTest extends TestCase
         // Skip test if getID3 class doesn't exist
         if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
-
-            return;
         }
 
         // Set up Log facade mock

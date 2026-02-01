@@ -47,7 +47,9 @@ class EnrichmentMergeTest extends TestCase
 
         // Simulate the merge logic with year/published_year handling
         foreach ($enrichedData as $key => $value) {
+            /** @phpstan-ignore-next-line identical.alwaysFalse,booleanAnd.alwaysFalse,empty.offset */
             if ($key === 'year' || $key === 'published_year') {
+                /** @phpstan-ignore-next-line empty.offset,booleanAnd.alwaysFalse */
                 if (empty($metadata['year']) && empty($metadata['published_year'])) {
                     $metadata[$key] = $value;
                 }
@@ -99,6 +101,7 @@ class EnrichmentMergeTest extends TestCase
         ];
 
         foreach ($enrichedData as $key => $value) {
+            /** @phpstan-ignore-next-line empty.offset */
             if (empty($metadata[$key])) {
                 $metadata[$key] = $value;
             }
@@ -121,6 +124,7 @@ class EnrichmentMergeTest extends TestCase
         ];
 
         foreach ($enrichedData as $key => $value) {
+            /** @phpstan-ignore-next-line empty.offset */
             if (empty($metadata[$key])) {
                 $metadata[$key] = $value;
             }

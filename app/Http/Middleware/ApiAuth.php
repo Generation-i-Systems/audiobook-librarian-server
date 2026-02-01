@@ -14,24 +14,25 @@ class ApiAuth
 {
     public function handle(Request $request, Closure $next)
     {
-        // Bypass for testing actingAs ONLY if explicitly requested via header
-        if (app()->environment('testing') && $request->hasHeader('X-Acting-As-Test') && Auth::check()) {
-            return $next($request);
-        }
-
         $authHeader = $request->header('Authorization');
         $clientIp = $request->ip();
         $userAgent = $request->header('User-Agent');
         $requestUri = $request->getRequestUri();
         $requestMethod = $request->getMethod();
 
-        // Log every request that hits this middleware for debugging
-        Log::info('ApiAuth middleware called', [
+        // Log EVERY request that hits this middleware - before any logic
+        Log::error('ApiAuth middleware START', [
             'uri' => $requestUri,
             'method' => $requestMethod,
             'ip' => $clientIp,
-            'has_auth_header' => !empty($authHeader)
+            'has_auth_header' => !empty($authHeader),
+            'auth_header' => $authHeader,
         ]);
+
+        // Bypass for testing actingAs ONLY if explicitly requested via header
+        if (app()->environment('testing') && $request->hasHeader('X-Acting-As-Test') && Auth::check()) {
+            return $next($request);
+        }
 
         // Testing bypass: if running in the testing environment and a user is already
         // authenticated via any guard (e.g., actingAs in tests), allow the request
@@ -120,7 +121,10 @@ class ApiAuth
                     }
 
                     if ($user->role === 'unverified') {
-                        return response()->json(['error' => 'Account pending admin approval'], 403);
+                        return response()->json([
+                            'code' => 'ACCOUNT_PENDING_APPROVAL',
+                            'message' => 'Account pending admin approval',
+                        ], 403);
                     }
 
                     Log::info('API Auth successful via api_tokens fallback', [
@@ -204,7 +208,10 @@ class ApiAuth
                 'user_created_at' => $user->created_at->toISOString(),
                 'reason' => 'account_pending_approval'
             ]);
-            return response()->json(['error' => 'Account pending admin approval'], 403);
+            return response()->json([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
+                'message' => 'Account pending admin approval',
+            ], 403);
         }
 
         // Log successful authentication with token preview for comparison

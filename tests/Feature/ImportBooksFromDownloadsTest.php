@@ -24,7 +24,7 @@ class ImportBooksFromDownloadsTest extends TestCase
         fwrite($file, '0');
         fclose($file);
 
-        // Mock the ImportUIService
+        // Mock the ImportUIService (used when --ui=ncurses)
         $this->mock(ImportUIService::class, function (MockInterface $mock) {
             $mock->shouldReceive('initialize')->once();
             $mock->shouldReceive('drawInitialLayout')->once();
@@ -34,9 +34,12 @@ class ImportBooksFromDownloadsTest extends TestCase
             $mock->shouldReceive('clear')->once();
         });
 
-        // Act: Run the import command
-        $this->artisan('book:import', ['path' => [$importDir], '--no-backup' => true])
-            ->assertExitCode(0);
+        // Act: Run the import command with --ui=ncurses to use ImportUIService
+        $this->artisan('book:import', [
+            'path' => [$importDir],
+            '--no-backup' => true,
+            '--ui' => 'ncurses',
+        ])->assertExitCode(0);
 
         // Clean up
         File::deleteDirectory(storage_path('import'));

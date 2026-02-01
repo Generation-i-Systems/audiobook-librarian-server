@@ -28,7 +28,7 @@ class ResolveDuplicateDirectoryPaths extends Command
     {
         $dryRun = $this->option('dry-run');
         $auto = $this->option('auto');
-        $limit = $this->option('limit');
+        $limit = (int) $this->option('limit');
         $verbose = $this->option('verbose');
         $permanent = $this->option('permanent');
 
@@ -128,7 +128,8 @@ class ResolveDuplicateDirectoryPaths extends Command
         ];
 
         foreach ($duplicates as $path => $books) {
-            if ($limit && $processed >= $limit) {
+            $limitVal = $this->option('limit');
+            if ($limitVal !== null && $processed >= (int) $limitVal) {
                 break;
             }
 
@@ -314,7 +315,8 @@ class ResolveDuplicateDirectoryPaths extends Command
             }
         }
 
-        return $total > 0 ? (int) round(($present / $total) * 100) : 0;
+        /** @var int<1, max> $total */
+        return (int) round(($present / $total) * 100);
     }
 
     protected function askForAction(array $books): string
@@ -551,6 +553,7 @@ class ResolveDuplicateDirectoryPaths extends Command
             }
 
             // Update relationships using the Book model
+            /** @var \App\Models\Book|null $bookModel */
             $bookModel = \App\Models\Book::find($baseId);
             if ($bookModel) {
                 // Sync authors

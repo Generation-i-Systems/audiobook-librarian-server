@@ -83,33 +83,28 @@ class TestAudiobookBayCommand extends Command
             return 0;
         }
 
-        // Perform search
-        $this->info("2. Searching for: {$query}");
-        $html = $this->audiobookBayService->getApiService()->audiobookBaySearch($query);
+        // Parse results
+        $this->info('3. Parsing search results...');
 
-        if (empty($html)) {
+        /** @var string|array<mixed> $response */
+        $response = $this->audiobookBayService->getApiService()->audiobookBaySearch($query);
+
+        if (empty($response)) {
             $this->error('❌ Search failed or returned no results');
 
             return 1;
         }
 
-        $this->info('✅ Search successful!');
-        $this->line('');
-
-        // Parse results
-        $this->info('3. Parsing search results...');
-        if (is_array($html)) {
-            $results = $html;
-        } else {
-            $results = $this->audiobookBayService->getApiService()->parseSearchResults($html);
-        }
+        $results = is_array($response)
+            ? $response
+            : $this->audiobookBayService->getApiService()->parseSearchResults((string) $response);
 
         if (empty($results)) {
             $this->warn('⚠️  No results found or failed to parse results');
 
             if ($debug) {
                 $this->line("\nRaw HTML response:");
-                $this->line($html);
+                $this->line(is_array($response) ? 'Array response' : (string) $response);
             }
 
             return 0;
@@ -154,12 +149,7 @@ class TestAudiobookBayCommand extends Command
 
                     continue;
                 }
-                // Number match (if present)
-                if ($inputNumber !== null && $resultNumber !== null && $inputNumber != $resultNumber) {
-                    $matchReason = "Book number mismatch: input {$inputNumber}, result {$resultNumber}";
 
-                    continue;
-                }
                 if ($sim > $bestScore) {
                     $bestScore = $sim;
                     $bestMatch = $result;
@@ -172,18 +162,16 @@ class TestAudiobookBayCommand extends Command
             } else {
                 $this->warn("\nNo sufficiently similar result found for enrichment.");
                 $this->line("  Searched for: '{$inputTitle}'" . ($inputAuthor ? " by '{$inputAuthor}'" : ''));
-                if (!empty($results)) {
-                    $this->line('  Search results:');
-                    foreach ($results as $i => $r) {
-                        $sim = AudiobookBayApiService::calculateSimilarity($inputTitle, $r['title'] ?? '');
-                        $authorMatch = $inputAuthor ? (stripos($r['title'] ?? '', $inputAuthor) !== false ? 'yes' : 'no') : 'n/a';
-                        $this->line(
-                            "    [{$i}] Title: '{$r['title']}' | Author match: {$authorMatch} | Similarity: {$sim}"
-                        );
-                    }
-                } else {
-                    $this->line('  No results returned from search.');
+
+                $this->line('  Search results:');
+                foreach ($results as $i => $r) {
+                    $sim = AudiobookBayApiService::calculateSimilarity($inputTitle, $r['title'] ?? '');
+                    $authorMatch = $inputAuthor ? (stripos($r['title'] ?? '', $inputAuthor) !== false ? 'yes' : 'no') : 'n/a';
+                    $this->line(
+                        "    [{$i}] Title: '{$r['title']}' | Author match: {$authorMatch} | Similarity: {$sim}"
+                    );
                 }
+
                 if ($matchReason) {
                     $this->line("  Last rejection reason: {$matchReason}");
                 }
@@ -193,7 +181,7 @@ class TestAudiobookBayCommand extends Command
         // If debug mode, show raw HTML
         if ($debug) {
             $this->line("\nRaw HTML response:");
-            $this->line($html);
+            $this->line(is_array($response) ? 'Array response' : (string) $response);
         }
 
         return 0;
@@ -237,12 +225,8 @@ class TestAudiobookBayCommand extends Command
 
         $this->info('Fetching details from: ' . $url);
 
-        // Use AudiobookBayService public method if available, fallback to apiService
-        if (method_exists($this->audiobookBayService, 'performGetBookDetails')) {
-            $book = $this->audiobookBayService->performGetBookDetails($url);
-        } else {
-            $book = $this->audiobookBayService->getApiService()->getAudiobookDetails($url);
-        }
+        // Fetch details from service
+        $book = $this->audiobookBayService->getApiService()->getAudiobookDetails($url);
 
         if (empty($book)) {
             $this->error('❌ Failed to fetch book details');
@@ -276,8 +260,7 @@ class TestAudiobookBayCommand extends Command
             $this->line("\n📷 Cover: " . $book['coverImage']);
             if (
                 $getImages &&
-                !empty($book['coverImageUrl']) &&
-                method_exists($this->audiobookBayService, 'downloadCoverImage')
+                !empty($book['coverImageUrl'])
             ) {
                 $this->line('Attempting to download cover image...');
                 $coverPath = $this->audiobookBayService->downloadCoverImage(

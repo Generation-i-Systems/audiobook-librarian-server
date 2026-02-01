@@ -4,7 +4,6 @@ namespace Tests\Web\Feature\Admin;
 
 use App\Auth\DocumentstoreUser;
 use App\Services\AudibleService;
-use App\Services\MongoService;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Auth;
 use Mockery;
@@ -27,10 +26,6 @@ class BookControllerAudibleTest extends TestCase
 
         // Set APP_KEY for testing
         $this->app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('a', 32)));
-
-        // Mock the MongoService to avoid database connection issues
-        $mockMongoService = Mockery::mock('MongoService');
-        $this->app->instance(MongoService::class, $mockMongoService);
 
         // Create a mock admin user with proper permissions
         $userData = [
@@ -82,7 +77,9 @@ class BookControllerAudibleTest extends TestCase
                 ],
             ]);
 
-        $this->app->instance(AudibleService::class, $mockAudibleService);
+        /** @var AudibleService $audibleMock */
+        $audibleMock = $mockAudibleService;
+        $this->app->instance(AudibleService::class, $audibleMock);
 
         // Make the request
         $response = $this->getJson('/admin/books/audible?title=Test+Book&author=Test+Author');
@@ -158,7 +155,9 @@ class BookControllerAudibleTest extends TestCase
 
         // For ASIN search, transform is not called - the raw data is returned directly
 
-        $this->app->instance(AudibleService::class, $mockAudibleService);
+        /** @var AudibleService $audibleAssinMock */
+        $audibleAssinMock = $mockAudibleService;
+        $this->app->instance(AudibleService::class, $audibleAssinMock);
 
         // Make the request
         $response = $this->getJson('/admin/books/audible?api_id=B123456789');
@@ -263,7 +262,9 @@ class BookControllerAudibleTest extends TestCase
                 ],
             ]);
 
-        $this->app->instance(AudibleService::class, $mockAudibleService);
+        /** @var AudibleService $audibleFantasyMock */
+        $audibleFantasyMock = $mockAudibleService;
+        $this->app->instance(AudibleService::class, $audibleFantasyMock);
 
         // Make the request with title and author
         $response = $this->getJson('/admin/books/audible?title=Fantasy+Book&author=John+Smith');
@@ -333,7 +334,9 @@ class BookControllerAudibleTest extends TestCase
                 ],
             ]);
 
-        $this->app->instance(AudibleService::class, $mockAudibleService);
+        /** @var AudibleService $audibleRareMock */
+        $audibleRareMock = $mockAudibleService;
+        $this->app->instance(AudibleService::class, $audibleRareMock);
 
         // Make the request with title and author
         $response = $this->getJson('/admin/books/audible?title=Rare+Book+Title&author=Famous+Author');

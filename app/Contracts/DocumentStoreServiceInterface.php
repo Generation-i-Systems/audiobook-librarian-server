@@ -30,6 +30,11 @@ interface DocumentStoreServiceInterface
     public function findBookByDirectoryPath(string $directoryPath): ?array;
 
     /**
+     * Get all books (optionally paginated by limit/offset).
+     */
+    public function getAllBooks(?int $limit = null, int $offset = 0): array;
+
+    /**
      * List books with pagination and optional filtering.
      *
      * @param int $page Page number (1-based)
@@ -253,6 +258,22 @@ interface DocumentStoreServiceInterface
      */
     public function getAllUsers(): array;
 
+    /**
+     * Get user activity data (progress, badges, reviews, etc.)
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getUserActivityData(string $userId): array;
+
+    /**
+     * Get badge tips for a user.
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getBadgeTips(string $userId): array;
+
     // GENRES
     public function createGenre(array $data);
 
@@ -444,6 +465,11 @@ interface DocumentStoreServiceInterface
     public function createMessage(array $messageData): ?string;
 
     /**
+     * Mark a message as acknowledged.
+     */
+    public function acknowledgeMessage(string $messageId): bool;
+
+    /**
      * Create an API token for a user.
      *
      * @param array $tokenData the token data including user_id, token, etc
@@ -515,6 +541,11 @@ interface DocumentStoreServiceInterface
     public function updateDocument(string $collection, string $id, array $data): bool;
 
     // JOBS
+    /**
+     * Return all jobs.
+     */
+    public function getJobs(): array;
+
     /**
      * List jobs with optional filtering and pagination.
      *
@@ -597,6 +628,18 @@ interface DocumentStoreServiceInterface
     public function updateJob(string $jobId, array $data): bool;
 
     /**
+     * Update job status with metadata.
+     *
+     * @param string $jobId The job ID
+     * @param string $type The job type
+     * @param string $status The job status
+     * @param array $metadata Additional metadata to merge
+     *
+     * @return bool Success status
+     */
+    public function updateJobStatus(string $jobId, string $type, string $status, array $metadata = []): bool;
+
+    /**
      * Clean up old completed/failed jobs.
      *
      * @param int $daysOld
@@ -661,6 +704,16 @@ interface DocumentStoreServiceInterface
      */
     public function getReadingProgress(string $userId, string $bookId): int;
 
+    /**
+     * Get reading progress for a user/book (alias for getReadingProgress).
+     *
+     * @param string $userId The user ID
+     * @param string $bookId The book ID
+     *
+     * @return int|null Current position in seconds, or null if no progress
+     */
+    public function getProgress(string $userId, string $bookId): ?int;
+
     // BOOKMARKS
     /**
      * Get all bookmarks for a user and book.
@@ -689,6 +742,65 @@ interface DocumentStoreServiceInterface
      */
     public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool;
 
+    // EXTERNAL READS
+    /**
+     * Get all external/previously-read entries for a user and book.
+     *
+     * @param string $userId The user ID
+     * @param string $bookId The book ID
+     *
+     * @return array List of external read entries
+     */
+    public function getExternalReads(string $userId, string $bookId): array;
+
+    /**
+     * Get a specific external read entry.
+     *
+     * @param string $externalReadId The external read ID
+     * @param string $userId The user ID
+     * @param string $bookId The book ID
+     *
+     * @return array|null The external read data or null if not found
+     */
+    public function getExternalRead(string $externalReadId, string $userId, string $bookId): ?array;
+
+    /**
+     * Create a new external read entry.
+     *
+     * @param array $data The external read data
+     *
+     * @return string The created external read ID
+     */
+    public function createExternalRead(array $data): string;
+
+    /**
+     * Update an external read entry.
+     *
+     * @param string $externalReadId The external read ID
+     * @param array $data The updated data
+     *
+     * @return bool Success status
+     */
+    public function updateExternalRead(string $externalReadId, array $data): bool;
+
+    /**
+     * Delete an external read entry.
+     *
+     * @param string $externalReadId The external read ID
+     * @param string $userId The user ID
+     * @param string $bookId The book ID
+     *
+     * @return bool Success status
+     */
+    public function deleteExternalRead(string $externalReadId, string $userId, string $bookId): bool;
+
+    /**
+     * Link statistical data that has no book_id to matching books by title/author.
+     *
+     * @return int Number of records linked
+     */
+    public function linkNonLibraryBooks(): int;
+
     // ACCOUNT REQUESTS
 
     /**
@@ -706,6 +818,14 @@ interface DocumentStoreServiceInterface
      * @return array|null The account request data or null if not found
      */
     public function getAccountRequest(string $id): ?array;
+
+    /**
+     * Create a new review for a book.
+     *
+     * @param array $data
+     * @return string Review ID
+     */
+    public function createReview(array $data): string;
 
     /**
      * Approve an account request.

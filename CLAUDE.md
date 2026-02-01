@@ -163,6 +163,7 @@ These rules ensure maintainability, safety, and developer velocity.
 - **GH-5 (MUST)** Use `git rebase` to rebase the last commit.
 - **GH-6 (MUST)** if a commit fails causing you to edit code, make sure the new changes are added before retrying the commit. Using `git status` to ensure the expected changes are added.
 - **GH-7 (SHOULD)** If a commit can reasonably be split into multiple commits, do so.
+- **GH-8 (MUST NOT)** Use `--no-verify` flag with git commands unless the user gives express approval after you explain why the hook failure cannot be avoided through fixing the underlying issue.
 
 ---
 

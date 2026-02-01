@@ -20,6 +20,7 @@ class GenrePathHandlingTest extends TestCase
         $directoryPathParts = explode('/', $directoryPath);
         $firstPart = reset($directoryPathParts);
 
+        /** @phpstan-ignore-next-line empty.variable */
         if (!empty($genrePath) && $firstPart !== $genrePath) {
             $destDir = $destRoot . DIRECTORY_SEPARATOR . $genrePath . DIRECTORY_SEPARATOR . $directoryPath;
         } else {
@@ -41,6 +42,7 @@ class GenrePathHandlingTest extends TestCase
         $directoryPathParts = explode('/', $directoryPath);
         $firstPart = reset($directoryPathParts);
 
+        /** @phpstan-ignore-next-line empty.variable */
         if (!empty($genrePath) && $firstPart !== $genrePath) {
             $destDir = $destRoot . DIRECTORY_SEPARATOR . $genrePath . DIRECTORY_SEPARATOR . $directoryPath;
         } else {

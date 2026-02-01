@@ -70,6 +70,100 @@ class BookApiController extends Controller
         $this->documentStoreService = $documentStoreService;
     }
 
+    /**
+     * Batch fetch book metadata
+     */
+    public function batch(Request $request)
+    {
+        $validated = $request->validate([
+            'bookIds' => 'nullable|array',
+            'bookIds.*' => 'integer',
+            'queries' => 'nullable|array',
+            'queries.*.title' => 'required_with:queries|string',
+            'queries.*.author' => 'nullable|string',
+        ]);
+
+        $bookIds = $validated['bookIds'] ?? [];
+        $queries = $validated['queries'] ?? [];
+
+        $results = [];
+        $processedIds = [];
+
+        // 1. Fetch by IDs
+        if (!empty($bookIds)) {
+            $books = \App\Models\Book::whereIn('id', $bookIds)->get();
+            foreach ($books as $book) {
+                // @phpstan-ignore-next-line
+                $results[] = $this->transformBookForBatch($book);
+                $processedIds[] = $book->id;
+            }
+
+            // Find missing IDs in ClientBooks
+            $missingIds = array_diff($bookIds, $processedIds);
+            if (!empty($missingIds)) {
+                $clientBooks = \App\Models\ClientBook::whereIn('id', $missingIds)->get();
+                foreach ($clientBooks as $clientBook) {
+                    $results[] = $this->transformClientBookForBatch($clientBook);
+                }
+            }
+        }
+
+        // 2. Process Queries
+        foreach ($queries as $query) {
+            $title = $query['title'];
+            $author = $query['author'] ?? null;
+
+            // Try main books
+            $q = \App\Models\Book::where('title', 'LIKE', $title);
+            if ($author) {
+                $q->whereHas('authors', function ($sq) use ($author) {
+                    $sq->where('name', 'LIKE', "%{$author}%");
+                });
+            }
+            $book = $q->first();
+
+            if ($book) {
+                // Avoid duplicates if we already found it by ID
+                if (!in_array($book->id, $processedIds)) {
+                    // @phpstan-ignore-next-line
+                    $results[] = $this->transformBookForBatch($book);
+                    $processedIds[] = $book->id;
+                }
+                continue;
+            }
+
+            // Try Client Books
+            $q = \App\Models\ClientBook::where('title', $title);
+            if ($author) {
+                $q->where('author', $author);
+            }
+            $clientBook = $q->first();
+
+            if ($clientBook) {
+                $results[] = $this->transformClientBookForBatch($clientBook);
+            }
+        }
+
+        return response()->json($results);
+    }
+
+    private function transformBookForBatch($book)
+    {
+        return $this->getBookWithCover($book->toArray(), true, false);
+    }
+
+    private function transformClientBookForBatch($clientBook)
+    {
+        return [
+            'id' => $clientBook->id,
+            'title' => $clientBook->title,
+            'author' => $clientBook->author,
+            'coverImage' => $clientBook->cover_url, // Map to expected field
+            'is_client_book' => true,
+            'source' => 'client',
+        ];
+    }
+
     public function index(Request $request)
     {
         $perPage = $request->input('per_page', 15);
@@ -126,15 +220,26 @@ class BookApiController extends Controller
             }, $booksArray);
         }
 
+        if ($booksData['total'] > 0) {
+            $from = (($page - 1) * $perPage) + 1;
+        } else {
+            $from = null;
+        }
+
+        // @phpstan-ignore-next-line
+        $total = (int) $booksData['total'] ?? 0;
+        $to = ($total > 0) ? min($page * $perPage, $total) : null;
+        $lastPage = $booksData['lastPage'] ?? max(1, ceil($total / $perPage));
+
         return response()->json([
             'data' => $transformedBooks,
             'meta' => [
                 'current_page' => $booksData['currentPage'] ?? $page,
-                'from' => ($booksData['total'] > 0) ? (($page - 1) * $perPage) + 1 : null,
-                'last_page' => $booksData['lastPage'] ?? max(1, ceil(($booksData['total'] ?? 0) / $perPage)),
+                'from' => $from,
+                'last_page' => $lastPage,
                 'per_page' => $perPage,
-                'to' => ($booksData['total'] > 0) ? min($page * $perPage, $booksData['total']) : null,
-                'total' => $booksData['total'] ?? 0,
+                'to' => $to,
+                'total' => $total,
             ],
         ]);
     }
@@ -263,9 +368,9 @@ class BookApiController extends Controller
      *
      * @param string $coverImage The cover image value from database
      * @param string|null $directoryPath The directory path for the book
-     * @return string|null The resolved cover image path
+     * @return string The resolved cover image path
      */
-    private function resolveCoverImagePath(string $coverImage, ?string $directoryPath): ?string
+    private function resolveCoverImagePath(string $coverImage, ?string $directoryPath): string
     {
         // Clean up any corrupted paths (remove quotes, etc.)
         $coverImage = trim($coverImage, "'\"");
@@ -337,14 +442,15 @@ class BookApiController extends Controller
      * Proxy a remote cover image URL with caching and error handling
      *
      * @param string $url The remote URL to proxy
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
      */
-    private function proxyRemoteCoverImage(string $url): \Illuminate\Http\Response
+    private function proxyRemoteCoverImage(string $url): \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
     {
         try {
             Log::info('Proxying remote cover image', ['url' => $url]);
 
             // Use Laravel's HTTP client with a reasonable timeout
+            /** @var \Illuminate\Http\Client\Response $response */
             $response = \Illuminate\Support\Facades\Http::timeout(10)
                 ->withHeaders([
                     'User-Agent' => 'Mozilla/5.0 (compatible; BooksCoverProxy/1.0)',
@@ -619,7 +725,6 @@ class BookApiController extends Controller
         }
         $orderedFiles = array_merge($orderedFiles, $audioFiles, $otherFiles);
 
-        // Generate download manifest
         $manifest = [
             'book_id' => (int) $id,
             'title' => $book['title'] ?? '',
@@ -634,7 +739,52 @@ class BookApiController extends Controller
             'generated_at' => now()->toISOString(),
         ];
 
-        return response()->json($manifest);
+        // If client wants JSON, return the manifest instead of the ZIP file
+        if (request()->wantsJson()) {
+            return response()->json($manifest);
+        }
+
+        // Ensure temp directory exists
+        if (!file_exists(storage_path('app/temp'))) {
+            mkdir(storage_path('app/temp'), 0755, true);
+        }
+
+        // Create ZIP file
+        $zipFileName = 'book_' . $id . '_' . Str::slug($book['title'] ?? 'unknown') . '.zip';
+        $zipPath = storage_path('app/temp/' . $zipFileName);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+            // Add metadata.json
+            $zip->addFromString('metadata.json', json_encode($orderedFiles, JSON_PRETTY_PRINT));
+
+            // Add cover image
+            if ($coverFile) {
+                $zip->addFile(Storage::disk('books')->path($coverFile['path']), 'cover.' . pathinfo($coverFile['path'], PATHINFO_EXTENSION));
+            }
+
+            // Add audio files
+            foreach ($audioFiles as $file) {
+                $zip->addFile(Storage::disk('books')->path($file['path']), $file['filename']);
+            }
+
+            // Add other files
+            foreach ($otherFiles as $file) {
+                if ($coverFile && $file['path'] === $coverFile['path']) {
+                    continue;
+                } // Skip if already added as cover
+                $zip->addFile(Storage::disk('books')->path($file['path']), $file['filename']);
+            }
+
+            $zip->close();
+        } else {
+            return response()->json([
+               'error' => 'Zip creation failed',
+               'message' => 'Could not create zip file',
+            ], 500);
+        }
+
+        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
     }
 
     /**
@@ -1509,15 +1659,26 @@ class BookApiController extends Controller
         $books = $booksData['data'];
         $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
+        if ($booksData['total'] > 0) {
+            $from = (($page - 1) * $perPage) + 1;
+        } else {
+            $from = null;
+        }
+
+        // @phpstan-ignore-next-line
+        $total = (int) $booksData['total'] ?? 0;
+        $to = ($total > 0) ? min($page * $perPage, $total) : null;
+        $lastPage = $booksData['lastPage'] ?? max(1, ceil($total / $perPage));
+
         return response()->json([
             'data' => $transformedBooks,
             'meta' => [
-                'current_page' => $page,
-                'from' => ($booksData['total'] > 0) ? (($page - 1) * $perPage) + 1 : null,
-                'last_page' => $booksData['lastPage'],
+                'current_page' => $booksData['currentPage'] ?? $page,
+                'from' => $from,
+                'last_page' => $lastPage,
                 'per_page' => $perPage,
-                'to' => ($booksData['total'] > 0) ? min($page * $perPage, $booksData['total']) : null,
-                'total' => $booksData['total'],
+                'to' => $to,
+                'total' => $total,
             ],
         ]);
     }
@@ -1766,13 +1927,16 @@ class BookApiController extends Controller
             $sort = 'name_asc';
         }
 
+        $isFavorite = $request->boolean('favorites', false);
+        $userId = Auth::id();
+
         // Build the base query
         $query = \App\Models\Author::query()
             ->select([
                 'authors.id',
                 'authors.name',
-                'authors.updated_at',
             ])
+            ->selectRaw('MAX(authors.updated_at) as updated_at')
             ->selectSub(function ($q) use ($includeNeedsReview) {
                 $q->from('author_book')
                     ->join('books', 'author_book.book_id', '=', 'books.id')
@@ -1782,8 +1946,17 @@ class BookApiController extends Controller
                 }
                 $q->selectRaw('COUNT(DISTINCT books.id)');
             }, 'book_count')
+            ->selectRaw('EXISTS(SELECT 1 FROM user_author_favorites WHERE user_id = ? AND author_id = authors.id) as isFavorite', [$userId])
             ->join('author_book', 'authors.id', '=', 'author_book.author_id')
             ->join('books', 'author_book.book_id', '=', 'books.id');
+
+        if ($isFavorite && $userId) {
+            $query->join('user_author_favorites', function ($join) use ($userId) {
+                $join->on('authors.id', '=', 'user_author_favorites.author_id')
+                    ->where('user_author_favorites.user_id', '=', $userId);
+            });
+        }
+
 
         if ($since) {
             $query->where('authors.updated_at', '>=', date('Y-m-d H:i:s', $since));
@@ -1848,6 +2021,14 @@ class BookApiController extends Controller
         if (!$includeNeedsReview) {
             $countQuery->where('books.needs_review', false);
         }
+
+        if ($isFavorite && $userId) {
+            $countQuery->join('user_author_favorites', function ($join) use ($userId) {
+                $join->on('authors.id', '=', 'user_author_favorites.author_id')
+                    ->where('user_author_favorites.user_id', '=', $userId);
+            });
+        }
+
 
         // Add same genre filtering as main query if present
         if ($genreId || $genreName) {
@@ -1930,6 +2111,7 @@ class BookApiController extends Controller
                 'image_url' => null, // Column doesn't exist in database
                 'genres' => $author->genres,
                 'series' => $authorSeries->toArray(),
+                'isFavorite' => (bool) $author->isFavorite,
             ];
         });
 
@@ -1967,6 +2149,8 @@ class BookApiController extends Controller
         $search = $request->input('search');
         $since = $request->input('since') ? (int) $request->input('since') : null;
         $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
+        $isFavorite = $request->boolean('favorites', false);
+        $userId = Auth::id();
 
         // Validate sort parameter
         $allowedSorts = ['name_asc', 'name_desc', 'book_count_asc', 'book_count_desc'];
@@ -1979,11 +2163,20 @@ class BookApiController extends Controller
             ->select([
                 'series.id',
                 'series.name',
-                'series.updated_at',
             ])
+            ->selectRaw('MAX(series.updated_at) as updated_at')
             ->withCount('books as book_count')
+            ->selectRaw('EXISTS(SELECT 1 FROM user_series_favorites WHERE user_id = ? AND series_id = series.id) as isFavorite', [$userId])
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
+
+        if ($isFavorite && $userId) {
+            $query->join('user_series_favorites', function ($join) use ($userId) {
+                $join->on('series.id', '=', 'user_series_favorites.series_id')
+                    ->where('user_series_favorites.user_id', '=', $userId);
+            });
+        }
+
 
         if ($since) {
             $query->where('series.updated_at', '>=', date('Y-m-d H:i:s', $since));
@@ -2048,6 +2241,14 @@ class BookApiController extends Controller
             $countQuery->where('books.needs_review', false);
         }
 
+        if ($isFavorite && $userId) {
+            $countQuery->join('user_series_favorites', function ($join) use ($userId) {
+                $join->on('series.id', '=', 'user_series_favorites.series_id')
+                    ->where('user_series_favorites.user_id', '=', $userId);
+            });
+        }
+
+
         // Add same author filtering as main query if present
         if ($authorId || $authorName) {
             $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
@@ -2104,6 +2305,7 @@ class BookApiController extends Controller
                 'book_count' => $totalBookCount,
                 'book_count_by_author' => $series->book_count_by_author ?? $series->book_count,
                 'authors' => $series->authors,
+                'isFavorite' => (bool) $series->isFavorite,
             ];
         });
 

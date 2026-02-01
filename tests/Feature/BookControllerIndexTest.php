@@ -42,6 +42,7 @@ class BookControllerIndexTest extends TestCase
         $this->actingAs($user);
 
         // Mock the Log facade with required methods
+        /** @var \Mockery\MockInterface $logMock */
         $logMock = \Mockery::mock('log');
         $logMock->shouldReceive('error');
         $logMock->shouldReceive('log');

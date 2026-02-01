@@ -41,14 +41,5 @@ class MetadataExtractionTest extends TestCase
     {
         // Skip this test for now as it requires more setup
         $this->markTestSkipped('This test requires additional setup to work with the current implementation');
-
-        // The test will be implemented in a future update
-        $this->assertTrue(true);
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function test_placeholder()
-    {
-        $this->assertTrue(true);
     }
 }

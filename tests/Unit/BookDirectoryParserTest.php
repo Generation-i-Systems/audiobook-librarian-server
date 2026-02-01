@@ -382,7 +382,6 @@ EOT;
 
         // Test with non-existent directory - should return array with empty values
         $result = $this->parser->readMetadataFile(vfsStream::url('non_existent_dir') . '/metadata.abs');
-        $this->assertIsArray($result);
         $this->assertEquals([], $result);
 
         // Test with empty metadata file
@@ -393,7 +392,6 @@ EOT;
         $result = $this->parser->readMetadataFile(vfsStream::url('testDir/empty_metadata.abs'));
 
         // Should return an array with empty values for expected keys
-        $this->assertIsArray($result);
         $this->assertArrayHasKey('title', $result);
         $this->assertEmpty($result['title']);
         $this->assertArrayHasKey('author', $result);
@@ -638,7 +636,7 @@ EOT;
         }
 
         $this->assertEquals('Mixed Line Endings', $result['title'] ?? '', 'Title does not match expected');
-        $this->assertEquals(['Author X'] ?? [], $result['author'] ?? [], 'Author does not match expected');
+        $this->assertEquals(['Author X'], $result['author'] ?? [], 'Author does not match expected');
         $this->assertEquals('Test Series', $result['series'] ?? '', 'Series does not match expected');
         $this->assertEquals('Narrator Y', $result['narrator'] ?? '', 'Narrator does not match expected');
     }
@@ -664,7 +662,6 @@ EOT;
         // The parser should use the metadata from the service
         $metadataFilePath = $directoryPath . '/metadata.abs';
         $result = $this->parser->readMetadataFile($directoryPath);
-        $this->assertIsArray($result, 'Result should be an array');
         $this->assertEmpty($result, 'Result empty if metadata.abs missing (service not used by this specific method).');
     }
 }

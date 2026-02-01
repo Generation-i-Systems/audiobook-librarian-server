@@ -308,7 +308,7 @@ class UpdateLibraryJson extends Command
                     return null;
                 }
                 $series = $data['series'];
-                if (is_array($series) && !empty($series)) {
+                if (is_array($series)) {
                     // Handle multiple series as an array of "Name #Number"
                     $seriesList = [];
                     foreach ($series as $name => $number) {

@@ -13,8 +13,6 @@ class BookMetadataServiceTest extends TestCase
 {
     private BookMetadataService $service;
 
-    private $root;
-
     private $testDir;
 
     private array $testMetadata = [
@@ -28,7 +26,7 @@ class BookMetadataServiceTest extends TestCase
     {
         parent::setUp();
         // Set up virtual filesystem
-        $this->root = vfsStream::setup('testDir');
+        vfsStream::setup('testDir');
 
         // Create a test directory for local storage
         $this->testDir = vfsStream::url('testDir/test_books');

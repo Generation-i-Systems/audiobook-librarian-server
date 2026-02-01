@@ -60,6 +60,10 @@ class MoveBookDirectory extends Command
         $verbose = $this->option('verbose');
         $regexPattern = $this->option('regex');
 
+        $this->logDebug('Documentstore service resolved', [
+            'service_class' => $this->documentStore::class,
+        ]);
+
         $this->verboseOutput = (bool) $verbose;
 
         // Need at least source and destination
@@ -318,7 +322,7 @@ class MoveBookDirectory extends Command
                 return 1;
             }
 
-            $isInteractive = isset($this->input) && $this->input->isInteractive();
+            $isInteractive = $this->input->isInteractive();
             if (!$isInteractive) {
                 $this->error('Destination is outside the configured book root. Aborting.');
                 return 1;
@@ -350,7 +354,7 @@ class MoveBookDirectory extends Command
         $this->info("Found " . count($allAffectedBooks) . " book(s) to update across " . count($bookSources) . " source(s)");
 
         if ((bool) $this->option('verify')) {
-            $isInteractive = isset($this->input) && $this->input->isInteractive();
+            $isInteractive = $this->input->isInteractive();
             if (!$isInteractive) {
                 $this->error('Cannot use --verify in non-interactive mode.');
                 return 1;
@@ -487,7 +491,7 @@ class MoveBookDirectory extends Command
                 $this->info("✓ Moved: " . basename($sourcePath));
 
                 // Update database records
-                if (!$noDb && !empty($bookSource['books'])) {
+                if (!$noDb) {
                     $destRelative = $this->getRelativePath($finalDest);
                     $this->logDebug('Updating book records', [
                         'source_relative' => $sourceRelative,
@@ -624,7 +628,6 @@ class MoveBookDirectory extends Command
             realpath($this->bookRoot) ?: null,
             config('app.book_root'),
             config('filesystems.disks.books.root'),
-            env('BOOK_STORAGE_PATH'),
         ]));
 
         $isWithinRoot = false;
@@ -662,11 +665,10 @@ class MoveBookDirectory extends Command
 
     private function resolveBookRoot(): string
     {
-        $configBookRoot = config('app.book_root');
+        $configBookRoot = config('filesystems.disks.books.root') ?? config('app.book_root');
         $diskRoot = config('filesystems.disks.books.root');
-        $envRoot = env('BOOK_STORAGE_PATH');
 
-        $bookStoragePath = $diskRoot ?: ($configBookRoot ?: $envRoot);
+        $bookStoragePath = $diskRoot ?: $configBookRoot;
 
         if (empty($bookStoragePath)) {
             throw new \RuntimeException('Book storage path is not configured. Set config("app.book_root") or filesystems.disks.books.root.');
@@ -825,8 +827,8 @@ class MoveBookDirectory extends Command
                     // Extract genre from path structure if it changed
                     // The first segment of the relative path is the genre directory
                     $pathSegments = explode('/', trim($newPath, '/'));
-                    if (count($pathSegments) > 0) {
-                        $newGenre = $pathSegments[0];
+                    $newGenre = $pathSegments[0];
+                    if ($newGenre !== '') {
                         $currentGenres = $bookModel->genres->pluck('name')->toArray();
                         $currentPrimaryGenre = $currentGenres[0] ?? null;
 
@@ -843,7 +845,8 @@ class MoveBookDirectory extends Command
                     // IMPORTANT: Full metadata parsing is DISABLED by default because the parser
                     // extracts incorrect data from absolute paths (e.g., "media" as author)
                     // We only update genre above, which comes from the directory structure
-                    if (false && !$noParse) {
+                    $parseMetadata = (bool) config('app.enable_move_book_directory_parse', false);
+                    if ($parseMetadata && !$noParse) {
                         try {
                             // Check if directory exists and has audio files before parsing
                             $fullPath = $this->bookRoot . '/' . $newPath;
@@ -1190,8 +1193,9 @@ class MoveBookDirectory extends Command
      */
     private function parseRegexPattern(string $pattern): ?array
     {
-        // Support s/pattern/replacement/flags format
-        if (!preg_match('#^s([/#])(.+?)\1(.*?)\1([gimsx]*)$#', $pattern, $matches)) {
+        // Support s<delim>pattern<delim>replacement<delim>flags format
+        // Delimiter can be any single non-whitespace character.
+        if (!preg_match('~^s(\S)(.*?)\1(.*?)\1([gimsx]*)$~', $pattern, $matches)) {
             return null;
         }
 

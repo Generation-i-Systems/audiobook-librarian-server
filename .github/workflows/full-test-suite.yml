@@ -2,8 +2,8 @@ name: Full Test Suite
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 2 * * *" # Run daily at 2 AM UTC
+  # schedule:
+  #   - cron: "0 2 * * *" # Run daily at 2 AM UTC
   push:
     branches: [main, develop, "release/*", "hotfix/*"]
   pull_request:

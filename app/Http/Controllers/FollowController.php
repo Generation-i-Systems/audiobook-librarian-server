@@ -24,11 +24,11 @@ class FollowController extends Controller
         ]);
 
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $this->documentStoreService->createFollow([
-            'user_id' => Auth::id(),
-            'followable_type' => $followableType,
-            'followable_id' => $followableId,
-        ]);
+        $this->documentStoreService->createFollow(
+            (string) Auth::id(),
+            $followableType,
+            $followableId
+        );
 
         return back()->with('success', 'Successfully followed!');
     }
@@ -41,11 +41,11 @@ class FollowController extends Controller
             'followable_id' => 'required|integer',
         ]);
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $this->documentStoreService->deleteFollow([
-            'user_id' => Auth::id(),
-            'followable_type' => $followableType,
-            'followable_id' => $followableId,
-        ]);
+        $this->documentStoreService->deleteFollow(
+            (string) Auth::id(),
+            $followableType,
+            $followableId
+        );
 
         return back()->with('success', 'Successfully unfollowed!');
     }

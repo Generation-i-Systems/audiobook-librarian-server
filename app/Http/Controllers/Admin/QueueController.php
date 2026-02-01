@@ -136,7 +136,7 @@ class QueueController extends Controller
     public function bulkImportBooks(Request $request)
     {
         $root = $request->input('dir');
-        $storagePath = env('BOOK_STORAGE_PATH');
+        $storagePath = config('filesystems.disks.books.root') ?? config('app.book_root');
         $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
         if (!is_dir($absRoot)) {
             return response()->json([

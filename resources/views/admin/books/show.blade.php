@@ -2,39 +2,43 @@
 
 @php
     // Helper function to format array values
-    function formatValue($value)
-    {
-        if (is_array($value)) {
-            // If it's an associative array with a 'name' key
-            if (isset($value['name'])) {
-                return $value['name'];
+    if (!function_exists('formatValue')) {
+        function formatValue($value)
+        {
+            if (is_array($value)) {
+                // If it's an associative array with a 'name' key
+                if (isset($value['name'])) {
+                    return $value['name'];
+                }
+                // If it's an array of values, join them with commas
+                return implode(', ', array_filter($value, 'is_string'));
             }
-            // If it's an array of values, join them with commas
-            return implode(', ', array_filter($value, 'is_string'));
+            return $value;
         }
-        return $value;
     }
 
     // Helper function to format series with their numbers
-    function formatSeries($series)
-    {
-        if (empty($series)) {
+    if (!function_exists('formatSeries')) {
+        function formatSeries($series)
+        {
+            if (empty($series)) {
+                return 'N/A';
+            }
+
+            $result = [];
+
+            // Handle the new format: ['Series Name' => number, ...]
+            if (is_array($series)) {
+                foreach ($series as $name => $number) {
+                    if (is_string($name)) {
+                        $result[] = $name . ($number !== null ? " (#$number)" : '');
+                    }
+                }
+                return !empty($result) ? implode(', ', $result) : 'N/A';
+            }
+
             return 'N/A';
         }
-
-        $result = [];
-
-        // Handle the new format: ['Series Name' => number, ...]
-        if (is_array($series)) {
-            foreach ($series as $name => $number) {
-                if (is_string($name)) {
-                    $result[] = $name . ($number !== null ? " (#$number)" : '');
-                }
-            }
-            return !empty($result) ? implode(', ', $result) : 'N/A';
-        }
-
-        return 'N/A';
     }
 @endphp
 

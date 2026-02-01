@@ -28,6 +28,7 @@ class AudiobookBayApiServiceCacheTest extends TestCase
         $result = $service->searchAudiobooks('foo');
 
         $this->assertNull($result, 'Should return null when cache contains invalid value');
+        // @phpstan-ignore-next-line
         $cacheSpy->shouldHaveReceived('get');
     }
 }

@@ -42,7 +42,9 @@ class BookImportTest extends TestCase
         $this->assertEquals('Test Book', $result['title']);
         $this->assertEquals('Test Author', $result['authors'][0]);
         $this->assertEquals(['Test Genre'], $result['genre']);
+        // @phpstan-ignore-next-line
         $this->assertEquals(['Test Series' => '1'], $result['series']);
+        // @phpstan-ignore-next-line
         $this->assertEquals(1, $result['series_number']);
     }
 

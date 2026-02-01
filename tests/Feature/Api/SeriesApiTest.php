@@ -13,6 +13,7 @@ class SeriesApiTest extends ApiTestCase
     public function test_series_endpoint_returns_paginated_list()
     {
         // Create test series with books and authors
+        /** @var \Illuminate\Database\Eloquent\Collection<int, Series> $series */
         $series = Series::factory()->count(3)->create();
 
         foreach ($series as $s) {
@@ -58,8 +59,11 @@ class SeriesApiTest extends ApiTestCase
         $author2 = Author::factory()->create(['name' => 'Stephen King']);
 
         // Create series
+        /** @var Series $series1 */
         $series1 = Series::factory()->create(['name' => 'The Stormlight Archive']);
+        /** @var Series $series2 */
         $series2 = Series::factory()->create(['name' => 'The Dark Tower']);
+        /** @var Series $series3 */
         $series3 = Series::factory()->create(['name' => 'Mistborn']); // Also by Sanderson
 
         // Create books and relationships
@@ -78,6 +82,7 @@ class SeriesApiTest extends ApiTestCase
         $book2->series()->attach($series2, ['series_number' => '1']);
 
         // Test filtering by author1
+        /** @var \Illuminate\Database\Eloquent\Model $author1 */
         $response = $this->getJson('/api/v1/series?author_id=' . $author1->id);
 
         $response->assertStatus(200);
@@ -95,6 +100,7 @@ class SeriesApiTest extends ApiTestCase
         $author = Author::factory()->create(['name' => 'Isaac Asimov']);
 
         // Create series with books by this author
+        /** @var Series $series */
         $series = Series::factory()->create(['name' => 'Foundation']);
         $book = Book::factory()->create();
         $book->authors()->attach($author);
@@ -118,6 +124,7 @@ class SeriesApiTest extends ApiTestCase
     public function test_series_endpoint_supports_pagination()
     {
         // Create many series with books
+        /** @var \Illuminate\Database\Eloquent\Collection<int, Series> $series */
         $series = Series::factory()->count(75)->create();
         foreach ($series as $s) {
             $author = Author::factory()->create();
@@ -150,7 +157,9 @@ class SeriesApiTest extends ApiTestCase
     public function test_series_endpoint_supports_search()
     {
         // Create series with specific names
+        /** @var Series $series1 */
         $series1 = Series::factory()->create(['name' => 'Harry Potter']);
+        /** @var Series $series2 */
         $series2 = Series::factory()->create(['name' => 'Lord of the Rings']);
 
         // Add books to make them appear in results
@@ -177,7 +186,9 @@ class SeriesApiTest extends ApiTestCase
     public function test_series_endpoint_supports_sorting()
     {
         // Create series with different names and book counts
+        /** @var Series $seriesA */
         $seriesA = Series::factory()->create(['name' => 'Alpha Series']);
+        /** @var Series $seriesZ */
         $seriesZ = Series::factory()->create(['name' => 'Zeta Series']);
 
         $author = Author::factory()->create();
@@ -253,6 +264,7 @@ class SeriesApiTest extends ApiTestCase
         $author2 = Author::factory()->create(['name' => 'Author Two']);
 
         // Create series
+        /** @var Series $series */
         $series = Series::factory()->create(['name' => 'Multi-Author Series']);
 
         // Create books by both authors in the same series
@@ -291,6 +303,7 @@ class SeriesApiTest extends ApiTestCase
         $otherAuthor = Author::factory()->create(['name' => 'Other Author']);
 
         // Create series
+        /** @var Series $series */
         $series = Series::factory()->create(['name' => 'Mixed Series']);
 
         // Target author has 2 books in the series
@@ -308,6 +321,7 @@ class SeriesApiTest extends ApiTestCase
         }
 
         // Filter by target author
+        /** @var \Illuminate\Database\Eloquent\Model $targetAuthor */
         $response = $this->getJson('/api/v1/series?author_id=' . $targetAuthor->id);
 
         $response->assertStatus(200);
@@ -318,5 +332,79 @@ class SeriesApiTest extends ApiTestCase
         $this->assertNotNull($testSeries);
         $this->assertEquals(5, $testSeries['book_count']); // Total books in series
         $this->assertEquals(2, $testSeries['book_count_by_author']); // Books by filtered author
+    }
+
+    public function test_toggle_series_favorite()
+    {
+        $user = $this->user;
+        /** @var Series $series */
+        $series = Series::factory()->create();
+        $author = Author::factory()->create();
+        $book = Book::factory()->create();
+        $book->authors()->attach($author);
+        $book->series()->attach($series, ['series_number' => '1']);
+
+        // Mark as favorite
+        $response = $this->postJson("/api/v1/series/{$series->id}/favorite", ['is_favorite' => true]);
+        $response->assertStatus(200)
+            ->assertJson([
+                'id' => $series->id,
+                'name' => $series->name,
+                'isFavorite' => true,
+            ]);
+
+        $this->assertTrue($user->favoritedSeries()->where('series_id', $series->id)->exists());
+
+        // Unmark as favorite
+        $response = $this->postJson("/api/v1/series/{$series->id}/favorite", ['is_favorite' => false]);
+        $response->assertStatus(200)
+            ->assertJson([
+                'id' => $series->id,
+                'name' => $series->name,
+                'isFavorite' => false,
+            ]);
+
+        $this->assertFalse($user->favoritedSeries()->where('series_id', $series->id)->exists());
+    }
+
+    public function test_series_endpoint_filters_by_favorites()
+    {
+        $user = $this->user;
+        /** @var Series $favoritedSeries */
+        $favoritedSeries = Series::factory()->create();
+        /** @var Series $nonFavoritedSeries */
+        $nonFavoritedSeries = Series::factory()->create();
+
+        // Attach books to series so they appear in results
+        $author = Author::factory()->create();
+        $book1 = Book::factory()->create();
+        $book1->authors()->attach($author);
+        $book1->series()->attach($favoritedSeries, ['series_number' => '1']);
+        $book2 = Book::factory()->create();
+        $book2->authors()->attach($author);
+        $book2->series()->attach($nonFavoritedSeries, ['series_number' => '1']);
+
+        $user->favoritedSeries()->attach($favoritedSeries);
+
+        $response = $this->getJson('/api/v1/series?favorites=true');
+
+        $response->assertStatus(200)
+            ->assertJsonFragment([
+                'id' => $favoritedSeries->id,
+                'name' => $favoritedSeries->name,
+                'isFavorite' => true,
+            ]);
+
+        $seriesInResponse = collect($response->json('series'));
+        $this->assertCount(1, $seriesInResponse);
+        $this->assertEquals($favoritedSeries->id, $seriesInResponse->first()['id']);
+
+        // Test that is_favorite is true when requesting all series
+        $responseAll = $this->getJson('/api/v1/series');
+        $responseAll->assertStatus(200);
+        $seriesAll = collect($responseAll->json('series'));
+
+        $this->assertTrue($seriesAll->firstWhere('id', $favoritedSeries->id)['isFavorite']);
+        $this->assertFalse($seriesAll->firstWhere('id', $nonFavoritedSeries->id)['isFavorite']);
     }
 }
