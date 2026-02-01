@@ -4071,20 +4071,9 @@ class BookImportService
         $normalizedGenre = trim($currentGenre);
         $isGenreValid = in_array($normalizedGenre, $validGenres, true);
 
-        $displayGenre = $normalizedGenre;
-        if (strlen($displayGenre) > 16) {
-            $displayGenre = substr($displayGenre, 0, 15) . '…';
-        }
-
-        $displayDirectory = $currentDirectoryPath;
-        if (strlen($displayDirectory) > 40) {
-            $displayDirectory = '…' . substr($displayDirectory, -39);
-        }
-
         $acceptLabel = $isFinalConfirmation ? 'Accept and save' : 'Accept all as correct';
         if (!$isGenreValid) {
             $acceptLabel = "\e[9m{$acceptLabel}\e[0m";
-            $displayGenre = 'Invalid';
         }
 
         $options = [

@@ -1,5 +1,7 @@
 <?php
 
+/** @noinspection PhpUnhandledExceptionInspection */
+
 namespace Tests\Cli\Unit\Commands;
 
 use App\Console\Commands\ImportBooksFromDownloads;
@@ -8,7 +10,7 @@ use Tests\TestCase;
 class ImportBooksFromDownloadsReviewOptionsTest extends TestCase
 {
     #[\PHPUnit\Framework\Attributes\Test]
-    public function buildReviewOptionsIncludesUpdateCoverGenreAndDirectory(): void
+    public function buildReviewOptionsIncludesStandardOptions(): void
     {
         $command = new ImportBooksFromDownloadsReviewOptionsTestDouble();
 
@@ -19,15 +21,23 @@ class ImportBooksFromDownloadsReviewOptionsTest extends TestCase
             false
         );
 
+        $this->assertArrayHasKey('1', $options);
+        $this->assertStringContainsString('Accept all as correct', $options['1']);
+
+        $this->assertArrayHasKey('2', $options);
+        $this->assertStringContainsString('Edit all fields', $options['2']);
+
+        $this->assertArrayHasKey('3', $options);
+        $this->assertStringContainsString('Edit individual fields', $options['3']);
+
         $this->assertArrayHasKey('4', $options);
-        $this->assertStringContainsString('Update cover', $options['4']);
+        $this->assertStringContainsString('Skip this book', $options['4']);
 
         $this->assertArrayHasKey('5', $options);
-        $this->assertStringContainsString('Update genre', $options['5']);
+        $this->assertStringContainsString('Update cover', $options['5']);
 
         $this->assertArrayHasKey('6', $options);
-        $this->assertStringContainsString('Update directory', $options['6']);
-        $this->assertStringContainsString('Some/Directory/Path', $options['6']);
+        $this->assertStringContainsString('Request enrichment', $options['6']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -46,23 +56,6 @@ class ImportBooksFromDownloadsReviewOptionsTest extends TestCase
         $this->assertStringContainsString("\e[9m", $options['1']);
         $this->assertArrayHasKey('2', $options);
         $this->assertArrayHasKey('3', $options);
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function buildReviewOptionsTruncatesLongGenreAndDirectoryValues(): void
-    {
-        $command = new ImportBooksFromDownloadsReviewOptionsTestDouble();
-
-        $options = $command->exposeBuildReviewOptions(
-            '',
-            'Historical Fiction', // Long enough to truncate (> 16)
-            'A/Very/Long/Directory/Path/That/Will/Never/Fit',
-            false
-        );
-
-        $this->assertStringContainsString('…', $options['5']);
-        $this->assertStringContainsString('…', $options['6']);
-        $this->assertStringContainsString('Update directory', $options['6']);
     }
 }
 
