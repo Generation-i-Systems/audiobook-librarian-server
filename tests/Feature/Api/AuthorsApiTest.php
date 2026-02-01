@@ -13,6 +13,7 @@ class AuthorsApiTest extends ApiTestCase
     public function test_authors_endpoint_returns_paginated_list()
     {
         // Create test data
+        /** @var \Illuminate\Database\Eloquent\Collection<int, Author> $authors */
         $authors = Author::factory()->count(3)->create();
 
         // Make each author have at least one book
@@ -57,8 +58,11 @@ class AuthorsApiTest extends ApiTestCase
         $scifiGenre = Genre::factory()->create(['name' => 'Science Fiction']);
 
         // Create authors
+        /** @var Author $fantasyAuthor */
         $fantasyAuthor = Author::factory()->create(['name' => 'Fantasy Author']);
+        /** @var Author $scifiAuthor */
         $scifiAuthor = Author::factory()->create(['name' => 'SciFi Author']);
+        /** @var Author $bothAuthor */
         $bothAuthor = Author::factory()->create(['name' => 'Both Genres Author']);
 
         // Create books and attach genres/authors
@@ -96,6 +100,7 @@ class AuthorsApiTest extends ApiTestCase
         $genre = Genre::factory()->create(['name' => 'Mystery']);
 
         // Create author with book in mystery genre
+        /** @var Author $author */
         $author = Author::factory()->create(['name' => 'Mystery Author']);
         $book = Book::factory()->create();
         $book->authors()->attach($author);
@@ -119,6 +124,7 @@ class AuthorsApiTest extends ApiTestCase
     public function test_authors_endpoint_supports_pagination()
     {
         // Create many authors with books
+        /** @var \Illuminate\Database\Eloquent\Collection<int, Author> $authors */
         $authors = Author::factory()
             ->count(75)
             ->sequence(fn (\Illuminate\Database\Eloquent\Factories\Sequence $sequence) => [
@@ -180,7 +186,9 @@ class AuthorsApiTest extends ApiTestCase
     public function test_authors_endpoint_supports_sorting()
     {
         // Create authors with different names and book counts
+        /** @var Author $authorA */
         $authorA = Author::factory()->create(['name' => 'Alpha Author']);
+        /** @var Author $authorZ */
         $authorZ = Author::factory()->create(['name' => 'Zeta Author']);
 
         // Give Alpha Author more books
@@ -252,6 +260,7 @@ class AuthorsApiTest extends ApiTestCase
         $genre = Genre::factory()->create(['name' => 'Fantasy']);
 
         // Create author with multiple books, some in fantasy
+        /** @var Author $author */
         $author = Author::factory()->create();
 
         // Create 3 fantasy books
@@ -282,6 +291,7 @@ class AuthorsApiTest extends ApiTestCase
     public function test_toggle_author_favorite()
     {
         $user = $this->user;
+        /** @var Author $author */
         $author = Author::factory()->create();
         $book = Book::factory()->create();
         $book->authors()->attach($author);
@@ -312,7 +322,9 @@ class AuthorsApiTest extends ApiTestCase
     public function test_authors_endpoint_filters_by_favorites()
     {
         $user = $this->user;
+        /** @var Author $favoritedAuthor */
         $favoritedAuthor = Author::factory()->create();
+        /** @var Author $nonFavoritedAuthor */
         $nonFavoritedAuthor = Author::factory()->create();
 
         // Attach books to authors so they appear in results

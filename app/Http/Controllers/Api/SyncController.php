@@ -9,6 +9,7 @@ use App\Models\ClientBook;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class SyncController extends Controller
 {
@@ -28,7 +29,7 @@ class SyncController extends Controller
             'progress.*.lastUpdated' => 'required|date',
         ]);
 
-        $userId = auth('api')->id(); // May be null if using device_id only
+        $userId = Auth::id(); // May be null if using device_id only
         $deviceId = $request->header('X-Device-ID') ?? 'unknown';
 
         $serverUpdates = [];

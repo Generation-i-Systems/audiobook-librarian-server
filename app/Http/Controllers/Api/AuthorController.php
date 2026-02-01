@@ -23,9 +23,9 @@ class AuthorController extends Controller
         }
 
         // Re-fetch the author with the updated favorite status for the current user
-        $author = Author::withExists('favoritedByUsers as isFavorite', function ($query) use ($user) {
+        $author = Author::withExists(['favoritedByUsers as isFavorite' => function ($query) use ($user) {
             $query->where('user_id', $user->id);
-        })->find($author->id);
+        }])->find($author->id);
 
         return response()->json($author);
     }

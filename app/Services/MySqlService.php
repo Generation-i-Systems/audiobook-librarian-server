@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Contracts\DocumentStatsServiceInterface;
 use App\Models\Author;
+use App\Models\Badge;
 use App\Models\Book;
 use App\Models\Bookmark;
 use App\Models\BookProgress;
@@ -2674,7 +2675,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     }
                 }
 
-                return $filteredBadges->map(function ($badge) use ($earnedBadgeIds, $user) {
+                return $filteredBadges->map(function (\App\Models\Badge $badge) use ($earnedBadgeIds, $user): array {
                     $isEarned = in_array($badge->id, $earnedBadgeIds);
                     $userBadge = $isEarned ? $user->badges->firstWhere('badge_id', $badge->id) : null;
 
@@ -2691,21 +2692,21 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                         'is_earned' => $isEarned,
                         'earned_at' => $userBadge?->earned_at,
                     ];
-                });
+                })->all();
             });
 
             return [
                 'badges_by_category' => $badgesByCategory->toArray(),
                 'progress' => $user->progress->map(fn ($p) => [
                     'book_id' => $p->book_id,
-                    'book_title' => $p->book?->title,
+                    'book_title' => $p->book->title,
                     'percentage' => $p->progress_percentage,
                     'last_listened_at' => $p->last_listened_at,
                     'completed' => $p->completed,
                 ])->toArray(),
                 'reviews' => $user->reviews->map(fn ($r) => [
                     'book_id' => $r->book_id,
-                    'book_title' => $r->book?->title,
+                    'book_title' => $r->book->title,
                     'comment' => $r->comment,
                     'age_rating' => $r->age_rating,
                     'content_rating' => $r->content_rating,
@@ -2713,7 +2714,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 ])->toArray(),
                 'recommendations' => $user->recommendationsReceived->map(fn ($rec) => [
                     'book_id' => $rec->book_id,
-                    'book_title' => $rec->book?->title,
+                    'book_title' => $rec->book->title,
                     'sender_name' => $rec->sender?->name,
                     'message' => $rec->message,
                     'created_at' => $rec->created_at,
@@ -3932,9 +3933,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
                     // Create a message for the user if user_id is available
                     $recipientId = null;
-                    if (isset($record->user_id) && is_numeric($record->user_id)) {
+                    if (isset($record->user_id)) {
                         $recipientId = (int) $record->user_id;
-                    } elseif (isset($record->deviceId) && is_numeric($record->deviceId)) {
+                    } elseif (isset($record->deviceId)) {
                         // In some models user_id might be stored in device_id field temporarily or vice versa
                         $recipientId = (int) $record->deviceId;
                     }

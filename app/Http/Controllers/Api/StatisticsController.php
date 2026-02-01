@@ -26,7 +26,7 @@ class StatisticsController extends Controller
         ]);
 
         $period = $validated['period'] ?? 'month';
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         // Calculate date ranges based on period
         switch ($period) {
@@ -95,7 +95,7 @@ class StatisticsController extends Controller
             'limit' => 'nullable|integer|min:1|max:365',
         ]);
 
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         $startDate = ($validated['start_date'] ?? null) ? Carbon::parse($validated['start_date']) : now()->subDays(29);
         $endDate = ($validated['end_date'] ?? null) ? Carbon::parse($validated['end_date']) : now();
@@ -184,7 +184,7 @@ class StatisticsController extends Controller
             'events.*.metadata' => 'nullable|array',
         ]);
 
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         $sessionStart = Carbon::parse($validated['session_start']);
         $sessionEnd = Carbon::parse($validated['session_end']);
@@ -206,7 +206,7 @@ class StatisticsController extends Controller
                 'playback_speed' => $playbackSpeed,
                 'pauses_count' => $validated['pauses_count'] ?? 0,
             ],
-            auth('api')->id(),
+            Auth::id(),
             $validated['actual_duration_ms'],
             $validated['events'] ?? [],
             $validated['title'] ?? null,
@@ -620,7 +620,7 @@ class StatisticsController extends Controller
     public function getDashboardStats(Request $request): JsonResponse
     {
         $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         if (!$deviceId && !$userId) {
             return response()->json(['message' => 'device_id or authentication required.'], 400);

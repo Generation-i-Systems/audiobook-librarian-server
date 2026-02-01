@@ -739,6 +739,11 @@ class BookApiController extends Controller
             'generated_at' => now()->toISOString(),
         ];
 
+        // If client wants JSON, return the manifest instead of the ZIP file
+        if (request()->wantsJson()) {
+            return response()->json($manifest);
+        }
+
         // Ensure temp directory exists
         if (!file_exists(storage_path('app/temp'))) {
             mkdir(storage_path('app/temp'), 0755, true);

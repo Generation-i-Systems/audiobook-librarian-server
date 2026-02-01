@@ -23,9 +23,9 @@ class SeriesController extends Controller
         }
 
         // Re-fetch the series with the updated favorite status for the current user
-        $series = Series::withExists('favoritedByUsers as isFavorite', function ($query) use ($user) {
+        $series = Series::withExists(['favoritedByUsers as isFavorite' => function ($query) use ($user) {
             $query->where('user_id', $user->id);
-        })->find($series->id);
+        }])->find($series->id);
 
         return response()->json($series);
     }

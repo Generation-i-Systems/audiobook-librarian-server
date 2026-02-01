@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class ExternalReadApiController extends Controller
 {
@@ -28,7 +29,7 @@ class ExternalReadApiController extends Controller
             return response()->json(['error' => 'Book not found'], 404);
         }
 
-        $userId = auth('api')->id();
+        $userId = Auth::id();
         $entries = $this->documentStoreService->getExternalReads($userId, $bookId);
 
         $formatted = array_map(function (array $entry) {
@@ -63,7 +64,7 @@ class ExternalReadApiController extends Controller
             return response()->json(['error' => 'Book not found'], 404);
         }
 
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         $data = [
             'user_id' => $userId,
@@ -106,7 +107,7 @@ class ExternalReadApiController extends Controller
             ], 422);
         }
 
-        $userId = auth('api')->id();
+        $userId = Auth::id();
 
         $data = [
             'user_id' => $userId,
@@ -139,7 +140,7 @@ class ExternalReadApiController extends Controller
      */
     public function getExternalRead(Request $request, string $bookId, string $externalReadId)
     {
-        $userId = auth('api')->id();
+        $userId = Auth::id();
         $entry = $this->documentStoreService->getExternalRead($externalReadId, $userId, $bookId);
 
         if (! $entry) {
@@ -169,7 +170,7 @@ class ExternalReadApiController extends Controller
             ], 422);
         }
 
-        $userId = auth('api')->id();
+        $userId = Auth::id();
         $existing = $this->documentStoreService->getExternalRead($externalReadId, $userId, $bookId);
         if (! $existing) {
             return response()->json(['error' => 'External read not found'], 404);

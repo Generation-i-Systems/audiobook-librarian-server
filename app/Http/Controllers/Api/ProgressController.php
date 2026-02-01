@@ -8,6 +8,7 @@ use App\Models\Book;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
 
 class ProgressController extends Controller
 {
@@ -26,7 +27,7 @@ class ProgressController extends Controller
         }
 
         // Use authenticated user's device/session instead of requiring device_id
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         /** @var BookProgress|null $progress */
         $progress = BookProgress::where('book_id', $bookId)
@@ -75,7 +76,7 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         /** @var BookProgress $progress */
         $progress = BookProgress::updateOrCreate(
@@ -84,7 +85,7 @@ class ProgressController extends Controller
                 'device_id' => $userId,
             ],
             [
-                'user_id' => auth('api')->id(),
+                'user_id' => Auth::id(),
             ]
         );
 
@@ -127,7 +128,7 @@ class ProgressController extends Controller
             'active_only' => 'nullable|boolean',
         ]);
 
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         $query = BookProgress::with('book')
             ->where('device_id', $userId)

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
  * @property string $name
  * @property string $description
  * @property string|null $icon
+ * @property string|null $icon_path
  * @property string|null $image_url
  * @property string $category
  * @property string $tier
