@@ -879,6 +879,61 @@
                 },
                 "required": ["order", "recommended_start", "resume"]
             },
+            "Skin": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string", "nullable": true},
+                    "version": {"type": "string"},
+                    "author_id": {"type": "integer"},
+                    "downloads": {"type": "integer"},
+                    "rating": {"type": "number", "format": "float"},
+                    "rating_count": {"type": "integer"},
+                    "is_public": {"type": "boolean"},
+                    "file_path": {"type": "string"},
+                    "image_path": {"type": "string", "nullable": true},
+                    "config": {"type": "object", "nullable": true},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "updated_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "SkinListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/Skin"}
+                    },
+                    "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+                }
+            },
+            "Theme": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string", "nullable": true},
+                    "author_id": {"type": "integer"},
+                    "downloads": {"type": "integer"},
+                    "rating": {"type": "number", "format": "float"},
+                    "rating_count": {"type": "integer"},
+                    "is_public": {"type": "boolean"},
+                    "colors": {"type": "object"},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "updated_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "ThemeListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/Theme"}
+                    },
+                    "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+                }
+            },
             "PaginationMeta": {
                 "type": "object",
                 "properties": {
@@ -1689,81 +1744,433 @@
                     }
                 }
             },
-            "UserBookStatus": {
+            "ProgressItem": {
                 "type": "object",
                 "properties": {
-                    "bookId": {
-                        "type": "integer",
-                        "example": 123
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": [
-                            "queue",
-                            "in_progress",
-                            "completed",
-                            "wishlist"
-                        ],
-                        "example": "queue"
-                    },
-                    "order": {
-                        "type": "integer",
-                        "example": 1
-                    },
-                    "statusDetail": {
-                        "type": "object",
-                        "nullable": true,
-                        "example": {
-                            "device": "iPhone 15"
-                        }
-                    },
-                    "targetDate": {
-                        "type": "string",
-                        "format": "date",
-                        "nullable": true,
-                        "description": "Goal date for finishing the book",
-                        "example": "2026-12-31"
-                    },
-                    "startedAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "nullable": true,
-                        "description": "When the user started reading"
-                    },
-                    "finishedAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "nullable": true,
-                        "description": "When the user finished reading"
+                    "book_id": {"type": "integer"},
+                    "position_ms": {"type": "integer"},
+                    "progress_percentage": {"type": "integer"},
+                    "last_updated": {"type": "string", "format": "date-time"},
+                    "is_finished": {"type": "boolean"},
+                    "current_chapter": {"type": "integer", "nullable": true},
+                    "current_chapter_name": {"type": "string", "nullable": true}
+                }
+            },
+            "ProgressListResponse": {
+                "type": "object",
+                "properties": {
+                    "progress": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/ProgressItem"}
                     }
                 }
             },
-            "QueueReorderRequest": {
+            "UpdateBookProgressRequest": {
                 "type": "object",
-                "required": ["bookOrders"],
+                "required": ["position_ms", "progress_percentage"],
                 "properties": {
-                    "bookOrders": {
+                    "position_ms": {"type": "integer", "minimum": 0},
+                    "progress_percentage": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "session_duration_ms": {"type": "integer", "nullable": true, "minimum": 0},
+                    "playback_speed": {"type": "number", "nullable": true, "minimum": 0.1, "maximum": 5.0},
+                    "current_chapter": {"type": "integer", "nullable": true, "minimum": 1},
+                    "current_chapter_name": {"type": "string", "nullable": true, "maxLength": 255}
+                }
+            },
+            "ClientEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "userId": {"type": "integer", "nullable": true},
+                    "deviceId": {"type": "string"},
+                    "eventType": {"type": "string"},
+                    "eventTimestamp": {"type": "string", "format": "date-time"},
+                    "metadata": {"type": "object", "nullable": true},
+                    "createdAt": {"type": "string", "format": "date-time"},
+                    "updatedAt": {"type": "string", "format": "date-time"}
+                }
+            },
+            "AnalyticsEventRequest": {
+                "type": "object",
+                "required": ["event_type", "timestamp"],
+                "properties": {
+                    "event_type": {"type": "string"},
+                    "timestamp": {"type": "integer"},
+                    "metadata": {"type": "array", "nullable": true, "items": {"type": "object"}}
+                }
+            },
+            "AnalyticsEventResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {"type": "boolean"},
+                    "message": {"type": "string"},
+                    "data": {"$ref": "#/components/schemas/ClientEvent"}
+                }
+            },
+            "GenreListItem": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"}
+                }
+            },
+            "BadgeListItem": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "key": {"type": "string"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "icon": {"type": "string", "nullable": true},
+                    "image_url": {"type": "string", "nullable": true},
+                    "category": {"type": "string"},
+                    "tier": {"type": "string"},
+                    "points": {"type": "integer"},
+                    "is_repeatable": {"type": "boolean"},
+                    "earned": {"type": "boolean"},
+                    "earned_at": {"type": "string", "format": "date-time", "nullable": true},
+                    "times_earned": {"type": "integer"},
+                    "tier_level": {"type": "integer"},
+                    "progress_percentage": {"type": "integer"},
+                    "can_earn_again": {"type": "boolean"}
+                }
+            },
+            "BadgesIndexResponse": {
+                "type": "object",
+                "properties": {
+                    "badges": {"type": "array", "items": {"$ref": "#/components/schemas/BadgeListItem"}},
+                    "total_badges": {"type": "integer"},
+                    "earned_badges": {"type": "integer"}
+                }
+            },
+            "UserBadgesResponse": {
+                "type": "object",
+                "properties": {
+                    "badges": {"type": "array", "items": {"type": "object"}},
+                    "total_earned": {"type": "integer"}
+                }
+            },
+            "BadgeStatsResponse": {
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "string"},
+                    "stats": {"type": "object"}
+                }
+            },
+            "BadgeCategoriesResponse": {
+                "type": "object",
+                "properties": {
+                    "categories": {"type": "array", "items": {"type": "object"}}
+                }
+            },
+            "BadgeProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "progress": {"type": "array", "items": {"type": "object"}},
+                    "total_badges": {"type": "integer"},
+                    "filtered_count": {"type": "integer"}
+                }
+            },
+            "BadgeUnnotifiedResponse": {
+                "type": "object",
+                "properties": {
+                    "badges": {"type": "array", "items": {"type": "object"}},
+                    "count": {"type": "integer"}
+                }
+            },
+            "BadgeMarkNotifiedRequest": {
+                "type": "object",
+                "required": ["badge_ids"],
+                "properties": {
+                    "badge_ids": {"type": "array", "minItems": 1, "items": {"type": "integer"}}
+                }
+            },
+            "BadgeMarkNotifiedResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {"type": "boolean"},
+                    "message": {"type": "string"},
+                    "marked_count": {"type": "integer"}
+                }
+            },
+            "BadgeLeaderboardResponse": {
+                "type": "object",
+                "properties": {
+                    "leaderboard": {"type": "array", "items": {"type": "object"}},
+                    "timeframe": {"type": "string"},
+                    "total_entries": {"type": "integer"}
+                }
+            },
+            "StatisticReport": {
+                "type": "object",
+                "properties": {
+                    "timeframe": {"type": "string"},
+                    "total_entries": {"type": "integer"}
+                }
+            },
+            "ApiRootResponse": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "version": {"type": "string"},
+                    "documentation": {"type": "string", "format": "uri"},
+                    "openapi": {"type": "string", "format": "uri"},
+                    "resources": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "method": {"type": "array", "items": {"type": "string"}},
+                                    "uri": {"type": "string"},
+                                    "url": {"type": "string", "format": "uri"},
+                                    "name": {"type": "string", "nullable": true}
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "HealthCheckResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["healthy", "unhealthy", "ok", "spec_compliant", "spec_violations_found"]},
+                    "timestamp": {"type": "string", "format": "date-time"},
+                    "service": {"type": "string"},
+                    "api_version": {"type": "string"},
+                    "checks": {"type": "object"},
+                    "validations": {"type": "object"}
+                }
+            },
+            "SkinRating": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "skin_id": {"type": "integer"},
+                    "user_id": {"type": "string"},
+                    "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "comment": {"type": "string", "nullable": true},
+                    "created_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "SkinUploadRequest": {
+                "type": "object",
+                "required": ["name", "author", "version", "file"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "author": {"type": "string"},
+                    "version": {"type": "string"},
+                    "description": {"type": "string"},
+                    "file": {"type": "string", "format": "binary"},
+                    "is_public": {"type": "boolean", "default": true}
+                }
+            },
+            "ThemeRating": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "theme_id": {"type": "integer"},
+                    "user_id": {"type": "string"},
+                    "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "comment": {"type": "string", "nullable": true},
+                    "created_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "ThemeUploadRequest": {
+                "type": "object",
+                "required": ["name", "author", "version", "theme_data"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "author": {"type": "string"},
+                    "version": {"type": "string"},
+                    "description": {"type": "string"},
+                    "theme_data": {"type": "object"},
+                    "is_public": {"type": "boolean", "default": true}
+                }
+            },
+            "BookAjax": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "title": {"type": "string"},
+                    "authors": {"type": "array", "items": {"type": "string"}},
+                    "narrators": {"type": "array", "items": {"type": "string"}},
+                    "genres": {"type": "array", "items": {"type": "string"}},
+                    "series": {
                         "type": "array",
                         "items": {
                             "type": "object",
-                            "required": ["bookId", "order"],
                             "properties": {
-                                "bookId": {
-                                    "type": "integer",
-                                    "example": 101
-                                },
-                                "order": {
-                                    "type": "integer",
-                                    "example": 1
+                                "seriesName": {"type": "string"},
+                                "number": {"type": "integer"}
+                            }
+                        }
+                    },
+                    "coverImage": {"type": "string"},
+                    "description": {"type": "string"},
+                    "duration": {"type": "string"},
+                    "createdAt": {"type": "string", "format": "date-time"}
+                }
+            },
+            "PaginatedAjaxBooks": {
+                "type": "object",
+                "properties": {
+                    "books": {"type": "array", "items": {"$ref": "#/components/schemas/BookAjax"}},
+                    "pagination": {
+                        "type": "object",
+                        "properties": {
+                            "total": {"type": "integer"},
+                            "per_page": {"type": "integer"},
+                            "current_page": {"type": "integer"},
+                            "last_page": {"type": "integer"}
+                        }
+                    },
+                    "view_type": {"type": "string"}
+                }
+            },
+            "LegacyBookmark": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "book_id": {"type": "integer"},
+                    "chapter": {"type": "integer"},
+                    "position": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "note": {"type": "string"},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "updated_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "ExternalRead": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "book_id": {"type": "integer", "nullable": true},
+                    "title": {"type": "string", "nullable": true},
+                    "author": {"type": "string", "nullable": true},
+                    "origin": {"type": "string", "enum": ["external", "previous"]},
+                    "source": {"type": "string", "nullable": true},
+                    "note": {"type": "string", "nullable": true},
+                    "started_at": {"type": "string", "format": "date-time", "nullable": true},
+                    "finished_at": {"type": "string", "format": "date-time", "nullable": true},
+                    "created_at": {"type": "string", "format": "date-time"},
+                    "updated_at": {"type": "string", "format": "date-time"}
+                }
+            },
+            "ReadingSession": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "user_id": {"type": "string"},
+                    "book_id": {"type": "integer"},
+                    "started_at": {"type": "string", "format": "date-time"},
+                    "ended_at": {"type": "string", "format": "date-time"},
+                    "duration_seconds": {"type": "integer"},
+                    "pages": {"type": "integer", "nullable": true},
+                    "position_start": {"type": "integer", "nullable": true},
+                    "position_end": {"type": "integer", "nullable": true},
+                    "device": {"type": "string", "nullable": true}
+                }
+            },
+            "ReadingDailyStats": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "format": "date"},
+                    "duration_seconds": {"type": "integer"},
+                    "sessions": {"type": "integer"},
+                    "books": {"type": "integer"}
+                }
+            },
+            "ReadingStreak": {
+                "type": "object",
+                "properties": {
+                    "current": {"type": "integer"},
+                    "longest": {"type": "integer"},
+                    "last_active_date": {"type": "string", "format": "date", "nullable": true}
+                }
+            },
+            "UserReadingStats": {
+                "type": "object",
+                "properties": {
+                    "total_duration_seconds": {"type": "integer"},
+                    "sessions": {"type": "integer"},
+                    "active_days": {"type": "integer"},
+                    "streak_current": {"type": "integer"},
+                    "streak_longest": {"type": "integer"}
+                }
+            },
+            "BookReadingStats": {
+                "type": "object",
+                "properties": {
+                    "total_duration_seconds": {"type": "integer"},
+                    "sessions": {"type": "integer"},
+                    "first_started_at": {"type": "string", "format": "date-time", "nullable": true},
+                    "last_ended_at": {"type": "string", "format": "date-time", "nullable": true}
+                }
+            }
+        }
+    },
+    "paths": {
+        "/": {
+            "get": {
+                "tags": ["Root"],
+                "summary": "API Root / Discovery",
+                "description": "Returns a list of all available API endpoints, grouped by resource, along with links to documentation.",
+                "operationId": "getApiRoot",
+                "security": [],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiRootResponse"
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-    },
-    "paths": {
+        },
+        "/v1/": {
+            "get": {
+                "tags": ["Root"],
+                "summary": "API Root (v1 Alias)",
+                "description": "Alias for the API discovery endpoint.",
+                "operationId": "getApiRootV1",
+                "security": [],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiRootResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/openapi.json": {
+            "get": {
+                "tags": ["Utility"],
+                "summary": "Get OpenAPI Specification",
+                "description": "Returns the complete OpenAPI specification for the API.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/sync/progress": {
             "post": {
                 "tags": ["Sync"],
@@ -1947,6 +2354,196 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/bookmarks/{book}": {
+            "get": {
+                "tags": ["Bookmarks"],
+                "summary": "Get bookmarks for a book",
+                "description": "Returns all bookmarks for the specified book belonging to the authenticated user.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/LegacyBookmark"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": ["Bookmarks"],
+                "summary": "Create a bookmark",
+                "description": "Creates a new bookmark for the specified book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bookmark created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/bookmarks": {
+            "get": {
+                "tags": ["Bookmarks"],
+                "summary": "Get bookmarks for a book (Legacy)",
+                "description": "Returns all bookmarks for the specified book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/LegacyBookmark"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": ["Bookmarks"],
+                "summary": "Create a bookmark (Legacy)",
+                "description": "Creates a new bookmark for the specified book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Bookmark created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/bookmarks/{bookmark}": {
+            "get": {
+                "tags": ["Bookmarks"],
+                "summary": "Get a specific bookmark",
+                "description": "Returns a specific bookmark.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "bookmark", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": ["Bookmarks"],
+                "summary": "Update a specific bookmark",
+                "description": "Updates a specific bookmark.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "bookmark", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Bookmark updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": ["Bookmarks"],
+                "summary": "Partial update of a bookmark",
+                "description": "Partially updates a specific bookmark.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "bookmark", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Bookmark updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/LegacyBookmark"}
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": ["Bookmarks"],
+                "summary": "Delete a specific bookmark",
+                "description": "Deletes a specific bookmark.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "bookmark", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Bookmark deleted successfully"
                     }
                 }
             }
@@ -2665,22 +3262,22 @@
                                                 "The password must be at least 8 characters."
                                             ]
                                         }
-                                    },
-                                    "duplicate_email": {
-                                        "summary": "Email already exists",
-                                        "value": {
-                                            "email": [
-                                                "The email has already been taken."
-                                            ]
-                                        }
-                                    },
-                                    "duplicate_username": {
-                                        "summary": "Username already exists",
-                                        "value": {
-                                            "username": [
-                                                "The username has already been taken."
-                                            ]
-                                        }
+                                    }
+                                },
+                                "duplicate_email": {
+                                    "summary": "Email already exists",
+                                    "value": {
+                                        "email": [
+                                            "The email has already been taken."
+                                        ]
+                                    }
+                                },
+                                "duplicate_username": {
+                                    "summary": "Username already exists",
+                                    "value": {
+                                        "username": [
+                                            "The username has already been taken."
+                                        ]
                                     }
                                 }
                             }
@@ -3246,50 +3843,6 @@
                 }
             }
         },
-        "/authors": {
-            "post": {
-                "tags": ["Imports"],
-                "summary": "Create author",
-                "operationId": "createAuthor",
-                "security": [{ "BearerAuth": [] }],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "required": ["name"],
-                                "properties": {
-                                    "name": { "type": "string" }
-                                }
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Author created",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "created": { "type": "boolean" },
-                                        "data": {
-                                            "type": "object",
-                                            "properties": {
-                                                "id": { "type": "integer" },
-                                                "name": { "type": "string" }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/series/search": {
             "get": {
                 "tags": ["Imports"],
@@ -3325,51 +3878,6 @@
                                                         "type": "integer"
                                                     }
                                                 }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/series": {
-            "post": {
-                "tags": ["Imports"],
-                "summary": "Create series",
-                "operationId": "createSeries",
-                "security": [{ "BearerAuth": [] }],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "required": ["name"],
-                                "properties": {
-                                    "name": { "type": "string" },
-                                    "is_collection": { "type": "boolean" }
-                                }
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Series created",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "created": { "type": "boolean" },
-                                        "data": {
-                                            "type": "object",
-                                            "properties": {
-                                                "id": { "type": "integer" },
-                                                "name": { "type": "string" }
                                             }
                                         }
                                     }
@@ -3846,6 +4354,242 @@
                 }
             }
         },
+        "/books/browse": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "Browse books by category",
+                "description": "Returns a paginated list of books filtered by various categories like genre, author, or series.",
+                "operationId": "browseBooks",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "Category to browse by (e.g., 'genre', 'author', 'series')",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "value",
+                        "in": "query",
+                        "description": "Value of the category (e.g., 'Fantasy' for genre, 'J.R.R. Tolkien' for author)",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of books per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Books retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Book"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid category or missing value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/books/search": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "Search books",
+                "description": "Performs a full-text search across book titles, authors, and descriptions.",
+                "operationId": "searchBooks",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "query",
+                        "in": "query",
+                        "description": "Search query string",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of books per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Search results retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Book"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/books/json": {
+            "get": {
+                "tags": ["Utility"],
+                "summary": "List books as JSON (AJAX)",
+                "description": "Returns a paginated list of books with AJAX-specific formatting and view preferences.",
+                "parameters": [
+                    {"name": "page", "in": "query", "schema": {"type": "integer", "default": 1}},
+                    {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 24}},
+                    {"name": "search", "in": "query", "schema": {"type": "string"}},
+                    {"name": "author_id", "in": "query", "schema": {"type": "string"}},
+                    {"name": "genre_id", "in": "query", "schema": {"type": "string"}},
+                    {"name": "series_id", "in": "query", "schema": {"type": "string"}},
+                    {"name": "sort", "in": "query", "schema": {"type": "string", "default": "title"}},
+                    {"name": "order", "in": "query", "schema": {"type": "string", "enum": ["asc", "desc"], "default": "asc"}},
+                    {"name": "view_type", "in": "query", "schema": {"type": "string", "enum": ["grid", "list"]}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/PaginatedAjaxBooks"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/recent/json": {
+            "get": {
+                "tags": ["Utility"],
+                "summary": "List recently added books as JSON (AJAX)",
+                "description": "Returns a list of recently added books with AJAX-specific formatting.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/BookAjax"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/cover": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "Get book cover",
+                "description": "Returns the cover image for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cover image retrieved",
+                        "content": {
+                            "image/*": {
+                                "schema": {"type": "string", "format": "binary"}
+                            }
+                        }
+                    },
+                    "404": {"$ref": "#/components/responses/NotFound"}
+                }
+            }
+        },
         "/books/{book}": {
             "get": {
                 "tags": ["Books"],
@@ -3933,6 +4677,298 @@
                                         "value": {
                                             "error": "Unauthorized"
                                         }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/external-reads": {
+            "get": {
+                "tags": ["External Reads"],
+                "summary": "List external read entries for a book",
+                "description": "Returns a list of external or previous read entries for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/ExternalRead"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": ["External Reads"],
+                "summary": "Create an external read entry",
+                "description": "Adds a new external or previous read entry for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Entry created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/external-reads/{externalRead}": {
+            "get": {
+                "tags": ["External Reads"],
+                "summary": "Get an external read entry",
+                "description": "Returns a specific external read entry.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "externalRead", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": ["External Reads"],
+                "summary": "Update an external read entry",
+                "description": "Updates a specific external read entry.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "externalRead", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Entry updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": ["External Reads"],
+                "summary": "Partial update of an external read entry",
+                "description": "Partially updates a specific external read entry.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "externalRead", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Entry updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": ["External Reads"],
+                "summary": "Delete an external read entry",
+                "description": "Deletes a specific external read entry.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "externalRead", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Entry deleted successfully"
+                    }
+                }
+            }
+        },
+        "/external-reads": {
+            "post": {
+                "tags": ["External Reads"],
+                "summary": "Create an external read entry (Non-library)",
+                "description": "Adds a new external read entry for a book not in the library.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Entry created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/ExternalRead"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/reading-stats/sessions": {
+            "post": {
+                "tags": ["Reading Stats"],
+                "summary": "Record a reading session",
+                "description": "Records a finished reading session for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/ReadingSession"}
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Session recorded successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "session": {"$ref": "#/components/schemas/ReadingSession"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/reading-stats/daily": {
+            "get": {
+                "tags": ["Reading Stats"],
+                "summary": "Get daily reading statistics",
+                "description": "Returns daily aggregation of reading time and sessions.",
+                "parameters": [
+                    {"name": "from", "in": "query", "schema": {"type": "string", "format": "date"}},
+                    {"name": "to", "in": "query", "schema": {"type": "string", "format": "date"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/ReadingDailyStats"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/reading-stats": {
+            "get": {
+                "tags": ["Reading Stats"],
+                "summary": "Get statistics for a specific book",
+                "description": "Returns aggregated reading statistics for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"$ref": "#/components/schemas/BookReadingStats"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/reading-stats/user": {
+            "get": {
+                "tags": ["Reading Stats"],
+                "summary": "Get overall user reading statistics",
+                "description": "Returns lifetime reading statistics and current streaks for the user.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"$ref": "#/components/schemas/UserStatistics"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/reading-stats/streaks": {
+            "get": {
+                "tags": ["Reading Stats"],
+                "summary": "Get user reading streaks",
+                "description": "Returns current and longest reading streaks and last active date.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"$ref": "#/components/schemas/ReadingStreak"}
                                     }
                                 }
                             }
@@ -4029,7 +5065,7 @@
                 }
             }
         },
-        "/books/{book}/download/{filename}": {
+        "/books/{book}/download/{file}": {
             "get": {
                 "tags": ["Books"],
                 "summary": "Download individual book file",
@@ -4052,7 +5088,7 @@
                         }
                     },
                     {
-                        "name": "filename",
+                        "name": "file",
                         "in": "path",
                         "description": "URL-encoded filename to download",
                         "required": true,
@@ -4263,6 +5299,48 @@
             }
         },
         "/authors": {
+            "post": {
+                "tags": ["Imports"],
+                "summary": "Create author",
+                "operationId": "createAuthor",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name"],
+                                "properties": {
+                                    "name": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Author created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "created": { "type": "boolean" },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": { "type": "integer" },
+                                                "name": { "type": "string" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "get": {
                 "tags": ["Authors"],
                 "summary": "Get authors with optional genre filtering",
@@ -4416,6 +5494,42 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        "/authors/{authorId}": {
+            "get": {
+                "tags": ["Authors"],
+                "summary": "Get author details",
+                "operationId": "getAuthorDetails",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "authorId", "in": "path", "required": true, "schema": {"type": "integer"}},
+                    {"name": "includeNeedsReview", "in": "query", "required": false, "schema": {"type": "boolean"}}
+                ],
+                "responses": {
+                    "200": {"description": "Author details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Author"}}}},
+                    "404": {"description": "Author not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/genres": {
+            "get": {
+                "tags": ["Genres"],
+                "summary": "List genres",
+                "operationId": "listGenres",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Genres retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "array", "items": {"$ref": "#/components/schemas/GenreListItem"}}
+                            }
+                        }
+                    },
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
                 }
             }
         },
@@ -4680,6 +5794,49 @@
             }
         },
         "/series": {
+            "post": {
+                "tags": ["Imports"],
+                "summary": "Create series",
+                "operationId": "createSeries",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name"],
+                                "properties": {
+                                    "name": { "type": "string" },
+                                    "is_collection": { "type": "boolean" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Series created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "created": { "type": "boolean" },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": { "type": "integer" },
+                                                "name": { "type": "string" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "get": {
                 "tags": ["Series"],
                 "summary": "Get series with optional author filtering",
@@ -4834,6 +5991,485 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        "/skins": {
+            "get": {
+                "tags": ["Skins"],
+                "summary": "List skins",
+                "description": "Returns a paginated list of public skins with filtering and sorting.",
+                "operationId": "getSkins",
+                "parameters": [
+                    { "name": "search", "in": "query", "schema": { "type": "string" } },
+                    { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["recent", "popular", "top_rated"] } },
+                    { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+                    { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 24 } }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/SkinListResponse" } }
+                        }
+                    }
+                }
+            }
+        },
+        "/skins/upload": {
+            "post": {
+                "tags": ["Skins"],
+                "summary": "Upload a skin",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": { "schema": { "$ref": "#/components/schemas/SkinUploadRequest" } }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Skin" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
+        "/skins/my-skins": {
+            "get": {
+                "tags": ["Skins"],
+                "summary": "List my skins",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+                    { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 24 } }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/SkinListResponse" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" }
+                }
+            }
+        },
+        "/skins/{id}": {
+            "get": {
+                "tags": ["Skins"],
+                "summary": "Get skin details",
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Skin" } }
+                        }
+                    },
+                    "404": { "description": "Skin not found" }
+                }
+            },
+            "patch": {
+                "tags": ["Skins"],
+                "summary": "Update skin",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": { "type": "string" },
+                                    "description": { "type": "string" },
+                                    "is_public": { "type": "boolean" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Skin" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden" },
+                    "404": { "description": "Skin not found" }
+                }
+            },
+            "delete": {
+                "tags": ["Skins"],
+                "summary": "Delete skin",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "responses": {
+                    "200": { "description": "Deleted" },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden" },
+                    "404": { "description": "Skin not found" }
+                }
+            }
+        },
+        "/skins/{id}/download": {
+            "get": {
+                "tags": ["Skins"],
+                "summary": "Download skin file",
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "responses": {
+                    "200": { "description": "Success", "content": { "application/zip": { "schema": { "type": "string", "format": "binary" } } } },
+                    "404": { "description": "Skin not found" }
+                }
+            }
+        },
+        "/skins/{id}/rate": {
+            "post": {
+                "tags": ["Skins"],
+                "summary": "Rate a skin",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["rating"],
+                                "properties": {
+                                    "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+                                    "comment": { "type": "string", "nullable": true }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Rated",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/SkinRating" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
+        "/skins/{id}/fork": {
+            "post": {
+                "tags": ["Skins"],
+                "summary": "Fork a skin",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name"],
+                                "properties": {
+                                    "name": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Forked",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Skin" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "404": { "description": "Skin not found" }
+                }
+            }
+        },
+        "/themes": {
+            "get": {
+                "tags": ["Themes"],
+                "summary": "List themes",
+                "description": "Returns a paginated list of public themes with filtering and sorting.",
+                "operationId": "getThemes",
+                "parameters": [
+                    { "name": "search", "in": "query", "schema": { "type": "string" } },
+                    { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["recent", "popular", "top_rated"] } },
+                    { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+                    { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 24 } }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/ThemeListResponse" } }
+                        }
+                    }
+                }
+            }
+        },
+        "/themes/upload": {
+            "post": {
+                "tags": ["Themes"],
+                "summary": "Upload a theme",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": { "schema": { "$ref": "#/components/schemas/ThemeUploadRequest" } }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Theme" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
+        "/themes/my-themes": {
+            "get": {
+                "tags": ["Themes"],
+                "summary": "List my themes",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+                    { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 24 } }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/ThemeListResponse" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" }
+                }
+            }
+        },
+        "/themes/{id}": {
+            "get": {
+                "tags": ["Themes"],
+                "summary": "Get theme details",
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Theme" } }
+                        }
+                    },
+                    "404": { "description": "Theme not found" }
+                }
+            },
+            "patch": {
+                "tags": ["Themes"],
+                "summary": "Update theme",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": { "type": "string" },
+                                    "description": { "type": "string" },
+                                    "theme_data": { "type": "object" },
+                                    "is_public": { "type": "boolean" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Theme" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden" },
+                    "404": { "description": "Theme not found" }
+                }
+            },
+            "delete": {
+                "tags": ["Themes"],
+                "summary": "Delete theme",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "responses": {
+                    "200": { "description": "Deleted" },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden" },
+                    "404": { "description": "Theme not found" }
+                }
+            }
+        },
+        "/themes/{id}/download": {
+            "get": {
+                "tags": ["Themes"],
+                "summary": "Download theme data",
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "theme_data": { "type": "object" },
+                                        "name": { "type": "string" },
+                                        "author": { "type": "string" },
+                                        "version": { "type": "string" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": { "description": "Theme not found" }
+                }
+            }
+        },
+        "/themes/{id}/rate": {
+            "post": {
+                "tags": ["Themes"],
+                "summary": "Rate a theme",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["rating"],
+                                "properties": {
+                                    "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+                                    "comment": { "type": "string", "nullable": true }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Rated",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/ThemeRating" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
+        "/themes/{id}/fork": {
+            "post": {
+                "tags": ["Themes"],
+                "summary": "Fork a theme",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name"],
+                                "properties": {
+                                    "name": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Forked",
+                        "content": {
+                            "application/json": { "schema": { "$ref": "#/components/schemas/Theme" } }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "404": { "description": "Theme not found" }
+                }
+            }
+        },
+        "/series/{seriesId}": {
+            "get": {
+                "tags": ["Series"],
+                "summary": "Get series details",
+                "operationId": "getSeriesDetails",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "seriesId", "in": "path", "required": true, "schema": {"type": "integer"}},
+                    {"name": "includeNeedsReview", "in": "query", "required": false, "schema": {"type": "boolean"}}
+                ],
+                "responses": {
+                    "200": {"description": "Series details", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Series"}}}},
+                    "404": {"description": "Series not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/progress": {
+            "get": {
+                "tags": ["Progress"],
+                "summary": "Get all progress",
+                "operationId": "getAllProgress",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "active_only", "in": "query", "required": false, "schema": {"type": "boolean"}}
+                ],
+                "responses": {
+                    "200": {"description": "Progress retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProgressListResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/progress/{book}": {
+            "get": {
+                "tags": ["Progress"],
+                "summary": "Get book progress",
+                "operationId": "getBookProgressOpenApi",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "integer"}}
+                ],
+                "responses": {
+                    "200": {"description": "Progress retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProgressItem"}}}},
+                    "404": {"description": "Book not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            },
+            "put": {
+                "tags": ["Progress"],
+                "summary": "Update book progress",
+                "operationId": "updateBookProgressOpenApi",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "integer"}}
+                ],
+                "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateBookProgressRequest"}}}},
+                "responses": {
+                    "200": {"description": "Progress updated successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProgressItem"}}}},
+                    "404": {"description": "Book not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "422": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
                 }
             }
         },
@@ -5156,102 +6792,6 @@
                 }
             }
         },
-        "/statistics/daily": {
-            "get": {
-                "tags": ["Statistics"],
-                "summary": "Get daily statistics",
-                "description": "Returns listening statistics for a specific day and device.",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "device_id",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Device identifier"
-                    },
-                    {
-                        "name": "date",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        },
-                        "description": "Date in YYYY-MM-DD format (defaults to today)"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Daily statistics retrieved successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DailyStatsResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/statistics/reading-history": {
-            "get": {
-                "tags": ["Statistics"],
-                "summary": "Get reading history stats",
-                "description": "Returns counts of finished books grouped by month or year.",
-                "operationId": "getReadingHistoryStats",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "group_by",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "enum": ["month", "year"],
-                            "default": "month"
-                        },
-                        "description": "Period to group stats by"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Reading history stats retrieved successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "period": {
-                                                "type": "string",
-                                                "example": "2024-01"
-                                            },
-                                            "count": {
-                                                "type": "integer",
-                                                "example": 5
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/statistics/dashboard": {
             "get": {
                 "tags": ["Statistics"],
@@ -5287,6 +6827,509 @@
                 }
             }
         },
+        "/reading-progress/{book}": {
+            "get": {
+                "tags": ["Progress"],
+                "summary": "Get reading progress",
+                "description": "Returns reading progress for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "book_id", "in": "query", "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "progress": {"type": "integer"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": ["Progress"],
+                "summary": "Update reading progress",
+                "description": "Updates reading progress for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "current_position": {"type": "integer"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Progress updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/reading-progress/reset": {
+            "post": {
+                "tags": ["Progress"],
+                "summary": "Reset reading progress",
+                "description": "Resets reading progress for a specific book.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "book_id": {"type": "integer"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Progress reset successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "message": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/series/autocomplete": {
+            "get": {
+                "tags": ["Series"],
+                "summary": "Autocomplete series names",
+                "description": "Fuzzy search for series names.",
+                "parameters": [
+                    {"name": "query", "in": "query", "required": true, "schema": {"type": "string"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 10}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"type": "string"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/authors/autocomplete": {
+            "get": {
+                "tags": ["Authors"],
+                "summary": "Autocomplete author names",
+                "description": "Fuzzy search for author names.",
+                "parameters": [
+                    {"name": "query", "in": "query", "required": true, "schema": {"type": "string"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 10}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"type": "string"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/narrators/autocomplete": {
+            "get": {
+                "tags": ["Authors"],
+                "summary": "Autocomplete narrator names",
+                "description": "Fuzzy search for narrator names.",
+                "parameters": [
+                    {"name": "query", "in": "query", "required": true, "schema": {"type": "string"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 10}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {"type": "array", "items": {"type": "string"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/series/{seriesId}/books": {
+            "get": {
+                "tags": ["Series"],
+                "summary": "Get books in a series",
+                "description": "Returns all books in a specific series.",
+                "parameters": [
+                    {"name": "seriesId", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 100}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "series": {"type": "object"},
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/Book"}},
+                                        "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/authors/{authorId}/books": {
+            "get": {
+                "tags": ["Authors"],
+                "summary": "Get books by an author",
+                "description": "Returns all books by a specific author.",
+                "parameters": [
+                    {"name": "authorId", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "per_page", "in": "query", "schema": {"type": "integer", "default": 100}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "author": {"type": "object"},
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/Book"}},
+                                        "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/authors/{authorId}/genres/{genreId}/books": {
+            "get": {
+                "tags": ["Authors"],
+                "summary": "Get books by author and genre",
+                "description": "Returns books matching both author and genre.",
+                "parameters": [
+                    {"name": "authorId", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "genreId", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "author": {"type": "object"},
+                                        "genre": {"type": "object"},
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/Book"}},
+                                        "meta": {"$ref": "#/components/schemas/PaginationMeta"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/authors/{authorId}/series": {
+            "get": {
+                "tags": ["Authors"],
+                "summary": "Get series by an author",
+                "description": "Returns all series containing books by a specific author.",
+                "parameters": [
+                    {"name": "authorId", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "author": {"type": "object"},
+                                        "data": {"type": "array", "items": {"type": "object"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/genres/{genre}/authors": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "Get authors in a genre",
+                "description": "Returns authors who have written books in the specified genre.",
+                "parameters": [
+                    {"name": "genre", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "genre": {"type": "object"},
+                                        "data": {"type": "array", "items": {"type": "object"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/genres/{genreId}/authors": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "Get authors in a genre (Simple)",
+                "description": "Returns authors in a genre by binary genre ID.",
+                "parameters": [
+                    {"name": "genreId", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "genre": {"type": "object"},
+                                        "data": {"type": "array", "items": {"type": "object"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/series/{series}/favorite": {
+            "post": {
+                "tags": ["Series"],
+                "summary": "Toggle series favorite",
+                "description": "Add or remove a series from user favorites.",
+                "parameters": [
+                    {"name": "series", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "favorite": {"type": "boolean"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/authors/{author}/favorite": {
+            "post": {
+                "tags": ["Authors"],
+                "summary": "Toggle author favorite",
+                "description": "Add or remove an author from user favorites.",
+                "parameters": [
+                    {"name": "author", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "favorite": {"type": "boolean"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/statistics/legacy-daily": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get daily statistics (Legacy)",
+                "description": "Returns daily statistics for the user.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/ReadingDailyStats"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/statistics/weekly": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get weekly statistics",
+                "description": "Returns weekly stats.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "data": {"type": "object"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/statistics/trends": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get listening trends",
+                "description": "Returns listening trends over time.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "data": {"type": "object"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/statistics/top-books": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get top books",
+                "description": "Returns a list of most listened to books.",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "data": {"type": "array", "items": {"$ref": "#/components/schemas/BookReadingStats"}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/statistics": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get statistics for a book (Legacy)",
+                "description": "Returns statistics for a specific book.",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/BookReadingStats"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/recommendations/{book}": {
             "post": {
                 "tags": ["Recommendations"],
@@ -5315,9 +7358,9 @@
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["recipientId"],
+                                "required": ["recipient_id"],
                                 "properties": {
-                                    "recipientId": {
+                                    "recipient_id": {
                                         "type": "integer",
                                         "description": "ID of the user to receive the recommendation"
                                     },
@@ -5394,6 +7437,266 @@
                 }
             }
         },
+        "/recommendations/{recommendation}/acknowledge": {
+            "post": {
+                "tags": ["Recommendations"],
+                "summary": "Acknowledge a recommendation",
+                "operationId": "acknowledgeRecommendation",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "recommendation", "in": "path", "required": true, "schema": {"type": "integer"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Acknowledged successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {"type": "string"},
+                                        "recommendation": {"$ref": "#/components/schemas/UserRecommendation"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {"description": "Unauthorized action", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/books/{book}/recommend": {
+            "post": {
+                "tags": ["Recommendations"],
+                "summary": "Send a book recommendation (alias)",
+                "description": "Alias for POST /recommendations/{book} used by some clients.",
+                "operationId": "sendRecommendationAlias",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "integer"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["recipient_id"],
+                                "properties": {
+                                    "recipient_id": {"type": "integer"},
+                                    "message": {"type": "string", "maxLength": 500, "nullable": true}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {"description": "Recommendation sent successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MessageResponse"}}}},
+                    "409": {"description": "Duplicate recommendation", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "422": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
+                }
+            }
+        },
+        "/analytics/event": {
+            "post": {
+                "tags": ["Analytics"],
+                "summary": "Record client analytics event",
+                "operationId": "recordAnalyticsEvent",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": "#/components/schemas/AnalyticsEventRequest"}
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {"description": "Event recorded successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AnalyticsEventResponse"}}}},
+                    "422": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges": {
+            "get": {
+                "tags": ["Badges"],
+                "summary": "List badges with user progress",
+                "operationId": "listBadges",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "category", "in": "query", "required": false, "schema": {"type": "string"}},
+                    {"name": "tier", "in": "query", "required": false, "schema": {"type": "string"}},
+                    {"name": "earned_only", "in": "query", "required": false, "schema": {"type": "boolean"}}
+                ],
+                "responses": {
+                    "200": {"description": "Badges retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgesIndexResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges/user": {
+            "get": {
+                "tags": ["Badges"],
+                "summary": "Get user's earned badges",
+                "operationId": "getUserBadges",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer"}},
+                    {"name": "recent_only", "in": "query", "required": false, "schema": {"type": "boolean"}}
+                ],
+                "responses": {
+                    "200": {"description": "User badges retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserBadgesResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges/stats": {
+            "get": {
+                "tags": ["Badges"],
+                "summary": "Get user badge stats",
+                "operationId": "getUserBadgeStats",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {"description": "Badge stats retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgeStatsResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges/categories": {
+            "get": {
+                "tags": ["Badges"],
+                "summary": "Get badges grouped by category",
+                "operationId": "getBadgeCategories",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {"description": "Categories retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgeCategoriesResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges/progress": {
+            "get": {
+                "tags": ["Badges"],
+                "summary": "Get badge progress",
+                "operationId": "getBadgeProgress",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "show_earned", "in": "query", "required": false, "schema": {"type": "boolean"}},
+                    {"name": "category", "in": "query", "required": false, "schema": {"type": "string"}},
+                    {"name": "min_progress", "in": "query", "required": false, "schema": {"type": "integer"}}
+                ],
+                "responses": {
+                    "200": {"description": "Badge progress retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgeProgressResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges/unnotified": {
+            "get": {
+                "tags": ["Badges"],
+                "summary": "Get unnotified badges",
+                "operationId": "getUnnotifiedBadges",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {"description": "Unnotified badges retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgeUnnotifiedResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges/mark-notified": {
+            "post": {
+                "tags": ["Badges"],
+                "summary": "Mark badges as notified",
+                "operationId": "markBadgesNotified",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgeMarkNotifiedRequest"}}}},
+                "responses": {
+                    "200": {"description": "Badges marked successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgeMarkNotifiedResponse"}}}},
+                    "422": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/badges/leaderboard": {
+            "get": {
+                "tags": ["Badges"],
+                "summary": "Get badge leaderboard",
+                "operationId": "getBadgeLeaderboard",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "timeframe", "in": "query", "required": false, "schema": {"type": "string"}},
+                    {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer"}}
+                ],
+                "responses": {
+                    "200": {"description": "Leaderboard retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/BadgeLeaderboardResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/auth/google": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Google Sign-In",
+                "operationId": "googleLogin",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["idToken"],
+                                "properties": {"idToken": {"type": "string"}}
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Authenticated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}},
+                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Logout (alias)",
+                "operationId": "logoutAlias",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {"description": "Logout successful", "content": {"application/json": {"schema": {"type": "object", "properties": {"message": {"type": "string"}}}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Refresh token",
+                "operationId": "refreshToken",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "refreshToken": {"type": "string"},
+                                    "token": {"type": "string"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "New token issued", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}},
+                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}},
+                    "401": {"description": "Invalid refresh token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "403": {"description": "Account pending approval", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
         "/status/list/{status}": {
             "get": {
                 "tags": ["Status"],
@@ -5447,196 +7750,6 @@
                                             "$ref": "#/components/schemas/PaginationMeta"
                                         }
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/status/history": {
-            "get": {
-                "tags": ["Status"],
-                "summary": "Get reading history",
-                "description": "Retrieve a paginated list of completed books ordered by finish date.",
-                "operationId": "getReadingHistory",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "default": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "default": 20
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Reading history retrieved successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/UserBookStatus"
-                                            }
-                                        },
-                                        "meta": {
-                                            "$ref": "#/components/schemas/PaginationMeta"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/status/goals": {
-            "get": {
-                "tags": ["Status"],
-                "summary": "Get reading goals",
-                "description": "Retrieve books in queue or in progress that have target completion dates.",
-                "operationId": "getReadingGoals",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Reading goals retrieved successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/UserBookStatus"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/status/{book}/set": {
-            "post": {
-                "tags": ["Status"],
-                "summary": "Set book status",
-                "description": "Set or update a user's status for a book (queue, in_progress, etc).",
-                "operationId": "setBookStatus",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "book",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Book ID"
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "required": ["status"],
-                                "properties": {
-                                    "status": {
-                                        "type": "string",
-                                        "enum": [
-                                            "queue",
-                                            "in_progress",
-                                            "completed",
-                                            "wishlist"
-                                        ]
-                                    },
-                                    "order": {
-                                        "type": "integer",
-                                        "minimum": 0
-                                    },
-                                    "statusDetail": {
-                                        "type": "object",
-                                        "nullable": true
-                                    },
-                                    "target_date": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "nullable": true,
-                                        "description": "Goal date for finishing the book",
-                                        "example": "2026-12-31"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Status updated successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/status/queue/reorder": {
-            "post": {
-                "tags": ["Status"],
-                "summary": "Reorder queue",
-                "description": "Update the ordering of books in the queue.",
-                "operationId": "reorderQueue",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/QueueReorderRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Queue reordered successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
                                 }
                             }
                         }
@@ -5909,8 +8022,16 @@
             "description": "User authentication and authorization endpoints"
         },
         {
+            "name": "Genres",
+            "description": "Genre listing and discovery endpoints"
+        },
+        {
             "name": "Authors",
             "description": "Author management and filtering endpoints"
+        },
+        {
+            "name": "Authors",
+            "description": "Author management and discovery endpoints"
         },
         {
             "name": "Series",
@@ -5919,6 +8040,14 @@
         {
             "name": "Books",
             "description": "Audiobook management and browsing endpoints"
+        },
+        {
+            "name": "Analytics",
+            "description": "App analytics and event recording endpoints"
+        },
+        {
+            "name": "Badges",
+            "description": "Badges system endpoints"
         },
         {
             "name": "Progress",
@@ -5939,6 +8068,34 @@
         {
             "name": "Downloads",
             "description": "Bulk download and download queue management endpoints"
+        },
+        {
+            "name": "Skins",
+            "description": "App skin management and discovery endpoints"
+        },
+        {
+            "name": "Themes",
+            "description": "App color theme management and discovery endpoints"
+        },
+        {
+            "name": "Utility",
+            "description": "Internal AJAX and helper utility endpoints"
+        },
+        {
+            "name": "Reading Stats",
+            "description": "User reading session recording and statistics endpoints"
+        },
+        {
+            "name": "External Reads",
+            "description": "Management of reading entries for external or previously read books"
+        },
+        {
+            "name": "Bookmarks",
+            "description": "User bookmark management endpoints"
+        },
+        {
+            "name": "Analytics",
+            "description": "App analytics and event recording endpoints"
         }
     ]
 }
