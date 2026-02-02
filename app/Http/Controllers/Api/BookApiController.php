@@ -6,6 +6,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -2057,7 +2058,7 @@ class BookApiController extends Controller
         $authors = $query->offset($offset)->limit($perPage)->get();
 
         // Get genres and series for each author
-        $authorsWithDetails = $authors->map(function ($author) use ($includeNeedsReview) {
+        $authorsWithDetails = $authors->map(function (\App\Models\Author $author) use ($includeNeedsReview) {
             // Get genres for this author
             $authorBooksQuery = $author->books();
             if (!$includeNeedsReview) {
@@ -2130,6 +2131,143 @@ class BookApiController extends Controller
                 'has_next' => $hasNext,
                 'has_prev' => $hasPrev,
             ],
+        ]);
+    }
+
+    public function authorDetails(Request $request, int $authorId)
+    {
+        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
+        $userId = Auth::id();
+
+        /** @var \App\Models\Author|null $author */
+        $author = \App\Models\Author::query()->find($authorId);
+
+        if (!$author) {
+            return response()->json([
+                'error' => 'Author not found',
+                'message' => 'The specified author could not be found',
+            ], 404);
+        }
+
+        $totalBookCount = \App\Models\Book::query()
+            ->join('author_book', 'books.id', '=', 'author_book.book_id')
+            ->where('author_book.author_id', $authorId)
+            ->when(!$includeNeedsReview, function ($q) {
+                $q->where('books.needs_review', false);
+            })
+            ->distinct('books.id')
+            ->count('books.id');
+
+        $genres = $author->books()
+            ->when(!$includeNeedsReview, function ($q) {
+                $q->where('books.needs_review', false);
+            })
+            ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+            ->join('genres', 'book_genre.genre_id', '=', 'genres.id')
+            ->select('genres.name')
+            ->distinct()
+            ->orderBy('genres.name')
+            ->pluck('name')
+            ->toArray();
+
+        $authorSeries = \App\Models\Series::query()
+            ->select('series.id', 'series.name')
+            ->selectRaw('COUNT(DISTINCT books.id) as series_book_count')
+            ->join('book_series', 'series.id', '=', 'book_series.series_id')
+            ->join('books', 'book_series.book_id', '=', 'books.id')
+            ->join('author_book', 'books.id', '=', 'author_book.book_id')
+            ->where('author_book.author_id', $authorId)
+            ->when(!$includeNeedsReview, function ($q) {
+                $q->where('books.needs_review', false);
+            })
+            ->groupBy('series.id', 'series.name')
+            ->orderBy('series.name')
+            ->get()
+            ->map(function (\App\Models\Series $series) {
+                /** @var int $count */
+                $count = $series->getAttribute('series_book_count');
+
+                return [
+                    'id' => $series->id,
+                    'name' => $series->name,
+                    'books_in_series' => $count,
+                ];
+            })
+            ->toArray();
+
+        $isFavorite = false;
+        if ($userId) {
+            $isFavorite = DB::table('user_author_favorites')
+                ->where('user_id', $userId)
+                ->where('author_id', $authorId)
+                ->exists();
+        }
+
+        return response()->json([
+            'id' => $author->id,
+            'name' => $author->name,
+            'biography' => null,
+            'book_count' => $totalBookCount,
+            'book_count_in_genre' => $totalBookCount,
+            'image_url' => null,
+            'genres' => $genres,
+            'series' => $authorSeries,
+            'isFavorite' => $isFavorite,
+        ]);
+    }
+
+    public function seriesDetails(Request $request, int $seriesId)
+    {
+        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
+        $userId = Auth::id();
+
+        /** @var \App\Models\Series|null $series */
+        $series = \App\Models\Series::query()->find($seriesId);
+
+        if (!$series) {
+            return response()->json([
+                'error' => 'Series not found',
+                'message' => 'The specified series could not be found',
+            ], 404);
+        }
+
+        $totalBookCount = \App\Models\Book::query()
+            ->join('book_series', 'books.id', '=', 'book_series.book_id')
+            ->where('book_series.series_id', $seriesId)
+            ->when(!$includeNeedsReview, function ($q) {
+                $q->where('books.needs_review', false);
+            })
+            ->distinct('books.id')
+            ->count('books.id');
+
+        $authors = $series->books()
+            ->when(!$includeNeedsReview, function ($q) {
+                $q->where('books.needs_review', false);
+            })
+            ->join('author_book', 'books.id', '=', 'author_book.book_id')
+            ->join('authors', 'author_book.author_id', '=', 'authors.id')
+            ->select('authors.name')
+            ->distinct()
+            ->orderBy('authors.name')
+            ->pluck('name')
+            ->toArray();
+
+        $isFavorite = false;
+        if ($userId) {
+            $isFavorite = DB::table('user_series_favorites')
+                ->where('user_id', $userId)
+                ->where('series_id', $seriesId)
+                ->exists();
+        }
+
+        return response()->json([
+            'id' => $series->id,
+            'name' => $series->name,
+            'description' => null,
+            'book_count' => $totalBookCount,
+            'book_count_by_author' => $totalBookCount,
+            'authors' => $authors,
+            'isFavorite' => $isFavorite,
         ]);
     }
 

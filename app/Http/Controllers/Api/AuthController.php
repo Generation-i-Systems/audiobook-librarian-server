@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -8,6 +10,7 @@ use App\Services\NewUserRegistrationNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -339,5 +342,106 @@ class AuthController extends Controller
         }
 
         return response()->json(['message' => 'Successfully logged out']);
+    }
+
+    public function refresh(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'refreshToken' => 'sometimes|required|string',
+            'token' => 'sometimes|required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        $refreshToken = $request->input('refreshToken') ?? $request->input('token');
+        if (!is_string($refreshToken) || $refreshToken === '') {
+            $authHeader = $request->header('Authorization');
+            if (is_string($authHeader) && str_starts_with($authHeader, 'Bearer ')) {
+                $refreshToken = substr($authHeader, 7);
+            }
+        }
+        if (!is_string($refreshToken) || $refreshToken === '') {
+            return response()->json(['message' => 'Invalid refresh token'], 401);
+        }
+
+        $user = null;
+
+        try {
+            $accessToken = PersonalAccessToken::findToken($refreshToken);
+            if ($accessToken) {
+                $tokenable = $accessToken->tokenable;
+                if ($tokenable instanceof \App\Models\User) {
+                    $user = $tokenable;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Auth refresh: Sanctum token lookup failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if (!$user) {
+            $apiTokenRow = $this->documentStoreService->getApiTokenByValue($refreshToken);
+            if (!$apiTokenRow) {
+                return response()->json(['message' => 'Invalid refresh token'], 401);
+            }
+
+            $userId = $apiTokenRow['user_id'] ?? null;
+            if (!is_string($userId) && !is_int($userId)) {
+                return response()->json(['message' => 'Invalid refresh token'], 401);
+            }
+
+            $userData = $this->documentStoreService->getUserById($userId);
+            if (!is_array($userData)) {
+                return response()->json(['message' => 'Invalid refresh token'], 401);
+            }
+
+            // If the role is unverified, preserve the login behavior
+            if (($userData['role'] ?? '') === 'unverified') {
+                return response()->json([
+                    'code' => 'ACCOUNT_PENDING_APPROVAL',
+                    'message' => 'Account pending admin approval',
+                ], 403);
+            }
+
+            $user = new \App\Models\User();
+            $user->id = (int) ($userData['id'] ?? 0);
+            $user->name = $userData['name'] ?? null;
+            $user->username = $userData['username'] ?? null;
+            $user->email = $userData['email'] ?? null;
+            $user->role = $userData['role'] ?? null;
+            $user->photo_url = $userData['photo_url'] ?? null;
+        }
+
+        if ($user->role === 'unverified') {
+            return response()->json([
+                'code' => 'ACCOUNT_PENDING_APPROVAL',
+                'message' => 'Account pending admin approval',
+            ], 403);
+        }
+
+        $tokenValue = bin2hex(random_bytes(32));
+        $tokenData = [
+            'user_id' => (string) ($user->id ?? ''),
+            'token' => $tokenValue,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        $this->documentStoreService->createApiToken($tokenData);
+
+        return response()->json([
+            'id' => (string) ($user->id ?? ''),
+            'name' => $user->name ?? null,
+            'username' => $user->username ?? null,
+            'email' => $user->email ?? null,
+            'photo_url' => $user->photo_url ?? null,
+            'role' => $user->role ?? null,
+            'authToken' => $tokenValue,
+            'refreshToken' => $tokenValue,
+            'token' => $tokenValue,
+        ]);
     }
 }

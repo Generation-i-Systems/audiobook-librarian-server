@@ -59,11 +59,6 @@ class SyncFeatureTest extends TestCase
         // $book = Book::factory()->create(['title' => 'Real Book']);
         // We might not have factories set up, let's skip creating if complex and just try with ClientBook we just made
 
-        $clientBook = ClientBook::first();
-        if (!$clientBook) {
-            return;
-        } // Should be created by previous test if sequence, but tests should be isolated.
-        // Actually RefreshDatabase clears DB. So we must create one.
         $clientBook = ClientBook::create([
             'title' => 'Batch Book',
             'author' => 'Batch Author',
