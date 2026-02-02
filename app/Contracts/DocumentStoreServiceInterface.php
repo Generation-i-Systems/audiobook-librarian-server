@@ -479,6 +479,13 @@ interface DocumentStoreServiceInterface
     public function createApiToken(array $tokenData): ?string;
 
     /**
+     * Get an API token by its raw value.
+     *
+     * @return array|null Token row as an array (e.g. ['id' => int, 'user_id' => int|string, 'token' => string])
+     */
+    public function getApiTokenByValue(string $tokenValue): ?array;
+
+    /**
      * Delete an API token by its value.
      *
      * @param string $tokenValue The token value to delete

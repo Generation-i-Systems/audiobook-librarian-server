@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ApiHealthController;
+use App\Http\Controllers\Api\ApiRootController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\BadgeController;
@@ -27,6 +28,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    // API Root
+    Route::get('/', [ApiRootController::class, 'index'])->name('api.v1.root');
+
     // Health check endpoints (no authentication required - for uptime monitors)
     Route::get('/health/ping', [ApiHealthController::class, 'ping']);
     Route::get('/health', [ApiHealthController::class, 'health']);
@@ -38,7 +42,7 @@ Route::prefix('v1')->group(function () {
             return response()->json(['error' => 'OpenAPI spec not found'], 404);
         }
         return response()->file($path, ['Content-Type' => 'application/json']);
-    });
+    })->name('api.v1.openapi');
 
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
@@ -96,6 +100,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/series', [BookApiController::class, 'series']);
         // Series Autocomplete
         Route::get('/series/autocomplete', [BookApiController::class, 'autocompleteSeries']);
+
+        // Series search and management (moved up to avoid conflict with {seriesId})
+        Route::get('/series/search', [BookImportApiController::class, 'searchSeries']);
+        Route::post('/series', [BookImportApiController::class, 'createSeries']);
+
+        Route::get('/series/{seriesId}', [BookApiController::class, 'seriesDetails']);
         // Toggle Series Favorite
         Route::post('/series/{series}/favorite', [SeriesController::class, 'toggleFavorite']);
 
@@ -103,6 +113,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/authors', [BookApiController::class, 'authors']);
         // Author Autocomplete
         Route::get('/authors/autocomplete', [BookApiController::class, 'autocompleteAuthors']);
+
+        // Author search and management (moved up to avoid conflict with {authorId})
+        Route::get('/authors/search', [BookImportApiController::class, 'searchAuthors']);
+        Route::post('/authors', [BookImportApiController::class, 'createAuthor']);
+
+        Route::get('/authors/{authorId}', [BookApiController::class, 'authorDetails']);
         // Toggle Author Favorite
         Route::post('/authors/{author}/favorite', [AuthorController::class, 'toggleFavorite']);
         // Narrator Autocomplete
@@ -204,6 +220,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/{recommendation}/acknowledge', [RecommendationController::class, 'acknowledge']);
         });
 
+        Route::post('/books/{book}/recommend', [RecommendationController::class, 'send']);
+
         // Badge routes
         Route::prefix('badges')->group(function () {
             // Core badge endpoints
@@ -252,16 +270,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/genres', [BookImportApiController::class, 'getGenres']);
         });
 
-        // Author management (for imports)
-        Route::get('/authors/search', [BookImportApiController::class, 'searchAuthors']);
-        Route::post('/authors', [BookImportApiController::class, 'createAuthor']);
-
-        // Series management (for imports)
-        Route::get('/series/search', [BookImportApiController::class, 'searchSeries']);
-        Route::post('/series', [BookImportApiController::class, 'createSeries']);
 
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/auth/logout', [AuthController::class, 'logout']);
     });
 
     // Authentication Routes (outside the auth:sanctum middleware)
@@ -276,6 +288,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/refresh', [AuthController::class, 'refresh']);
         Route::post('/check-status', [AuthController::class, 'checkStatus']);
         Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
         Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);

@@ -3223,6 +3223,19 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
+    public function getApiTokenByValue(string $tokenValue): ?array
+    {
+        try {
+            $row = DB::table('api_tokens')->where('token', $tokenValue)->first();
+
+            return $row ? (array) $row : null;
+        } catch (\Exception $e) {
+            Log::error('MySqlService getApiTokenByValue failed: ' . $e->getMessage());
+
+            return null;
+        }
+    }
+
     /**
      * Delete an API token by its value.
      *

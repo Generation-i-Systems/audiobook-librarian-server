@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-abstract class BaseApiTest extends TestCase
+abstract class BaseApiTestCase extends TestCase
 {
     /**
      * If true, tests will attempt to download images (cover art) from APIs.
@@ -28,8 +28,9 @@ abstract class BaseApiTest extends TestCase
 
         // Ensure a clean cache state for tests
         if (config('cache.default') === 'array') {
-            \Illuminate\Support\Facades\Cache::store('array')->flush();
+            \Illuminate\Support\Facades\Cache::store('array')->clear();
         } else {
+            /** @phpstan-ignore-next-line */
             \Illuminate\Support\Facades\Cache::fake();
         }
 

@@ -1736,6 +1736,17 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $id;
     }
 
+    public function getApiTokenByValue(string $tokenValue): ?array
+    {
+        foreach ($this->apiTokens as $token) {
+            if (isset($token['token']) && $token['token'] === $tokenValue) {
+                return $token;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Delete an API token by its value.
      *

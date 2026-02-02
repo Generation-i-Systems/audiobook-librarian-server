@@ -6,7 +6,7 @@ use App\Services\AudibleApiService;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 
-class AudibleApiIntegrationTest extends BaseApiTest
+class AudibleApiIntegrationTest extends BaseApiTestCase
 {
     private AudibleApiService $audibleApi;
 
