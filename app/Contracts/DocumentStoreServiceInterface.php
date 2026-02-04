@@ -749,6 +749,11 @@ interface DocumentStoreServiceInterface
      */
     public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool;
 
+    /**
+     * Delete a bookmark by ID (without book context).
+     */
+    public function deleteBookmarkById(string $bookmarkId, string $userId): bool;
+
     // EXTERNAL READS
     /**
      * Get all external/previously-read entries for a user and book.

@@ -152,6 +152,8 @@ Route::prefix('v1')->group(function () {
         // OpenAPI spec bookmark routes
         Route::get('/bookmarks/{book}', [BookmarkApiController::class, 'getBookmarksOpenApi']);
         Route::post('/bookmarks/{book}', [BookmarkApiController::class, 'createBookmarkOpenApi']);
+        // Client compatibility bookmark route (delete by ID)
+        Route::delete('/bookmarks/{bookmark}', [BookmarkApiController::class, 'deleteBookmarkById']);
 
         // Legacy bookmark routes
         Route::get('/books/{book}/bookmarks', [BookmarkApiController::class, 'getBookmarks']);
@@ -188,7 +190,9 @@ Route::prefix('v1')->group(function () {
 
         // OpenAPI spec progress routes - specific routes must come before dynamic ones
         Route::get('/progress/device', [ProgressController::class, 'getDeviceProgress']);
+        Route::get('/progress/device/{deviceId}', [ProgressController::class, 'getDeviceProgressByPath']); // Client compatibility
         Route::get('/progress', [ProgressController::class, 'getAllProgress']);
+        Route::post('/progress/{book}/mark-completed', [ProgressController::class, 'markCompletedByPath']); // Client compatibility
         Route::get('/progress/{book}', [ProgressController::class, 'getBookProgress']);
         Route::put('/progress/{book}', [ProgressController::class, 'updateBookProgress'])->middleware('idempotency');
 

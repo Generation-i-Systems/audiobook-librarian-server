@@ -2999,6 +2999,19 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $bookmark->delete();
     }
 
+    public function deleteBookmarkById(string $bookmarkId, string $userId): bool
+    {
+        $bookmark = Bookmark::where('id', $bookmarkId)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (!$bookmark) {
+            return false;
+        }
+
+        return $bookmark->delete();
+    }
+
     // EXTERNAL READS / PREVIOUSLY READ
     public function getExternalReads(string $userId, string $bookId): array
     {

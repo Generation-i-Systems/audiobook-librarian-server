@@ -182,7 +182,12 @@ class AuthController extends Controller
 
         try {
             // Verify the Google ID token
-            $client = new \Google_Client(['client_id' => config('services.google.client_id')]);
+            $clientIds = config('services.google.allowed_client_ids');
+            if (empty($clientIds)) {
+                $clientIds = config('services.google.client_id'); // Fallback for backward compatibility
+            }
+
+            $client = new \Google_Client(['client_id' => $clientIds]);
             $payload = $client->verifyIdToken($request->idToken);
 
             if (!$payload) {
@@ -243,7 +248,7 @@ class AuthController extends Controller
             } else {
                 // Update existing user's Google info if not set
                 if (empty($user['google_id'])) {
-                    $this->documentStoreService->updateUser($user['id'], [
+                    $this->documentStoreService->updateUser((string) $user['id'], [
                         'google_id' => $googleId,
                         'photo_url' => $photoUrl ?? $user['photo_url'],
                     ]);

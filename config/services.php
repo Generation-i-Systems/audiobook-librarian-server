@@ -40,6 +40,13 @@ return [
 
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
+        'allowed_client_ids' => array_values(array_filter([
+            env('GOOGLE_CLIENT_ID'),
+            env('GOOGLE_CLIENT_ID_ANDROID_LIBRARY'),
+            env('GOOGLE_CLIENT_ID_ANDROID_PLAYER'),
+            env('GOOGLE_CLIENT_ID_ANDROID_LIBRARY_DEV'),
+            env('GOOGLE_CLIENT_ID_ANDROID_PLAYER_DEV'),
+        ])),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
         'api_key' => env('GOOGLE_API_KEY'),

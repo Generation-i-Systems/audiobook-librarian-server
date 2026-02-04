@@ -2358,6 +2358,21 @@
                 }
             }
         },
+        "/bookmarks/{bookmark}": {
+            "delete": {
+                "tags": ["Bookmarks"],
+                "summary": "Delete a bookmark by ID",
+                "description": "Deletes a specific bookmark using only its ID.",
+                "parameters": [
+                    {"name": "bookmark", "in": "path", "required": true, "schema": {"type": "string"}, "description": "Bookmark ID"}
+                ],
+                "responses": {
+                    "204": {"description": "Bookmark deleted successfully"},
+                    "404": {"description": "Bookmark not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
         "/bookmarks/{book}": {
             "get": {
                 "tags": ["Bookmarks"],
@@ -6442,6 +6457,33 @@
                 }
             }
         },
+        "/progress/{book}/mark-completed": {
+            "post": {
+                "tags": ["Progress"],
+                "summary": "Mark book as completed",
+                "description": "Marks a book as completed (Client alias).",
+                "parameters": [
+                    {"name": "book", "in": "path", "required": true, "schema": {"type": "integer"}}
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "device_id": {"type": "string"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Progress updated successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProgressItem"}}}},
+                    "404": {"description": "Book not found", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
         "/progress/{book}": {
             "get": {
                 "tags": ["Progress"],
@@ -6689,6 +6731,22 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        "/progress/device/{deviceId}": {
+            "get": {
+                "tags": ["Progress"],
+                "summary": "Get device progress by ID",
+                "description": "Returns recent listening progress for all books on a specific device (Client alias).",
+                "parameters": [
+                    {"name": "deviceId", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 20}},
+                    {"name": "completed", "in": "query", "schema": {"type": "boolean"}}
+                ],
+                "responses": {
+                    "200": {"description": "Device progress retrieved successfully", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceProgressResponse"}}}},
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
                 }
             }
         },

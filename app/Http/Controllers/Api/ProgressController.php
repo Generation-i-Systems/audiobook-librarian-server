@@ -411,4 +411,28 @@ class ProgressController extends Controller
             'message' => 'Progress reset successfully'
         ]);
     }
+
+    /**
+     * Mark a book as completed (Alias for client compatibility)
+     */
+    public function markCompletedByPath(Request $request, int $bookId): JsonResponse
+    {
+        // Inject device_id if missing, using authenticated user ID
+        if (!$request->has('device_id')) {
+            $request->merge(['device_id' => (string) (Auth::id() ?? 'unknown')]);
+        }
+
+        return $this->markCompleted($request, $bookId);
+    }
+
+    /**
+     * Get device progress by path parameter (Alias for client compatibility)
+     */
+    public function getDeviceProgressByPath(Request $request, string $deviceId): JsonResponse
+    {
+        // Inject device_id from path into request
+        $request->merge(['device_id' => $deviceId]);
+
+        return $this->getDeviceProgress($request);
+    }
 }

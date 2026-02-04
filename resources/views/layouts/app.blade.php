@@ -43,7 +43,7 @@
     <!-- Scripts -->
     @if (!app()->environment('testing'))
         @vite([
-            'resources/sass/app.scss', 
+            'resources/sass/app.scss',
             'resources/js/app.js',
             'resources/js/global-ajax-auth.js'
         ])
@@ -67,6 +67,12 @@
 
 <body>
     <div id="app">
+        @if(config('database.default') === 'mysql_devel')
+            <div class="bg-warning text-dark text-center py-1 fw-bold">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                DEVELOPMENT ENVIRONMENT - Using Database: {{ config('database.default') }}
+            </div>
+        @endif
         <nav class="navbar navbar-expand-md navbar-dark bg-primary shadow-sm">
             <div class="container">
                 <a class="navbar-brand" href="{{ url('/') }}">
@@ -221,7 +227,7 @@
             @yield('content')
         </main>
     </div>
-    
+
     @stack('scripts')
 
     <!-- Force re-initialize Bootstrap dropdowns after DOM ready to fix event delegation conflicts -->

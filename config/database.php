@@ -78,6 +78,46 @@ return [
             ]) : [],
         ],
 
+        'mysql_production' => [
+            'driver' => 'mysql',
+            'url' => env('DB_PROD_URL'),
+            'host' => env('DB_PROD_HOST', '127.0.0.1'),
+            'port' => env('DB_PROD_PORT', '3306'),
+            'database' => env('DB_PROD_DATABASE', 'librarian_prod'),
+            'username' => env('DB_PROD_USERNAME', 'root'),
+            'password' => env('DB_PROD_PASSWORD', ''),
+            'unix_socket' => env('DB_PROD_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
+        'mysql_devel' => [
+            'driver' => 'mysql',
+            'url' => env('DB_DEVEL_URL'),
+            'host' => env('DB_DEVEL_HOST', '127.0.0.1'),
+            'port' => env('DB_DEVEL_PORT', '3306'),
+            'database' => env('DB_DEVEL_DATABASE', 'librarian_devel'),
+            'username' => env('DB_DEVEL_USERNAME', 'root'),
+            'password' => env('DB_DEVEL_PASSWORD', ''),
+            'unix_socket' => env('DB_DEVEL_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'mysql_testing' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),

@@ -322,4 +322,22 @@ class BookmarkApiController extends Controller
 
         return response()->json(null, 204);
     }
+
+    /**
+     * Delete a bookmark by ID (without book context)
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function deleteBookmarkById(Request $request, string $bookmarkId)
+    {
+        $userId = Auth::id();
+
+        $result = $this->documentStoreService->deleteBookmarkById($bookmarkId, $userId);
+
+        if (!$result) {
+            return response()->json(['error' => 'Bookmark not found'], 404);
+        }
+
+        return response()->json(null, 204);
+    }
 }

@@ -1440,6 +1440,11 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return true;
     }
 
+    public function deleteBookmarkById(string $bookmarkId, string $userId): bool
+    {
+        return true;
+    }
+
     public function updateBookQueue(string $userId, array $bookIds): void
     {
         $this->queues[$userId] = $bookIds;

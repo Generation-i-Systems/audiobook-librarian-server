@@ -62,6 +62,9 @@ class ApiRootController extends Controller
         return response()->json([
             'name' => 'Librarian API',
             'version' => 'v1',
+            'environment' => config('app.env'),
+            'database' => config('database.default'),
+            'is_devel_site' => config('database.default') === 'mysql_devel',
             'documentation' => $baseUrl . '/docs/api', // Assuming this exists or points to something useful
             'openapi' => route('api.v1.openapi'), // We'll name the existing openapi route
             'resources' => $apiRoutes,
