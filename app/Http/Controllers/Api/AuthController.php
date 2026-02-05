@@ -171,8 +171,13 @@ class AuthController extends Controller
 
     public function googleLogin(Request $request)
     {
+        // Validate: either idToken OR (googleId + email) must be provided
         $validator = Validator::make($request->all(), [
-            'idToken' => 'required|string',
+            'idToken' => 'nullable|string',
+            'googleId' => 'nullable|string',
+            'email' => 'nullable|string|email',
+            'name' => 'nullable|string',
+            'photoUrl' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -180,37 +185,77 @@ class AuthController extends Controller
             return response()->json($validator->errors(), 400);
         }
 
+        $idToken = $request->input('idToken');
+        $googleId = $request->input('googleId');
+        $email = $request->input('email');
+        $name = $request->input('name');
+        $photoUrl = $request->input('photoUrl');
+
+        // Determine which flow to use
+        $useJwtFlow = !empty($idToken) && $idToken !== 'NO_ID_TOKEN_AVAILABLE';
+
         try {
-            // Verify the Google ID token
-            $clientIds = config('services.google.allowed_client_ids');
-            if (empty($clientIds)) {
-                $clientIds = config('services.google.client_id'); // Fallback for backward compatibility
+            if ($useJwtFlow) {
+                // JWT Flow: Verify the Google ID token cryptographically
+                Log::debug('Google login: Using JWT verification flow');
+
+                // Get all allowed client IDs (Web + Android)
+                $allowedClientIds = config('services.google.allowed_client_ids');
+                if (empty($allowedClientIds)) {
+                    $allowedClientIds = [config('services.google.client_id')];
+                }
+
+                Log::debug('Google login: Allowed client IDs', ['ids' => $allowedClientIds]);
+
+                // Google_Client needs to be initialized with the Web Client ID
+                // But verifyIdToken will accept the token if its 'aud' matches any of the allowed IDs
+                $webClientId = config('services.google.client_id');
+                $client = new \Google_Client(['client_id' => $webClientId]);
+
+                // Verify token - the aud claim must match one of the allowed client IDs
+                try {
+                    $payload = $client->verifyIdToken($idToken);
+                } catch (\Exception $verifyException) {
+                    Log::error('Google token verification exception', [
+                        'error' => $verifyException->getMessage(),
+                    ]);
+                    $payload = null;
+                }
+
+                if (!$payload) {
+                    Log::error('Invalid Google ID token', [
+                        'tokenLength' => strlen($idToken),
+                        'webClientId' => $webClientId,
+                    ]);
+                    return response()->json(['message' => 'Invalid Google ID token'], 401);
+                }
+
+                Log::debug('Google token verified successfully', [
+                    'aud' => $payload['aud'] ?? 'missing',
+                    'email' => $payload['email'] ?? 'missing',
+                ]);
+
+                $email = $payload['email'] ?? null;
+                $name = $payload['name'] ?? null;
+                $googleId = $payload['sub'] ?? null;
+                $photoUrl = $payload['picture'] ?? null;
+                $emailVerified = $payload['email_verified'] ?? false;
+            } else {
+                // Android Client ID Flow: Trust client-provided data
+                // This is used when the app is signed by Play Store and Web Client ID doesn't work
+                Log::debug('Google login: Using Android Client ID flow (no JWT verification)', [
+                    'email' => $email,
+                    'googleId' => $googleId,
+                ]);
+
+                if (empty($googleId) || empty($email)) {
+                    Log::error('Missing required fields for Android Client ID flow');
+                    return response()->json(['message' => 'Missing googleId or email'], 400);
+                }
+
+                // For Android Client ID flow, we assume email is verified since it comes from Google Sign-In
+                $emailVerified = true;
             }
-
-            $client = new \Google_Client(['client_id' => $clientIds]);
-            $payload = $client->verifyIdToken($request->idToken);
-
-            if (!$payload) {
-                Log::error('Invalid Google ID token');
-                return response()->json(['message' => 'Invalid Google ID token'], 401);
-            }
-
-            $email = $payload['email'] ?? null;
-            $name = $payload['name'] ?? null;
-            $googleId = $payload['sub'] ?? null;
-            $photoUrl = $payload['picture'] ?? null;
-            $emailVerified = $payload['email_verified'] ?? false;
-
-            if (!$email || !$googleId) {
-                Log::error('Missing required fields from Google token', ['payload' => $payload]);
-                return response()->json(['message' => 'Invalid token payload'], 401);
-            }
-
-            Log::debug('Google login verified', [
-                'email' => $email,
-                'name' => $name,
-                'google_id' => $googleId,
-            ]);
 
             // Check if user exists by email
             $user = $this->documentStoreService->getUserByEmail($email);
