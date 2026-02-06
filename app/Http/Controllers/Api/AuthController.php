@@ -9,8 +9,11 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\NewUserRegistrationNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Sanctum\PersonalAccessToken;
+use Firebase\JWT\JWT;
+use Firebase\JWT\JWK;
 
 class AuthController extends Controller
 {
@@ -493,5 +496,264 @@ class AuthController extends Controller
             'refreshToken' => $tokenValue,
             'token' => $tokenValue,
         ]);
+    }
+    public function facebookLogin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'accessToken' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        $accessToken = $request->input('accessToken');
+
+        try {
+            // Verify token with Facebook Graph API
+            $response = Http::get('https://graph.facebook.com/v19.0/me', [
+                'fields' => 'id,name,email,picture',
+                'access_token' => $accessToken,
+            ]);
+
+            if ($response->failed()) {
+                Log::error('Facebook token verification failed', ['error' => $response->body()]);
+                return response()->json(['message' => 'Invalid Facebook token'], 401);
+            }
+
+            $fbUser = $response->json();
+            $facebookId = $fbUser['id'] ?? null;
+            $email = $fbUser['email'] ?? null;
+            $name = $fbUser['name'] ?? null;
+            $photoUrl = $fbUser['picture']['data']['url'] ?? null;
+
+            if (!$facebookId || !$email) {
+                return response()->json(['message' => 'Facebook account must have an email'], 400);
+            }
+
+            // Check if user exists by email
+            $user = $this->documentStoreService->getUserByEmail($email);
+            $isNewUser = false;
+            $createdId = null;
+
+            if (!$user) {
+                // Create new user
+                $userData = [
+                    'name' => $name,
+                    'username' => explode('@', $email)[0],
+                    'email' => $email,
+                    'facebook_id' => $facebookId,
+                    'photo_url' => $photoUrl,
+                    'role' => 'unverified',
+                    'password' => null,
+                    'email_verified_at' => now(), // Trusted from Facebook
+                ];
+
+                $createdId = $this->documentStoreService->createUser($userData);
+
+                if (!$createdId) {
+                    return response()->json(['message' => 'Registration failed'], 500);
+                }
+
+                $user = $this->documentStoreService->getUserByEmail($email);
+                $isNewUser = true;
+
+                Log::info('New Facebook user created', ['email' => $email, 'id' => $createdId]);
+            } else {
+                // Update existing user
+                if (empty($user['facebook_id'])) {
+                    $this->documentStoreService->updateUser((string) $user['id'], [
+                        'facebook_id' => $facebookId,
+                        'photo_url' => $photoUrl ?? $user['photo_url'],
+                    ]);
+                }
+            }
+
+            if ($isNewUser) {
+                // @phpstan-ignore-next-line
+                $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
+                $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
+                $this->registrationNotifier->send((array) $completeUserData, 'api-facebook', $request);
+            }
+
+            // Check status
+            if (($user['role'] ?? '') === 'unverified') {
+                return response()->json([
+                   'code' => 'ACCOUNT_PENDING_APPROVAL',
+                   'message' => 'Facebook account verified. Waiting for admin approval.',
+                ], 403);
+            }
+
+            // Generate token
+            $tokenValue = bin2hex(random_bytes(32));
+            $tokenData = [
+                'user_id' => (string) ($user['id'] ?? ''),
+                'token' => $tokenValue,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            $this->documentStoreService->createApiToken($tokenData);
+
+            return response()->json([
+                'id' => (string) ($user['id'] ?? ''),
+                'name' => $user['name'] ?? null,
+                'username' => $user['username'] ?? null,
+                'email' => $user['email'] ?? null,
+                'photo_url' => $user['photo_url'] ?? null,
+                'role' => $user['role'] ?? null,
+                'authToken' => $tokenValue,
+                'refreshToken' => $tokenValue,
+                'token' => $tokenValue,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Facebook login failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Facebook authentication failed'], 500);
+        }
+    }
+
+    public function appleLogin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'idToken' => 'required|string',
+            'name' => 'nullable|string', // Apple only sends name on first login
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        $idToken = $request->input('idToken');
+        $fullName = $request->input('name'); // Client should send this if available
+
+        try {
+            // Fetch Apple's public keys
+            $publicKeys = Http::get('https://appleid.apple.com/auth/keys')->json();
+
+            // Verify JWT
+            try {
+                $jwks = JWK::parseKeySet($publicKeys);
+                $payload = JWT::decode($idToken, $jwks);
+            } catch (\Exception $e) {
+                Log::error('Apple token verification failed', ['error' => $e->getMessage()]);
+                return response()->json(['message' => 'Invalid Apple ID token'], 401);
+            }
+
+            // Verify audience (client ID)
+            $allowedClientIds = config('services.apple.allowed_client_ids');
+            if (empty($allowedClientIds)) {
+                $allowedClientIds = [config('services.apple.client_id')];
+            }
+
+            if (!in_array($payload->aud, $allowedClientIds)) {
+                Log::error('Apple token audience mismatch', ['aud' => $payload->aud, 'allowed' => $allowedClientIds]);
+                return response()->json(['message' => 'Invalid Apple ID token'], 401);
+            }
+            // Proceed assuming valid if verification passed (standard claims check)
+
+            $appleId = $payload->sub;
+            $email = $payload->email ?? null;
+            $emailVerified = (bool) ($payload->email_verified ?? false);
+
+            if (!$email) {
+                // Apple might not return email on subsequent logins, but 'sub' is stable.
+                // However, for our system, we need an email to create a user.
+                // If user exists by apple_id, we are good.
+            }
+
+            // Find user by apple_id or email
+            $user = null;
+
+            // First try by apple_id (if we stored it previously)
+            // We don't have a direct method for this in DocumentStoreService yet, so we rely on email
+            // or we might need to add a method logic here.
+
+            if ($email) {
+                $user = $this->documentStoreService->getUserByEmail($email);
+            }
+
+            // Use query builder if needed for apple_id lookup if not found by email
+            if (!$user) {
+                $userModel = \App\Models\User::where('apple_id', $appleId)->first();
+                if ($userModel) {
+                    $user = $userModel->toArray();
+                }
+            }
+
+            $isNewUser = false;
+            $createdId = null;
+
+            if (!$user) {
+                if (!$email) {
+                    return response()->json(['message' => 'Email required for registration'], 400);
+                }
+
+                // Create new user
+                $userData = [
+                   'name' => $fullName ?? explode('@', $email)[0],
+                   'username' => explode('@', $email)[0],
+                   'email' => $email,
+                   'apple_id' => $appleId,
+                   'role' => 'unverified',
+                   'password' => null,
+                   'email_verified_at' => $emailVerified ? now() : null,
+                ];
+
+                $createdId = $this->documentStoreService->createUser($userData);
+                if (!$createdId) {
+                    return response()->json(['message' => 'Registration failed'], 500);
+                }
+
+                $user = $this->documentStoreService->getUserByEmail($email);
+                $isNewUser = true;
+                Log::info('New Apple user created', ['email' => $email, 'id' => $createdId]);
+            } else {
+                // Update existing user
+                if (empty($user['apple_id'])) {
+                    $this->documentStoreService->updateUser((string) $user['id'], [
+                        'apple_id' => $appleId,
+                    ]);
+                }
+            }
+
+            if ($isNewUser) {
+                // @phpstan-ignore-next-line
+                $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
+                $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
+                $this->registrationNotifier->send((array) $completeUserData, 'api-apple', $request);
+            }
+
+            // Check status
+            if (($user['role'] ?? '') === 'unverified') {
+                return response()->json([
+                   'code' => 'ACCOUNT_PENDING_APPROVAL',
+                   'message' => 'Apple account verified. Waiting for admin approval.',
+                ], 403);
+            }
+
+            // Generate token
+            $tokenValue = bin2hex(random_bytes(32));
+            $tokenData = [
+                'user_id' => (string) ($user['id'] ?? ''),
+                'token' => $tokenValue,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            $this->documentStoreService->createApiToken($tokenData);
+
+            return response()->json([
+                'id' => (string) ($user['id'] ?? ''),
+                'name' => $user['name'] ?? null,
+                'username' => $user['username'] ?? null,
+                'email' => $user['email'] ?? null,
+                'photo_url' => $user['photo_url'] ?? null,
+                'role' => $user['role'] ?? null,
+                'authToken' => $tokenValue,
+                'refreshToken' => $tokenValue,
+                'token' => $tokenValue,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Apple login failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Apple authentication failed'], 500);
+        }
     }
 }

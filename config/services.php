@@ -57,6 +57,23 @@ return [
         'key' => env('GOOGLE_BOOKS_API_KEY'),
     ],
 
+    'facebook' => [
+        'client_id' => env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_REDIRECT_URI'),
+    ],
+
+    'apple' => [
+        'client_id' => env('APPLE_CLIENT_ID'),
+        'allowed_client_ids' => array_values(array_filter([
+            env('APPLE_CLIENT_ID'),
+            env('APPLE_CLIENT_ID_IOS'),
+            env('APPLE_CLIENT_ID_ANDROID'),
+        ])),
+        'client_secret' => env('APPLE_CLIENT_SECRET'),
+        'redirect' => env('APPLE_REDIRECT_URI'),
+    ],
+
     'audiobook_bay' => [
         'base_url' => env('AUDIOBOOK_BAY_BASE_URL'),
         'username' => env('AUDIOBOOK_BAY_USERNAME'),

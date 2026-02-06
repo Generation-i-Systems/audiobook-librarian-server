@@ -86,6 +86,9 @@ class User extends Authenticatable
         'password',
         'role',
         'email_verified_at',
+        'google_id',
+        'facebook_id',
+        'apple_id',
     ];
 
     /**

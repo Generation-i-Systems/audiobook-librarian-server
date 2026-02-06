@@ -24,6 +24,9 @@ use App\Http\Controllers\Api\AuthorController;
 use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\BookImportApiController;
 use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\PositionSyncController;
+use App\Http\Controllers\Api\BookmarkSyncController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -76,6 +79,27 @@ Route::prefix('v1')->group(function () {
         // Sync Routes
         Route::prefix('sync')->middleware('idempotency')->group(function () {
             Route::post('/progress', [\App\Http\Controllers\Api\SyncController::class, 'progress']);
+        });
+
+        // Device Management Routes
+        Route::middleware('device.identify')->group(function () {
+            Route::get('/devices', [DeviceController::class, 'index']);
+            Route::put('/devices/{deviceId}', [DeviceController::class, 'update']);
+            Route::delete('/devices/{deviceId}', [DeviceController::class, 'destroy']);
+            Route::put('/devices/{deviceId}/sync-enabled', [DeviceController::class, 'updateSyncEnabled']);
+
+            // Position Sync Routes
+            Route::prefix('sync')->group(function () {
+                Route::get('/positions', [PositionSyncController::class, 'index']);
+                Route::get('/positions/{bookId}', [PositionSyncController::class, 'show']);
+                Route::post('/positions', [PositionSyncController::class, 'store'])->middleware('idempotency');
+
+                // Bookmark Sync Routes
+                Route::get('/bookmarks', [BookmarkSyncController::class, 'index']);
+                Route::get('/bookmarks/{bookId}', [BookmarkSyncController::class, 'show']);
+                Route::post('/bookmarks', [BookmarkSyncController::class, 'store'])->middleware('idempotency');
+                Route::delete('/bookmarks/{stringId}', [BookmarkSyncController::class, 'destroy']);
+            });
         });
 
         // Book Routes
@@ -287,6 +311,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
     Route::post('/auth/google', [AuthController::class, 'googleLogin']);
+    Route::post('/auth/facebook', [AuthController::class, 'facebookLogin']);
+    Route::post('/auth/apple', [AuthController::class, 'appleLogin']);
 
     // Backwards compatible auth-prefixed routes (mobile clients expect /auth/* paths)
     Route::prefix('auth')->group(function () {
@@ -297,5 +323,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
         Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
         Route::post('/google', [AuthController::class, 'googleLogin']);
+        Route::post('/facebook', [AuthController::class, 'facebookLogin']);
+        Route::post('/apple', [AuthController::class, 'appleLogin']);
     });
 });

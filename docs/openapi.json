@@ -7716,6 +7716,55 @@
                 }
             }
         },
+        "/auth/facebook": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Facebook Sign-In",
+                "operationId": "facebookLogin",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["accessToken"],
+                                "properties": {"accessToken": {"type": "string"}}
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Authenticated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}},
+                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
+                }
+            }
+        },
+        "/auth/apple": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Apple Sign-In",
+                "operationId": "appleLogin",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["idToken"],
+                                "properties": {
+                                    "idToken": {"type": "string"},
+                                    "name": {"type": "string", "description": "User name (optional, only sent on first login)"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Authenticated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}},
+                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
+                }
+            }
+        },
         "/auth/logout": {
             "post": {
                 "tags": ["Authentication"],

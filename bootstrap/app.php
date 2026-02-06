@@ -10,10 +10,6 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
-    ->withKernels([
-        Illuminate\Contracts\Http\Kernel::class => App\Http\Kernel::class,
-        Illuminate\Contracts\Console\Kernel::class => App\Console\Kernel::class,
-    ])
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
@@ -97,6 +93,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => \App\Http\Middleware\EnsureActiveUser::class,
             'api.auth' => \App\Http\Middleware\ApiAuth::class,
             'idempotency' => \App\Http\Middleware\CheckIdempotency::class,
+            'device.identify' => \App\Http\Middleware\IdentifyDevice::class,
         ]);
     })
     ->withProviders([

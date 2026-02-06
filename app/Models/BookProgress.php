@@ -87,6 +87,11 @@ class BookProgress extends Model
         return $this->belongsTo(ClientBook::class);
     }
 
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(Device::class, 'device_id', 'device_id');
+    }
+
     /**
      * Update progress and calculate percentage
      */

@@ -2241,6 +2241,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             'password' => $data['password'], // Hashed automatically by model cast
             'role' => $data['role'] ?? 'library-user',
             'email_verified_at' => $data['email_verified_at'] ?? null,
+            'google_id' => $data['google_id'] ?? null,
+            'facebook_id' => $data['facebook_id'] ?? null,
+            'apple_id' => $data['apple_id'] ?? null,
         ]);
 
         return (string) $user->id;
