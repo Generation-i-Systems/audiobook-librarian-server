@@ -30,6 +30,7 @@ class ImportUIService implements ImportUIInterface
     protected $ttyStream = null;
     protected ?string $lastKeyDebug = null;
     protected bool $interrupted = false;
+    protected int $bookDetailsEndY = 0;
 
     public function setPlainMode(bool $plainMode): void
     {
@@ -823,13 +824,12 @@ class ImportUIService implements ImportUIInterface
     protected function drawBookDetails(): void
     {
         $y = 5;
-        $footerTop = $this->getFooterSeparatorY();
-        $logHeight = min(14, max(12, $this->height - 24));
-        $detailsHeight = max(10, $footerTop - $y - $logHeight);
-        $this->drawBox(2, $y, $this->width - 2, $detailsHeight, " Current Book Details ", "green");
 
         if (empty($this->currentBook)) {
-            $this->screen->write("\e[" . ($y + 5) . ";10HNo book currently processing...");
+            $emptyHeight = 5;
+            $this->drawBox(2, $y, $this->width - 2, $emptyHeight, " Current Book Details ", "green");
+            $this->bookDetailsEndY = $y + $emptyHeight;
+            $this->screen->write("\e[" . ($y + 2) . ";10HNo book currently processing...");
             return;
         }
 
@@ -909,6 +909,23 @@ class ImportUIService implements ImportUIInterface
             $fields['Cover URL'] = $coverUrlLabel;
         }
 
+        // Calculate actual needed height based on fields
+        $neededRows = 0;
+        foreach ($fields as $label => $value) {
+            $displayValue = $this->stringifyForDisplay($value);
+            $maxExtraLines = $label === 'Desc' ? 2 : 0; // Desc can have up to 3 total lines (1 + 2 extra)
+
+            $wrapped = wordwrap($displayValue, $valueMaxWidth, "\n", true);
+            $lines = explode("\n", $wrapped);
+            $lines = array_slice($lines, 0, 1 + $maxExtraLines);
+            $neededRows += count($lines);
+        }
+
+        // Box height = 2 (top/bottom borders) + neededRows + small padding
+        $detailsHeight = $neededRows + 4;
+        $this->drawBox(2, $y, $this->width - 2, $detailsHeight, " Current Book Details ", "green");
+        $this->bookDetailsEndY = $y + $detailsHeight;
+
         $row = $y + 2;
         $maxRows = ($y + $detailsHeight) - 2;
         foreach ($fields as $label => $value) {
@@ -917,7 +934,7 @@ class ImportUIService implements ImportUIInterface
             }
 
             $displayValue = $this->stringifyForDisplay($value);
-            $maxExtraLines = $label === 'Desc' ? 3 : 1;
+            $maxExtraLines = $label === 'Desc' ? 2 : 0;
 
             $wrapped = wordwrap($displayValue, $valueMaxWidth, "\n", true);
             $lines = explode("\n", $wrapped);
@@ -949,12 +966,16 @@ class ImportUIService implements ImportUIInterface
     protected function drawLogs(): void
     {
         $footerTop = $this->getFooterSeparatorY();
-        $h = min(14, max(12, $this->height - 24));
-        $y = $footerTop - $h;
+        $y = $this->bookDetailsEndY + 1;
+
+        // Calculate available height for logs
+        $availableHeight = max(5, $footerTop - $y);
+        $h = min($availableHeight, 15); // Cap at 15 lines for logs
+
         $this->drawBox(2, $y, $this->width - 2, $h, " Activity Log ", "yellow");
 
         $row = $y + 1;
-        $displayLogs = array_slice($this->logs, -$h + 2);
+        $displayLogs = array_slice($this->logs, -($h - 2));
         foreach ($displayLogs as $log) {
             $this->screen->write("\e[{$row};4H" . substr($log, 0, $this->width - 6));
             $row++;
