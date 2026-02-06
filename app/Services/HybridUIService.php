@@ -95,13 +95,35 @@ class HybridUIService extends ImportUIService
         // The area below the outer box is left empty for Laravel Prompts to render into.
     }
 
+    protected function drawLogs(): void
+    {
+        $layout = $this->computeLayout();
+        $y = $layout['logY'];
+        $h = $layout['logHeight'] + 2;
+
+        $this->drawBox(2, $y, $this->width - 2, $h, ' Activity Log ', 'yellow');
+
+        $row = $y + 1;
+        $maxLogs = max(1, $layout['maxLogs'] + 2);
+        $displayLogs = array_slice($this->logs, -$maxLogs);
+        foreach ($displayLogs as $log) {
+            $this->screen->write("\e[{$row};4H" . substr($log, 0, $this->width - 6));
+            $row++;
+        }
+    }
+
+    protected function getPromptCursorY(): int
+    {
+        return $this->getFooterSeparatorY() + 2;
+    }
+
     public function ask(string $question, string $default = '', bool $clearPrompt = true): string
     {
         // Ensure UI is up to date
         $this->renderFull();
 
         // Move cursor to prompt position (where the separator used to be)
-        $cursorY = $this->getFooterSeparatorY();
+        $cursorY = $this->getPromptCursorY();
         $cursorX = 1;
 
         echo "\e[{$cursorY};{$cursorX}H";
@@ -126,7 +148,7 @@ class HybridUIService extends ImportUIService
     {
         $this->renderFull();
 
-        $cursorY = $this->getFooterSeparatorY();
+        $cursorY = $this->getPromptCursorY();
         $cursorX = 1;
         echo "\e[{$cursorY};{$cursorX}H";
 
@@ -165,7 +187,7 @@ class HybridUIService extends ImportUIService
     {
         $this->renderFull();
 
-        $cursorY = $this->getFooterSeparatorY();
+        $cursorY = $this->getPromptCursorY();
         $cursorX = 1;
         echo "\e[{$cursorY};{$cursorX}H";
 
