@@ -119,3 +119,9 @@ all cover images should be relative to the directoryPath. So   "coverImage": "Ro
 ## 2025-12-17
 
 updating the path in the form still isn't moving the files
+
+---
+
+## 2025-12-18
+
+I am trying to optimize the sizes of the blocks in the import cli. but have been unable to increase the size of the submenu for editing individual fields but one row so that all content shows up without scrolling and maximizes all other box sizes according to the section sizes

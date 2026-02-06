@@ -1,4 +1,12 @@
 ## [Unreleased]
+### Changed
+- Import CLI layout redesigned to fit within actual terminal height
+  - Replaced outer box with a simple title row; eliminated progress bar gaps
+  - Menu fixed at 14 rows with dynamic scroll (all 9 edit-field options visible)
+  - Activity Log gets all remaining space and grows with terminal height (6 visible lines at 40 rows)
+  - Added `computeLayout()` centralized layout engine
+  - Eliminated blank lines below submenus
+
 ### Added
 - Reorganized test suite by category for better organization and targeted testing
   - tests/Api/ - API tests (156 tests)

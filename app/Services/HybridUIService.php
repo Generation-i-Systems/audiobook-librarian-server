@@ -91,11 +91,8 @@ class HybridUIService extends ImportUIService
      */
     protected function drawPrompt(): void
     {
-        $separatorY = $this->getFooterSeparatorY();
-        // Clear from the separator line position downwards
-        for ($y = $separatorY; $y <= $this->height; $y++) {
-            $this->screen->write("\e[{$y};1H\e[K");
-        }
+        // No-op: renderFull() already clears the screen with \e[H\e[J.
+        // The area below the outer box is left empty for Laravel Prompts to render into.
     }
 
     public function ask(string $question, string $default = '', bool $clearPrompt = true): string
@@ -146,11 +143,16 @@ class HybridUIService extends ImportUIService
         // Check if default exists
         $defaultKey = $default !== '' && isset($formattedOptions[$default]) ? $default : (string) array_key_first($formattedOptions);
 
+        // Compute scroll from available menu height minus Laravel Prompts rendering overhead
+        $layout = $this->computeLayout();
+        $promptOverhead = 4;
+        $scroll = max(5, min(count($formattedOptions), $layout['menuHeight'] - $promptOverhead));
+
         $response = select(
             label: $question,
             options: $formattedOptions,
             default: $defaultKey,
-            scroll: 8 // Increased scroll area for select
+            scroll: $scroll
         );
 
         // Restore layout

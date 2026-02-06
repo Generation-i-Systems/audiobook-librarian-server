@@ -115,18 +115,56 @@ class ImportUIService implements ImportUIInterface
 
     protected function getPromptHeight(): int
     {
-        // Ensure we always have room for the main UI above
-        $max = max(3, $this->height - 18);
-
-        $linesNeeded = max(3, count($this->promptLines));
-
-        return min($linesNeeded, $this->promptHeight + 3, $max);
+        $layout = $this->computeLayout();
+        return $layout['menuHeight'];
     }
 
     protected function getFooterSeparatorY(): int
     {
-        // One separator line above prompt area
-        return $this->height - ($this->getPromptHeight() + 1);
+        $layout = $this->computeLayout();
+        return $layout['separatorY'];
+    }
+
+    protected function computeLayout(): array
+    {
+        $totalHeight = $this->height;
+
+        // Title row at Y=1, progress immediately below at Y=2, book details at Y=3
+        $titleY = 1;
+        $progressY = 2;
+        $bookDetailsY = 3;
+        $bookDetailsHeight = 14;
+
+        // Log starts right after book details
+        $logY = $bookDetailsY + $bookDetailsHeight;
+
+        // Work backwards from the bottom: fix the menu to 13 rows.
+        // All remaining space goes to the activity log.
+        $fixedMenuHeight = 13;
+        $remaining = $totalHeight - $logY;
+
+        // Menu gets its fixed allocation; log gets the rest
+        $menuHeight = max(10, min($fixedMenuHeight, $remaining - 3));
+        $menuStartY = $totalHeight - $menuHeight + 1;
+        $separatorY = $menuStartY - 1;
+
+        // Log fills from logY to just before the separator
+        $logHeight = max(1, $separatorY - $logY);
+
+        $maxLogs = max(1, $logHeight - 2);
+
+        return [
+            'titleY' => $titleY,
+            'progressY' => $progressY,
+            'bookDetailsY' => $bookDetailsY,
+            'bookDetailsHeight' => $bookDetailsHeight,
+            'logY' => $logY,
+            'logHeight' => $logHeight,
+            'separatorY' => $separatorY,
+            'menuStartY' => $menuStartY,
+            'menuHeight' => $menuHeight,
+            'maxLogs' => $maxLogs,
+        ];
     }
 
     public function initialize(int $width, int $height): void
@@ -140,7 +178,8 @@ class ImportUIService implements ImportUIInterface
         // Many terminals will auto-wrap when drawing the bottom-right corner, which causes a scroll.
         $this->width = max(40, $width - 1);
         $this->height = max(20, $height - 1);
-        $this->maxLogs = max(5, $this->height - 25);
+        $layout = $this->computeLayout();
+        $this->maxLogs = $layout['maxLogs'];
         $this->screen = new Screen($this->width, $this->height);
 
         $this->enableAlternateScreen();
@@ -221,8 +260,14 @@ class ImportUIService implements ImportUIInterface
         // Clear buffer
         $this->screen->write("\e[H\e[J");
 
-        // Draw outer border
-        $this->drawBox(1, 1, $this->width, $this->height, " Audiobook LibrarianImport ", "cyan");
+        $layout = $this->computeLayout();
+
+        // Draw title row
+        $titleY = $layout['titleY'];
+        $title = " Audiobook Librarian Import ";
+        $titleLen = mb_strwidth($title);
+        $line = str_repeat('─', max(0, $this->width - $titleLen - 2));
+        $this->screen->write("\e[{$titleY};1H\e[36m─{$title}{$line}─\e[0m");
 
         // Header section (Progress)
         $this->drawProgress();
@@ -811,24 +856,27 @@ class ImportUIService implements ImportUIInterface
 
     protected function drawProgress(): void
     {
+        $layout = $this->computeLayout();
+        $y = $layout['progressY'];
         $percent = $this->progressTotal > 0 ? round(($this->progressCurrent / $this->progressTotal) * 100) : 0;
         $barWidth = $this->width - 30;
         $filledWidth = (int) ($barWidth * ($percent / 100));
         $bar = str_repeat("█", $filledWidth) . str_repeat("░", $barWidth - $filledWidth);
 
-        $progressText = "\e[3;4H\e[1;33mProgress:\e[0m [\e[32m{$bar}\e[0m] " .
+        $progressText = "\e[{$y};4H\e[1;33mProgress:\e[0m [\e[32m{$bar}\e[0m] " .
             "{$percent}% ({$this->progressCurrent}/{$this->progressTotal})";
         $this->screen->write($progressText);
     }
 
     protected function drawBookDetails(): void
     {
-        $y = 5;
+        $layout = $this->computeLayout();
+        $y = $layout['bookDetailsY'];
+        $fixedHeight = $layout['bookDetailsHeight'];
 
         if (empty($this->currentBook)) {
-            $emptyHeight = 5;
-            $this->drawBox(2, $y, $this->width - 2, $emptyHeight, " Current Book Details ", "green");
-            $this->bookDetailsEndY = $y + $emptyHeight;
+            $this->drawBox(2, $y, $this->width - 2, $fixedHeight, " Current Book Details ", "green");
+            $this->bookDetailsEndY = $y + $fixedHeight;
             $this->screen->write("\e[" . ($y + 2) . ";10HNo book currently processing...");
             return;
         }
@@ -909,20 +957,7 @@ class ImportUIService implements ImportUIInterface
             $fields['Cover URL'] = $coverUrlLabel;
         }
 
-        // Calculate actual needed height based on fields
-        $neededRows = 0;
-        foreach ($fields as $label => $value) {
-            $displayValue = $this->stringifyForDisplay($value);
-            $maxExtraLines = $label === 'Desc' ? 2 : 0; // Desc can have up to 3 total lines (1 + 2 extra)
-
-            $wrapped = wordwrap($displayValue, $valueMaxWidth, "\n", true);
-            $lines = explode("\n", $wrapped);
-            $lines = array_slice($lines, 0, 1 + $maxExtraLines);
-            $neededRows += count($lines);
-        }
-
-        // Box height = 2 (top/bottom borders) + neededRows + small padding
-        $detailsHeight = $neededRows + 4;
+        $detailsHeight = $fixedHeight;
         $this->drawBox(2, $y, $this->width - 2, $detailsHeight, " Current Book Details ", "green");
         $this->bookDetailsEndY = $y + $detailsHeight;
 
@@ -934,48 +969,30 @@ class ImportUIService implements ImportUIInterface
             }
 
             $displayValue = $this->stringifyForDisplay($value);
-            $maxExtraLines = $label === 'Desc' ? 2 : 0;
 
-            $wrapped = wordwrap($displayValue, $valueMaxWidth, "\n", true);
-            $lines = explode("\n", $wrapped);
-            $lines = array_slice($lines, 0, 1 + $maxExtraLines);
-            if (count($lines) === 0) {
-                $lines = [''];
+            // Truncate long values to fit on one line
+            if (strlen($displayValue) > $valueMaxWidth) {
+                $displayValue = substr($displayValue, 0, $valueMaxWidth - 3) . '...';
             }
 
-            $firstLine = array_shift($lines);
             $labelText = str_pad($label . ':', $labelWidth);
             $this->screen->write("\e[{$row};{$labelX}H\e[1;36m{$labelText}\e[0m");
-            $this->screen->write("\e[{$row};{$valueX}H" . substr($firstLine, 0, $valueMaxWidth));
+            $this->screen->write("\e[{$row};{$valueX}H" . $displayValue);
             $row++;
-
-            foreach ($lines as $line) {
-                if ($row > $maxRows) {
-                    break;
-                }
-
-                $this->screen->write(
-                    "\e[{$row};{$labelX}H\e[1;36m" . str_repeat(' ', $labelWidth) . "\e[0m"
-                );
-                $this->screen->write("\e[{$row};{$valueX}H" . substr($line, 0, $valueMaxWidth));
-                $row++;
-            }
         }
     }
 
     protected function drawLogs(): void
     {
-        $footerTop = $this->getFooterSeparatorY();
-        $y = $this->bookDetailsEndY + 1;
-
-        // Calculate available height for logs
-        $availableHeight = max(5, $footerTop - $y);
-        $h = min($availableHeight, 15); // Cap at 15 lines for logs
+        $layout = $this->computeLayout();
+        $y = $layout['logY'];
+        $h = $layout['logHeight'];
 
         $this->drawBox(2, $y, $this->width - 2, $h, " Activity Log ", "yellow");
 
         $row = $y + 1;
-        $displayLogs = array_slice($this->logs, -($h - 2));
+        $maxLogs = $layout['maxLogs'];
+        $displayLogs = array_slice($this->logs, -$maxLogs);
         foreach ($displayLogs as $log) {
             $this->screen->write("\e[{$row};4H" . substr($log, 0, $this->width - 6));
             $row++;
@@ -984,10 +1001,10 @@ class ImportUIService implements ImportUIInterface
 
     protected function drawFooter(): void
     {
-        $separatorY = $this->getFooterSeparatorY();
+        $layout = $this->computeLayout();
+        $separatorY = $layout['separatorY'];
+
         $this->screen->write("\e[{$separatorY};2H" . str_repeat("─", $this->width - 2));
-        $this->screen->write("\e[" . ($this->height - 1) . ";2H" . str_repeat(' ', $this->width - 4));
-        $this->screen->write("\e[" . ($this->height - 1) . ";4H\e[1;37m>\e[0m ");
     }
 
     protected function drawPrompt(): void
@@ -996,15 +1013,19 @@ class ImportUIService implements ImportUIInterface
             return;
         }
 
-        $startY = $this->height - ($this->getPromptHeight() + 1);
-        $endY = $this->height - 2;
+        $layout = $this->computeLayout();
+        $startY = $layout['menuStartY'];
+        $promptHeight = $layout['menuHeight'];
+        $endY = $startY + $promptHeight - 1;
+
+        // Clear the prompt area
         for ($y = $startY; $y <= $endY; $y++) {
             $this->screen->write("\e[{$y};2H" . str_repeat(' ', $this->width - 4));
         }
 
-        $maxLines = $endY - $startY + 1;
-        $lines = array_slice($this->promptLines, -$maxLines);
-        $row = $endY - count($lines) + 1;
+        // Display prompt lines from the beginning (not the end) to show titles
+        $lines = array_slice($this->promptLines, 0, $promptHeight);
+        $row = $startY;
         foreach ($lines as $line) {
             if ($row > $endY) {
                 break;
@@ -1187,7 +1208,9 @@ class ImportUIService implements ImportUIInterface
             return;
         }
         $this->logs[] = $message;
-        if (count($this->logs) > $this->maxLogs) {
+        $layout = $this->computeLayout();
+        $maxLogs = $layout['maxLogs'];
+        if (count($this->logs) > $maxLogs) {
             array_shift($this->logs);
         }
         $this->renderFull();
@@ -1378,10 +1401,10 @@ class ImportUIService implements ImportUIInterface
         }
         $this->renderFull();
 
-        // Calculate where the cursor should be after the prompt
-        // We need to move the cursor to the input position after echoing the whole screen
+        // Dynamic cursor position at bottom of menu area
+        $layout = $this->computeLayout();
         $cursorX = 7;
-        $cursorY = $this->height - 1;
+        $cursorY = $layout['menuStartY'] + $layout['menuHeight'] - 2;
 
         // Show cursor for interactive input
         echo "\e[?25h\e[{$cursorY};{$cursorX}H";
