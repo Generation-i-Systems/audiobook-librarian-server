@@ -125,3 +125,9 @@ updating the path in the form still isn't moving the files
 ## 2025-12-18
 
 I am trying to optimize the sizes of the blocks in the import cli. but have been unable to increase the size of the submenu for editing individual fields but one row so that all content shows up without scrolling and maximizes all other box sizes according to the section sizes
+
+---
+
+## 2026-02-07
+
+restoring a deleted book doesn't restore the db record and does not set the file permissions using the permissions script

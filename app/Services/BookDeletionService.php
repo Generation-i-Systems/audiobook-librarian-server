@@ -16,7 +16,8 @@ class BookDeletionService
     use HandlesLibraryJson;
 
     public function __construct(
-        private DocumentStoreServiceInterface $documentStore
+        private DocumentStoreServiceInterface $documentStore,
+        private PermissionsQueueService $permissionsQueueService
     ) {
     }
 
@@ -151,6 +152,9 @@ class BookDeletionService
                     if ($restoredPath !== $originalDirectoryPath) {
                         $book['directoryPath'] = $restoredPath;
                     }
+
+                    $restoredAbsPath = Storage::disk('books')->path($restoredPath);
+                    $this->permissionsQueueService->addPath($restoredAbsPath);
                 }
             }
 
@@ -381,12 +385,7 @@ class BookDeletionService
             return ['moved' => false, 'file_count' => 0];
         }
 
-        $directoryExists = false;
-        if (method_exists($booksDisk, 'directoryExists')) {
-            $directoryExists = $booksDisk->directoryExists($directoryPath);
-        } else {
-            $directoryExists = count($booksDisk->allFiles($directoryPath)) > 0;
-        }
+        $directoryExists = $booksDisk->exists($directoryPath);
 
         if (!$directoryExists) {
             Log::warning('Directory not found when moving to trash', [
@@ -471,6 +470,7 @@ class BookDeletionService
         $restoredAbsPath = $booksDisk->path($restoredPath);
         if (is_dir($restoredAbsPath)) {
             $this->setDirectoryOwnership($restoredAbsPath);
+            $this->permissionsQueueService->addPath($restoredAbsPath);
         }
 
         $files = $trashDisk->allFiles($filesPath);
@@ -496,6 +496,7 @@ class BookDeletionService
 
                 if (rename($sourceAbsPath, $targetAbsPath)) {
                     $restoredFiles[] = $targetAbsPath;
+                    $this->permissionsQueueService->addPath($targetAbsPath);
                 } else {
                     Log::warning('Failed to restore file from trash', [
                         'source' => $file,
@@ -525,11 +526,7 @@ class BookDeletionService
             return $directoryPath;
         }
 
-        if (method_exists($disk, 'directoryExists')) {
-            $exists = $disk->directoryExists($directoryPath);
-        } else {
-            $exists = count($disk->allFiles($directoryPath)) > 0;
-        }
+        $exists = $disk->exists($directoryPath);
 
         if (!$exists) {
             return $directoryPath;
@@ -544,11 +541,7 @@ class BookDeletionService
             $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
             $candidate = $directoryPath . $suffix;
 
-            if (method_exists($disk, 'directoryExists')) {
-                $candidateExists = $disk->directoryExists($candidate);
-            } else {
-                $candidateExists = count($disk->allFiles($candidate)) > 0;
-            }
+            $candidateExists = $disk->exists($candidate);
 
             if (!$candidateExists) {
                 return $candidate;

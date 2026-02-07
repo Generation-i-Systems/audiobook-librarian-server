@@ -897,9 +897,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return [
             'data' => $transformedData,
             'total' => $total,
+            'perPage' => $perPage,
             'per_page' => $perPage,
+            'currentPage' => $page,
             'current_page' => $page,
-            'last_page' => max(1, ceil($total / $perPage)),
+            'lastPage' => max(1, (int) ceil($total / $perPage)),
+            'last_page' => max(1, (int) ceil($total / $perPage)),
         ];
     }
 

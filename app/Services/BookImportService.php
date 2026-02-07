@@ -1222,21 +1222,25 @@ class BookImportService
 
                 if ($operation === 'move') {
                     $this->moveDirectoryContents($sourcePath, $targetDir);
-                    // Clean up source directory after successful move
-                    $cleanupAudiobook = $audiobook;
-                    $cleanupAudiobook['path'] = $originalSourcePath;
-                    $this->cleanupSourceDirectory($cleanupAudiobook);
                 } else {
                     $this->copyDirectoryContents($sourcePath, $targetDir);
                 }
             }
 
+            // CRITICAL: Verify files exist in destination BEFORE cleaning up source
             $this->assertDirectoryHasAudioFiles($targetDir, [
                 'book_id' => $book->id,
                 'source' => $sourcePath,
                 'target' => $targetDir,
                 'operation' => $operation,
             ]);
+
+            // Only clean up source after verifying destination has audio files
+            if ($operation === 'move' && !$isMultiBookPart) {
+                $cleanupAudiobook = $audiobook;
+                $cleanupAudiobook['path'] = $originalSourcePath;
+                $this->cleanupSourceDirectory($cleanupAudiobook);
+            }
 
             // Save any changes (including directory_path if there was a conflict)
             $book->save();
@@ -1443,6 +1447,9 @@ class BookImportService
             $this->setDirectoryOwnership($targetDir);
         }
 
+        $filesToDelete = [];
+
+        // First, copy/move all files
         foreach ($files as $filePath) {
             if (!file_exists($filePath)) {
                 Log::warning("File not found for multi-book move: {$filePath}");
@@ -1462,7 +1469,8 @@ class BookImportService
                 if (!File::copy($filePath, $targetFile)) {
                     throw new \Exception("Failed to copy file: {$filePath} to {$targetFile}");
                 }
-                File::delete($filePath);
+                // Mark for deletion AFTER verification
+                $filesToDelete[] = $filePath;
             }
 
             chmod($targetFile, 0664);
@@ -1470,6 +1478,18 @@ class BookImportService
 
             // Also move matching PDF if exists
             $this->moveMatchingPdfFile($filePath, $targetDir);
+        }
+
+        // CRITICAL: Verify destination has files BEFORE deleting cross-filesystem copies
+        if (!empty($filesToDelete)) {
+            if (!$this->directoryHasAudioFiles($targetDir)) {
+                throw new \Exception("Multi-book file move failed - destination has no audio files: {$targetDir}");
+            }
+
+            // Only delete source files after verification
+            foreach ($filesToDelete as $filePath) {
+                File::delete($filePath);
+            }
         }
     }
 
@@ -4287,7 +4307,19 @@ class BookImportService
             $displayEnrichedMetadataCallback($metadata);
         }
 
+        Log::debug("processSingleBook: Review decision point", [
+            'title' => $metadata['title'] ?? 'unknown',
+            'isAutoMode' => $isAutoMode,
+            'isDryRun' => $isDryRun,
+            'hasReviewCallback' => $reviewAndApproveCallback !== null,
+            'is_multi_book_part' => !empty($audiobook['is_multi_book_part']),
+        ]);
+
         if (!$isAutoMode && !$isDryRun && $reviewAndApproveCallback) {
+            Log::info("processSingleBook: Calling review and approve", [
+                'title' => $metadata['title'] ?? 'unknown',
+            ]);
+
             if (!$reviewAndApproveCallback($metadata, $audiobook)) {
                 if ($infoCallback) {
                     $infoCallback("❌ Import rejected by user");
@@ -4298,8 +4330,15 @@ class BookImportService
                         'reason' => 'Rejected by user',
                     ];
                 }
+                Log::info("processSingleBook: User rejected import", [
+                    'title' => $metadata['title'] ?? 'unknown',
+                ]);
                 return null;
             }
+
+            Log::info("processSingleBook: User approved import", [
+                'title' => $metadata['title'] ?? 'unknown',
+            ]);
         } elseif ($isAutoMode && $hasEnrichmentDataCallback && !$hasEnrichmentDataCallback($metadata)) {
             if ($infoCallback) {
                 $infoCallback("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
@@ -4455,6 +4494,14 @@ class BookImportService
                 $bookMetadata['title'] = $fileInfos[0]['title'];
             }
 
+            // Clean the title to remove series name prefix/suffix
+            if (!empty($bookMetadata['title']) && !empty($multiBookInfo['series_name'])) {
+                $bookMetadata['title'] = $this->removeSeriesFromTitle(
+                    $bookMetadata['title'],
+                    $multiBookInfo['series_name']
+                );
+            }
+
             $virtualAudiobook = [
                 'path' => $audiobook['path'],  // Keep parent path for file operations
                 'display_path' => $firstFilePath,  // Show the actual file being imported in UI
@@ -4480,12 +4527,28 @@ class BookImportService
                     $infoCallback("📁 File: {$firstFilename}");
                 }
 
+                Log::info("Processing multi-book part", [
+                    'series' => $multiBookInfo['series_name'],
+                    'book_number' => $bookNumber,
+                    'title' => $bookMetadata['title'],
+                    'file_count' => count($virtualAudiobook['files']),
+                ]);
+
                 try {
                     $processSingleBookCallback($virtualAudiobook, $bookMetadata);
+
+                    Log::info("Multi-book part processed successfully", [
+                        'series' => $multiBookInfo['series_name'],
+                        'book_number' => $bookNumber,
+                    ]);
                 } catch (MergeIntoParentException $e) {
                     if ($infoCallback) {
                         $infoCallback("🛑 Merge requested: Stopping split processing and reprocessing parent directory...");
                     }
+
+                    Log::info("Merge requested - reprocessing as single book", [
+                        'series' => $multiBookInfo['series_name'],
+                    ]);
 
                     // Reprocess original parent audiobook (all files) as a single book
                     // Pass flag to prevent it from being re-detected as a multi-book/flat archive
@@ -4502,6 +4565,24 @@ class BookImportService
 
                     // Stop processing further split groups
                     return $books;
+                } catch (\Exception $e) {
+                    // CRITICAL: Any exception during multi-book processing should stop the entire split
+                    // to prevent data loss from automated continuation without user confirmation
+                    Log::error("Failed to process multi-book part - stopping split processing", [
+                        'series' => $multiBookInfo['series_name'],
+                        'book_number' => $bookNumber,
+                        'title' => $bookMetadata['title'],
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+
+                    if ($infoCallback) {
+                        $infoCallback("❌ Error processing book {$bookNumber}: " . $e->getMessage());
+                        $infoCallback("🛑 Stopping multi-book import to prevent data loss");
+                    }
+
+                    // Re-throw to stop the import process
+                    throw $e;
                 }
             }
         }
@@ -5684,21 +5765,39 @@ class BookImportService
         foreach ($files as $filePath) {
             $filename = basename($filePath);
             $title = $this->extractBookTitleFromFilename($filename, $multiBookInfo['series_name'], 0);
+            $matched = false;
 
+            // Use word boundaries to match book numbers precisely
+            // Matches: "[04]", "Book 04", "Book 4", " 04-", " 04 ", " 4-", " 4 ", etc.
             foreach ($numbers as $number) {
-                if (stripos($title, (string) $number) !== false || stripos($filename, (string) $number) !== false) {
-                    if (!isset($splitGroups[$number])) {
-                        $splitGroups[$number] = [];
+                $patterns = [
+                    '/\[0*' . $number . '\]/',           // [04], [4]
+                    '/\b0*' . $number . '\b/',           // word boundary (4, 04 as whole number)
+                    '/[\s\-_]0*' . $number . '[\s\-_\.]/', // surrounded by separators
+                ];
+
+                foreach ($patterns as $pattern) {
+                    if (preg_match($pattern, $filename)) {
+                        if (!isset($splitGroups[$number])) {
+                            $splitGroups[$number] = [];
+                        }
+                        $splitGroups[$number][] = [
+                            'file' => $filePath,
+                            'title' => $title,
+                        ];
+                        $matched = true;
+
+                        Log::debug("Multi-book file matched", [
+                            'filename' => $filename,
+                            'matched_number' => $number,
+                            'pattern' => $pattern,
+                        ]);
+                        break 2; // Break out of both pattern and number loops
                     }
-                    $splitGroups[$number][] = [
-                        'file' => $filePath,
-                        'title' => $title,
-                    ];
-                    break;
                 }
             }
 
-            if (!isset($splitGroups[$number])) {
+            if (!$matched) {
                 if (!isset($splitGroups['unmatched'])) {
                     $splitGroups['unmatched'] = [];
                 }
@@ -5706,6 +5805,9 @@ class BookImportService
                     'file' => $filePath,
                     'title' => $title,
                 ];
+                Log::warning("Multi-book file unmatched", [
+                    'filename' => $filename,
+                ]);
             }
         }
 
@@ -7411,130 +7513,132 @@ class BookImportService
         $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
         $isGenreValid = in_array($normalizedGenre, $validGenres, true);
 
-        if (!$hasEnrichmentDataCallback($metadata)) {
+        // Check for enrichment data and set warning/default choice accordingly
+        $hasEnrichmentData = $hasEnrichmentDataCallback($metadata);
+        if (!$hasEnrichmentData) {
             $uiServiceLogCallback("⚠️  No external enrichment data found - detected fields may be incorrect");
+        }
+
+        // Determine default choice based on enrichment data and field quality
+        $confidence = $metadata['confidence'] ?? 0;
+        $title = $metadata['title'] ?? '';
+        $author = $metadata['author'] ?? '';
+        $isTitleGood = is_string($title) && strlen(trim($title)) > 0;
+        $isAuthorGood = is_string($author) && strlen(trim($author)) > 0;
+
+        // Default to option 3 (Edit) when genre is invalid or no enrichment data
+        if (!$isGenreValid || !$hasEnrichmentData) {
+            $defaultChoice = '3';
+        } elseif ($isTitleGood && $isAuthorGood && $confidence > 80) {
+            $defaultChoice = '1';
         } else {
-            $confidence = $metadata['confidence'] ?? 0;
+            // Default to Edit if confidence is low or some fields are weak
+            $defaultChoice = $confidence > 80 ? '1' : '2';
+        }
 
-            // Smart default logic
-            $title = $metadata['title'] ?? '';
-            $author = $metadata['author'] ?? '';
-            $isTitleGood = is_string($title) && strlen(trim($title)) > 0;
-            $isAuthorGood = is_string($author) && strlen(trim($author)) > 0;
-
-            // Default to option 3 (Edit) when genre is invalid
-            if ($isTitleGood && $isAuthorGood && $isGenreValid && $confidence > 80) {
-                $defaultChoice = '1';
-            } elseif (!$isGenreValid) {
-                // Default to option 3 (Edit) when genre is invalid
-                $defaultChoice = '3';
-            } else {
-                // Default to Edit if confidence is low or some fields are weak
-                $defaultChoice = $confidence > 80 ? '1' : '2';
+        // ALWAYS run the review loop - this ensures user confirmation regardless of enrichment data
+        while (true) {
+            // Automatically recalculate proposed directory path if not manually overridden
+            // This ensures changes to Genre, Title, or Series are reflected in the UI
+            if (empty($metadata['custom_directory_path'])) {
+                $currentDirectoryPath = $generateDirectoryPathCallback($metadata, [
+                    'include_title' => true,
+                ]);
             }
 
-            while (true) {
-                // Automatically recalculate proposed directory path if not manually overridden
-                // This ensures changes to Genre, Title, or Series are reflected in the UI
-                if (empty($metadata['custom_directory_path'])) {
-                    $currentDirectoryPath = $generateDirectoryPathCallback($metadata, [
-                        'include_title' => true,
-                    ]);
-                }
+            $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false, count($audiobook['files'] ?? []));
+            $choice = $selectWithImmediateInterruptCallback('Choose an option', $options, $defaultChoice);
 
-                $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false, count($audiobook['files'] ?? []));
-                $choice = $selectWithImmediateInterruptCallback('Choose an option', $options, $defaultChoice);
-
-                $choice = strtolower(trim($choice));
-                if (in_array($choice, ['1', 'a', 'accept'], true)) {
-                    if (!$isGenreValid) {
-                        $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 3)');
-                        continue;
-                    }
-                    return true;
+            $choice = strtolower(trim($choice));
+            if (in_array($choice, ['1', 'a', 'accept'], true)) {
+                if (!$isGenreValid) {
+                    $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 3)');
+                    continue;
                 }
-                if (in_array($choice, ['4', 's', 'skip'], true)) {
+                return true;
+            }
+            if (in_array($choice, ['4', 's', 'skip'], true)) {
+                return false;
+            }
+
+            if ($choice === '2' || $choice === 'a' || $choice === 'all') {
+                $metadata = $editMetadataFieldsCallback($metadata, true);
+                if ($inputInterrupted) {
                     return false;
                 }
 
-                if ($choice === '2' || $choice === 'a' || $choice === 'all') {
-                    $metadata = $editMetadataFieldsCallback($metadata, true);
-                    if ($inputInterrupted) {
-                        return false;
-                    }
-
-                    $currentGenre = $metadata['genre'] ?? $currentGenre;
-                    if (is_array($currentGenre)) {
-                        $currentGenre = $currentGenre[0] ?? 'Other';
-                    }
-                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                    if ($isGenreValid) {
-                        $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
-                    }
-                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                    continue;
+                $currentGenre = $metadata['genre'] ?? $currentGenre;
+                if (is_array($currentGenre)) {
+                    $currentGenre = $currentGenre[0] ?? 'Other';
                 }
-
-                if ($choice === '3' || $choice === 'e' || $choice === 'edit') {
-                    $metadata = $editMetadataFieldsCallback($metadata, false);
-                    if ($inputInterrupted) {
-                        return false;
-                    }
-
-                    $currentGenre = $metadata['genre'] ?? $currentGenre;
-                    if (is_array($currentGenre)) {
-                        $currentGenre = $currentGenre[0] ?? 'Other';
-                    }
-                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                    if ($isGenreValid) {
-                        $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
-                    }
-                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                    continue;
+                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                if ($isGenreValid) {
+                    $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
                 }
-
-                if ($choice === '5') {
-                    $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
-                    if ($inputInterrupted) {
-                        $metadata['cover_url'] = $currentCoverUrl;
-                    } else {
-                        $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
-                    }
-                    $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                    continue;
-                }
-
-                if ($choice === '6') {
-                    $metadata = $manualEnrichmentWithComparisonCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
-                    $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                    $currentGenre = $metadata['genre'] ?? 'Other';
-                    if (is_array($currentGenre)) {
-                        $currentGenre = $currentGenre[0] ?? 'Other';
-                    }
-                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                    continue;
-                }
-
-                if ($choice === '7') {
-                    $metadata['_action'] = 'reprocess_multi';
-                    return true;
-                }
-
-                if ($choice === '8') {
-                    $metadata['_action'] = 'merge_parent';
-                    return true;
-                }
-
-                break;
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
             }
+
+            if ($choice === '3' || $choice === 'e' || $choice === 'edit') {
+                $metadata = $editMetadataFieldsCallback($metadata, false);
+                if ($inputInterrupted) {
+                    return false;
+                }
+
+                $currentGenre = $metadata['genre'] ?? $currentGenre;
+                if (is_array($currentGenre)) {
+                    $currentGenre = $currentGenre[0] ?? 'Other';
+                }
+                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                if ($isGenreValid) {
+                    $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
+                }
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+
+            if ($choice === '5') {
+                $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
+                if ($inputInterrupted) {
+                    $metadata['cover_url'] = $currentCoverUrl;
+                } else {
+                    $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
+                }
+                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+
+            if ($choice === '6') {
+                $metadata = $manualEnrichmentWithComparisonCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
+                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                $currentGenre = $metadata['genre'] ?? 'Other';
+                if (is_array($currentGenre)) {
+                    $currentGenre = $currentGenre[0] ?? 'Other';
+                }
+                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+
+            if ($choice === '7') {
+                $metadata['_action'] = 'reprocess_multi';
+                return true;
+            }
+
+            if ($choice === '8') {
+                $metadata['_action'] = 'merge_parent';
+                return true;
+            }
+
+            break;
         }
 
-        return true;
+        // This should never be reached, but return false to be safe
+        return false;
     }
 
     /**
@@ -7735,9 +7839,11 @@ class BookImportService
         // 2. Check if titles indicate parts (contain "Chapter", "Track", or start with number)
         $partTitleCount = 0;
         foreach ($titles as $title) {
-            if (preg_match('/(chapter|ch\.?|track|part|cd|disc|disk)\s*[-_.]?\s*\d+/i', $title) ||
+            if (
+                preg_match('/(chapter|ch\.?|track|part|cd|disc|disk)\s*[-_.]?\s*\d+/i', $title) ||
                 preg_match('/^\d+[\s\-_]/', $title) ||
-                is_numeric($title)) {
+                is_numeric($title)
+            ) {
                 $partTitleCount++;
             }
         }

@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 use Tests\Mocks\MockDocumentStoreService;
+use App\Services\PermissionsQueueService;
 
 class BookDeletionServiceTest extends TestCase
 {
@@ -17,6 +18,7 @@ class BookDeletionServiceTest extends TestCase
 
     private BookDeletionService $service;
     private MockDocumentStoreService $documentStore;
+    private PermissionsQueueService $permissionsQueue;
 
     protected function setUp(): void
     {
@@ -40,7 +42,14 @@ class BookDeletionServiceTest extends TestCase
         Storage::fake('books');
 
         $this->documentStore = new MockDocumentStoreService();
-        $this->service = new BookDeletionService($this->documentStore);
+        $queueFile = storage_path('app/permissions-queue.txt');
+        if (!is_dir(dirname($queueFile))) {
+            mkdir(dirname($queueFile), 0775, true);
+        }
+        file_put_contents($queueFile, "# test\n");
+
+        $this->permissionsQueue = new PermissionsQueueService();
+        $this->service = new BookDeletionService($this->documentStore, $this->permissionsQueue);
     }
 
     public function testMoveToTrashCreatesProperStructure(): void
@@ -99,7 +108,8 @@ class BookDeletionServiceTest extends TestCase
             ->with('1', false)
             ->willReturn(true);
 
-        $service = new BookDeletionService($documentStore);
+        $permissionsQueue = $this->permissionsQueue;
+        $service = new BookDeletionService($documentStore, $permissionsQueue);
 
         $result = $service->moveToTrash('1', false);
 
@@ -133,7 +143,8 @@ class BookDeletionServiceTest extends TestCase
             ->with('1', false)
             ->willReturn(true);
 
-        $service = new BookDeletionService($documentStore);
+        $permissionsQueue = $this->permissionsQueue;
+        $service = new BookDeletionService($documentStore, $permissionsQueue);
 
         $result = $service->moveToTrash('1', true);
 
@@ -183,6 +194,10 @@ class BookDeletionServiceTest extends TestCase
 
         $trashDisk = Storage::disk('trash');
         $this->assertFalse($trashDisk->exists($trashResult['trash_item_id']));
+
+        $this->assertTrue(
+            $this->permissionsQueue->isInQueue(Storage::disk('books')->path($book['directoryPath']))
+        );
     }
 
     public function testRestoreHandlesDirectoryConflicts(): void

@@ -31,6 +31,7 @@ class ImportBooksFromDownloadsTest extends TestCase
             $mock->shouldReceive('logMessage')->atLeast()->once();
             $mock->shouldReceive('updateProgress')->atLeast()->once();
             $mock->shouldReceive('setCurrentBook')->zeroOrMoreTimes();
+            $mock->shouldReceive('getAllLogs')->zeroOrMoreTimes()->andReturn([]);
             $mock->shouldReceive('clear')->once();
         });
 

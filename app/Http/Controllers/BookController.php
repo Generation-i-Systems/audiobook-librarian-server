@@ -221,10 +221,10 @@ class BookController extends Controller
         $response = [
             'books' => $paginatedBooks,
             'pagination' => [
-                'total' => $result['total'],
-                'per_page' => $result['perPage'],
-                'current_page' => $result['currentPage'],
-                'last_page' => $result['lastPage'],
+                'total' => $result['total'] ?? 0,
+                'per_page' => $result['perPage'] ?? $result['per_page'] ?? $perPage,
+                'current_page' => $result['currentPage'] ?? $result['current_page'] ?? $page,
+                'last_page' => $result['lastPage'] ?? $result['last_page'] ?? 1,
             ],
             'view_type' => $request->input('view_type', session('main_view_type', 'grid')),
         ];

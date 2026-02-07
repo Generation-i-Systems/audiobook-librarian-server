@@ -2205,6 +2205,312 @@
                 }
             }
         },
+        "/devices": {
+            "get": {
+                "tags": ["Devices"],
+                "summary": "List devices",
+                "description": "Returns devices for the authenticated user.",
+                "operationId": "listDevices",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Devices",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/devices/{deviceId}": {
+            "put": {
+                "tags": ["Devices"],
+                "summary": "Update device",
+                "description": "Update a device for the authenticated user.",
+                "operationId": "updateDevice",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string"}
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            },
+            "delete": {
+                "tags": ["Devices"],
+                "summary": "Delete device",
+                "description": "Delete a device for the authenticated user.",
+                "operationId": "deleteDevice",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string"}
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/devices/{deviceId}/sync-enabled": {
+            "put": {
+                "tags": ["Devices"],
+                "summary": "Update device sync enabled",
+                "description": "Enable or disable device sync.",
+                "operationId": "updateDeviceSyncEnabled",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string"}
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/sync/positions": {
+            "get": {
+                "tags": ["Sync"],
+                "summary": "List synced positions",
+                "description": "List synced positions for the authenticated device/user.",
+                "operationId": "listSyncPositions",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Positions",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            },
+            "post": {
+                "tags": ["Sync"],
+                "summary": "Store synced position",
+                "description": "Store/update a synced position.",
+                "operationId": "storeSyncPosition",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Stored",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/sync/positions/{bookId}": {
+            "get": {
+                "tags": ["Sync"],
+                "summary": "Get synced position",
+                "description": "Get synced position for a book.",
+                "operationId": "getSyncPosition",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "bookId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string"}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Position",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/sync/bookmarks": {
+            "get": {
+                "tags": ["Sync"],
+                "summary": "List synced bookmarks",
+                "description": "List synced bookmarks for the authenticated device/user.",
+                "operationId": "listSyncBookmarks",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Bookmarks",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            },
+            "post": {
+                "tags": ["Sync"],
+                "summary": "Store synced bookmark",
+                "description": "Store/update a synced bookmark.",
+                "operationId": "storeSyncBookmark",
+                "security": [{"BearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object"}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Stored",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/sync/bookmarks/{bookId}": {
+            "get": {
+                "tags": ["Sync"],
+                "summary": "Get synced bookmarks for book",
+                "description": "Get synced bookmarks for a specific book.",
+                "operationId": "getSyncBookmarks",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "bookId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string"}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bookmarks",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/sync/bookmarks/{stringId}": {
+            "delete": {
+                "tags": ["Sync"],
+                "summary": "Delete synced bookmark",
+                "description": "Delete a synced bookmark by stringId.",
+                "operationId": "deleteSyncBookmark",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "stringId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string"}
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
         "/books/batch": {
             "post": {
                 "tags": ["Books"],

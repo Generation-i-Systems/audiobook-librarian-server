@@ -7,6 +7,28 @@
   - Added `computeLayout()` centralized layout engine
   - Eliminated blank lines below submenus
 
+### Fixed
+- **CRITICAL**: Fixed auto-processing bug where books were imported without user confirmation
+  - reviewAndApprove method was auto-approving books when no enrichment data existed
+  - Restructured to always run the review loop regardless of enrichment data presence
+  - Ensures user can review and approve ALL imports, set cover images, and verify metadata
+  - Fixed default choice to prefer 'Edit' when enrichment data is missing
+- **CRITICAL**: Import now verifies files exist in destination BEFORE deleting source to prevent data loss
+  - Fixed moveSpecificFiles to verify destination before deleting cross-filesystem source files
+  - Moved assertDirectoryHasAudioFiles check before cleanupSourceDirectory for regular moves
+  - Prevents source deletion if move/copy operations fail silently
+  - Added exception handling to stop multi-book imports on ANY error (not just merge requests)
+  - Enhanced logging for multi-book processing to track each book's import status
+- Series names are now properly removed from book titles in multi-book collections
+  - Added removeSeriesFromTitle call in processMultiBookSplit
+- Fixed multi-book file grouping to correctly split each file into its own book
+  - Replaced fuzzy stripos matching with precise regex patterns using word boundaries
+  - Prevents multiple files from being incorrectly grouped into a single book entry
+- Restoring a deleted book now restores/updates the existing (soft-deleted) database record and queues restored paths for permission fixing
+- Bookmark delete-by-id now permanently deletes the bookmark record (instead of soft-deleting)
+- Import UI test mock updated to include `getAllLogs()`
+- OpenAPI spec updated to document device management and sync endpoints required by route coverage tests
+
 ### Added
 - Reorganized test suite by category for better organization and targeted testing
   - tests/Api/ - API tests (156 tests)

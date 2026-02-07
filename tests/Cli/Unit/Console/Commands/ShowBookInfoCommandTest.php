@@ -10,6 +10,7 @@ use App\Services\BookDeletionService;
 use App\Models\Book;
 use App\Models\Publisher;
 use App\Services\TerminalImageService;
+use App\Services\PermissionsQueueService;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,7 +29,14 @@ class ShowBookInfoCommandTest extends TestCase
         parent::setUp();
 
         $this->documentStore = Mockery::mock(DocumentStoreServiceInterface::class);
-        $this->bookDeletionService = new BookDeletionService($this->documentStore);
+        $queueFile = storage_path('app/permissions-queue.txt');
+        if (!is_dir(dirname($queueFile))) {
+            mkdir(dirname($queueFile), 0775, true);
+        }
+        file_put_contents($queueFile, "# test\n");
+
+        $permissionsQueue = new PermissionsQueueService();
+        $this->bookDeletionService = new BookDeletionService($this->documentStore, $permissionsQueue);
 
         $terminalImageService = new class () extends TerminalImageService {
             public function supportsImages(): bool
