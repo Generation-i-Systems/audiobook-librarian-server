@@ -19,8 +19,11 @@
   - Prevents source deletion if move/copy operations fail silently
   - Added exception handling to stop multi-book imports on ANY error (not just merge requests)
   - Enhanced logging for multi-book processing to track each book's import status
-- Series names are now properly removed from book titles in multi-book collections
-  - Added removeSeriesFromTitle call in processMultiBookSplit
+- Series names and numbers are now properly removed from book titles in all import paths
+  - Added removeSeriesFromTitle call after extractSeriesNumberFromTitle and after enrichment
+  - Added patterns for "Series [##] Title", "Series (##) Title", and "Series Title" (space-only) formats
+  - Ensures title cleaning happens regardless of metadata source (AI, tags, enrichment)
+- Genre is now auto-detected from existing books in the same series by the same author
 - Fixed multi-book file grouping to correctly split each file into its own book
   - Replaced fuzzy stripos matching with precise regex patterns using word boundaries
   - Prevents multiple files from being incorrectly grouped into a single book entry

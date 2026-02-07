@@ -2763,6 +2763,40 @@ class BookImportService
     }
 
     /**
+     * Look up genre from existing books in the same series by the same author
+     */
+    public function lookupGenreFromExistingSeries(array $metadata): ?string
+    {
+        $seriesName = $metadata['series'] ?? '';
+        if (empty($seriesName)) {
+            return null;
+        }
+
+        $authors = $metadata['author'] ?? [];
+        if (is_string($authors)) {
+            $authors = [$authors];
+        }
+        if (empty($authors)) {
+            return null;
+        }
+
+        $query = Book::whereHas('series', function ($q) use ($seriesName) {
+            $q->where('name', $seriesName);
+        })->whereHas('authors', function ($q) use ($authors) {
+            $q->whereIn('name', $authors);
+        })->whereHas('genres');
+
+        $existingBook = $query->with('genres')->first();
+        if (!$existingBook) {
+            return null;
+        }
+
+        $primaryGenre = $existingBook->genres->first();
+
+        return $primaryGenre?->name;
+    }
+
+    /**
      * Find existing book in database (returns Book model instead of boolean)
      */
     public function findExistingBook(string $path, array $metadata = []): ?Book
@@ -4295,6 +4329,11 @@ class BookImportService
             $infoCallback("🔍 Enriching with external data...");
         }
 
+        // Clean series name from title before display
+        if (!empty($metadata['title']) && !empty($metadata['series'])) {
+            $metadata['title'] = $this->removeSeriesFromTitle($metadata['title'], $metadata['series']);
+        }
+
         // Use display_path for UI if available (multi-book parts), otherwise use path
         $displayPath = $audiobook['display_path'] ?? $audiobook['path'];
         $metadata['source_path'] = $displayPath;
@@ -4439,6 +4478,17 @@ class BookImportService
     ): array {
         if ($infoCallback) {
             $infoCallback("🔄 Processing {$multiBookInfo['series_name']} as split books...");
+        }
+
+        // Look up genre from existing books in the same series by the same author
+        $lookupMetadata = $aiMetadata;
+        $lookupMetadata['series'] = $multiBookInfo['series_name'];
+        $seriesGenre = $this->lookupGenreFromExistingSeries($lookupMetadata);
+        if ($seriesGenre) {
+            $aiMetadata['genre'] = $seriesGenre;
+            if ($infoCallback) {
+                $infoCallback("📚 Genre set from existing series: {$seriesGenre}");
+            }
         }
 
         $books = [];
@@ -4884,6 +4934,16 @@ class BookImportService
         $originalSeries = $seriesName;
         $cleanedSeries = $seriesName;
 
+        // If the series name contains " - ", the part after is likely the actual series name
+        // This handles "Author Name - Series Name" format from directory names
+        if (str_contains($cleanedSeries, ' - ')) {
+            $parts = explode(' - ', $cleanedSeries);
+            $candidate = trim(end($parts));
+            if (strlen($candidate) >= 2) {
+                $cleanedSeries = $candidate;
+            }
+        }
+
         // Preserve GraphicAudio markers - extract and reapply later
         $graphicAudioMarker = '';
         if (preg_match('/\(Graphic\s*Audio\)/i', $cleanedSeries, $matches)) {
@@ -5112,6 +5172,19 @@ class BookImportService
         // 1. If series name is known, try to remove it along with trailing info
         if ($seriesName && strlen($seriesName) > 0) {
             $seriesName = str_replace(['–', '—'], '-', $seriesName);
+
+            // If the series name contains " - " (e.g. "Author - Series"), try the part after
+            // the separator first since that's the actual series name
+            if (str_contains($seriesName, ' - ')) {
+                $parts = explode(' - ', $seriesName);
+                $shortSeriesName = trim(end($parts));
+                if (strlen($shortSeriesName) >= 2) {
+                    $result = $this->removeSeriesFromTitle($title, $shortSeriesName);
+                    if ($result !== $title) {
+                        return $result;
+                    }
+                }
+            }
             $seriesEscaped = preg_quote($seriesName, '/');
 
             // Handle patterns like "Title - Series, Book N", "Title: Series #N", "Title (Series)"
@@ -5130,15 +5203,34 @@ class BookImportService
                 }
             }
 
-            // Also check for "Series - Title"
+            // Remove series name from the start of the title (with any separator or just whitespace)
             $startPatterns = [
                 '/^' . $seriesEscaped . '\s*[\-:]\s*/i',
+                '/^' . $seriesEscaped . '\s*\[\d+\]\s*/i',
+                '/^' . $seriesEscaped . '\s*\(\d+\)\s*/i',
+                '/^' . $seriesEscaped . '\s+\d+\s*[\-:]\s*/i',
+                '/^' . $seriesEscaped . '\s+/i',
             ];
             foreach ($startPatterns as $pattern) {
                 $cleaned = preg_replace($pattern, '', $title);
                 if ($cleaned !== $title) {
                     return trim($cleaned, ' ,-');
                 }
+            }
+
+            // Remove series name from the end of the title
+            $endPatterns = [
+                '/\s*,\s*Book\s+\d+\s*$/i',
+            ];
+            // First strip trailing ", Book N" then check for series at end
+            $strippedTitle = $title;
+            foreach ($endPatterns as $pattern) {
+                $strippedTitle = preg_replace($pattern, '', $strippedTitle);
+            }
+            $trailingPattern = '/\s*[\-,]\s*' . $seriesEscaped . '$/i';
+            $cleaned = preg_replace($trailingPattern, '', $strippedTitle);
+            if ($cleaned !== $title) {
+                return trim($cleaned, ' ,-');
             }
         }
 
@@ -7252,6 +7344,18 @@ class BookImportService
             $extractSeriesNumberFromTitleCallback($aiMetadata);
         }
 
+        // Clean series name from title after series number extraction
+        if (!empty($aiMetadata['title']) && !empty($aiMetadata['series'])) {
+            $aiMetadata['title'] = $this->removeSeriesFromTitle($aiMetadata['title'], $aiMetadata['series']);
+        }
+
+        // Look up genre from existing books in the same series by the same author
+        $seriesGenre = $this->lookupGenreFromExistingSeries($aiMetadata);
+        if ($seriesGenre) {
+            $aiMetadata['genre'] = $seriesGenre;
+            $infoCallback("📚 Genre set from existing series: {$seriesGenre}");
+        }
+
         $existingBook = $findExistingBookCallback($audiobook['path'], $aiMetadata);
         if ($existingBook) {
             $warnCallback("⚠️  Book already exists (detected after AI processing)");
@@ -7393,6 +7497,11 @@ class BookImportService
             } else {
                 $warnCallback("⚠️  No enrichment data found");
             }
+        }
+
+        // Clean series name from title after enrichment (enrichment may override with unclean title)
+        if (!empty($aiMetadata['title']) && !empty($aiMetadata['series'])) {
+            $aiMetadata['title'] = $this->removeSeriesFromTitle($aiMetadata['title'], $aiMetadata['series']);
         }
 
         $newLineCallback();
