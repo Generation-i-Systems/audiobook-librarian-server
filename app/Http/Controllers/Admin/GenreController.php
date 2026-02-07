@@ -175,7 +175,7 @@ class GenreController extends Controller
     }
 
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         try {
             // Check if genre exists
@@ -185,7 +185,8 @@ class GenreController extends Controller
             }
 
             $this->documentStoreService->deleteGenre($id);
-            return redirect()->route('admin.genres.index')->with('success', 'Genre deleted successfully!');
+            $returnUrl = $request->input('return_url', route('admin.genres.index'));
+            return redirect()->to($returnUrl)->with('success', 'Genre deleted successfully!');
         } catch (\Exception $e) {
             Log::error('Failed to delete genre: ' . $e->getMessage());
             return redirect()->route('admin.genres.index')->with('error', 'Failed to delete genre. Please try again.');

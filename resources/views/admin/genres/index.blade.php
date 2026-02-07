@@ -7,8 +7,27 @@
         @include('components.ai-query-prompt')
 
         @if(session('success'))
-            <div class="alert alert-success">
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
                 {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if ($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
@@ -65,14 +84,10 @@
                                 <a href="{{ route('admin.genres.authors', $genre['id']) }}"
                                     class="btn btn-sm btn-outline-secondary" title="View Authors"><i
                                         class="fas fa-users"></i></a>
-                                <form action="{{ route('admin.genres.destroy', $genre['id']) }}" method="POST"
-                                    style="display:inline;">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
-                                        onclick="return confirm('Are you sure you want to delete genre &quot;{{ $genre['name'] }}&quot;?')"><i
-                                            class="fas fa-trash-alt"></i></button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                    onclick="if(confirm('Are you sure you want to delete genre &quot;{{ addslashes($genre['name']) }}&quot;?')) { document.getElementById('delete-genre-form').action = '{{ route('admin.genres.destroy', $genre['id']) }}'; document.getElementById('delete-genre-form').submit(); }">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
                             </td>
                         </tr>
                     @endforeach
@@ -94,6 +109,12 @@
                     </button>
                 </div>
             </div>
+        </form>
+
+        <form id="delete-genre-form" action="" method="POST" style="display: none;">
+            @csrf
+            @method('DELETE')
+            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
         </form>
     </div>
 @endsection

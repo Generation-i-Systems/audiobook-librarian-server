@@ -23,6 +23,7 @@ class AuthorController extends Controller
         $search = $request->input('search');
         $sort = $request->input('sort', 'name');
         $direction = $request->input('direction', 'asc');
+        $perPage = (int) $request->input('perPage', 25);
 
         $allowedSorts = ['name', 'books'];
         if (!in_array($sort, $allowedSorts, true)) {
@@ -30,40 +31,59 @@ class AuthorController extends Controller
         }
 
         $direction = $direction === 'desc' ? 'desc' : 'asc';
-        $authors = $this->documentStoreService->listAuthorsWithStats();
 
-        if ($search) {
-            $authors = array_filter($authors, function (array $author) use ($search) {
-                return stripos($author['name'] ?? '', $search) !== false;
-            });
-        }
-
-        usort($authors, function (array $a, array $b) use ($sort, $direction) {
-            $multiplier = $direction === 'desc' ? -1 : 1;
-
-            if ($sort === 'books') {
-                $aValue = $a['bookCount'] ?? 0;
-                $bValue = $b['bookCount'] ?? 0;
-
-                if ($aValue === $bValue) {
-                    return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
-                }
-
-                return $multiplier * ($aValue <=> $bValue);
-            }
-
-            return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
-        });
+        $authors = $this->documentStoreService->paginateAuthorsWithStats(
+            perPage: $perPage,
+            search: $search,
+            sort: $sort,
+            direction: $direction
+        );
 
         // Store the current URL as the last viewed list for redirects after edit/update
         session(['last_admin_list_url' => $request->fullUrl()]);
+
+        $selectedMergeIds = session('selected_merge_author_ids', []);
+        $selectedAuthors = $this->documentStoreService->getAuthorsByIdsWithStats($selectedMergeIds);
 
         return view('admin.authors.index', [
             'authors' => $authors,
             'search' => $search,
             'sort' => $sort,
             'direction' => $direction,
+            'selectedAuthors' => $selectedAuthors,
+            'selectedMergeIds' => $selectedMergeIds,
         ]);
+    }
+
+
+    public function toggleMerge(Request $request)
+    {
+        $id = (string) $request->input('id');
+        if (!$id) {
+            return response()->json(['success' => false, 'message' => 'Missing ID'], 400);
+        }
+
+        $selectedIds = session('selected_merge_author_ids', []);
+
+        if (in_array($id, $selectedIds, true)) {
+            $selectedIds = array_diff($selectedIds, [$id]);
+        } else {
+            $selectedIds[] = $id;
+        }
+
+        session(['selected_merge_author_ids' => array_values($selectedIds)]);
+
+        return response()->json([
+            'success' => true,
+            'count' => count($selectedIds),
+            'selected' => in_array($id, session('selected_merge_author_ids', []), true)
+        ]);
+    }
+
+    public function clearMerge()
+    {
+        session()->forget('selected_merge_author_ids');
+        return redirect()->route('admin.authors.index')->with('success', 'Merge selection cleared.');
     }
 
 
@@ -101,7 +121,7 @@ class AuthorController extends Controller
         $booksResult = $this->documentStoreService->listBooks(
             page: $page,
             perPage: $perPage,
-            filters: ['author' => $author['name']],
+            filters: ['author_id' => $id],
             withRelated: true,
             sort: 'title',
             order: 'asc'
@@ -141,11 +161,12 @@ class AuthorController extends Controller
     }
 
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $this->documentStoreService->deleteAuthor($id);
 
-        return redirect()->route('admin.authors.index')->with('success', 'Author deleted!');
+        $returnUrl = $request->input('return_url', route('admin.authors.index'));
+        return redirect()->to($returnUrl)->with('success', 'Author deleted!');
     }
 
 
@@ -259,6 +280,9 @@ class AuthorController extends Controller
 
         try {
             $affectedBooks = $this->documentStoreService->mergeAuthors($primaryAuthorId, $secondaryAuthorIds);
+
+            // Clear session after successful merge
+            session()->forget('selected_merge_author_ids');
 
             return redirect()->route('admin.authors.index')->with(
                 'success',

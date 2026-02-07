@@ -1278,8 +1278,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         try {
             $query = DB::table('genres')
                 ->leftJoin('book_genre', 'genres.id', '=', 'book_genre.genre_id')
-                ->leftJoin('books', 'book_genre.book_id', '=', 'books.id')
+                ->leftJoin('books', function ($join) {
+                    $join->on('book_genre.book_id', '=', 'books.id')
+                        ->whereNull('books.deleted_at');
+                })
                 ->leftJoin('author_book', 'books.id', '=', 'author_book.book_id')
+                ->whereNull('genres.deleted_at')
                 ->groupBy('genres.id', 'genres.name', 'genres.updated_at')
                 ->orderBy('genres.name')
                 ->select(
@@ -1315,7 +1319,13 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         try {
             $query = DB::table('authors')
                 ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
-                ->leftJoin('books', 'author_book.book_id', '=', 'books.id')
+                ->leftJoin('books', function ($join) {
+                    $join->on('author_book.book_id', '=', 'books.id')
+                        ->whereNull('books.deleted_at')
+                        ->where('books.directory_exists', true)
+                        ->where('books.needs_review', false);
+                })
+                ->whereNull('authors.deleted_at')
                 ->groupBy('authors.id', 'authors.name', 'authors.updated_at')
                 ->orderBy('authors.name')
                 ->select(
@@ -1342,6 +1352,72 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return [];
         }
+    }
+
+    public function paginateAuthorsWithStats(int $perPage = 25, ?string $search = null, string $sort = 'name', string $direction = 'asc'): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = DB::table('authors')
+            ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
+            ->leftJoin('books', function ($join) {
+                $join->on('author_book.book_id', '=', 'books.id')
+                    ->whereNull('books.deleted_at')
+                    ->where('books.directory_exists', true)
+                    ->where('books.needs_review', false);
+            })
+            ->whereNull('authors.deleted_at')
+            ->groupBy('authors.id', 'authors.name', 'authors.updated_at')
+            ->select(
+                'authors.id',
+                'authors.name',
+                'authors.updated_at',
+                DB::raw('COUNT(DISTINCT books.id) as book_count')
+            );
+
+        if ($search) {
+            $query->where('authors.name', 'LIKE', '%' . $search . '%');
+        }
+
+        if ($sort === 'books') {
+            $query->orderBy('book_count', $direction)->orderBy('authors.name', 'asc');
+        } else {
+            $query->orderBy('authors.name', $direction);
+        }
+
+        return $query->paginate($perPage);
+    }
+
+    public function getAuthorsByIdsWithStats(array $ids): array
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        $rows = DB::table('authors')
+            ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
+            ->leftJoin('books', function ($join) {
+                $join->on('author_book.book_id', '=', 'books.id')
+                    ->whereNull('books.deleted_at')
+                    ->where('books.directory_exists', true)
+                    ->where('books.needs_review', false);
+            })
+            ->whereNull('authors.deleted_at')
+            ->whereIn('authors.id', $ids)
+            ->groupBy('authors.id', 'authors.name', 'authors.updated_at')
+            ->orderBy('authors.name')
+            ->select(
+                'authors.id',
+                'authors.name',
+                'authors.updated_at',
+                DB::raw('COUNT(DISTINCT books.id) as book_count')
+            )
+            ->get();
+
+        return $rows->map(fn ($row) => [
+            'id' => (string) $row->id,
+            'name' => (string) $row->name,
+            'updatedAt' => $row->updated_at,
+            'bookCount' => (int) $row->book_count,
+        ])->toArray();
     }
 
     public function getGenreAuthorsHierarchy(string $genreId): array
@@ -1802,29 +1878,57 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     public function createBook(array $data)
     {
         try {
+            $bookId = $data['id'] ?? null;
+            $directoryPath = $data['directory_path'] ?? $data['directoryPath'] ?? null;
+            $releaseDate = $data['release_date'] ?? $data['releaseDate'] ?? null;
+            $needsReview = $data['needs_review'] ?? $data['needsReview'] ?? false;
+            $needsReviewReasons = $data['needs_review_reasons'] ?? $data['needsReviewReasons'] ?? null;
+            $audioFileCount = $data['audio_file_count'] ?? $data['audioFileCount'] ?? null;
+
             $normalizedCover = $this->normalizeCoverImageValue($data['cover_image'] ?? $data['coverImage'] ?? null);
-            $book = Book::create([
+
+            $attributes = [
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
-                'release_date' => $data['release_date'] ?? null,
+                'release_date' => $releaseDate,
                 'cover_image' => $normalizedCover,
                 'language' => $data['language'] ?? 'en',
                 'source' => $data['source'] ?? 'unknown',
                 'series_id' => $data['series_id'] ?? null,
                 'mongo_id' => $data['mongo_id'] ?? null,
-                'directory_path' => $data['directory_path'] ?? null,
+                'directory_path' => $directoryPath,
                 'duration' => $data['duration'] ?? null,
                 'publisher' => $data['publisher'] ?? null,
-                'needs_review' => $data['needs_review'] ?? false,
-                'needs_review_reasons' => $data['needs_review_reasons'] ?? null,
-                'audio_file_count' => $data['audio_file_count'] ?? null,
+                'needs_review' => $needsReview,
+                'needs_review_reasons' => $needsReviewReasons,
+                'audio_file_count' => $audioFileCount,
                 'mongo_record' => $data['mongo_record'] ?? null,
                 'file_tags' => $data['file_tags'] ?? null,
                 'audible_info' => $data['audible_info'] ?? null,
                 'google_books_info' => $data['google_books_info'] ?? null,
                 'hardcover_info' => $data['hardcover_info'] ?? null,
                 'audiobook_bay_info' => $data['audiobook_bay_info'] ?? null,
-            ]);
+            ];
+
+            if ($bookId !== null && is_numeric($bookId)) {
+                $existingBook = Book::withTrashed()->find((int) $bookId);
+
+                if ($existingBook) {
+                    if ($existingBook->trashed()) {
+                        $existingBook->restore();
+                    }
+
+                    $existingBook->update($attributes);
+                    $book = $existingBook;
+                } else {
+                    $book = new Book();
+                    $book->id = (int) $bookId;
+                    $book->fill($attributes);
+                    $book->save();
+                }
+            } else {
+                $book = Book::create($attributes);
+            }
 
             // Handle authors (support both IDs and names)
             $authorData = $data['authors'] ?? $data['author'] ?? null;
@@ -3012,7 +3116,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             return false;
         }
 
-        return $bookmark->delete();
+        $bookmark->forceDelete();
+
+        return true;
     }
 
     // EXTERNAL READS / PREVIOUSLY READ

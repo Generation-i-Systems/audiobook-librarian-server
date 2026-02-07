@@ -479,6 +479,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('genres/merge', [Admin\GenreController::class, 'merge'])->name('genres.merge');
 
     Route::get('authors/{author}/browse', [Admin\AuthorController::class, 'browse'])->name('authors.browse');
+    Route::post('authors/toggle-merge', [Admin\AuthorController::class, 'toggleMerge'])->name('authors.toggle-merge');
+    Route::post('authors/clear-merge', [Admin\AuthorController::class, 'clearMerge'])->name('authors.clear-merge');
     Route::post('authors/merge', [Admin\AuthorController::class, 'merge'])->name('authors.merge');
 
     Route::resource('genres', Admin\GenreController::class);
