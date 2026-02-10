@@ -549,8 +549,38 @@ body {
     border-color: rgba(13, 110, 253, 0.5);
 }
 
-.skin-element.selected {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.5);
-    z-index: 10;
+
+/* Property Validation and Tooltips */
+.prop-group.has-error .prop-input {
+    border-color: #dc3545 !important;
 }
+
+.prop-error-text {
+    color: #dc3545;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.prop-info-icon {
+    color: #6c757d;
+    font-size: 11px;
+    cursor: help;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.prop-info-icon:hover {
+    opacity: 1;
+}
+
+.prop-label-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.prop-label-container .prop-label {
+    margin-bottom: 0;
+}
+

@@ -859,6 +859,48 @@ class SampleDataEditor {
     }
 }
 
+
+const VALIDATORS = {
+    id: (val) => /^[a-zA-Z0-9_-]+$/.test(val) ? null : "ID must be alphanumeric, underscores or hyphens",
+    dimension: (val) => {
+        if (typeof val === 'number') return null;
+        if (val === 'max' || val === 'auto' || val === 'none' || val === 'start') return null;
+        if (/^max-\d+$/.test(val)) return null;
+        if (/^\d+%$/.test(val)) return null;
+        const n = parseFloat(val);
+        return isNaN(n) ? "Invalid. Use number, 'max', 'max-N', 'auto', or '50%'" : null;
+    },
+    action: (val) => {
+        const validActions = [
+            'toggle-play-pause', 'play', 'pause', 'stop',
+            'next-chapter', 'prev-chapter', 'next-book', 'prev-book',
+            'show-chapters', 'show-bookmarks', 'create-bookmark',
+            'sleep-timer', 'playback-speed', 'exit-drive-mode'
+        ];
+        if (validActions.includes(val)) return null;
+        if (/^skip-(forward|backward)-\d+$/.test(val)) return null;
+        return "Invalid action format.";
+    },
+    anchor: (val) => [
+        'top-left', 'top-center', 'top-right',
+        'center-left', 'center', 'center-right',
+        'bottom-left', 'bottom-center', 'bottom-right'
+    ].includes(val) ? null : "Invalid anchor",
+    color: (val) => /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(val) || val === '' ? null : "Invalid hex color",
+    generic: (val) => val === '' ? "Value required" : null
+};
+
+const TOOLTIPS = {
+    id: "Unique identifier for this element.",
+    anchor: "Point on the canvas where this element is positioned from.",
+    x: "Horizontal position. Supports 'auto' (center), 'max' (full width), 'max-20' (20px margin).",
+    y: "Vertical position. Supports 'auto' (center), 'max' (full height), 'max-20' (20px margin).",
+    width: "Width in pixels, 'max' (fill), or '50%' (percentage).",
+    height: "Height in pixels, 'max' (fill), or '50%' (percentage).",
+    action: "Action on tap. Defaults: skip-forward-30, next-chapter, etc.",
+    dataBinding: "Dynamic field from book or playback state."
+};
+
 class PropertyEditor {
     constructor(containerId, state) {
         this.container = document.getElementById(containerId);
@@ -897,48 +939,43 @@ class PropertyEditor {
             return;
         }
 
-        this.addInput('ID', el.id, (val) => this.state.updateElement(el.id, { id: val }));
+        this.addInput('ID', el.id, (val) => this.state.updateElement(el.id, { id: val }), { validator: VALIDATORS.id, tooltip: TOOLTIPS.id });
 
         // Layout Props
-        this.addSelect('Anchor', el.anchor || 'top-left', ['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'], (val) => this.state.updateElement(el.id, { anchor: val }));
+        this.addSelect('Anchor', el.anchor || 'top-left', ['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'], (val) => this.state.updateElement(el.id, { anchor: val }), { tooltip: TOOLTIPS.anchor });
 
-        this.addNumberInput('X', el.x, (val) => this.state.updateElement(el.id, { x: val }));
-        this.addNumberInput('Y', el.y, (val) => this.state.updateElement(el.id, { y: val }));
+        this.addInput('X', el.x, (val) => this.state.updateElement(el.id, { x: val }), { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.x });
+        this.addInput('Y', el.y, (val) => this.state.updateElement(el.id, { y: val }), { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.y });
 
-        // Width/Height logic (Text inputs to support 'max' or numbers)
+        // Width/Height logic
         this.addInput('Width', el.width, (val) => {
             const num = parseFloat(val);
-            // If it's a valid number and not explicitly 'max', save as number. Otherwise string.
-            // Wait, 'max' is the only string we expect? Or percentages?
-            // "max" is a value. Percentage "50%" is also valid usually.
-            // Let's rely on user string unless it looks like a plain number.
-            this.state.updateElement(el.id, { width: (val === 'max' || isNaN(num)) ? val : num });
-        });
+            this.state.updateElement(el.id, { width: (val === 'max' || isNaN(num) || val.includes('%') || val.includes('-')) ? val : num });
+        }, { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.width });
+
         this.addInput('Height', el.height, (val) => {
             const num = parseFloat(val);
-            this.state.updateElement(el.id, { height: (val === 'max' || isNaN(num)) ? val : num });
-        });
-
-        // Removed separate Max Width/Height inputs
+            this.state.updateElement(el.id, { height: (val === 'max' || isNaN(num) || val.includes('%') || val.includes('-')) ? val : num });
+        }, { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.height });
 
         // Background Color (All elements)
-        this.addColorInput('Background', el.backgroundColor || '', (val) => this.state.updateElement(el.id, { backgroundColor: val }));
+        this.addColorInput('Background', el.backgroundColor || '', (val) => this.state.updateElement(el.id, { backgroundColor: val }), { validator: VALIDATORS.color });
 
         if (el.type === 'text') {
             this.addInput('Text', el.text || '', (val) => this.state.updateElement(el.id, { text: val }));
             // Data Binding Dropdown
             const bindings = ['', 'book.title', 'book.author', 'book.narrator', 'book.series', 'book.duration', 'book.description', 'playback.currentTime', 'playback.timeLeft', 'playback.percentage', 'playback.speed', 'playback.chapter', 'playback.totalTime'];
-            this.addSelect('Data Binding', el.dataBinding || '', bindings, (val) => this.state.updateElement(el.id, { dataBinding: val }));
+            this.addSelect('Data Binding', el.dataBinding || '', bindings, (val) => this.state.updateElement(el.id, { dataBinding: val }), { tooltip: TOOLTIPS.dataBinding });
 
             this.addNumberInput('Font Size', el.fontSize, (val) => this.state.updateElement(el.id, { fontSize: val }));
-            this.addColorInput('Color', el.themeable?.color || '#ffffff', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, color: val } }));
+            this.addColorInput('Color', el.themeable?.color || '#ffffff', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, color: val } }), { validator: VALIDATORS.color });
             this.addSelect('Align', el.textAlign || 'left', ['left', 'center', 'right'], (val) => this.state.updateElement(el.id, { textAlign: val }));
-             this.addSelect('Font Weight', el.fontWeight || 'normal', ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'], (val) => this.state.updateElement(el.id, { fontWeight: val }));
+            this.addSelect('Font Weight', el.fontWeight || 'normal', ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'], (val) => this.state.updateElement(el.id, { fontWeight: val }));
         }
 
         if (el.type === 'button') {
-            this.addInput('Action', el.action || '', (val) => this.state.updateElement(el.id, { action: val }));
-            this.addColorInput('Tint', el.themeable?.tint || '', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, tint: val } }));
+            this.addActionInput('Action', el.action || '', (val) => this.state.updateElement(el.id, { action: val }));
+            this.addColorInput('Tint', el.themeable?.tint || '', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, tint: val } }), { validator: VALIDATORS.color });
             this.addImageInput('Icon Image', el.image, (val) => this.state.updateElement(el.id, { image: val }));
         }
 
@@ -947,20 +984,21 @@ class PropertyEditor {
         }
 
         if (el.type === 'progress-bar') {
-             this.addColorInput('Active Color', el.themeable?.activeColor || '#2196F3', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, activeColor: val } }));
-             this.addColorInput('Inactive Color', el.themeable?.inactiveColor || '#424242', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, inactiveColor: val } }));
+             this.addColorInput('Active Color', el.themeable?.activeColor || '#2196F3', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, activeColor: val } }), { validator: VALIDATORS.color });
+             this.addColorInput('Inactive Color', el.themeable?.inactiveColor || '#424242', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, inactiveColor: val } }), { validator: VALIDATORS.color });
         }
     }
 
-    addInput(label, value, onChange) {
+    addInput(label, value, onChange, options = {}) {
+        const error = options.validator ? options.validator(value) : null;
         this.renderField(label, document.createElement('input'), (input) => {
-            input.value = value || '';
+            input.value = value !== undefined ? value : '';
             input.onchange = (e) => onChange(e.target.value);
             input.className = 'prop-input';
-        });
+        }, { ...options, error });
     }
 
-    addNumberInput(label, value, onChange) {
+    addNumberInput(label, value, onChange, options = {}) {
         this.renderField(label, document.createElement('input'), (input) => {
             input.type = typeof value === 'number' ? 'number' : 'text';
             input.value = value !== undefined ? value : '';
@@ -970,15 +1008,99 @@ class PropertyEditor {
                 const num = parseFloat(val);
                 onChange(isNaN(num) ? val : num);
             };
+        }, options);
+    }
+
+    addActionInput(label, value, onChange) {
+        const commonActions = [
+            { label: 'Play/Pause', value: 'toggle-play-pause' },
+            { label: 'Skip Forward 10m', value: 'skip-forward-600' },
+            { label: 'Skip Forward 1m', value: 'skip-forward-60' },
+            { label: 'Skip Forward 30s', value: 'skip-forward-30' },
+            { label: 'Skip Forward 10s', value: 'skip-forward-10' },
+            { label: 'Skip Backward 10m', value: 'skip-backward-600' },
+            { label: 'Skip Backward 1m', value: 'skip-backward-60' },
+            { label: 'Skip Backward 30s', value: 'skip-backward-30' },
+            { label: 'Skip Backward 10s', value: 'skip-backward-10' },
+            { label: 'Next Chapter', value: 'next-chapter' },
+            { label: 'Prev Chapter', value: 'prev-chapter' },
+            { label: 'Show Chapters', value: 'show-chapters' },
+            { label: 'Bookmarks', value: 'show-bookmarks' },
+            { label: 'Add Bookmark', value: 'create-bookmark' },
+            { label: 'Sleep Timer', value: 'sleep-timer' },
+            { label: 'Playback Speed', value: 'playback-speed' },
+            { label: 'Exit Drive Mode', value: 'exit-drive-mode' }
+        ];
+
+        const currentValue = value || '';
+        const selectedAction = commonActions.find(a => a.value === currentValue);
+        const isCustom = !selectedAction && currentValue !== '';
+
+        this.renderField(label, document.createElement('div'), (container) => {
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '6px';
+
+            const select = document.createElement('select');
+            select.className = 'prop-select';
+
+            const defOpt = document.createElement('option');
+            defOpt.value = '';
+            defOpt.innerText = '-- Select Action --';
+            select.appendChild(defOpt);
+
+            commonActions.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.value;
+                opt.innerText = a.label;
+                if (a.value === currentValue) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            const customOpt = document.createElement('option');
+            customOpt.value = 'CUSTOM';
+            customOpt.innerText = 'Custom Action...';
+            if (isCustom) customOpt.selected = true;
+            select.appendChild(customOpt);
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'prop-input';
+            input.value = currentValue;
+            input.placeholder = 'e.g. skip-forward-45';
+            input.style.display = isCustom || select.value === 'CUSTOM' ? 'block' : 'none';
+
+            select.onchange = (e) => {
+                const val = e.target.value;
+                if (val === 'CUSTOM') {
+                    input.style.display = 'block';
+                    input.focus();
+                } else {
+                    input.style.display = 'none';
+                    if (val !== '') {
+                        input.value = val;
+                        onChange(val);
+                    }
+                }
+            };
+
+            input.onchange = (e) => onChange(e.target.value);
+
+            container.appendChild(select);
+            container.appendChild(input);
+        }, {
+            tooltip: TOOLTIPS.action,
+            error: VALIDATORS.action(currentValue)
         });
     }
 
-    addColorInput(label, value, onChange) {
+    addColorInput(label, value, onChange, options = {}) {
+        const error = options.validator ? options.validator(value) : null;
         this.renderField(label, document.createElement('div'), (container) => {
             container.className = 'color-picker-wrapper';
             const colorInput = document.createElement('input');
             colorInput.type = 'color';
-            colorInput.value = value && value.startsWith('#') ? value : '#ffffff';
+            colorInput.value = value && value.startsWith('#') && value.length <= 7 ? value : '#ffffff';
             colorInput.className = 'color-input-swatch';
             const textInput = document.createElement('input');
             textInput.type = 'text';
@@ -991,7 +1113,7 @@ class PropertyEditor {
 
             container.appendChild(colorInput);
             container.appendChild(textInput);
-        });
+        }, { ...options, error });
     }
 
     addImageInput(label, value, onChange) {
@@ -1084,7 +1206,7 @@ class PropertyEditor {
         });
     }
 
-    addSelect(label, value, options, onChange) {
+    addSelect(label, value, options, onChange, fieldOptions = {}) {
         this.renderField(label, document.createElement('select'), (select) => {
             select.className = 'prop-select';
             options.forEach(opt => {
@@ -1095,18 +1217,41 @@ class PropertyEditor {
                 select.appendChild(o);
             });
             select.onchange = (e) => onChange(e.target.value);
-        });
+        }, fieldOptions);
     }
 
-    renderField(label, element, setup) {
+    renderField(label, element, setup, options = {}) {
         const group = document.createElement('div');
         group.className = 'prop-group';
+        if (options.error) group.classList.add('has-error');
+
+        const lblContainer = document.createElement('div');
+        lblContainer.className = 'prop-label-container';
+
         const lbl = document.createElement('label');
         lbl.className = 'prop-label';
         lbl.innerText = label;
-        group.appendChild(lbl);
+        lblContainer.appendChild(lbl);
+
+        if (options.tooltip) {
+            const info = document.createElement('span');
+            info.className = 'prop-info-icon';
+            info.innerHTML = '<i class="fas fa-info-circle"></i>';
+            info.title = options.tooltip;
+            lblContainer.appendChild(info);
+        }
+
+        group.appendChild(lblContainer);
         setup(element);
         group.appendChild(element);
+
+        if (options.error) {
+            const err = document.createElement('div');
+            err.className = 'prop-error-text';
+            err.innerText = options.error;
+            group.appendChild(err);
+        }
+
         this.container.appendChild(group);
     }
 }
