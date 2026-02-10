@@ -549,6 +549,10 @@ body {
     border-color: rgba(13, 110, 253, 0.5);
 }
 
+.skin-element.selected {
+    border-color: rgba(13, 110, 253, 0.8);
+    cursor: move;
+}
 
 /* Property Validation and Tooltips */
 .prop-group.has-error .prop-input {

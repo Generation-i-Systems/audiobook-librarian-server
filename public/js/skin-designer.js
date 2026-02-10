@@ -408,6 +408,8 @@ class SkinRenderer {
 
 
     render() {
+        if (this.isDragging) return;
+
         const dims = this.state.getDimensions();
         const layout = this.state.getLayout();
 
@@ -668,15 +670,22 @@ class SkinRenderer {
         div.style.width = `${actualWidth}px`;
         div.style.height = `${actualHeight}px`;
 
-        // Background color
-
-        // Background from properties (supports gradients if string is valid CSS)
+        // Background
         if (el.backgroundColor) {
             if (el.backgroundColor.includes('gradient')) {
                 div.style.backgroundImage = el.backgroundColor;
             } else {
                 div.style.backgroundColor = el.backgroundColor;
             }
+        }
+        if (el.backgroundImage) {
+            const bgUrl = this.state.resolveAssetUrl(el.backgroundImage);
+            div.style.backgroundImage = el.backgroundColor?.includes('gradient')
+                ? `${el.backgroundColor}, url('${bgUrl}')`
+                : `url('${bgUrl}')`;
+            div.style.backgroundSize = 'cover';
+            div.style.backgroundPosition = 'center';
+            div.style.backgroundRepeat = 'no-repeat';
         }
 
         switch (el.type) {
@@ -767,14 +776,61 @@ class SkinRenderer {
             case 'container':
                 if (!el.backgroundColor) {
                     div.style.border = '1px dashed #6c757d';
-                    div.style.backgroundColor = 'rgba(0,0,0,0.2)';
                 }
                 break;
         }
 
-        div.addEventListener('click', (e) => {
+        div.addEventListener('mousedown', (e) => {
             e.stopPropagation();
+            e.preventDefault();
+
+            const startMouseX = e.clientX;
+            const startMouseY = e.clientY;
+            let hasDragged = false;
+
+            // Resolve current x/y to numeric values for dragging
+            const initialX = typeof el.x === 'number' ? el.x : this.calculatePosition(el.x, containerWidth, actualWidth);
+            const initialY = typeof el.y === 'number' ? el.y : this.calculatePosition(el.y, containerHeight, actualHeight);
+
+            // Select immediately, which triggers a re-render
             this.state.selectElement(el.id);
+
+            // Re-find the DOM element after re-render replaced it
+            let dragDiv = document.getElementById(`el-${el.id}`);
+            if (!dragDiv) return;
+
+            const initialLeft = parseFloat(dragDiv.style.left);
+            const initialTop = parseFloat(dragDiv.style.top);
+
+            const onMouseMove = (moveEvent) => {
+                const dx = (moveEvent.clientX - startMouseX) / this.scale;
+                const dy = (moveEvent.clientY - startMouseY) / this.scale;
+
+                if (!hasDragged && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+                    hasDragged = true;
+                    this.isDragging = true;
+                }
+
+                if (hasDragged) {
+                    dragDiv.style.left = `${initialLeft + dx}px`;
+                    dragDiv.style.top = `${initialTop + dy}px`;
+                }
+            };
+
+            const onMouseUp = (upEvent) => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                this.isDragging = false;
+
+                if (hasDragged) {
+                    const dx = (upEvent.clientX - startMouseX) / this.scale;
+                    const dy = (upEvent.clientY - startMouseY) / this.scale;
+                    this.state.updateElement(el.id, { x: Math.round(initialX + dx), y: Math.round(initialY + dy) });
+                }
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         });
 
         return div;
@@ -814,6 +870,7 @@ class ElementTree {
     constructor(containerId, state) {
         this.container = document.getElementById(containerId);
         this.state = state;
+        this.collapsedIds = new Set();
         this.state.subscribe(() => this.render());
     }
 
@@ -825,23 +882,47 @@ class ElementTree {
 
     renderElements(elements, depth) {
         elements.forEach(el => {
+            const hasChildren = el.children && el.children.length > 0;
+            const isCollapsed = this.collapsedIds.has(el.id);
+
             const item = document.createElement('div');
             item.className = 'tree-item' + (this.state.selectedElementId === el.id ? ' active' : '');
             item.style.paddingLeft = `${depth * 16 + 10}px`;
 
-            // Add expand/collapse icon for containers with children
-            let expandIcon = '';
-            if (el.children && el.children.length > 0) {
-                expandIcon = `<span class="tree-expand">▼</span>`;
+            const expandSpan = document.createElement('span');
+            expandSpan.className = 'tree-expand';
+            if (hasChildren) {
+                expandSpan.innerText = isCollapsed ? '▶' : '▼';
+                expandSpan.style.cursor = 'pointer';
+                expandSpan.onclick = (e) => {
+                    e.stopPropagation();
+                    if (this.collapsedIds.has(el.id)) {
+                        this.collapsedIds.delete(el.id);
+                    } else {
+                        this.collapsedIds.add(el.id);
+                    }
+                    this.render();
+                };
             } else {
-                expandIcon = `<span class="tree-expand" style="visibility: hidden;">▼</span>`;
+                expandSpan.innerText = '▼';
+                expandSpan.style.visibility = 'hidden';
             }
 
-            item.innerHTML = `
-                ${expandIcon}
-                <span class="tree-item-icon">${this.getTypeIcon(el.type)}</span>
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${el.id}</span>
-            `;
+            item.appendChild(expandSpan);
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'tree-item-icon';
+            iconSpan.innerText = this.getTypeIcon(el.type);
+            item.appendChild(iconSpan);
+
+            const labelSpan = document.createElement('span');
+            labelSpan.style.overflow = 'hidden';
+            labelSpan.style.textOverflow = 'ellipsis';
+            labelSpan.style.whiteSpace = 'nowrap';
+            labelSpan.style.flex = '1';
+            labelSpan.innerText = el.id;
+            item.appendChild(labelSpan);
+
             const del = document.createElement('button');
             del.className = 'tree-item-delete';
             del.innerHTML = '&times;';
@@ -853,8 +934,7 @@ class ElementTree {
             item.onclick = () => this.state.selectElement(el.id);
             this.container.appendChild(item);
 
-            // Recursively render children
-            if (el.children && el.children.length > 0) {
+            if (hasChildren && !isCollapsed) {
                 this.renderElements(el.children, depth + 1);
             }
         });
@@ -966,7 +1046,12 @@ const VALIDATORS = {
         if (/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(val)) return null;
         return "Use theme key (primary, surface, etc.) or hex color";
     },
-    color: (val) => /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(val) || val === '' ? null : "Invalid hex color",
+    color: (val) => {
+        if (val === '') return null;
+        if (/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(val)) return null;
+        if (val.includes('gradient')) return null;
+        return "Use hex color or CSS gradient";
+    },
     generic: (val) => val === '' ? "Value required" : null
 };
 
@@ -1011,8 +1096,8 @@ class PropertyEditor {
                 this.state.manifest.version = val;
             });
 
-            this.addImageInput('Background Image', this.state.getBackgroundImage() || '', (val) => {
-                this.state.setBackgroundImage(val);
+            this.addBackgroundInput('Background', '', this.state.getBackgroundImage() || '', (bgColor, bgImage) => {
+                this.state.setBackgroundImage(bgImage);
             });
 
             this.container.innerHTML += '<div class="text-center small text-muted mt-5">Select an element to edit properties</div>';
@@ -1044,8 +1129,10 @@ class PropertyEditor {
             this.state.updateElement(el.id, { height: (val === 'max' || isNaN(num) || val.includes('%') || val.includes('-')) ? val : num });
         }, { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.height });
 
-        // Background Color (All elements)
-        this.addColorInput('Background', el.backgroundColor || '', (val) => this.state.updateElement(el.id, { backgroundColor: val }), { validator: VALIDATORS.color });
+        // Background (All elements)
+        this.addBackgroundInput('Background', el.backgroundColor || '', el.backgroundImage || '', (bgColor, bgImage) => {
+            this.state.updateElement(el.id, { backgroundColor: bgColor, backgroundImage: bgImage });
+        });
 
         if (el.type === 'text') {
             this.addInput('Text', el.text || '', (val) => this.state.updateElement(el.id, { text: val }));
@@ -1180,32 +1267,344 @@ class PropertyEditor {
         });
     }
 
-    addColorInput(label, value, onChange, options = {}) {
-        const error = options.validator ? options.validator(value) : null;
+    addBackgroundInput(label, colorValue, imageValue, onUpdate) {
+        const isGradient = colorValue && colorValue.includes('gradient');
+
+        // Alpha helpers
+        const hexToRgba = (hex) => {
+            hex = (hex || '').replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16) || 0;
+            const g = parseInt(hex.substring(2, 4), 16) || 0;
+            const b = parseInt(hex.substring(4, 6), 16) || 0;
+            const a = hex.length >= 8 ? parseInt(hex.substring(6, 8), 16) / 255 : 1;
+            return { r, g, b, a };
+        };
+        const rgbaToHex = (r, g, b, a) => {
+            const toHex = (n) => Math.round(n).toString(16).padStart(2, '0');
+            const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+            return a < 1 ? hex + toHex(a * 255) : hex;
+        };
+        const hex6 = (hex) => {
+            if (!hex || !hex.startsWith('#')) return '#ffffff';
+            return '#' + hex.replace('#', '').substring(0, 6).padEnd(6, '0');
+        };
+        const makeAlphaRow = (initialAlpha) => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '8px';
+            const lbl = document.createElement('span');
+            lbl.innerText = 'Opacity';
+            lbl.style.fontSize = '12px';
+            lbl.style.color = '#adb5bd';
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = '0';
+            slider.max = '100';
+            slider.value = Math.round(initialAlpha * 100);
+            slider.style.flex = '1';
+            const val = document.createElement('span');
+            val.innerText = `${slider.value}%`;
+            val.style.fontSize = '12px';
+            val.style.color = '#adb5bd';
+            val.style.minWidth = '35px';
+            slider.oninput = () => { val.innerText = `${slider.value}%`; };
+            row.appendChild(lbl);
+            row.appendChild(slider);
+            row.appendChild(val);
+            return { row, slider, valSpan: val };
+        };
+
+        // Gradient helpers
+        const parseGradient = (val) => {
+            const result = { type: 'linear', angle: 135, color1: '#000000', alpha1: 1, color2: '#333333', alpha2: 1 };
+            if (!val || !val.includes('gradient')) return result;
+            result.type = val.includes('radial') ? 'radial' : 'linear';
+            const colors = val.match(/#[A-Fa-f0-9]{3,8}/g);
+            if (colors && colors.length >= 2) {
+                const c1 = hexToRgba(colors[0]);
+                result.color1 = hex6(colors[0]); result.alpha1 = c1.a;
+                const c2 = hexToRgba(colors[1]);
+                result.color2 = hex6(colors[1]); result.alpha2 = c2.a;
+            }
+            const angleMatch = val.match(/(\d+)deg/);
+            if (angleMatch) result.angle = parseInt(angleMatch[1]);
+            return result;
+        };
+        const grad = parseGradient(colorValue);
+
+        // Determine initial mode
+        let initMode = '';
+        if (imageValue) initMode = 'IMAGE';
+        else if (isGradient && colorValue.includes('linear')) initMode = 'LINEAR';
+        else if (isGradient && colorValue.includes('radial')) initMode = 'RADIAL';
+        else if (colorValue) initMode = 'SOLID';
+
         this.renderField(label, document.createElement('div'), (container) => {
-            container.className = 'color-picker-wrapper';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '6px';
+
+            const select = document.createElement('select');
+            select.className = 'prop-select';
+            [['', '-- None --'], ['SOLID', 'Solid Color'], ['LINEAR', 'Linear Gradient'], ['RADIAL', 'Radial Gradient'], ['IMAGE', 'Image']].forEach(([v, l]) => {
+                const opt = document.createElement('option');
+                opt.value = v; opt.innerText = l;
+                select.appendChild(opt);
+            });
+            select.value = initMode;
+
+            // --- Solid color ---
+            const colorSection = document.createElement('div');
+            colorSection.style.display = initMode === 'SOLID' ? 'flex' : 'none';
+            colorSection.style.flexDirection = 'column';
+            colorSection.style.gap = '6px';
+
+            const colorPickerRow = document.createElement('div');
+            colorPickerRow.className = 'color-picker-wrapper';
+            const rgba = hexToRgba(colorValue);
+
             const colorInput = document.createElement('input');
             colorInput.type = 'color';
-            colorInput.value = value && value.startsWith('#') && value.length <= 7 ? value : '#ffffff';
+            colorInput.value = hex6(colorValue);
             colorInput.className = 'color-input-swatch';
             const textInput = document.createElement('input');
             textInput.type = 'text';
-            textInput.value = value || '';
+            textInput.value = (!isGradient && colorValue) ? colorValue : '';
             textInput.className = 'prop-input';
             textInput.style.flex = '1';
+            textInput.placeholder = '#FF0000 or #FF000080';
+            colorPickerRow.appendChild(colorInput);
+            colorPickerRow.appendChild(textInput);
 
-            colorInput.oninput = (e) => { textInput.value = e.target.value; onChange(e.target.value); };
-            textInput.onchange = (e) => { colorInput.value = e.target.value; onChange(e.target.value); };
+            const solidAlpha = makeAlphaRow(rgba.a);
 
-            container.appendChild(colorInput);
-            container.appendChild(textInput);
-        }, { ...options, error });
+            const emitSolidColor = () => {
+                const c = hexToRgba(hex6(colorInput.value));
+                const a = parseInt(solidAlpha.slider.value) / 100;
+                const hex = rgbaToHex(c.r, c.g, c.b, a);
+                textInput.value = hex;
+                onUpdate(hex, '');
+            };
+            colorInput.oninput = () => emitSolidColor();
+            solidAlpha.slider.oninput = () => { solidAlpha.valSpan.innerText = `${solidAlpha.slider.value}%`; emitSolidColor(); };
+            textInput.onchange = (e) => {
+                const p = hexToRgba(e.target.value);
+                colorInput.value = hex6(e.target.value);
+                solidAlpha.slider.value = Math.round(p.a * 100);
+                solidAlpha.valSpan.innerText = `${solidAlpha.slider.value}%`;
+                onUpdate(e.target.value, '');
+            };
+
+            colorSection.appendChild(colorPickerRow);
+            colorSection.appendChild(solidAlpha.row);
+
+            // --- Gradient builder ---
+            const gradientSection = document.createElement('div');
+            gradientSection.style.display = (initMode === 'LINEAR' || initMode === 'RADIAL') ? 'flex' : 'none';
+            gradientSection.style.flexDirection = 'column';
+            gradientSection.style.gap = '6px';
+
+            const preview = document.createElement('div');
+            preview.style.height = '24px';
+            preview.style.borderRadius = '4px';
+            preview.style.border = '1px solid #555';
+            if (isGradient) preview.style.backgroundImage = colorValue;
+
+            const buildGradient = () => {
+                const c1 = hexToRgba(grad.color1);
+                const hex1 = rgbaToHex(c1.r, c1.g, c1.b, parseInt(gradAlpha1.slider.value) / 100);
+                const c2 = hexToRgba(grad.color2);
+                const hex2 = rgbaToHex(c2.r, c2.g, c2.b, parseInt(gradAlpha2.slider.value) / 100);
+                const type = select.value === 'RADIAL' ? 'radial' : 'linear';
+                const css = type === 'radial'
+                    ? `radial-gradient(circle, ${hex1} 0%, ${hex2} 100%)`
+                    : `linear-gradient(${grad.angle}deg, ${hex1} 0%, ${hex2} 100%)`;
+                preview.style.backgroundImage = css;
+                onUpdate(css, '');
+            };
+
+            // Stop 1
+            const stop1Row = document.createElement('div');
+            stop1Row.className = 'color-picker-wrapper';
+            const pick1 = document.createElement('input');
+            pick1.type = 'color'; pick1.value = grad.color1; pick1.className = 'color-input-swatch';
+            const lbl1 = document.createElement('span');
+            lbl1.innerText = 'Start'; lbl1.style.flex = '1'; lbl1.style.fontSize = '12px'; lbl1.style.color = '#adb5bd';
+            pick1.oninput = (e) => { grad.color1 = e.target.value; buildGradient(); };
+            stop1Row.appendChild(pick1); stop1Row.appendChild(lbl1);
+            const gradAlpha1 = makeAlphaRow(grad.alpha1);
+            gradAlpha1.slider.oninput = () => { gradAlpha1.valSpan.innerText = `${gradAlpha1.slider.value}%`; buildGradient(); };
+
+            // Stop 2
+            const stop2Row = document.createElement('div');
+            stop2Row.className = 'color-picker-wrapper';
+            const pick2 = document.createElement('input');
+            pick2.type = 'color'; pick2.value = grad.color2; pick2.className = 'color-input-swatch';
+            const lbl2 = document.createElement('span');
+            lbl2.innerText = 'End'; lbl2.style.flex = '1'; lbl2.style.fontSize = '12px'; lbl2.style.color = '#adb5bd';
+            pick2.oninput = (e) => { grad.color2 = e.target.value; buildGradient(); };
+            stop2Row.appendChild(pick2); stop2Row.appendChild(lbl2);
+            const gradAlpha2 = makeAlphaRow(grad.alpha2);
+            gradAlpha2.slider.oninput = () => { gradAlpha2.valSpan.innerText = `${gradAlpha2.slider.value}%`; buildGradient(); };
+
+            // Angle
+            const angleRow = document.createElement('div');
+            angleRow.style.display = initMode === 'LINEAR' ? 'flex' : 'none';
+            angleRow.style.alignItems = 'center';
+            angleRow.style.gap = '8px';
+            const angleLbl = document.createElement('span');
+            angleLbl.innerText = 'Angle'; angleLbl.style.fontSize = '12px'; angleLbl.style.color = '#adb5bd';
+            const angleInput = document.createElement('input');
+            angleInput.type = 'range'; angleInput.min = '0'; angleInput.max = '360';
+            angleInput.value = grad.angle; angleInput.style.flex = '1';
+            const angleValSpan = document.createElement('span');
+            angleValSpan.innerText = `${grad.angle}°`; angleValSpan.style.fontSize = '12px';
+            angleValSpan.style.color = '#adb5bd'; angleValSpan.style.minWidth = '35px';
+            angleInput.oninput = (e) => { grad.angle = parseInt(e.target.value); angleValSpan.innerText = `${grad.angle}°`; buildGradient(); };
+            angleRow.appendChild(angleLbl); angleRow.appendChild(angleInput); angleRow.appendChild(angleValSpan);
+
+            gradientSection.appendChild(preview);
+            gradientSection.appendChild(stop1Row);
+            gradientSection.appendChild(gradAlpha1.row);
+            gradientSection.appendChild(stop2Row);
+            gradientSection.appendChild(gradAlpha2.row);
+            gradientSection.appendChild(angleRow);
+
+            // --- Image section ---
+            const imageSection = document.createElement('div');
+            imageSection.style.display = initMode === 'IMAGE' ? 'flex' : 'none';
+            imageSection.style.flexDirection = 'column';
+            imageSection.style.gap = '8px';
+
+            if (imageValue) {
+                const img = document.createElement('img');
+                img.src = this.state.resolveAssetUrl(imageValue);
+                img.className = 'prop-image-preview';
+                imageSection.appendChild(img);
+            }
+
+            const imgInput = document.createElement('input');
+            imgInput.type = 'text';
+            imgInput.value = imageValue;
+            imgInput.placeholder = 'assets/images/bg.png';
+            imgInput.className = 'prop-input';
+            imgInput.onchange = (e) => onUpdate('', e.target.value);
+            imageSection.appendChild(imgInput);
+
+            const imgControls = document.createElement('div');
+            imgControls.style.display = 'flex';
+            imgControls.style.gap = '8px';
+
+            const uploadBtn = document.createElement('button');
+            uploadBtn.innerText = 'Upload';
+            uploadBtn.className = 'btn btn-sm btn-secondary';
+            uploadBtn.style.flex = '1';
+            uploadBtn.onclick = () => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*';
+                fileInput.onchange = (ev) => {
+                    const file = ev.target.files[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const path = `assets/images/${file.name}`;
+                    formData.append('path', path);
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                    uploadBtn.innerText = 'Uploading...';
+                    uploadBtn.disabled = true;
+                    fetch(`/gallery/skins/${this.state.skin.id}/assets`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken },
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        uploadBtn.innerText = 'Upload';
+                        uploadBtn.disabled = false;
+                        if (data.success) {
+                            this.state.addAsset({ path: data.url, relative_path: path, name: file.name, url: data.url });
+                            onUpdate('', path);
+                        } else alert('Upload failed: ' + data.error);
+                    })
+                    .catch(err => { uploadBtn.innerText = 'Upload'; uploadBtn.disabled = false; alert('Upload failed: ' + err.message); });
+                };
+                fileInput.click();
+            };
+            imgControls.appendChild(uploadBtn);
+
+            if (this.state.assets.length > 0) {
+                const assetSelect = document.createElement('select');
+                assetSelect.className = 'prop-input';
+                assetSelect.style.fontSize = '12px';
+                assetSelect.style.flex = '1';
+                assetSelect.innerHTML = '<option value="">Select...</option>';
+                this.state.assets.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.relative_path;
+                    opt.innerText = a.name;
+                    if (a.relative_path === imageValue) opt.selected = true;
+                    assetSelect.appendChild(opt);
+                });
+                assetSelect.onchange = (e) => { if (e.target.value) onUpdate('', e.target.value); };
+                imgControls.appendChild(assetSelect);
+            }
+            imageSection.appendChild(imgControls);
+
+            // --- Mode switching (single batched update) ---
+            select.onchange = (e) => {
+                const mode = e.target.value;
+                colorSection.style.display = 'none';
+                gradientSection.style.display = 'none';
+                imageSection.style.display = 'none';
+                angleRow.style.display = 'none';
+                if (mode === '') {
+                    onUpdate('', '');
+                } else if (mode === 'SOLID') {
+                    colorSection.style.display = 'flex';
+                    const c = hexToRgba(hex6(colorInput.value));
+                    const a = parseInt(solidAlpha.slider.value) / 100;
+                    onUpdate(rgbaToHex(c.r, c.g, c.b, a), '');
+                } else if (mode === 'LINEAR' || mode === 'RADIAL') {
+                    gradientSection.style.display = 'flex';
+                    angleRow.style.display = mode === 'LINEAR' ? 'flex' : 'none';
+                    buildGradient();
+                } else if (mode === 'IMAGE') {
+                    imageSection.style.display = 'flex';
+                }
+            };
+
+            container.appendChild(select);
+            container.appendChild(colorSection);
+            container.appendChild(gradientSection);
+            container.appendChild(imageSection);
+        });
     }
 
     addThemeColorInput(label, value, onChange) {
         const themeKeys = ['primary', 'secondary', 'background', 'surface', 'text', 'accent', 'progressActive', 'progressInactive', 'timeText', 'buttonTint', 'borderColor', 'overlayColor'];
         const isThemeKey = themeKeys.includes(value);
+        const isCustom = value && !isThemeKey && value !== '';
         const error = VALIDATORS.themeColor(value);
+
+        const hexToRgba = (hex) => {
+            hex = (hex || '').replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16) || 0;
+            const g = parseInt(hex.substring(2, 4), 16) || 0;
+            const b = parseInt(hex.substring(4, 6), 16) || 0;
+            const a = hex.length >= 8 ? parseInt(hex.substring(6, 8), 16) / 255 : 1;
+            return { r, g, b, a };
+        };
+        const rgbaToHex = (r, g, b, a) => {
+            const toHex = (n) => Math.round(n).toString(16).padStart(2, '0');
+            const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+            return a < 1 ? hex + toHex(a * 255) : hex;
+        };
+        const hex6 = (hex) => {
+            if (!hex || !hex.startsWith('#')) return '#ffffff';
+            return '#' + hex.replace('#', '').substring(0, 6).padEnd(6, '0');
+        };
 
         this.renderField(label, document.createElement('div'), (container) => {
             container.style.display = 'flex';
@@ -1231,44 +1630,92 @@ class PropertyEditor {
             const customOpt = document.createElement('option');
             customOpt.value = 'CUSTOM';
             customOpt.innerText = 'Custom Hex...';
-            if (value && !isThemeKey && value !== '') customOpt.selected = true;
+            if (isCustom) customOpt.selected = true;
             select.appendChild(customOpt);
+
+            // Custom color section with picker + opacity
+            const customSection = document.createElement('div');
+            customSection.style.display = isCustom ? 'flex' : 'none';
+            customSection.style.flexDirection = 'column';
+            customSection.style.gap = '6px';
 
             const colorRow = document.createElement('div');
             colorRow.className = 'color-picker-wrapper';
-            colorRow.style.display = (!isThemeKey && value && value !== '') ? 'flex' : 'none';
 
+            const rgba = hexToRgba(value);
             const colorInput = document.createElement('input');
             colorInput.type = 'color';
-            colorInput.value = value && value.startsWith('#') && value.length <= 7 ? value : '#ffffff';
+            colorInput.value = isCustom ? hex6(value) : '#ffffff';
             colorInput.className = 'color-input-swatch';
 
             const textInput = document.createElement('input');
             textInput.type = 'text';
-            textInput.value = (!isThemeKey && value) ? value : '';
+            textInput.value = isCustom ? value : '';
             textInput.className = 'prop-input';
             textInput.style.flex = '1';
-            textInput.placeholder = '#FF0000';
-
-            colorInput.oninput = (e) => { textInput.value = e.target.value; onChange(e.target.value); };
-            textInput.onchange = (e) => { onChange(e.target.value); };
+            textInput.placeholder = '#FF0000 or #FF000080';
 
             colorRow.appendChild(colorInput);
             colorRow.appendChild(textInput);
 
+            // Opacity slider
+            const alphaRow = document.createElement('div');
+            alphaRow.style.display = 'flex';
+            alphaRow.style.alignItems = 'center';
+            alphaRow.style.gap = '8px';
+            const alphaLbl = document.createElement('span');
+            alphaLbl.innerText = 'Opacity';
+            alphaLbl.style.fontSize = '12px';
+            alphaLbl.style.color = '#adb5bd';
+            const alphaSlider = document.createElement('input');
+            alphaSlider.type = 'range';
+            alphaSlider.min = '0';
+            alphaSlider.max = '100';
+            alphaSlider.value = Math.round((isCustom ? rgba.a : 1) * 100);
+            alphaSlider.style.flex = '1';
+            const alphaVal = document.createElement('span');
+            alphaVal.innerText = `${alphaSlider.value}%`;
+            alphaVal.style.fontSize = '12px';
+            alphaVal.style.color = '#adb5bd';
+            alphaVal.style.minWidth = '35px';
+            alphaRow.appendChild(alphaLbl);
+            alphaRow.appendChild(alphaSlider);
+            alphaRow.appendChild(alphaVal);
+
+            const emitColor = () => {
+                const c = hexToRgba(hex6(colorInput.value));
+                const a = parseInt(alphaSlider.value) / 100;
+                const hex = rgbaToHex(c.r, c.g, c.b, a);
+                textInput.value = hex;
+                onChange(hex);
+            };
+
+            colorInput.oninput = () => emitColor();
+            alphaSlider.oninput = () => { alphaVal.innerText = `${alphaSlider.value}%`; emitColor(); };
+            textInput.onchange = (e) => {
+                const p = hexToRgba(e.target.value);
+                colorInput.value = hex6(e.target.value);
+                alphaSlider.value = Math.round(p.a * 100);
+                alphaVal.innerText = `${alphaSlider.value}%`;
+                onChange(e.target.value);
+            };
+
+            customSection.appendChild(colorRow);
+            customSection.appendChild(alphaRow);
+
             select.onchange = (e) => {
                 const val = e.target.value;
                 if (val === 'CUSTOM') {
-                    colorRow.style.display = 'flex';
+                    customSection.style.display = 'flex';
                     textInput.focus();
                 } else {
-                    colorRow.style.display = 'none';
+                    customSection.style.display = 'none';
                     onChange(val);
                 }
             };
 
             container.appendChild(select);
-            container.appendChild(colorRow);
+            container.appendChild(customSection);
         }, { error });
     }
 
