@@ -34,6 +34,11 @@ class SkinState {
         this.selectedElementId = null;
         this.listeners = [];
         this.updatingFromJson = false;
+
+        // History
+        this.history = [];
+        this.historyIndex = -1;
+        this.pushState();
     }
 
     subscribe(callback) {
@@ -103,6 +108,7 @@ class SkinState {
         targetList.push(element);
         this.selectedElementId = element.id;
         this.notify('elementAdded');
+        this.pushState();
         return element.id;
     }
 
@@ -119,6 +125,7 @@ class SkinState {
             }
             parent[index] = { ...element, ...updates };
             this.notify('elementUpdated');
+            this.pushState();
         }
     }
 
@@ -128,6 +135,7 @@ class SkinState {
             result.parent.splice(result.index, 1);
             if (this.selectedElementId === id) this.selectedElementId = null;
             this.notify('elementRemoved');
+            this.pushState();
         }
     }
 
@@ -152,6 +160,7 @@ class SkinState {
             this.updatingFromJson = true;
             this.notify('manifestLoaded');
             this.updatingFromJson = false;
+            this.pushState();
             return true;
         } catch (e) {
             return false;
@@ -187,17 +196,58 @@ class SkinState {
          if (!this.manifest.backgrounds) this.manifest.backgrounds = {};
          this.manifest.backgrounds[this.currentOrientation] = path;
          this.notify('backgroundUpdated');
+         this.pushState();
     }
 
     addAsset(asset) {
         this.assets.push(asset);
         this.notify('assetsUpdated');
     }
+
+    pushState() {
+        if (this.historyIndex < this.history.length - 1) {
+            this.history = this.history.slice(0, this.historyIndex + 1);
+        }
+        const stateStr = JSON.stringify(this.manifest);
+        if (this.history.length > 0 && this.history[this.historyIndex] === stateStr) return;
+
+        this.history.push(stateStr);
+        this.historyIndex++;
+        if (this.history.length > 50) {
+            this.history.shift();
+            this.historyIndex--;
+        }
+    }
+
+    undo() {
+        if (this.historyIndex > 0) {
+            this.historyIndex--;
+            this.restoreState();
+        }
+    }
+
+    redo() {
+        if (this.historyIndex < this.history.length - 1) {
+            this.historyIndex++;
+            this.restoreState();
+        }
+    }
+
+    restoreState() {
+        try {
+            this.manifest = JSON.parse(this.history[this.historyIndex]);
+            this.updatingFromJson = true;
+            this.selectedElementId = null;
+            this.notify('manifestLoaded');
+            this.updatingFromJson = false;
+        } catch(e) {}
+    }
 }
 
 class SampleData {
     constructor(state) {
         this.state = state;
+        this.coverUrl = null;
         this.data = {
             'book.title': 'The Hitchhiker\'s Guide to the Galaxy',
             'book.author': 'Douglas Adams',
@@ -224,8 +274,7 @@ class SampleData {
     }
 
     getCover() {
-        // Return a placeholder book cover image
-        return 'https://via.placeholder.com/300x450/2c3e50/ecf0f1?text=Book+Cover';
+        return this.coverUrl || 'https://via.placeholder.com/300x450/2c3e50/ecf0f1?text=Book+Cover';
     }
 
     getBindingValue(binding) {
@@ -244,6 +293,88 @@ class SampleData {
             case 'playback.chapter': return 'Chapter 3';
             default: return `[${binding}]`;
         }
+    }
+
+    fetchSampleData(bookId = null) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        let url = '/gallery/skins/sample-data';
+        if (bookId) {
+            url += `?book_id=${bookId}`;
+        }
+
+        fetch(url, {
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Sample data error:', data.error);
+                return;
+            }
+            if (data.cover) this.coverUrl = data.cover;
+
+            Object.keys(data).forEach(key => {
+                if (key !== 'cover' && key !== 'available_books' && key !== 'current_book_id') {
+                    this.data[key] = data[key];
+                }
+            });
+
+            if (data.available_books) {
+                this.updateBookSelector(data.available_books, data.current_book_id);
+            }
+
+            this.state.notify('sampleDataUpdated');
+        })
+        .catch(err => console.error('Failed to fetch sample data:', err));
+    }
+
+    updateBookSelector(books, currentId) {
+        const wrapper = document.getElementById('sample-data-wrapper');
+        if (!wrapper) return;
+
+        let selector = document.getElementById('sample-book-select');
+        if (!selector) {
+            const container = document.createElement('div');
+            container.className = 'prop-group sample-selector';
+            container.style.padding = '10px';
+            container.style.borderBottom = '1px solid #444';
+            container.style.marginBottom = '10px';
+
+            const label = document.createElement('label');
+            label.innerText = 'Preview Book:';
+            label.className = 'prop-label';
+            label.style.display = 'block';
+            label.style.marginBottom = '5px';
+
+            selector = document.createElement('select');
+            selector.id = 'sample-book-select';
+            selector.className = 'prop-select';
+            selector.style.width = '100%';
+
+            selector.onchange = (e) => {
+                const id = e.target.value;
+                if (id) this.fetchSampleData(id);
+            };
+
+            container.appendChild(label);
+            container.appendChild(selector);
+
+            // Insert at the top of the wrapper
+            wrapper.insertBefore(container, wrapper.firstChild);
+        }
+
+        // Rebuild options
+        selector.innerHTML = '';
+        books.forEach(book => {
+            const opt = document.createElement('option');
+            opt.value = book.id;
+            opt.innerText = book.title;
+            if (book.id == currentId) opt.selected = true;
+            selector.appendChild(opt);
+        });
     }
 }
 
@@ -1006,6 +1137,9 @@ class JsonEditor {
             // Only update editor if the change didn't come from the editor itself
             if (!this.editor.hasFocus()) {
                  this.updateEditor();
+                 // Re-highlight if selection exists
+                 const el = this.state.getSelectedElement();
+                 if (el) this.highlightElement(el.id);
             }
             if (type === 'selectionChanged') {
                 const el = this.state.getSelectedElement();
@@ -1092,6 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const state = new SkinState(skinData, assetsData);
     const sampleData = new SampleData(state);
+    sampleData.fetchSampleData();
 
     new SkinRenderer('preview-container', state, sampleData);
     new ElementTree('element-tree', state);
@@ -1288,4 +1423,41 @@ document.addEventListener('DOMContentLoaded', () => {
              btn.innerHTML = originalHTML; btn.disabled = false;
          });
     };
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        // Undo/Redo
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) state.redo();
+            else state.undo();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+             e.preventDefault();
+             state.redo();
+        }
+
+        // Delete
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+             const el = state.getSelectedElement();
+             if (el) state.removeElement(el.id);
+        }
+
+        // Arrow Movement
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+             const el = state.getSelectedElement();
+             if (el) {
+                 e.preventDefault();
+                 const step = e.shiftKey ? 10 : 1;
+                 const updates = {};
+                 if (e.key === 'ArrowLeft') updates.x = (el.x || 0) - step;
+                 if (e.key === 'ArrowRight') updates.x = (el.x || 0) + step;
+                 if (e.key === 'ArrowUp') updates.y = (el.y || 0) - step;
+                 if (e.key === 'ArrowDown') updates.y = (el.y || 0) + step;
+                 state.updateElement(el.id, updates);
+             }
+        }
+    });
 });

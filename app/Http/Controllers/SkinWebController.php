@@ -6,6 +6,7 @@ use App\Services\Contracts\SkinServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class SkinWebController extends Controller
 {
@@ -311,12 +312,12 @@ class SkinWebController extends Controller
             // Also update metadata if provided and valid
             $data = $request->only(['name', 'author', 'version']);
             if (!empty($data)) {
-                 // We reuse updateSkin for name. Author/Version are in manifest but maybe should be in DB too?
-                 // Skin model has author, version columns.
-                 // updateSkin only accepts name, description, is_public.
-                 // We might need to expand updateSkin or just direct update here if service allows.
-                 // Service updateSkin takes $data array.
-                 $this->skinService->updateSkin($id, Auth::id(), $data);
+                // We reuse updateSkin for name. Author/Version are in manifest but maybe should be in DB too?
+                // Skin model has author, version columns.
+                // updateSkin only accepts name, description, is_public.
+                // We might need to expand updateSkin or just direct update here if service allows.
+                // Service updateSkin takes $data array.
+                $this->skinService->updateSkin($id, Auth::id(), $data);
             }
 
             return response()->json(['success' => true, 'skin' => $skin]);
@@ -388,6 +389,84 @@ class SkinWebController extends Controller
             Log::error('Export ZIP error: ' . $e->getMessage());
 
             return redirect()->back()->with('error', 'Failed to generate ZIP.');
+        }
+    }
+    public function getSampleData(Request $request)
+    {
+        if (! Auth::check()) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $bookId = $request->input('book_id');
+            $book = null;
+
+            if ($bookId) {
+                $book = \App\Models\Book::with(['authors', 'narrators', 'series'])->find($bookId);
+            }
+
+            if (!$book) {
+                // Default: Last imported book with a cover
+                $book = \App\Models\Book::with(['authors', 'narrators', 'series'])
+                    ->whereNotNull('cover_image')
+                    ->where('cover_image', '!=', '')
+                    ->latest('id')
+                    ->first();
+            }
+
+            // Available books list
+            $availableBooks = \App\Models\Book::select('id', 'title')
+                ->whereNotNull('cover_image')
+                ->where('cover_image', '!=', '')
+                ->latest('id')
+                ->limit(30)
+                ->get();
+
+            if (!$book) {
+                return response()->json([
+                   'book.title' => 'The Hitchhiker\'s Guide to the Galaxy',
+                   'book.author' => 'Douglas Adams',
+                   'book.narrator' => 'Stephen Fry',
+                   'book.series' => 'Hitchhiker\'s Guide #1',
+                   'book.duration' => '5h 51m',
+                   'book.description' => 'Seconds before the Earth is demolished to make way for a galactic freeway...',
+                   'cover' => asset('images/placeholder.png'),
+                   'available_books' => [],
+                   'current_book_id' => null
+                ]);
+            }
+
+            $coverUrl = $book->cover_image;
+            if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
+                $coverUrl = route('cover.proxy', ['path' => $coverUrl]);
+            }
+
+            $seriesText = '';
+            if ($book->series->isNotEmpty()) {
+                $s = $book->series->first();
+                $seriesText = $s->name;
+                if ($s->pivot->series_number) { /** @phpstan-ignore-line */
+                    $seriesText .= ' #' . $s->pivot->series_number; /** @phpstan-ignore-line */
+                }
+            }
+
+            $durationSeconds = $book->duration ?? 0;
+            $durationFormatted = sprintf('%02d:%02d:%02d', ($durationSeconds / 3600), ($durationSeconds / 60 % 60), $durationSeconds % 60);
+
+            return response()->json([
+                'book.title' => $book->title,
+                'book.author' => $book->authors->pluck('name')->implode(', '),
+                'book.narrator' => $book->narrators->pluck('name')->implode(', '),
+                'book.series' => $seriesText,
+                'book.duration' => $durationFormatted,
+                'book.description' => Str::limit($book->description ?? '', 200),
+                'cover' => $coverUrl,
+                'available_books' => $availableBooks,
+                'current_book_id' => $book->id
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Sample data error: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to load sample data: ' . $e->getMessage()], 500);
         }
     }
 }

@@ -658,6 +658,7 @@ Route::name('gallery.')->prefix('gallery')->group(function (): void {
         Route::get('/design-new', [SkinWebController::class, 'designerNew'])->name('designerNew');
         Route::post('/', [SkinWebController::class, 'store'])->name('store');
         Route::get('/my-skins', [SkinWebController::class, 'mySkins'])->name('my-skins');
+        Route::get('/sample-data', [SkinWebController::class, 'getSampleData'])->name('sample-data');
         Route::get('/{id}', [SkinWebController::class, 'show'])->name('show')->whereNumber('id');
         Route::get('/{id}/edit', [SkinWebController::class, 'edit'])->name('edit')->whereNumber('id');
         Route::put('/{id}', [SkinWebController::class, 'update'])->name('update')->whereNumber('id');
