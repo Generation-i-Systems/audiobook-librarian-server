@@ -436,9 +436,14 @@ class SkinWebController extends Controller
                 ]);
             }
 
-            $coverUrl = $book->cover_image;
-            if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
-                $coverUrl = route('cover.proxy', ['path' => $coverUrl]);
+            $coverImage = $book->cover_image;
+            if (filter_var($coverImage, FILTER_VALIDATE_URL)) {
+                $coverUrl = $coverImage;
+            } else {
+                $baseName = basename($coverImage);
+                $directoryPath = trim($book->directory_path ?? '', '/');
+                $fullPath = $directoryPath ? $directoryPath . '/' . $baseName : $baseName;
+                $coverUrl = route('cover.proxy', ['path' => $fullPath]);
             }
 
             $seriesText = '';

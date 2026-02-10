@@ -274,7 +274,7 @@ class SampleData {
     }
 
     getCover() {
-        return this.coverUrl || 'https://via.placeholder.com/300x450/2c3e50/ecf0f1?text=Book+Cover';
+        return this.coverUrl || '/images/sample_cover.jpg';
     }
 
     getBindingValue(binding) {
@@ -332,16 +332,18 @@ class SampleData {
     }
 
     updateBookSelector(books, currentId) {
-        const wrapper = document.getElementById('sample-data-wrapper');
-        if (!wrapper) return;
+        // Change: Insert into the editor container, not the section wrapper,
+        // to avoid breaking the header/collapsible logic
+        const container = document.getElementById('sample-data-editor');
+        if (!container) return;
 
         let selector = document.getElementById('sample-book-select');
         if (!selector) {
-            const container = document.createElement('div');
-            container.className = 'prop-group sample-selector';
-            container.style.padding = '10px';
-            container.style.borderBottom = '1px solid #444';
-            container.style.marginBottom = '10px';
+            const selectGroup = document.createElement('div');
+            selectGroup.className = 'prop-group sample-selector';
+            selectGroup.style.padding = '0 0 12px 0';
+            selectGroup.style.borderBottom = '1px solid #444';
+            selectGroup.style.marginBottom = '12px';
 
             const label = document.createElement('label');
             label.innerText = 'Preview Book:';
@@ -359,11 +361,11 @@ class SampleData {
                 if (id) this.fetchSampleData(id);
             };
 
-            container.appendChild(label);
-            container.appendChild(selector);
+            selectGroup.appendChild(label);
+            selectGroup.appendChild(selector);
 
-            // Insert at the top of the wrapper
-            wrapper.insertBefore(container, wrapper.firstChild);
+            // Insert at the VERY top of the list
+            container.insertBefore(selectGroup, container.firstChild);
         }
 
         // Rebuild options
@@ -670,7 +672,11 @@ class SkinRenderer {
 
         // Background from properties (supports gradients if string is valid CSS)
         if (el.backgroundColor) {
-             div.style.background = el.backgroundColor;
+            if (el.backgroundColor.includes('gradient')) {
+                div.style.backgroundImage = el.backgroundColor;
+            } else {
+                div.style.backgroundColor = el.backgroundColor;
+            }
         }
 
         switch (el.type) {
@@ -681,7 +687,7 @@ class SkinRenderer {
                     div.innerText = el.text || 'Text';
                 }
                 div.style.fontSize = el.fontSize ? `${el.fontSize}px` : '16px';
-                div.style.color = el.themeable?.color && el.themeable.color !== 'text' ? el.themeable.color : '#ffffff';
+                div.style.color = this.resolveThemeColor(el.themeable?.color, '#ffffff');
                 div.style.textAlign = el.textAlign || 'left';
                 div.style.fontWeight = el.fontWeight || 'normal';
                 break;
@@ -694,7 +700,7 @@ class SkinRenderer {
                     img.style.objectFit = 'contain';
                     div.appendChild(img);
                 } else {
-                     if (!el.backgroundColor) div.style.backgroundColor = (el.themeable?.tint && el.themeable.tint !== 'text') ? el.themeable.tint : '#495057';
+                     if (!el.backgroundColor) div.style.backgroundColor = el.themeable?.tint ? this.resolveThemeColor(el.themeable.tint, '#495057') : '#495057';
                      div.style.borderRadius = '999px';
                      div.style.color = 'white';
                      div.style.display = 'flex';
@@ -714,20 +720,30 @@ class SkinRenderer {
                      div.appendChild(img);
                 } else if (el.type === 'cover-image') {
                     // Sample cover
-                    if (!el.backgroundColor) div.style.backgroundColor = '#ccc';
-                    div.style.display = 'flex';
-                    div.style.alignItems = 'center';
-                    div.style.justifyContent = 'center';
-                    div.style.color = '#333';
-                    // Use sample cover from SampleData if avail
+                    div.style.overflow = 'hidden';
                     const sampleCover = this.sampleData.getCover();
                     if (sampleCover) {
-                        div.style.backgroundImage = `url('${sampleCover}')`;
-                        div.style.backgroundSize = 'cover';
+                        const coverImg = document.createElement('img');
+                        coverImg.src = sampleCover;
+                        coverImg.style.width = '100%';
+                        coverImg.style.height = '100%';
+                        coverImg.style.objectFit = 'cover';
+                        coverImg.style.display = 'block';
+                        coverImg.onerror = () => {
+                            coverImg.remove();
+                            if (!el.backgroundColor) div.style.background = 'linear-gradient(135deg, #444 0%, #666 100%)';
+                            div.style.display = 'flex';
+                            div.style.alignItems = 'center';
+                            div.style.justifyContent = 'center';
+                            div.innerHTML = '<span style="font-size: 24px; color: white;">📕</span>';
+                        };
+                        div.appendChild(coverImg);
                     } else {
-                        div.innerHTML = '<span style="font-size: 24px;">📕</span>';
                         if (!el.backgroundColor) div.style.background = 'linear-gradient(135deg, #444 0%, #666 100%)';
-                        div.style.color = 'white';
+                        div.style.display = 'flex';
+                        div.style.alignItems = 'center';
+                        div.style.justifyContent = 'center';
+                        div.innerHTML = '<span style="font-size: 24px; color: white;">📕</span>';
                     }
                 } else {
                      if (!el.backgroundColor) div.style.backgroundColor = '#6c757d';
@@ -745,7 +761,7 @@ class SkinRenderer {
                 progress.style.height = '100%';
                 progress.style.width = '50%'; // Sample value
                 progress.style.borderRadius = '4px';
-                progress.style.backgroundColor = el.themeable?.activeColor || '#0d6efd';
+                progress.style.backgroundColor = this.resolveThemeColor(el.themeable?.activeColor, '#0d6efd');
                 div.appendChild(progress);
                 break;
             case 'container':
@@ -762,6 +778,27 @@ class SkinRenderer {
         });
 
         return div;
+    }
+
+    resolveThemeColor(value, fallback) {
+        if (!value) return fallback;
+        if (value.startsWith('#')) return value;
+        // Resolve theme keys from skin manifest's embedded theme
+        const theme = this.state.manifest?.theme;
+        if (theme?.embeddedThemes) {
+            const defaultThemeId = theme.defaultTheme || Object.keys(theme.embeddedThemes)[0];
+            const themeColors = theme.embeddedThemes[defaultThemeId]?.colors;
+            if (themeColors && themeColors[value]) return themeColors[value];
+        }
+        // Default theme color map
+        const defaults = {
+            primary: '#2196F3', secondary: '#FF4081', background: '#121212',
+            surface: '#1E1E1E', text: '#FFFFFF', accent: '#FF4081',
+            progressActive: '#2196F3', progressInactive: '#424242',
+            timeText: '#FFFFFF', buttonTint: '#2196F3', borderColor: '#666666',
+            overlayColor: '#00000080'
+        };
+        return defaults[value] || fallback;
     }
 
     getActionIcon(action) {
@@ -833,12 +870,30 @@ class SampleDataEditor {
     constructor(containerId, sampleData) {
         this.container = document.getElementById(containerId);
         this.sampleData = sampleData;
+
+        // Subscribe to updates so we sync when a book is selected or fetched
+        this.sampleData.state.subscribe((_, type) => {
+            if (type === 'sampleDataUpdated') {
+                this.render();
+            }
+        });
+
         this.render();
     }
 
     render() {
         if (!this.container) return;
-        this.container.innerHTML = '';
+
+        // Preserve the book selector if it exists
+        const existingSelector = this.container.querySelector('.sample-selector');
+
+        // Remove all children except the selector
+        Array.from(this.container.children).forEach(child => {
+            if (!child.classList.contains('sample-selector')) {
+                child.remove();
+            }
+        });
+
         const keys = Object.keys(this.sampleData.data);
         keys.forEach(key => {
             const group = document.createElement('div');
@@ -856,6 +911,24 @@ class SampleDataEditor {
             group.appendChild(input);
             this.container.appendChild(group);
         });
+
+        // Add cover image preview
+        if (this.sampleData.coverUrl) {
+            const coverGroup = document.createElement('div');
+            coverGroup.className = 'prop-group';
+            const coverLbl = document.createElement('label');
+            coverLbl.className = 'prop-label';
+            coverLbl.innerText = 'Cover Preview';
+            const coverImg = document.createElement('img');
+            coverImg.src = this.sampleData.coverUrl;
+            coverImg.style.maxWidth = '100%';
+            coverImg.style.maxHeight = '120px';
+            coverImg.style.borderRadius = '4px';
+            coverImg.style.objectFit = 'contain';
+            coverGroup.appendChild(coverLbl);
+            coverGroup.appendChild(coverImg);
+            this.container.appendChild(coverGroup);
+        }
     }
 }
 
@@ -864,11 +937,11 @@ const VALIDATORS = {
     id: (val) => /^[a-zA-Z0-9_-]+$/.test(val) ? null : "ID must be alphanumeric, underscores or hyphens",
     dimension: (val) => {
         if (typeof val === 'number') return null;
-        if (val === 'max' || val === 'auto' || val === 'none' || val === 'start') return null;
+        if (val === 'max' || val === 'auto' || val === 'none' || val === 'start' || val === 'line' || val === 'center') return null;
         if (/^max-\d+$/.test(val)) return null;
         if (/^\d+%$/.test(val)) return null;
         const n = parseFloat(val);
-        return isNaN(n) ? "Invalid. Use number, 'max', 'max-N', 'auto', or '50%'" : null;
+        return isNaN(n) ? "Invalid. Use number, 'max', 'max-N', 'auto', 'line', 'center', or '50%'" : null;
     },
     action: (val) => {
         const validActions = [
@@ -886,6 +959,13 @@ const VALIDATORS = {
         'center-left', 'center', 'center-right',
         'bottom-left', 'bottom-center', 'bottom-right'
     ].includes(val) ? null : "Invalid anchor",
+    themeColor: (val) => {
+        if (val === '') return null;
+        const themeKeys = ['primary', 'secondary', 'background', 'surface', 'text', 'accent', 'progressActive', 'progressInactive', 'timeText', 'buttonTint', 'borderColor', 'overlayColor'];
+        if (themeKeys.includes(val)) return null;
+        if (/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(val)) return null;
+        return "Use theme key (primary, surface, etc.) or hex color";
+    },
     color: (val) => /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(val) || val === '' ? null : "Invalid hex color",
     generic: (val) => val === '' ? "Value required" : null
 };
@@ -968,14 +1048,14 @@ class PropertyEditor {
             this.addSelect('Data Binding', el.dataBinding || '', bindings, (val) => this.state.updateElement(el.id, { dataBinding: val }), { tooltip: TOOLTIPS.dataBinding });
 
             this.addNumberInput('Font Size', el.fontSize, (val) => this.state.updateElement(el.id, { fontSize: val }));
-            this.addColorInput('Color', el.themeable?.color || '#ffffff', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, color: val } }), { validator: VALIDATORS.color });
+            this.addThemeColorInput('Color', el.themeable?.color || '#ffffff', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, color: val } }));
             this.addSelect('Align', el.textAlign || 'left', ['left', 'center', 'right'], (val) => this.state.updateElement(el.id, { textAlign: val }));
             this.addSelect('Font Weight', el.fontWeight || 'normal', ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'], (val) => this.state.updateElement(el.id, { fontWeight: val }));
         }
 
         if (el.type === 'button') {
             this.addActionInput('Action', el.action || '', (val) => this.state.updateElement(el.id, { action: val }));
-            this.addColorInput('Tint', el.themeable?.tint || '', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, tint: val } }), { validator: VALIDATORS.color });
+            this.addThemeColorInput('Tint', el.themeable?.tint || '', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, tint: val } }));
             this.addImageInput('Icon Image', el.image, (val) => this.state.updateElement(el.id, { image: val }));
         }
 
@@ -984,8 +1064,8 @@ class PropertyEditor {
         }
 
         if (el.type === 'progress-bar') {
-             this.addColorInput('Active Color', el.themeable?.activeColor || '#2196F3', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, activeColor: val } }), { validator: VALIDATORS.color });
-             this.addColorInput('Inactive Color', el.themeable?.inactiveColor || '#424242', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, inactiveColor: val } }), { validator: VALIDATORS.color });
+             this.addThemeColorInput('Active Color', el.themeable?.activeColor || '#2196F3', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, activeColor: val } }));
+             this.addThemeColorInput('Inactive Color', el.themeable?.inactiveColor || '#424242', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, inactiveColor: val } }));
         }
     }
 
@@ -1114,6 +1194,76 @@ class PropertyEditor {
             container.appendChild(colorInput);
             container.appendChild(textInput);
         }, { ...options, error });
+    }
+
+    addThemeColorInput(label, value, onChange) {
+        const themeKeys = ['primary', 'secondary', 'background', 'surface', 'text', 'accent', 'progressActive', 'progressInactive', 'timeText', 'buttonTint', 'borderColor', 'overlayColor'];
+        const isThemeKey = themeKeys.includes(value);
+        const error = VALIDATORS.themeColor(value);
+
+        this.renderField(label, document.createElement('div'), (container) => {
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '6px';
+
+            const select = document.createElement('select');
+            select.className = 'prop-select';
+
+            const defOpt = document.createElement('option');
+            defOpt.value = '';
+            defOpt.innerText = '-- None --';
+            select.appendChild(defOpt);
+
+            themeKeys.forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.innerText = key;
+                if (key === value) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            const customOpt = document.createElement('option');
+            customOpt.value = 'CUSTOM';
+            customOpt.innerText = 'Custom Hex...';
+            if (value && !isThemeKey && value !== '') customOpt.selected = true;
+            select.appendChild(customOpt);
+
+            const colorRow = document.createElement('div');
+            colorRow.className = 'color-picker-wrapper';
+            colorRow.style.display = (!isThemeKey && value && value !== '') ? 'flex' : 'none';
+
+            const colorInput = document.createElement('input');
+            colorInput.type = 'color';
+            colorInput.value = value && value.startsWith('#') && value.length <= 7 ? value : '#ffffff';
+            colorInput.className = 'color-input-swatch';
+
+            const textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.value = (!isThemeKey && value) ? value : '';
+            textInput.className = 'prop-input';
+            textInput.style.flex = '1';
+            textInput.placeholder = '#FF0000';
+
+            colorInput.oninput = (e) => { textInput.value = e.target.value; onChange(e.target.value); };
+            textInput.onchange = (e) => { onChange(e.target.value); };
+
+            colorRow.appendChild(colorInput);
+            colorRow.appendChild(textInput);
+
+            select.onchange = (e) => {
+                const val = e.target.value;
+                if (val === 'CUSTOM') {
+                    colorRow.style.display = 'flex';
+                    textInput.focus();
+                } else {
+                    colorRow.style.display = 'none';
+                    onChange(val);
+                }
+            };
+
+            container.appendChild(select);
+            container.appendChild(colorRow);
+        }, { error });
     }
 
     addImageInput(label, value, onChange) {
