@@ -19,7 +19,10 @@
       "Bash(timeout:*)",
       "Bash(sudo chmod:*)",
       "Bash(sed:*)",
-      "WebFetch(domain:books.thelin.org)"
+      "WebFetch(domain:books.thelin.org)",
+      "Bash(./vendor/bin/phpstan analyze:*)",
+      "Bash(./vendor/bin/pint:*)",
+      "Bash(./vendor/bin/phpcbf:*)"
     ],
     "deny": []
   }

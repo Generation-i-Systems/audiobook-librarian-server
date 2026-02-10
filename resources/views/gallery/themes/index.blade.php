@@ -71,7 +71,7 @@
                             </h5>
                             <p class="card-text text-muted small">by {{ $theme['author'] }}</p>
                             @if(!empty($theme['description']))
-                                <p class="card-text">{{ Str::limit($theme['description'], 100) }}</p>
+                                <p class="card-text">{{ \Illuminate\Support\Str::limit($theme['description'], 100) }}</p>
                             @endif
 
                             @php

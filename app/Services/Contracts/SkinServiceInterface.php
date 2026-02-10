@@ -21,4 +21,20 @@ interface SkinServiceInterface
     public function rateSkin(int $skinId, int $userId, int $rating, ?string $comment): array;
 
     public function getMySkins(int $userId, int $page, int $perPage): array;
+
+    public function createBlankSkin(int $userId): array;
+
+    public function addCustomization(int $skinId, int $userId, array $data): array;
+
+    public function getCustomizations(int $skinId, int $userId): array;
+
+    public function updateManifest(int $skinId, int $userId, array $manifest): array;
+
+    public function addAsset(int $skinId, int $userId, UploadedFile $file, string $assetPath): string;
+
+    public function listAssets(int $skinId): array;
+
+    public function extractAssets(int $skinId): void;
+
+    public function buildZip(int $skinId): string;
 }

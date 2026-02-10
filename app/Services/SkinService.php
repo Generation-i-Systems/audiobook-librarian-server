@@ -232,4 +232,272 @@ class SkinService implements SkinServiceInterface
             ],
         ];
     }
+
+    public function createBlankSkin(int $userId): array
+    {
+        return DB::transaction(function () use ($userId) {
+            $user = \App\Models\User::find($userId);
+
+            $manifest = [
+                'version' => '1.0',
+                'skinName' => 'New Skin',
+                'author' => $user->name,
+                'dimensions' => [
+                    'portrait' => ['width' => 360, 'height' => 640, 'aspectRatio' => 'free'],
+                    'landscape' => ['width' => 640, 'height' => 360, 'aspectRatio' => 'free'],
+                ],
+                'theme' => [
+                    'allowColorOverride' => true,
+                    'defaultTheme' => 'default',
+                    'embeddedThemes' => [
+                        'default' => [
+                            'version' => '1.0',
+                            'themeName' => 'Default Theme',
+                            'author' => $user->name,
+                            'colors' => [
+                                'primary' => '#2196F3',
+                                'background' => '#121212',
+                                'surface' => '#1E1E1E',
+                                'text' => '#FFFFFF',
+                                'accent' => '#FF4081',
+                                'progressActive' => '#2196F3',
+                                'progressInactive' => '#424242',
+                                'timeText' => '#FFFFFF',
+                                'buttonTint' => '#2196F3',
+                            ],
+                        ],
+                    ],
+                    'defaultTheme' => 'default',
+                ],
+                'layout' => [
+                    'portrait' => [],
+                    'landscape' => [],
+                ],
+            ];
+
+            $skin = Skin::create([
+                'name' => 'Skin-' . $userId . '-' . time(),
+                'author' => $user->name,
+                'version' => '1.0',
+                'description' => 'Created in Designer',
+                'user_id' => $userId,
+                'file_path' => '',
+                'file_size' => 0,
+                'manifest' => $manifest,
+                'is_public' => false,
+            ]);
+
+            return $skin->fresh()->toArray();
+        });
+    }
+
+    public function addCustomization(int $skinId, int $userId, array $data): array
+    {
+        $skin = Skin::find($skinId);
+
+        if (! $skin) {
+            throw new \InvalidArgumentException('Skin not found');
+        }
+
+        $type = $data['type'];
+        $value = $data['value'] ?? null;
+        $filePath = null;
+
+        if ($type === 'image' && isset($data['image']) && $data['image'] instanceof UploadedFile) {
+            $path = $data['image']->store('customizations', 'public');
+            $filePath = $path;
+        }
+
+        $customization = $skin->customizations()->create([
+            'user_id' => $userId,
+            'type' => $type,
+            'value' => $value,
+            'file_path' => $filePath,
+            'visibility' => $data['visibility'] ?? 'private',
+        ]);
+
+        $result = $customization->toArray();
+        if ($customization->file_path) {
+            $result['url'] = asset('storage/' . $customization->file_path);
+        }
+
+        return $result;
+    }
+
+    public function getCustomizations(int $skinId, int $userId): array
+    {
+        $skin = Skin::find($skinId);
+
+        if (! $skin) {
+            throw new \InvalidArgumentException('Skin not found');
+        }
+
+        return $skin->customizations()
+            ->where(function ($query) use ($userId) {
+                $query->where('user_id', $userId)
+                    ->orWhere('visibility', 'public');
+            })
+            ->with('user')
+            ->get()
+            ->map(function ($item) {
+                $data = $item->toArray();
+                if ($item->file_path) {
+                    $data['url'] = asset('storage/' . $item->file_path);
+                }
+                $data['author'] = $item->user->name;
+
+                return $data;
+            })
+            ->toArray();
+    }
+
+    public function updateManifest(int $skinId, int $userId, array $manifest): array
+    {
+        $skin = Skin::find($skinId);
+
+        if (! $skin) {
+            throw new \InvalidArgumentException('Skin not found');
+        }
+
+        // Allow owner or admin
+        if ($skin->user_id !== $userId && ! auth()->user()?->is_admin) {
+            throw new \RuntimeException('You do not have permission to update this skin', 403);
+        }
+
+        $manifestErrors = $this->validationService->validateManifest($manifest);
+        if (! empty($manifestErrors)) {
+            throw new \InvalidArgumentException('Manifest validation failed: ' . implode(', ', $manifestErrors));
+        }
+
+        $skin->update(['manifest' => $manifest]);
+
+        return $skin->fresh()->toArray();
+    }
+
+    public function addAsset(int $skinId, int $userId, UploadedFile $file, string $assetPath): string
+    {
+        $skin = Skin::find($skinId);
+
+        if (! $skin) {
+            throw new \InvalidArgumentException('Skin not found');
+        }
+
+        if ($skin->user_id !== $userId && ! auth()->user()?->is_admin) {
+            throw new \RuntimeException('You do not have permission to update this skin', 403);
+        }
+
+        // Sanitize path
+        $assetPath = str_replace('..', '', $assetPath);
+        $assetPath = ltrim($assetPath, '/');
+
+        // Store in public disk so it's accessible by the designer
+        $fullPath = "skins/{$skin->id}/assets/{$assetPath}";
+        Storage::disk('public')->put($fullPath, file_get_contents($file->getRealPath()));
+
+        return Storage::url($fullPath);
+    }
+
+    public function listAssets(int $skinId): array
+    {
+        // Recursively list all files in the skin's asset directory
+        $files = Storage::disk('public')->allFiles("skins/{$skinId}/assets");
+
+        return array_map(function ($file) use ($skinId) {
+            return [
+                'path' => $file,
+                'url' => Storage::url($file),
+                'name' => basename($file),
+                'relative_path' => str_replace("skins/{$skinId}/", '', $file), // e.g. "assets/images/foo.png"
+            ];
+        }, $files);
+    }
+
+    public function buildZip(int $skinId): string
+    {
+        $skin = Skin::find($skinId);
+
+        if (! $skin) {
+            throw new \InvalidArgumentException('Skin not found');
+        }
+
+        $zipFileName = 'skin_generated_' . time() . '.zip';
+        // Store in local disk (storage/app) not public
+        $zipPath = storage_path("app/skins/{$skin->id}/{$zipFileName}");
+
+        // Ensure directory exists
+        if (!file_exists(dirname($zipPath))) {
+            mkdir(dirname($zipPath), 0755, true);
+        }
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException('Could not create ZIP file');
+        }
+
+        // Add manifest
+        $zip->addFromString('manifest.json', json_encode($skin->manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        // Add assets from public storage
+        $assetFiles = Storage::disk('public')->allFiles("skins/{$skin->id}/assets");
+        foreach ($assetFiles as $file) {
+            // $file is like "skins/1/assets/images/foo.png"
+            // We want it as "assets/images/foo.png" in the ZIP
+            $zipName = str_replace("skins/{$skin->id}/", '', $file);
+            $localPath = Storage::disk('public')->path($file);
+            $zip->addFile($localPath, $zipName);
+        }
+
+        // Also add preview images if they exist in standard locations
+        // Standard location for preview is "skin-previews/{id}.png" in public disk
+        // But usually skins include "preview.png" inside the zip
+        // Let's check if the skin has a preview_path
+        if ($skin->preview_path && Storage::disk('public')->exists($skin->preview_path)) {
+            $zip->addFile(Storage::disk('public')->path($skin->preview_path), 'preview.png');
+        }
+
+        $zip->close();
+
+        return $zipPath;
+    }
+
+    public function extractAssets(int $skinId): void
+    {
+        $skin = Skin::find($skinId);
+
+        if (! $skin || ! $skin->file_path) {
+            return;
+        }
+
+        // Target directory for extracted assets
+        $extractPath = Storage::disk('public')->path("skins/{$skin->id}/assets");
+
+        // If directory exists and has files (more than . and ..), skip extraction
+        if (file_exists($extractPath) && count(scandir($extractPath) ?: []) > 2) {
+            return;
+        }
+
+        // Locate the ZIP file
+        // createSkin stores it in 'local' disk at specific path, or relative path in file_path
+        $zipFullPath = Storage::disk('local')->path($skin->file_path);
+
+        if (! file_exists($zipFullPath)) {
+            return;
+        }
+
+        // Extract
+        if (! file_exists($extractPath)) {
+            mkdir($extractPath, 0755, true);
+        }
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipFullPath) === true) {
+            $zip->extractTo($extractPath);
+            $zip->close();
+
+            // Cleanup manifest from assets folder since it's stored in DB
+            if (file_exists("{$extractPath}/manifest.json")) {
+                unlink("{$extractPath}/manifest.json");
+            }
+        }
+    }
 }

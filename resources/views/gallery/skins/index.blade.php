@@ -82,7 +82,7 @@
                             </h5>
                             <p class="card-text text-muted small">by {{ $skin['author'] }}</p>
                             @if(!empty($skin['description']))
-                                <p class="card-text">{{ Str::limit($skin['description'], 100) }}</p>
+                                <p class="card-text">{{ \Illuminate\Support\Str::limit($skin['description'], 100) }}</p>
                             @endif
 
                             <div class="d-flex justify-content-between align-items-center mt-2">

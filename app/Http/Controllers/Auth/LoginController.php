@@ -88,7 +88,7 @@ class LoginController extends Controller
     {
         // Update last login timestamp
         try {
-            $this->documentStoreService->updateUser($user->getAuthIdentifier(), [
+            $this->documentStoreService->updateUser((string) $user->getAuthIdentifier(), [
                 'last_login_at' => new \DateTime(),
                 'updated_at' => new \DateTime(),
             ]);
@@ -162,7 +162,7 @@ class LoginController extends Controller
                     'avatar' => $googleUser->getAvatar(),
                     'updated_at' => new \DateTime(),
                 ];
-                $this->documentStoreService->updateUser($userId, $updateData);
+                $this->documentStoreService->updateUser((string) $userId, $updateData);
                 Log::info('Existing user updated via Google login', ['user_id' => $userId]);
             }
 

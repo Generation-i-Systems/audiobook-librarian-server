@@ -131,3 +131,13 @@ I am trying to optimize the sizes of the blocks in the import cli. but have been
 ## 2026-02-07
 
 restoring a deleted book doesn't restore the db record and does not set the file permissions using the permissions script
+
+fix auto-processing bug where books were imported without user confirmation even without --auto flag
+
+fix series name removal from book titles across all import paths (multi-book splits, single books, enrichment overrides)
+
+add logic to check for existing books in a series when determining genre. If there are already other books by that author with that series then use the same genre as them
+
+for multi-book archives the title still has the series
+
+commit all changes

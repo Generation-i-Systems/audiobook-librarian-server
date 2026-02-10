@@ -34,6 +34,9 @@
                         <a href="{{ route('gallery.skins.edit', $skin['id']) }}" class="btn btn-warning">
                             <i class="fas fa-edit"></i> Edit
                         </a>
+                        <a href="{{ route('gallery.skins.designer', $skin['id']) }}" class="btn btn-info text-white">
+                            <i class="fas fa-paint-brush"></i> Designer
+                        </a>
 
                         <form method="POST" action="{{ route('gallery.skins.destroy', $skin['id']) }}"
                               onsubmit="return confirm('Are you sure you want to delete this skin?');">

@@ -114,7 +114,7 @@ class SkinWebController extends Controller
                 return redirect()->route('gallery.skins.index')->with('error', 'Skin not found.');
             }
 
-            if ($skin['user_id'] !== Auth::id()) {
+            if ($skin['userId'] !== Auth::id() && !Auth::user()->is_admin) {
                 return redirect()->route('gallery.skins.show', $id)
                     ->with('error', 'You do not have permission to edit this skin.');
             }
@@ -244,6 +244,150 @@ class SkinWebController extends Controller
             Log::error('Failed to list my skins: ' . $e->getMessage());
 
             return redirect()->back()->with('error', 'Failed to load your skins.');
+        }
+    }
+
+    public function designerNew()
+    {
+        if (! Auth::check()) {
+            return redirect()->route('login');
+        }
+
+        try {
+            $skin = $this->skinService->createBlankSkin(Auth::id());
+
+            return redirect()->route('gallery.skins.designer', $skin['id']);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to create new skin: ' . $e->getMessage());
+        }
+    }
+
+    public function designer(int $id)
+    {
+        if (! Auth::check()) {
+            return redirect()->route('login');
+        }
+
+        try {
+            $skin = $this->skinService->getSkin($id);
+            if (! $skin) {
+                abort(404);
+            }
+
+            $skinUserId = $skin['user_id'] ?? $skin['userId'] ?? null;
+            if ($skinUserId !== Auth::id() && ! Auth::user()->is_admin) {
+                return redirect()->route('gallery.skins.show', $id)
+                    ->with('error', 'You must fork this skin to edit it.');
+            }
+
+            // Ensure assets are extracted for the designer
+            $this->skinService->extractAssets($id);
+
+            // Get assets
+            $assets = $this->skinService->listAssets($id);
+
+            return view('gallery.skins.designer', [
+                'skin' => $skin,
+                'assets' => $assets,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Designer error: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Error loading designer.');
+        }
+    }
+
+    public function updateManifest(Request $request, int $id)
+    {
+        $manifest = $request->input('manifest');
+        if (is_string($manifest)) {
+            $manifest = json_decode($manifest, true);
+        }
+
+        try {
+            // Update manifest
+            $skin = $this->skinService->updateManifest($id, Auth::id(), $manifest);
+
+            // Also update metadata if provided and valid
+            $data = $request->only(['name', 'author', 'version']);
+            if (!empty($data)) {
+                 // We reuse updateSkin for name. Author/Version are in manifest but maybe should be in DB too?
+                 // Skin model has author, version columns.
+                 // updateSkin only accepts name, description, is_public.
+                 // We might need to expand updateSkin or just direct update here if service allows.
+                 // Service updateSkin takes $data array.
+                 $this->skinService->updateSkin($id, Auth::id(), $data);
+            }
+
+            return response()->json(['success' => true, 'skin' => $skin]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function uploadAsset(Request $request, int $id)
+    {
+        $request->validate([
+            'file' => 'required|image|max:2048', // 2MB max
+            'path' => 'required|string',
+        ]);
+
+        try {
+            $url = $this->skinService->addAsset($id, Auth::id(), $request->file('file'), $request->input('path'));
+
+            return response()->json(['success' => true, 'url' => $url]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function listAssets(int $id)
+    {
+        try {
+            $assets = $this->skinService->listAssets($id);
+
+            return response()->json(['success' => true, 'assets' => $assets]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function forkForDesigner(int $id)
+    {
+        if (! Auth::check()) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $skin = $this->skinService->getSkin($id);
+            $newName = $skin['name'] . ' (Copy)';
+            $newSkin = $this->skinService->forkSkin($id, Auth::id(), $newName);
+
+            return response()->json(['success' => true, 'redirect' => route('gallery.skins.designer', $newSkin['id'])]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function exportZip(int $id)
+    {
+        try {
+            $skin = $this->skinService->getSkin($id);
+            if (! $skin) {
+                abort(404);
+            }
+
+            if (! $skin['is_public'] && $skin['user_id'] !== Auth::id() && ! Auth::user()?->is_admin) {
+                abort(403);
+            }
+
+            $zipPath = $this->skinService->buildZip($id);
+
+            return response()->download($zipPath)->deleteFileAfterSend();
+        } catch (\Exception $e) {
+            Log::error('Export ZIP error: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Failed to generate ZIP.');
         }
     }
 }

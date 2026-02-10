@@ -160,12 +160,23 @@ class SkinState {
 
     resolveAssetUrl(path) {
         if (!path) return '';
+
+        // If it's already a full URL or data URI, return as-is
         if (path.startsWith('http') || path.startsWith('data:')) return path;
-        // Search in assets
+
+        // If it's an absolute path starting with /skin-asset/, return as-is (already proxied)
+        if (path.startsWith('/skin-asset/')) return path;
+
+        // Check if we have this asset in the uploaded assets list
         const asset = this.assets.find(a => a.relative_path === path || a.path === path || a.name === path);
         if (asset) return asset.url;
-        // Fallback: assume it's relative to root or public
-        return path.startsWith('/') ? path : `/${path}`;
+
+        // Use the skin asset proxy route
+        // Format: /skin-asset/{skinId}/{path}
+        const skinId = this.skin.id;
+        const assetPath = path.startsWith('/') ? path.substring(1) : path;
+
+        return `/skin-asset/${skinId}/${assetPath}`;
     }
 
     getBackgroundImage() {

@@ -66,6 +66,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Skin Paths
+    |--------------------------------------------------------------------------
+    |
+    | Comma-separated list of directories to search for skins. Supports both
+    | .zip files and extracted directories. The system will search these paths
+    | in order when serving skin assets.
+    |
+    */
+
+    'skin_paths' => env('SKIN_PATHS', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Library Repair Sync Path
     |--------------------------------------------------------------------------
     |

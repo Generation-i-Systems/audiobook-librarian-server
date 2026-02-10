@@ -88,6 +88,10 @@ class Theme extends Model
         'average_rating' => 'decimal:2',
     ];
 
+    protected $appends = [
+        'download_url',
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -143,5 +147,10 @@ class Theme extends Model
             'average_rating' => $averageRating ?? 0,
             'rating_count' => $ratingCount,
         ]);
+    }
+
+    public function getDownloadUrlAttribute(): string
+    {
+        return route('api.v1.themes.download', $this->id);
     }
 }

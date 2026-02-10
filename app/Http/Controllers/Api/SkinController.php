@@ -251,4 +251,50 @@ class SkinController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    public function getCustomizations(int $id): JsonResponse
+    {
+        try {
+            $userId = Auth::id() ?? 0;
+            $result = $this->skinService->getCustomizations($id, $userId);
+
+            return response()->json($result);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function uploadCustomization(Request $request, int $id): JsonResponse
+    {
+        if (! Auth::check()) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'type' => 'required|in:color,image',
+            'value' => 'required_if:type,color|nullable|string',
+            'image' => 'required_if:type,image|file|image|max:10240',
+            'visibility' => 'nullable|in:private,public',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $customization = $this->skinService->addCustomization(
+                $id,
+                Auth::id(),
+                $request->all()
+            );
+
+            return response()->json($customization, 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }

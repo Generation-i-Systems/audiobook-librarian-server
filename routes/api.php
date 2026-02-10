@@ -50,14 +50,15 @@ Route::prefix('v1')->group(function () {
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
     // Public Skin Routes (no authentication required)
-    Route::get('/skins', [SkinController::class, 'index']);
-    Route::get('/skins/{id}', [SkinController::class, 'show']);
-    Route::get('/skins/{id}/download', [SkinController::class, 'download']);
+    Route::get('/skins', [SkinController::class, 'index'])->name('api.v1.skins.index');
+    Route::get('/skins/{id}', [SkinController::class, 'show'])->name('api.v1.skins.show');
+    Route::get('/skins/{id}/download', [SkinController::class, 'download'])->name('api.v1.skins.download');
+    Route::get('/skins/{id}/customizations', [SkinController::class, 'getCustomizations'])->name('api.v1.skins.customizations');
 
     // Public Theme Routes (no authentication required)
-    Route::get('/themes', [ThemeController::class, 'index']);
-    Route::get('/themes/{id}', [ThemeController::class, 'show']);
-    Route::get('/themes/{id}/download', [ThemeController::class, 'download']);
+    Route::get('/themes', [ThemeController::class, 'index'])->name('api.v1.themes.index');
+    Route::get('/themes/{id}', [ThemeController::class, 'show'])->name('api.v1.themes.show');
+    Route::get('/themes/{id}/download', [ThemeController::class, 'download'])->name('api.v1.themes.download');
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
         Route::get('/user', function (Request $request) {
@@ -270,6 +271,7 @@ Route::prefix('v1')->group(function () {
 
         // Skin Routes (authenticated)
         Route::post('/skins/upload', [SkinController::class, 'store']);
+        Route::post('/skins/{id}/customizations', [SkinController::class, 'uploadCustomization']);
         Route::post('/skins/{id}/rate', [SkinController::class, 'rate']);
         Route::get('/skins/my-skins', [SkinController::class, 'mySkins']);
         Route::post('/skins/{id}/fork', [SkinController::class, 'fork']);

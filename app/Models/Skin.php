@@ -100,6 +100,11 @@ class Skin extends Model
         'average_rating' => 'decimal:2',
     ];
 
+    protected $appends = [
+        'download_url',
+        'preview_url',
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -118,6 +123,11 @@ class Skin extends Model
     public function ratings(): HasMany
     {
         return $this->hasMany(SkinRating::class);
+    }
+
+    public function customizations(): HasMany
+    {
+        return $this->hasMany(SkinCustomization::class);
     }
 
     public function scopePublic(Builder $query): Builder
@@ -159,7 +169,7 @@ class Skin extends Model
 
     public function getDownloadUrlAttribute(): string
     {
-        return route('api.skins.download', $this->id);
+        return route('api.v1.skins.download', $this->id);
     }
 
     public function getPreviewUrlAttribute(): ?string

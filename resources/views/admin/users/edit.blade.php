@@ -85,12 +85,9 @@
             <div class="alert alert-warning">
                 <div class="d-flex justify-content-between align-items-center">
                     <span>This user is not yet verified.</span>
-                    <form action="{{ route('admin.users.verify', $user['id']) }}" method="POST" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-success btn-sm">
-                            <i class="fas fa-check"></i> Verify User
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-success btn-sm" id="verify-user-btn">
+                        <i class="fas fa-check"></i> Verify User
+                    </button>
                 </div>
             </div>
         @endif
@@ -121,6 +118,16 @@
             </div>
         </div>
     </form>
+    @if(($user['role'] ?? '') === 'unverified')
+        <form id="verify-user-form" action="{{ route('admin.users.verify', $user['id']) }}" method="POST" class="d-none">
+            @csrf
+        </form>
+        <script>
+            document.getElementById('verify-user-btn').addEventListener('click', function() {
+                document.getElementById('verify-user-form').submit();
+            });
+        </script>
+    @endif
     @if(isset($activityData))
         @include('partials.activity-summary', ['activityData' => $activityData])
     @endif

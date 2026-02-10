@@ -269,41 +269,18 @@ Route::get('/google-books-cover/{encodedUrl}', [
     'googleBooksCover',
 ])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
 
+// Skin asset proxy - serves assets from configured skin paths
+Route::get('/skin-asset/{skinId}/{path}', [
+    \App\Http\Controllers\SkinAssetController::class,
+    'show',
+])->where('path', '.*')->name('skin.asset.proxy');
+
 // Admin series autocomplete endpoint for book form (accessible to admin users)
 Route::get('/admin/series-autocomplete', [Admin\BookController::class, 'autocompleteSeries'])
     ->name('admin.series.autocomplete')
     ->middleware(['auth', 'admin']);
 
-// Gallery Routes (Skins & Themes)
-Route::name('gallery.')->prefix('gallery')->group(function (): void {
-    // Skins
-    Route::name('skins.')->prefix('skins')->group(function (): void {
-        Route::get('/', [\App\Http\Controllers\SkinWebController::class, 'index'])->name('index');
-        Route::get('/create', [\App\Http\Controllers\SkinWebController::class, 'create'])->name('create');
-        Route::post('/', [\App\Http\Controllers\SkinWebController::class, 'store'])->name('store');
-        Route::get('/my-skins', [\App\Http\Controllers\SkinWebController::class, 'mySkins'])->name('my-skins');
-        Route::get('/{id}', [\App\Http\Controllers\SkinWebController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [\App\Http\Controllers\SkinWebController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [\App\Http\Controllers\SkinWebController::class, 'update'])->name('update');
-        Route::delete('/{id}', [\App\Http\Controllers\SkinWebController::class, 'destroy'])->name('destroy');
-        Route::post('/{id}/fork', [\App\Http\Controllers\SkinWebController::class, 'fork'])->name('fork');
-        Route::post('/{id}/rate', [\App\Http\Controllers\SkinWebController::class, 'rate'])->name('rate');
-    });
 
-    // Themes
-    Route::name('themes.')->prefix('themes')->group(function (): void {
-        Route::get('/', [\App\Http\Controllers\ThemeWebController::class, 'index'])->name('index');
-        Route::get('/create', [\App\Http\Controllers\ThemeWebController::class, 'create'])->name('create');
-        Route::post('/', [\App\Http\Controllers\ThemeWebController::class, 'store'])->name('store');
-        Route::get('/my-themes', [\App\Http\Controllers\ThemeWebController::class, 'myThemes'])->name('my-themes');
-        Route::get('/{id}', [\App\Http\Controllers\ThemeWebController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [\App\Http\Controllers\ThemeWebController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [\App\Http\Controllers\ThemeWebController::class, 'update'])->name('update');
-        Route::delete('/{id}', [\App\Http\Controllers\ThemeWebController::class, 'destroy'])->name('destroy');
-        Route::post('/{id}/fork', [\App\Http\Controllers\ThemeWebController::class, 'fork'])->name('fork');
-        Route::post('/{id}/rate', [\App\Http\Controllers\ThemeWebController::class, 'rate'])->name('rate');
-    });
-});
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function (): void {
     // Admin Social Activity Dashboard
@@ -666,6 +643,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::delete('/trash/{id}', [Admin\TrashController::class, 'destroy'])->name('trash.destroy');
     Route::delete('/trash', [Admin\TrashController::class, 'destroyAll'])->name('trash.destroyAll');
     Route::post('/trash/cleanup', [Admin\TrashController::class, 'applyAutoCleanup'])->name('trash.cleanup');
+
+    // Skin & Theme Management
+    Route::resource('skins', Admin\SkinController::class);
+    Route::resource('themes', Admin\ThemeController::class);
 });
 
 // Gallery Routes (Skins & Themes)
@@ -674,14 +655,23 @@ Route::name('gallery.')->prefix('gallery')->group(function (): void {
     Route::name('skins.')->prefix('skins')->group(function (): void {
         Route::get('/', [SkinWebController::class, 'index'])->name('index');
         Route::get('/create', [SkinWebController::class, 'create'])->name('create');
+        Route::get('/design-new', [SkinWebController::class, 'designerNew'])->name('designerNew');
         Route::post('/', [SkinWebController::class, 'store'])->name('store');
         Route::get('/my-skins', [SkinWebController::class, 'mySkins'])->name('my-skins');
-        Route::get('/{id}', [SkinWebController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [SkinWebController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [SkinWebController::class, 'update'])->name('update');
-        Route::delete('/{id}', [SkinWebController::class, 'destroy'])->name('destroy');
-        Route::post('/{id}/fork', [SkinWebController::class, 'fork'])->name('fork');
-        Route::post('/{id}/rate', [SkinWebController::class, 'rate'])->name('rate');
+        Route::get('/{id}', [SkinWebController::class, 'show'])->name('show')->whereNumber('id');
+        Route::get('/{id}/edit', [SkinWebController::class, 'edit'])->name('edit')->whereNumber('id');
+        Route::put('/{id}', [SkinWebController::class, 'update'])->name('update')->whereNumber('id');
+        Route::delete('/{id}', [SkinWebController::class, 'destroy'])->name('destroy')->whereNumber('id');
+        Route::post('/{id}/fork', [SkinWebController::class, 'fork'])->name('fork')->whereNumber('id');
+        Route::post('/{id}/rate', [SkinWebController::class, 'rate'])->name('rate')->whereNumber('id');
+
+        // Designer Routes
+        Route::get('/{id}/designer', [SkinWebController::class, 'designer'])->name('designer')->whereNumber('id');
+        Route::post('/{id}/manifest', [SkinWebController::class, 'updateManifest'])->name('updateManifest')->whereNumber('id');
+        Route::post('/{id}/assets', [SkinWebController::class, 'uploadAsset'])->name('uploadAsset')->whereNumber('id');
+        Route::get('/{id}/assets', [SkinWebController::class, 'listAssets'])->name('listAssets')->whereNumber('id');
+        Route::post('/{id}/fork-designer', [SkinWebController::class, 'forkForDesigner'])->name('forkForDesigner')->whereNumber('id');
+        Route::get('/{id}/export', [SkinWebController::class, 'exportZip'])->name('exportZip')->whereNumber('id');
     });
 
     // Theme Routes

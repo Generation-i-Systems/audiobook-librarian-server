@@ -112,7 +112,7 @@ class ThemeWebController extends Controller
                 return redirect()->route('gallery.themes.index')->with('error', 'Theme not found.');
             }
 
-            if ($theme['user_id'] !== Auth::id()) {
+            if ($theme['userId'] !== Auth::id() && !Auth::user()->is_admin) {
                 return redirect()->route('gallery.themes.show', $id)
                     ->with('error', 'You do not have permission to edit this theme.');
             }
