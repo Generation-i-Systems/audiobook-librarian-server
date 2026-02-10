@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Skin;
 use Illuminate\Support\Facades\Log;
 use ZipArchive;
 
@@ -21,56 +22,88 @@ class SkinAssetController extends Controller
         $skinPaths = array_filter(array_map('trim', explode(',', $skinPathsConfig)));
 
         if (empty($skinPaths)) {
-            Log::warning('No skin paths configured in SKIN_PATHS environment variable');
+            // Log::warning('No skin paths configured in SKIN_PATHS environment variable');
             abort(404, 'No skin paths configured');
         }
 
-        // Try to find the skin in each configured path
-        foreach ($skinPaths as $basePath) {
-            $basePath = rtrim($basePath, '/');
+        // Determine candidate names for the skin folder
+        $candidates = [$skinId];
 
-            // Try as extracted directory first
-            $extractedPath = $basePath . '/' . $skinId;
-            if (is_dir($extractedPath)) {
-                $fullPath = $extractedPath . '/' . ltrim($path, '/');
-                if (file_exists($fullPath) && is_file($fullPath)) {
-                    return $this->serveFile($fullPath);
+        // If numeric ID, try to resolve name from DB
+        if (is_numeric($skinId)) {
+            try {
+                $skin = Skin::with('forkedFrom')->find($skinId);
+                if ($skin) {
+                    // Add skin name (e.g. "Arctic Breeze")
+                    $candidates[] = $skin->name;
+
+                    // Add manifest skinName if available
+                    if (isset($skin->manifest['skinName'])) {
+                        $candidates[] = $skin->manifest['skinName'];
+                    }
+
+                    // If forked, try original skin name
+                    if ($skin->forkedFrom) {
+                        $candidates[] = $skin->forkedFrom->name;
+                        if (isset($skin->forkedFrom->manifest['skinName'])) {
+                            $candidates[] = $skin->forkedFrom->manifest['skinName'];
+                        }
+                    }
                 }
+            } catch (\Exception $e) {
+                // Ignore DB errors, fall back to just ID
+                Log::warning('SkinAssetController: Failed to resolve skin name from DB: ' . $e->getMessage());
+            }
+        }
+
+        $candidates = array_unique($candidates);
+
+        // Try to find the skin in each configured path using each candidate name
+        foreach ($candidates as $candidate) {
+            // Skip empty candidates
+            if (empty($candidate)) {
+                continue;
             }
 
-            // Try as .zip file
-            $zipPath = $basePath . '/' . $skinId . '.zip';
-            if (file_exists($zipPath)) {
-                $fileContent = $this->extractFromZip($zipPath, $path);
-                if ($fileContent !== null) {
-                    return $this->serveContent($fileContent, $path);
+            foreach ($skinPaths as $basePath) {
+                $basePath = rtrim($basePath, '/');
+
+                // Try as extracted directory first
+                $extractedPath = $basePath . '/' . $candidate;
+                if (is_dir($extractedPath)) {
+                    $fullPath = $extractedPath . '/' . ltrim($path, '/');
+                    if (file_exists($fullPath) && is_file($fullPath)) {
+                        return $this->serveFile($fullPath);
+                    }
+                }
+
+                // Try as .zip file
+                $zipPath = $basePath . '/' . $candidate . '.zip';
+                if (file_exists($zipPath)) {
+                    $fileContent = $this->extractFromZip($zipPath, $path);
+                    if ($fileContent !== null) {
+                        return $this->serveContent($fileContent, $path);
+                    }
                 }
             }
         }
 
-        Log::error("Skin asset not found: skinId={$skinId}, path={$path}");
         abort(404, 'Skin asset not found');
     }
 
-    /**
-     * Serve a file from the filesystem
-     */
     private function serveFile($fullPath)
     {
         $mime = mime_content_type($fullPath);
 
         return response()->file($fullPath, [
             'Content-Type' => $mime,
-            'Cache-Control' => 'public, max-age=86400', // Cache for 24 hours
+            'Cache-Control' => 'public, max-age=86400',
+            'Access-Control-Allow-Origin' => '*',
         ]);
     }
 
-    /**
-     * Serve content directly from memory
-     */
     private function serveContent($content, $path)
     {
-        // Determine MIME type from file extension
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         $mimeTypes = [
             'png' => 'image/png',
@@ -82,35 +115,35 @@ class SkinAssetController extends Controller
             'json' => 'application/json',
             'css' => 'text/css',
             'js' => 'application/javascript',
+            'ttf' => 'font/ttf',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
         ];
 
         $mime = $mimeTypes[$extension] ?? 'application/octet-stream';
 
         return response($content, 200, [
             'Content-Type' => $mime,
-            'Cache-Control' => 'public, max-age=86400', // Cache for 24 hours
+            'Cache-Control' => 'public, max-age=86400',
+            'Access-Control-Allow-Origin' => '*',
         ]);
     }
 
-    /**
-     * Extract a file from a ZIP archive
-     *
-     * @return string|null File content or null if not found
-     */
     private function extractFromZip($zipPath, $filePath)
     {
         $zip = new ZipArchive();
 
         if ($zip->open($zipPath) !== true) {
-            Log::error("Failed to open ZIP file: {$zipPath}");
             return null;
         }
 
-        // Normalize the path (remove leading slash)
         $filePath = ltrim($filePath, '/');
 
-        // Try to get the file content
         $content = $zip->getFromName($filePath);
+
+        if ($content === false) {
+            $content = $zip->getFromName('skin/' . $filePath);
+        }
 
         $zip->close();
 
