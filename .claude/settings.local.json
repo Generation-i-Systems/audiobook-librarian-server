@@ -22,7 +22,9 @@
       "WebFetch(domain:books.thelin.org)",
       "Bash(./vendor/bin/phpstan analyze:*)",
       "Bash(./vendor/bin/pint:*)",
-      "Bash(./vendor/bin/phpcbf:*)"
+      "Bash(./vendor/bin/phpcbf:*)",
+      "Bash(node --check:*)",
+      "Bash(node -c:*)"
     ],
     "deny": []
   }
