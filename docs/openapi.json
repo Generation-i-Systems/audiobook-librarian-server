@@ -6483,6 +6483,63 @@
                 }
             }
         },
+        "/skins/{id}/customizations": {
+            "get": {
+                "tags": ["Skins"],
+                "summary": "Get customizations for a skin",
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "responses": {
+                    "200": {
+                        "description": "List of customizations",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": { "type": "object" }
+                                }
+                            }
+                        }
+                    },
+                    "404": { "description": "Skin not found" }
+                }
+            },
+            "post": {
+                "tags": ["Skins"],
+                "summary": "Upload a customization for a skin",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["type"],
+                                "properties": {
+                                    "type": { "type": "string", "enum": ["color", "image"] },
+                                    "value": { "type": "string", "description": "Required when type is color" },
+                                    "image": { "type": "string", "format": "binary", "description": "Required when type is image, max 10MB" },
+                                    "visibility": { "type": "string", "enum": ["private", "public"] }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Customization created",
+                        "content": {
+                            "application/json": {
+                                "schema": { "type": "object" }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "404": { "description": "Skin not found" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
         "/skins/{id}/fork": {
             "post": {
                 "tags": ["Skins"],

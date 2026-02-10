@@ -29,6 +29,7 @@
                             <form action="{{ route('admin.account_requests.update', ['account_request' => $request['id']]) }}"
                                 method="POST" style="display:inline;">
                                 @csrf
+                                @method('PUT')
                                 <button type="submit" class="btn btn-success btn-sm">Approve</button>
                             </form>
                             <form action="{{ route('admin.account_requests.destroy', ['account_request' => $request['id']]) }}"
