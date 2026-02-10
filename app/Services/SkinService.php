@@ -267,7 +267,6 @@ class SkinService implements SkinServiceInterface
                             ],
                         ],
                     ],
-                    'defaultTheme' => 'default',
                 ],
                 'layout' => [
                     'portrait' => [],
@@ -308,6 +307,7 @@ class SkinService implements SkinServiceInterface
             $filePath = $path;
         }
 
+        /** @var \App\Models\SkinCustomization $customization */
         $customization = $skin->customizations()->create([
             'user_id' => $userId,
             'type' => $type,
@@ -332,19 +332,23 @@ class SkinService implements SkinServiceInterface
             throw new \InvalidArgumentException('Skin not found');
         }
 
-        return $skin->customizations()
+        /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\SkinCustomization> $customizations */
+        $customizations = $skin->customizations()
             ->where(function ($query) use ($userId) {
                 $query->where('user_id', $userId)
                     ->orWhere('visibility', 'public');
             })
             ->with('user')
-            ->get()
+            ->get();
+
+        return $customizations
             ->map(function ($item) {
+                /** @var \App\Models\SkinCustomization $item */
                 $data = $item->toArray();
                 if ($item->file_path) {
                     $data['url'] = asset('storage/' . $item->file_path);
                 }
-                $data['author'] = $item->user->name;
+                $data['author'] = $item->user->name ?? 'Unknown';
 
                 return $data;
             })

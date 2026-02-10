@@ -35,6 +35,8 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property-read int|null $forks_count
  * @property-read string $download_url
  * @property-read string|null $preview_url
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SkinCustomization> $customizations
+ * @property-read int|null $customizations_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SkinRating> $ratings
  * @property-read int|null $ratings_count
  * @property-read \App\Models\User $user

@@ -31,7 +31,7 @@ class GoogleLoginCallbackTest extends TestCase
                 return 'Example User';
             }
 
-            public function getNickname(): ?string
+            public function getNickname(): null
             {
                 return null;
             }
