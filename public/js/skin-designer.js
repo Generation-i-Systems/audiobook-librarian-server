@@ -1024,8 +1024,14 @@ class PropertyEditor {
         // Layout Props
         this.addSelect('Anchor', el.anchor || 'top-left', ['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'], (val) => this.state.updateElement(el.id, { anchor: val }), { tooltip: TOOLTIPS.anchor });
 
-        this.addInput('X', el.x, (val) => this.state.updateElement(el.id, { x: val }), { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.x });
-        this.addInput('Y', el.y, (val) => this.state.updateElement(el.id, { y: val }), { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.y });
+        this.addInput('X', el.x ?? 0, (val) => {
+            const num = parseFloat(val);
+            this.state.updateElement(el.id, { x: (val === '' || val === undefined) ? 0 : (isNaN(num) ? val : num) });
+        }, { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.x });
+        this.addInput('Y', el.y ?? 0, (val) => {
+            const num = parseFloat(val);
+            this.state.updateElement(el.id, { y: (val === '' || val === undefined) ? 0 : (isNaN(num) ? val : num) });
+        }, { validator: VALIDATORS.dimension, tooltip: TOOLTIPS.y });
 
         // Width/Height logic
         this.addInput('Width', el.width, (val) => {
@@ -1428,13 +1434,14 @@ class JsonEditor {
             gutters: ["CodeMirror-lint-markers"]
         });
         this.updateEditor();
+
+        // Force refresh after initial render so content is visible without clicking
+        setTimeout(() => this.editor.refresh(), 200);
+        setTimeout(() => this.editor.refresh(), 500);
+
         this.state.subscribe((_, type) => {
-            // Only update editor if the change didn't come from the editor itself
             if (!this.editor.hasFocus()) {
                  this.updateEditor();
-                 // Re-highlight if selection exists
-                 const el = this.state.getSelectedElement();
-                 if (el) this.highlightElement(el.id);
             }
             if (type === 'selectionChanged') {
                 const el = this.state.getSelectedElement();
@@ -1450,7 +1457,6 @@ class JsonEditor {
              } catch (e) { }
         });
 
-        // Listen for global resize event
         window.addEventListener('resize', () => {
              this.editor.refresh();
         });
@@ -1468,17 +1474,35 @@ class JsonEditor {
 
     highlightElement(id) {
         if (!this.editor) return;
-        const searchString = `"${id}"`; // Search for ID value
-        const cursor = this.editor.getSearchCursor(searchString);
-        if (cursor.findNext()) {
-            const line = cursor.from().line;
-            this.editor.scrollIntoView({line: line, char: 0}, 200);
-            this.editor.setSelection(cursor.from(), cursor.to());
-            this.editor.addLineClass(line, "background", "cm-highlight-line");
+        const searchString = `"id": "${id}"`;
+
+        setTimeout(() => {
+            const content = this.editor.getValue();
+
+            // Find match in current orientation's layout section first
+            const layoutIndex = content.indexOf('"layout"');
+            const orientationKey = `"${this.state.currentOrientation}"`;
+            const orientationIndex = layoutIndex >= 0 ? content.indexOf(orientationKey, layoutIndex) : -1;
+
+            let matchIndex = -1;
+            if (orientationIndex >= 0) {
+                matchIndex = content.indexOf(searchString, orientationIndex);
+            }
+            if (matchIndex < 0) {
+                matchIndex = content.indexOf(searchString);
+            }
+            if (matchIndex < 0) return;
+
+            const from = this.editor.posFromIndex(matchIndex);
+            const to = this.editor.posFromIndex(matchIndex + searchString.length);
+
+            this.editor.setSelection(from, to);
+            this.editor.scrollIntoView({line: from.line, ch: 0}, 200);
+            this.editor.addLineClass(from.line, "background", "cm-highlight-line");
             setTimeout(() => {
-                this.editor.removeLineClass(line, "background", "cm-highlight-line");
+                this.editor.removeLineClass(from.line, "background", "cm-highlight-line");
             }, 2000);
-        }
+        }, 50);
     }
 
 
@@ -1568,7 +1592,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Init docked state
     if (jsonPanel) jsonPanel.classList.add('docked');
 
-    if (jsonToggleBtn) jsonToggleBtn.onclick = () => jsonPanel.classList.toggle('hidden');
+    if (jsonToggleBtn) jsonToggleBtn.onclick = () => {
+        jsonPanel.classList.toggle('hidden');
+        if (!jsonPanel.classList.contains('hidden')) {
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+        }
+    };
     if (jsonCloseBtn) jsonCloseBtn.onclick = () => jsonPanel.classList.add('hidden');
 
     if (jsonFloatBtn) {
