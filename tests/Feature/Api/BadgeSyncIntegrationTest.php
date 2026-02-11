@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Badge;
 use App\Models\Book;
+use App\Models\ClientEvent;
 use App\Models\Device;
 use App\Models\ListeningStatistic;
 use App\Models\Message;
@@ -272,5 +273,95 @@ class BadgeSyncIntegrationTest extends TestCase
         $count = $reflection->invoke($badgeService, (string) $this->user->id, $this->deviceId);
 
         $this->assertEquals(2, $count);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function action_badge_awarded_when_client_event_recorded(): void
+    {
+        Cache::flush();
+
+        $badge = $this->createTestBadge(['action_skin_changed' => 1], 'exploration');
+
+        ClientEvent::create([
+            'user_id'         => $this->user->id,
+            'device_id'       => $this->deviceId,
+            'event_type'      => 'skin_changed',
+            'event_timestamp' => now(),
+            'metadata'        => ['skin_id' => 'bold-driver'],
+        ]);
+
+        $badgeService = app(BadgeService::class);
+        $newBadges    = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertNotEmpty($newBadges, 'Action badge should be awarded');
+        $this->assertEquals($badge->id, $newBadges[0]->badge_id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function analytics_endpoint_triggers_badge_evaluation(): void
+    {
+        Cache::flush();
+
+        $badge = $this->createTestBadge(['action_drive_mode_activated' => 1], 'exploration');
+
+        $response = $this->withHeaders($this->authHeaders())
+            ->postJson('/api/v1/analytics/event', [
+                'event_type' => 'drive_mode_activated',
+                'timestamp'  => now()->getTimestampMs(),
+                'metadata'   => [],
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure(['badges_earned']);
+
+        $this->assertNotEmpty($response->json('badges_earned'), 'Badge should be earned from analytics event');
+        $this->assertEquals($badge->name, $response->json('badges_earned.0.badge_name'));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function multiple_action_events_count_correctly(): void
+    {
+        Cache::flush();
+
+        $badge = $this->createTestBadge(['action_bookmark_created' => 3], 'discovery');
+
+        for ($i = 0; $i < 3; $i++) {
+            ClientEvent::create([
+                'user_id'         => $this->user->id,
+                'device_id'       => $this->deviceId,
+                'event_type'      => 'bookmark_created',
+                'event_timestamp' => now(),
+                'metadata'        => [],
+            ]);
+        }
+
+        $badgeService = app(BadgeService::class);
+        $newBadges    = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertNotEmpty($newBadges, 'Badge requiring 3 events should be awarded');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function platform_install_badge_awarded_per_platform(): void
+    {
+        Cache::flush();
+
+        $androidBadge = $this->createTestBadge(['action_app_installed_android' => 1], 'discovery');
+        $iosBadge     = $this->createTestBadge(['action_app_installed_ios' => 1], 'discovery');
+
+        ClientEvent::create([
+            'user_id'         => $this->user->id,
+            'device_id'       => $this->deviceId,
+            'event_type'      => 'app_installed_android',
+            'event_timestamp' => now(),
+            'metadata'        => ['platform' => 'android'],
+        ]);
+
+        $badgeService = app(BadgeService::class);
+        $newBadges    = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $earnedIds = array_map(fn ($ub) => $ub->badge_id, $newBadges);
+        $this->assertContains($androidBadge->id, $earnedIds, 'Android badge should be awarded');
+        $this->assertNotContains($iosBadge->id, $earnedIds, 'iOS badge should NOT be awarded');
     }
 }

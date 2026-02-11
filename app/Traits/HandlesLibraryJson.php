@@ -113,8 +113,22 @@ trait HandlesLibraryJson
 
             // Skip if directory has no audio files - a book should never have only librarian.json
             $audioExtensions = 'mp3,m4a,m4b,flac,ogg,opus,aac,wav,wma,mp4';
-            $audioFiles = glob($bookDir . '/*.{' . $audioExtensions . '}', GLOB_BRACE | GLOB_NOCHECK);
-            $audioFiles = array_filter($audioFiles, 'is_file');
+            $audioFiles = glob($bookDir . '/*.{' . $audioExtensions . '}', GLOB_BRACE);
+            $audioFiles = is_array($audioFiles) ? array_filter($audioFiles, 'is_file') : [];
+
+            // Check subdirectories (CD 1, Disc 1, etc.) if no top-level audio files
+            if (empty($audioFiles)) {
+                $subdirs = glob($bookDir . '/*', GLOB_ONLYDIR);
+                if (is_array($subdirs)) {
+                    foreach ($subdirs as $subdir) {
+                        $subAudioFiles = glob($subdir . '/*.{' . $audioExtensions . '}', GLOB_BRACE);
+                        if (is_array($subAudioFiles) && array_filter($subAudioFiles, 'is_file')) {
+                            $audioFiles = $subAudioFiles;
+                            break;
+                        }
+                    }
+                }
+            }
 
             if (empty($audioFiles)) {
                 Log::warning('Book directory has no audio files for librarian.json', [

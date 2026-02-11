@@ -6,7 +6,6 @@
       "Bash(find:*)",
       "Bash(./vendor/bin/phpunit:*)",
       "Bash(rg:*)",
-      "Bash(php:*)",
       "Bash(npm run build:*)",
       "Bash(curl:*)",
       "Bash(ls:*)",
@@ -24,8 +23,17 @@
       "Bash(./vendor/bin/pint:*)",
       "Bash(./vendor/bin/phpcbf:*)",
       "Bash(node --check:*)",
-      "Bash(node -c:*)"
+      "Bash(node -c:*)",
+      "Bash(echo:*)",
+      "Bash(vendor/bin/phpcbf:*)",
+      "Bash(git status:*)",
+      "Bash(php -l:*)",
+      "Bash(git -C /home/devel/src/audiobook-librarian-server status)",
+      "Bash(git -C /home/devel/src/audiobook-librarian-server diff --stat)",
+      "Bash(git -C /home/devel/src/audiobook-librarian-server log --oneline -5)",
+      "Bash(git -C /home/devel/src/audiobook-librarian-server diff --cached --stat)"
     ],
     "deny": []
-  }
+  },
+  "outputStyle": "Explanatory"
 }

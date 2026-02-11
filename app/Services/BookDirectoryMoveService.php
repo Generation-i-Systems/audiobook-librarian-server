@@ -222,7 +222,7 @@ class BookDirectoryMoveService
         }
 
         // Check if directory only contains metadata files
-        if ($this->containsOnlyMetadata($disk, $directoryPath, $files)) {
+        if ($this->containsOnlyMetadataFiles($files)) {
             // Safe to use this directory - metadata files will be overwritten
             return $directoryPath;
         }
@@ -246,9 +246,9 @@ class BookDirectoryMoveService
     }
 
     /**
-     * Check if directory contains only metadata files (librarian.json, covers, etc.)
+     * Check if a list of files contains only metadata files (librarian.json, covers, etc.)
      */
-    private function containsOnlyMetadata($disk, string $directoryPath, array $files): bool
+    public function containsOnlyMetadataFiles(array $files): bool
     {
         foreach ($files as $file) {
             $filename = basename($file);

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Badge;
+use App\Models\ClientEvent;
 use App\Models\ListeningStatistic;
 use App\Models\Message;
 use App\Models\UserBadge;
@@ -121,6 +122,9 @@ class BadgeService
             $deviceVariety     = $this->getDeviceVariety($userId, $deviceId);
             $repeatListening   = $this->getRepeatListening($userId, $deviceId);
 
+            // Get action-based statistics from client events
+            $actionCounts = $this->getActionCounts($userId, $deviceId);
+
             return [
                 'total_listening_time'       => (int) ($allTimeStats->total_listening_time ?? 0),
                 'session_count'              => (int) ($allTimeStats->session_count ?? 0),
@@ -146,7 +150,7 @@ class BadgeService
                 'repeat_listening'           => $repeatListening,
                 'first_listening_date'       => $allTimeStats->getAttribute('first_listening_date'),
                 'last_listening_date'        => $allTimeStats->getAttribute('last_listening_date'),
-            ];
+            ] + $actionCounts;
         });
     }
 
@@ -414,6 +418,47 @@ class BadgeService
             ->havingRaw('COUNT(*) > 1')
             ->get()
             ->count();
+    }
+
+    /**
+     * Get action counts from client_events for action-based badge criteria
+     *
+     * @return array<string, int>
+     */
+    protected function getActionCounts(string $userId, ?string $deviceId = null): array
+    {
+        $eventTypes = [
+            'app_installed',
+            'app_installed_android',
+            'app_installed_ios',
+            'app_installed_desktop',
+            'book_downloaded',
+            'book_started',
+            'skin_changed',
+            'gallery_skin_downloaded',
+            'theme_changed',
+            'drive_mode_activated',
+            'bookmark_created',
+        ];
+
+        $query = ClientEvent::where(function ($q) use ($userId, $deviceId) {
+            $q->where('user_id', $userId);
+            if ($deviceId) {
+                $q->orWhere('device_id', $deviceId);
+            }
+        })->whereIn('event_type', $eventTypes);
+
+        $counts = (clone $query)->select('event_type', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('event_type')
+            ->pluck('cnt', 'event_type')
+            ->toArray();
+
+        $result = [];
+        foreach ($eventTypes as $type) {
+            $result['action_' . $type] = (int) ($counts[$type] ?? 0);
+        }
+
+        return $result;
     }
 
     /**

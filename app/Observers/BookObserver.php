@@ -30,9 +30,9 @@ class BookObserver
                     $book->load(['authors', 'narrators', 'genres', 'series', 'publisher']);
                 }
 
-                $this->updateLibraryJson($book);
+                $result = $this->updateLibraryJson($book);
 
-                Log::debug('Updated librarian.json for book', [
+                Log::debug($result ? 'Updated librarian.json for book' : 'Skipped librarian.json update for book', [
                     'book_id' => $book->id,
                     'title' => $book->title,
                     'directory_path' => $book->directory_path,
@@ -80,9 +80,9 @@ class BookObserver
         }
 
         try {
-            $this->updateLibraryJson($book);
+            $result = $this->updateLibraryJson($book);
 
-            Log::debug('Updated librarian.json for book after pivot change', [
+            Log::debug($result ? 'Updated librarian.json for book after pivot change' : 'Skipped librarian.json update after pivot change', [
                 'book_id' => $book->id,
                 'title' => $book->title,
                 'relation' => $relationName,

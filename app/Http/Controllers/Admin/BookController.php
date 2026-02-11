@@ -1403,15 +1403,24 @@ class BookController extends Controller
             $oldExists = false;
             $newExists = false;
             $oldCoverBasename = null;
+            $booksDisk = Storage::disk('books');
 
             try {
-                $booksDisk = Storage::disk('books');
-
                 /** @phpstan-ignore-next-line function.alreadyNarrowedType */
                 $oldExists = count($booksDisk->allFiles($oldDirectoryPath)) > 0;
                 $newExists = count($booksDisk->allFiles($newDirectoryPath)) > 0;
 
                 $shouldSkipMove = !$oldExists && $newExists;
+
+                // Also skip if old directory only has metadata (librarian.json, covers)
+                // and new directory already has real content
+                if (!$shouldSkipMove && $oldExists && $newExists) {
+                    $moveService = app(BookDirectoryMoveService::class);
+                    $oldFiles = $booksDisk->allFiles($oldDirectoryPath);
+                    if ($moveService->containsOnlyMetadataFiles($oldFiles)) {
+                        $shouldSkipMove = true;
+                    }
+                }
             } catch (\Exception $e) {
                 Log::warning('Error checking directory existence, will attempt move', [
                     'oldPath' => $oldDirectoryPath,
@@ -1423,12 +1432,29 @@ class BookController extends Controller
             }
 
             if ($shouldSkipMove) {
-                Log::info('Old directory does not exist and new directory exists - skipping move', [
+                Log::info('Skipping directory move - new directory already has content', [
                     'oldPath' => $oldDirectoryPath,
                     'newPath' => $newDirectoryPath,
                     'book_id' => $id,
+                    'oldExists' => $oldExists,
+                    'newExists' => $newExists,
                 ]);
-                // Skip the move, just proceed with database update
+
+                // Clean up orphaned metadata files from old directory
+                if ($oldExists) {
+                    $oldFiles = $booksDisk->allFiles($oldDirectoryPath);
+                    foreach ($oldFiles as $file) {
+                        $booksDisk->delete($file);
+                    }
+                    try {
+                        $booksDisk->deleteDirectory($oldDirectoryPath);
+                    } catch (\Exception $e) {
+                        Log::debug('Could not remove old metadata directory', [
+                            'path' => $oldDirectoryPath,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             } else {
                 Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
                 Log::debug('BookController@update: Directory move details', [
