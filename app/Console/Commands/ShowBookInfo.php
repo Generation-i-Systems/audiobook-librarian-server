@@ -1457,26 +1457,50 @@ class ShowBookInfo extends Command
                     $notFoundItems[] = "Book ID: {$item}";
                 }
             } else {
-                $pattern = rtrim($bookRoot, '/') . '/' . ltrim($item, '/');
-                $matchedDirs = glob($pattern, GLOB_ONLYDIR);
+                $item = rtrim($item, '/');
+                $searchPath = null;
 
-                if (empty($matchedDirs)) {
-                    $notFoundItems[] = "Pattern: {$item}";
+                // Try CWD-relative path first
+                $cwd = getcwd();
+                if ($cwd && str_starts_with($cwd, rtrim($bookRoot, '/'))) {
+                    $cwdPath = rtrim($cwd, '/') . '/' . $item;
+                    if (is_dir($cwdPath)) {
+                        $searchPath = ltrim(substr($cwdPath, strlen(rtrim($bookRoot, '/'))), '/');
+                    }
+                }
+
+                // Try as relative path from book root
+                if (!$searchPath) {
+                    $fullPath = rtrim($bookRoot, '/') . '/' . ltrim($item, '/');
+                    if (is_dir($fullPath)) {
+                        $searchPath = ltrim($item, '/');
+                    }
+                }
+
+                // Try as absolute path
+                if (!$searchPath && str_starts_with($item, '/') && is_dir($item)) {
+                    if (str_starts_with($item, rtrim($bookRoot, '/'))) {
+                        $searchPath = ltrim(substr($item, strlen(rtrim($bookRoot, '/'))), '/');
+                    }
+                }
+
+                if (!$searchPath) {
+                    $notFoundItems[] = "Directory: {$item}";
                     continue;
                 }
 
-                foreach ($matchedDirs as $dir) {
-                    $relativePath = ltrim(substr($dir, strlen($bookRoot)), '/');
-                    $books = $this->queryBook()->where('directory_path', $relativePath)->get();
+                $books = $this->queryBook()->where('directory_path', $searchPath)->get();
+                if ($books->isEmpty()) {
+                    $books = $this->queryBook()->where('directory_path', 'LIKE', rtrim($searchPath, '/') . '/%')->get();
+                }
 
-                    if ($books->isEmpty()) {
-                        $notFoundItems[] = "Directory: {$relativePath}";
-                    }
+                if ($books->isEmpty()) {
+                    $notFoundItems[] = "Directory: {$searchPath}";
+                }
 
-                    foreach ($books as $book) {
-                        if (!$booksToDelete->contains('id', $book->id)) {
-                            $booksToDelete->push($book);
-                        }
+                foreach ($books as $book) {
+                    if (!$booksToDelete->contains('id', $book->id)) {
+                        $booksToDelete->push($book);
                     }
                 }
             }
