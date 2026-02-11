@@ -7941,11 +7941,24 @@ class BookImportService
         while (true) {
             // Recalculate default choice each iteration (confidence may have changed after edits)
             $confidence = $metadata['confidence'] ?? 0;
+            $currentGenre = $metadata['genre'] ?? 'Other';
+            if (is_array($currentGenre)) {
+                $currentGenre = $currentGenre[0] ?? 'Other';
+            }
             $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
             $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+
+            $currentAuthor = $metadata['author'] ?? '';
+            $authorStr = is_array($currentAuthor) ? implode('', $currentAuthor) : (string) $currentAuthor;
+            $hasAuthor = trim($authorStr) !== '';
+
+            // confidence 100 means user manually edited/confirmed, so trust it fully
+            $userConfirmed = $confidence >= 100;
             if (!$isGenreValid) {
                 $defaultChoice = '3';
-            } elseif ($confidence >= 75) {
+            } elseif ($userConfirmed && $hasAuthor) {
+                $defaultChoice = '1';
+            } elseif ($confidence >= 75 && $hasAuthor && $hasEnrichmentData) {
                 $defaultChoice = '1';
             } else {
                 $defaultChoice = '2';
