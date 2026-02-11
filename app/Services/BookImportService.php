@@ -5790,7 +5790,7 @@ class BookImportService
 
                 $seriesName = trim($seriesName, " \t\n\r\0\x0B-_");
 
-                if (!empty($seriesName)) {
+                if (!empty($seriesName) && !is_numeric($seriesName)) {
                     $aiResult['series'] = $seriesName;
                     // If we found a better series name, verify title doesn't still have it
                     if (!empty($aiResult['title'])) {
@@ -5830,6 +5830,11 @@ class BookImportService
             }
 
             $aiResult['title'] = trim($aiResult['title']);
+        }
+
+        // Discard purely numeric series names (e.g. "11") — not valid series
+        if (!empty($aiResult['series']) && is_numeric($aiResult['series'])) {
+            unset($aiResult['series']);
         }
 
         return $aiResult;
@@ -7712,7 +7717,7 @@ class BookImportService
             $isGenreValid = in_array($normalizedGenre, $validGenres, true);
             if (!$isGenreValid) {
                 $defaultChoice = '3';
-            } elseif ($confidence > 80) {
+            } elseif ($confidence >= 75) {
                 $defaultChoice = '1';
             } else {
                 $defaultChoice = '2';

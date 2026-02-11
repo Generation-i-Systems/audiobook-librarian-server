@@ -192,6 +192,42 @@ class BookImportServiceMetadataTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function postProcessAiResultDiscardsNumericSeriesName(): void
+    {
+        $aiResult = [
+            'title' => 'Some Book',
+            'author' => ['Author Name'],
+            'genre' => ['Fiction'],
+            'series' => '11',
+            'confidence' => 80,
+        ];
+
+        $audiobook = ['path' => '/media/audiobooks/Author Name/11/Some Book'];
+
+        $result = $this->service->postProcessAIResult($aiResult, $audiobook);
+
+        $this->assertArrayNotHasKey('series', $result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function postProcessAiResultDoesNotUseNumericParentAsSeries(): void
+    {
+        $aiResult = [
+            'title' => 'Some Book',
+            'author' => ['Author Name'],
+            'genre' => ['Fiction'],
+            'series' => '',
+            'confidence' => 80,
+        ];
+
+        $audiobook = ['path' => '/media/audiobooks/Author Name/42/Some Book'];
+
+        $result = $this->service->postProcessAIResult($aiResult, $audiobook);
+
+        $this->assertNotEquals('42', $result['series'] ?? '');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function adjustConfidenceBoostsForSeriesMatch(): void
     {
         $author = Author::create(['name' => 'Brandon Sanderson']);
