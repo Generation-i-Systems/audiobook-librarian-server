@@ -53,6 +53,9 @@ done
 # Change to project directory
 cd "$PROJECT_ROOT" || exit 1
 
+# Export shell CWD so PHP can resolve relative paths in options
+export SHELL_CWD="$ORIGINAL_DIR"
+
 # If no directory arguments provided, use the saved original working directory
 if [ ${#DIRS[@]} -eq 0 ]; then
     php artisan books:info "$ORIGINAL_DIR" "${OPTS[@]}"

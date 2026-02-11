@@ -1458,44 +1458,41 @@ class ShowBookInfo extends Command
                 }
             } else {
                 $item = rtrim($item, '/');
-                $searchPath = null;
+                $trimmedBookRoot = rtrim($bookRoot, '/');
+                $books = collect();
 
-                // Try CWD-relative path first
-                $cwd = getcwd();
-                if ($cwd && str_starts_with($cwd, rtrim($bookRoot, '/'))) {
-                    $cwdPath = rtrim($cwd, '/') . '/' . $item;
-                    if (is_dir($cwdPath)) {
-                        $searchPath = ltrim(substr($cwdPath, strlen(rtrim($bookRoot, '/'))), '/');
+                // Build candidate search paths to try against the DB
+                $searchPaths = [];
+
+                // If absolute path under book root, strip to relative
+                if (str_starts_with($item, $trimmedBookRoot . '/')) {
+                    $searchPaths[] = ltrim(substr($item, strlen($trimmedBookRoot)), '/');
+                }
+
+                // Shell CWD from wrapper script (getcwd/PWD return artisan project dir)
+                $cwd = getenv('SHELL_CWD') ?: (getenv('PWD') ?: getcwd());
+                if ($cwd && str_starts_with($cwd, $trimmedBookRoot)) {
+                    $cwdRelative = ltrim(substr($cwd, strlen($trimmedBookRoot)), '/');
+                    $searchPaths[] = $cwdRelative ? $cwdRelative . '/' . $item : $item;
+                }
+
+                // As-is relative from book root
+                $searchPaths[] = ltrim($item, '/');
+
+                foreach ($searchPaths as $searchPath) {
+                    $books = $this->queryBook()->where('directory_path', $searchPath)->get();
+                    if ($books->isNotEmpty()) {
+                        break;
+                    }
+                    $prefixSearch = rtrim($searchPath, '/') . '/%';
+                    $books = $this->queryBook()->where('directory_path', 'LIKE', $prefixSearch)->get();
+                    if ($books->isNotEmpty()) {
+                        break;
                     }
                 }
 
-                // Try as relative path from book root
-                if (!$searchPath) {
-                    $fullPath = rtrim($bookRoot, '/') . '/' . ltrim($item, '/');
-                    if (is_dir($fullPath)) {
-                        $searchPath = ltrim($item, '/');
-                    }
-                }
-
-                // Try as absolute path
-                if (!$searchPath && str_starts_with($item, '/') && is_dir($item)) {
-                    if (str_starts_with($item, rtrim($bookRoot, '/'))) {
-                        $searchPath = ltrim(substr($item, strlen(rtrim($bookRoot, '/'))), '/');
-                    }
-                }
-
-                if (!$searchPath) {
+                if ($books->isEmpty()) {
                     $notFoundItems[] = "Directory: {$item}";
-                    continue;
-                }
-
-                $books = $this->queryBook()->where('directory_path', $searchPath)->get();
-                if ($books->isEmpty()) {
-                    $books = $this->queryBook()->where('directory_path', 'LIKE', rtrim($searchPath, '/') . '/%')->get();
-                }
-
-                if ($books->isEmpty()) {
-                    $notFoundItems[] = "Directory: {$searchPath}";
                 }
 
                 foreach ($books as $book) {
