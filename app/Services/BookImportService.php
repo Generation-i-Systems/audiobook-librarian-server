@@ -2797,6 +2797,72 @@ class BookImportService
     }
 
     /**
+     * Adjust confidence based on series matches and genre quality.
+     *
+     * +10% if other books by the same author exist in the same series.
+     * -30% if genre is "Other" or "Unknown".
+     * -20% if genre is "Action" and author has no other Action books and no books in any genre.
+     * If genre is "Action", author has no Action books, but has books in another genre,
+     * update genre to the preferred genre and leave confidence unchanged.
+     */
+    public function adjustConfidence(array &$metadata, ?callable $infoCallback = null): void
+    {
+        $confidence = (int) ($metadata['confidence'] ?? 0);
+
+        $seriesName = $metadata['series'] ?? '';
+        $authors = $metadata['author'] ?? [];
+        if (is_string($authors)) {
+            $authors = [$authors];
+        }
+
+        if (!empty($seriesName) && !empty($authors)) {
+            $seriesBookCount = Book::whereHas('series', function ($q) use ($seriesName) {
+                $q->where('name', $seriesName);
+            })->whereHas('authors', function ($q) use ($authors) {
+                $q->whereIn('name', $authors);
+            })->count();
+
+            if ($seriesBookCount > 0) {
+                $confidence = min(100, $confidence + 10);
+                if ($infoCallback) {
+                    $infoCallback("📈 Confidence +10% (found {$seriesBookCount} book(s) in same series by author)");
+                }
+            }
+        }
+
+        $genre = $metadata['genre'] ?? '';
+        if (is_array($genre)) {
+            $genre = $genre[0] ?? '';
+        }
+
+        if (in_array($genre, ['Other', 'Unknown'], true)) {
+            $confidence = max(0, $confidence - 30);
+            if ($infoCallback) {
+                $infoCallback("📉 Confidence -30% (genre is '{$genre}')");
+            }
+        } elseif ($genre === 'Action' && !empty($authors)) {
+            $preferredGenre = $this->getAuthorPreferredGenre($authors);
+            if ($preferredGenre && $preferredGenre !== 'Action') {
+                if (is_array($metadata['genre'])) {
+                    $metadata['genre'] = [$preferredGenre];
+                } else {
+                    $metadata['genre'] = $preferredGenre;
+                }
+                if ($infoCallback) {
+                    $infoCallback("🔄 Genre updated from 'Action' to '{$preferredGenre}' (author's preferred genre)");
+                }
+            } elseif (!$preferredGenre) {
+                $confidence = max(0, $confidence - 20);
+                if ($infoCallback) {
+                    $infoCallback("📉 Confidence -20% (genre is 'Action' with no author genre history)");
+                }
+            }
+        }
+
+        $metadata['confidence'] = $confidence;
+    }
+
+    /**
      * Find existing book in database (returns Book model instead of boolean)
      */
     public function findExistingBook(string $path, array $metadata = []): ?Book
@@ -4004,7 +4070,7 @@ class BookImportService
             }
             $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
 
-            $extractSeriesNumberFromTitleCallback($metadata);
+            $metadata['confidence'] = 100;
             $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
 
             return $metadata;
@@ -4054,9 +4120,11 @@ class BookImportService
                 break;
             }
 
+            $titleManuallyEdited = false;
             switch ($choice) {
                 case '1':
                     $metadata['title'] = $askInlineCallback('Title', (string) $currentTitle);
+                    $titleManuallyEdited = true;
                     break;
                 case '2':
                     $newAuthor = $askInlineCallback('Author(s) (comma-separated)', (string) $displayAuthor);
@@ -4102,7 +4170,10 @@ class BookImportService
                     break;
             }
 
-            $extractSeriesNumberFromTitleCallback($metadata);
+            if (!$titleManuallyEdited) {
+                $extractSeriesNumberFromTitleCallback($metadata);
+            }
+            $metadata['confidence'] = 100;
             $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
         }
 
@@ -5699,7 +5770,8 @@ class BookImportService
             $parentPath = dirname($audiobook['path']);
             // Only use parent if it's not the root import directory
             // (Naive check: assuming we are at least 1 level deep from import root)
-            if (basename($parentPath) !== 'download' && basename($parentPath) !== 'audiobooks') {
+            $nonSeriesDirs = ['download', 'downloads', 'audiobooks', 'audiobook', 'unsorted', 'books', 'media'];
+            if (!in_array(strtolower(basename($parentPath)), $nonSeriesDirs, true)) {
                 $parentName = basename($parentPath);
 
                 // Clean parent name: Remove Year, Author, Narrator
@@ -7356,6 +7428,8 @@ class BookImportService
             $infoCallback("📚 Genre set from existing series: {$seriesGenre}");
         }
 
+        $this->adjustConfidence($aiMetadata, $infoCallback);
+
         $existingBook = $findExistingBookCallback($audiobook['path'], $aiMetadata);
         if ($existingBook) {
             $warnCallback("⚠️  Book already exists (detected after AI processing)");
@@ -7628,25 +7702,22 @@ class BookImportService
             $uiServiceLogCallback("⚠️  No external enrichment data found - detected fields may be incorrect");
         }
 
-        // Determine default choice based on enrichment data and field quality
-        $confidence = $metadata['confidence'] ?? 0;
-        $title = $metadata['title'] ?? '';
-        $author = $metadata['author'] ?? '';
-        $isTitleGood = is_string($title) && strlen(trim($title)) > 0;
-        $isAuthorGood = is_string($author) && strlen(trim($author)) > 0;
-
-        // Default to option 3 (Edit) when genre is invalid or no enrichment data
-        if (!$isGenreValid || !$hasEnrichmentData) {
-            $defaultChoice = '3';
-        } elseif ($isTitleGood && $isAuthorGood && $confidence > 80) {
-            $defaultChoice = '1';
-        } else {
-            // Default to Edit if confidence is low or some fields are weak
-            $defaultChoice = $confidence > 80 ? '1' : '2';
-        }
+        $defaultChoice = '2';
 
         // ALWAYS run the review loop - this ensures user confirmation regardless of enrichment data
         while (true) {
+            // Recalculate default choice each iteration (confidence may have changed after edits)
+            $confidence = $metadata['confidence'] ?? 0;
+            $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+            $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+            if (!$isGenreValid) {
+                $defaultChoice = '3';
+            } elseif ($confidence > 80) {
+                $defaultChoice = '1';
+            } else {
+                $defaultChoice = '2';
+            }
+
             // Automatically recalculate proposed directory path if not manually overridden
             // This ensures changes to Genre, Title, or Series are reflected in the UI
             if (empty($metadata['custom_directory_path'])) {

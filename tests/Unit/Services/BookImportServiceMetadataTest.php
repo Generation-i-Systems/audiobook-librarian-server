@@ -2,6 +2,10 @@
 
 namespace Tests\Unit\Services;
 
+use App\Models\Author;
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Series;
 use App\Services\BookImportService;
 use App\Services\GenreMappingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,6 +145,153 @@ class BookImportServiceMetadataTest extends TestCase
                 exec("rm -rf {$tempDir}");
             }
         }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('unsortedPathProvider')]
+    public function postProcessAiResultDoesNotUseUnsortedAsSeriesName(string $path): void
+    {
+        $aiResult = [
+            'title' => 'The Great Book',
+            'author' => ['John Smith'],
+            'genre' => ['Fiction'],
+            'series' => '',
+        ];
+
+        $audiobook = ['path' => $path];
+
+        $result = $this->service->postProcessAIResult($aiResult, $audiobook);
+
+        $this->assertNotEquals('unsorted', $result['series'] ?? '');
+    }
+
+    public static function unsortedPathProvider(): array
+    {
+        return [
+            'media audiobooks unsorted' => ['/media/audiobooks/unsorted/The Great Book'],
+            'media lyra_data1 unsorted' => ['/media/lyra_data1/audiobooks/unsorted/The Great Book'],
+            'downloads path' => ['/media/downloads/The Great Book'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function postProcessAiResultUsesValidParentAsSeriesName(): void
+    {
+        $aiResult = [
+            'title' => 'Book One',
+            'author' => ['Jane Doe'],
+            'genre' => ['Fantasy'],
+            'series' => '',
+        ];
+
+        $audiobook = ['path' => '/media/audiobooks/Jane Doe/Awesome Series/Book One'];
+
+        $result = $this->service->postProcessAIResult($aiResult, $audiobook);
+
+        $this->assertEquals('Awesome Series', $result['series']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceBoostsForSeriesMatch(): void
+    {
+        $author = Author::create(['name' => 'Brandon Sanderson']);
+        $series = Series::create(['name' => 'Mistborn']);
+        $genre = Genre::create(['name' => 'Fantasy']);
+
+        $book = Book::create([
+            'title' => 'The Final Empire',
+            'directory_path' => 'Fantasy/Brandon Sanderson/Mistborn/The Final Empire',
+            'language' => 'en',
+        ]);
+        $book->authors()->attach($author);
+        $book->series()->attach($series, ['series_number' => 1]);
+        $book->genres()->attach($genre);
+
+        $metadata = [
+            'title' => 'The Well of Ascension',
+            'author' => ['Brandon Sanderson'],
+            'series' => 'Mistborn',
+            'genre' => 'Fantasy',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals(90, $metadata['confidence']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceReducesForOtherGenre(): void
+    {
+        $metadata = [
+            'title' => 'Some Book',
+            'author' => ['Unknown Author'],
+            'genre' => 'Other',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals(50, $metadata['confidence']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceReducesForUnknownGenre(): void
+    {
+        $metadata = [
+            'title' => 'Some Book',
+            'author' => ['Unknown Author'],
+            'genre' => 'Unknown',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals(50, $metadata['confidence']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceReducesForActionWithNoAuthorHistory(): void
+    {
+        $metadata = [
+            'title' => 'Action Book',
+            'author' => ['New Author'],
+            'genre' => 'Action',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals(60, $metadata['confidence']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceReplacesActionWithAuthorPreferredGenre(): void
+    {
+        $author = Author::create(['name' => 'SciFi Author']);
+        $sciFi = Genre::create(['name' => 'Science Fiction']);
+
+        for ($i = 1; $i <= 2; $i++) {
+            $book = Book::create([
+                'title' => "SciFi Book {$i}",
+                'directory_path' => "Science Fiction/SciFi Author/SciFi Book {$i}",
+                'language' => 'en',
+            ]);
+            $book->authors()->attach($author);
+            $book->genres()->attach($sciFi);
+        }
+
+        $metadata = [
+            'title' => 'New Book',
+            'author' => ['SciFi Author'],
+            'genre' => 'Action',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals(80, $metadata['confidence']);
+        $this->assertEquals('Science Fiction', $metadata['genre']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
