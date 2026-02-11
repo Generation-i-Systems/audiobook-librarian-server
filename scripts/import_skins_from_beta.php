@@ -3,7 +3,6 @@
 use App\Models\Skin;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -81,7 +80,7 @@ foreach ($iterator as $fileinfo) {
     }
 
     $zip = new ZipArchive();
-    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
         echo "Failed to create zip for $skinName\n";
         $skin->delete();
         continue;
@@ -109,9 +108,9 @@ foreach ($iterator as $fileinfo) {
     $previewImage = $manifest['previewImage'] ?? 'preview.png';
     $previewSource = $skinDir . '/' . $previewImage;
     if (file_exists($previewSource)) {
-         $previewDest = "skin-previews/{$skin->id}.png";
-         Storage::disk('public')->put($previewDest, file_get_contents($previewSource));
-         $skin->preview_path = $previewDest;
+        $previewDest = "skin-previews/{$skin->id}.png";
+        Storage::disk('public')->put($previewDest, file_get_contents($previewSource));
+        $skin->preview_path = $previewDest;
     }
 
     $skin->save();
