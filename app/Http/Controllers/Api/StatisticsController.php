@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ListeningStatistic;
 use App\Models\Book;
+use App\Models\ListeningStatistic;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class StatisticsController extends Controller
 {
@@ -73,14 +73,14 @@ class StatisticsController extends Controller
         $dailyStats = $this->getDailyStatsForPeriod($userId, $startDate);
 
         return response()->json([
-            'daily_stats' => $dailyStats,
-            'total_listening_time_ms' => ($stats->total_listening_time_ms ?? 0) * 1000,
-            'books_started' => $stats->books_started ?? 0,
-            'books_finished' => $stats->books_finished ?? 0,
+            'daily_stats'                 => $dailyStats,
+            'total_listening_time_ms'     => ($stats->total_listening_time_ms ?? 0) * 1000,
+            'books_started'               => $stats->books_started ?? 0,
+            'books_finished'              => $stats->books_finished ?? 0,
             'average_session_duration_ms' => ($stats->average_session_duration_ms ?? 0) * 1000,
-            'favorite_genres' => $favoriteGenres,
-            'current_streak' => $currentStreak,
-            'longest_streak' => $longestStreak,
+            'favorite_genres'             => $favoriteGenres,
+            'current_streak'              => $currentStreak,
+            'longest_streak'              => $longestStreak,
         ]);
     }
 
@@ -91,15 +91,15 @@ class StatisticsController extends Controller
     {
         $validated = $request->validate([
             'start_date' => 'nullable|date_format:Y-m-d',
-            'end_date' => 'nullable|date_format:Y-m-d',
-            'limit' => 'nullable|integer|min:1|max:365',
+            'end_date'   => 'nullable|date_format:Y-m-d',
+            'limit'      => 'nullable|integer|min:1|max:365',
         ]);
 
         $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
         $startDate = ($validated['start_date'] ?? null) ? Carbon::parse($validated['start_date']) : now()->subDays(29);
-        $endDate = ($validated['end_date'] ?? null) ? Carbon::parse($validated['end_date']) : now();
-        $limit = $validated['limit'] ?? 30;
+        $endDate   = ($validated['end_date'] ?? null) ? Carbon::parse($validated['end_date']) : now();
+        $limit     = $validated['limit'] ?? 30;
 
         $stats = ListeningStatistic::where('device_id', $userId)
             ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
@@ -129,10 +129,10 @@ class StatisticsController extends Controller
                     ->toArray();
 
                 return [
-                    'date' => $stat->listening_date ?? $stat->date ?? '',
+                    'date'              => $stat->listening_date ?? $stat->date ?? '',
                     'listening_time_ms' => (int) ($stat->listening_time_ms ?? 0),
-                    'sessions_count' => $stat->sessions_count ?? 0,
-                    'books_listened' => $bookIds,
+                    'sessions_count'    => $stat->sessions_count ?? 0,
+                    'books_listened'    => $bookIds,
                 ];
             });
         } else {
@@ -143,21 +143,21 @@ class StatisticsController extends Controller
                 COUNT(*) as sessions_count,
                 JSON_ARRAYAGG(DISTINCT book_id) as books_listened
             ')
-            ->toBase()
-            ->get()
-            ->map(function ($stat) {
-                /** @var \stdClass $stat */
-                return [
-                    'date' => $stat->date,
-                    'listening_time_ms' => (int) $stat->listening_time_ms,
-                    'sessions_count' => $stat->sessions_count,
-                    'books_listened' => json_decode((string)($stat->books_listened ?? '[]'), true) ?? [],
-                ];
-            });
+                ->toBase()
+                ->get()
+                ->map(function ($stat) {
+                    /** @var \stdClass $stat */
+                    return [
+                        'date'              => $stat->date,
+                        'listening_time_ms' => (int) $stat->listening_time_ms,
+                        'sessions_count'    => $stat->sessions_count,
+                        'books_listened'    => json_decode((string) ($stat->books_listened ?? '[]'), true) ?? [],
+                    ];
+                });
         }
 
         return response()->json([
-            'daily_stats' => $dailyStats
+            'daily_stats' => $dailyStats,
         ]);
     }
 
@@ -167,30 +167,35 @@ class StatisticsController extends Controller
     public function reportSession(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'book_id' => 'nullable|integer|exists:books,id',
-            'title' => 'required_without:book_id|string|max:255',
-            'author' => 'required_without:book_id|string|max:255',
-            'session_start' => 'required|date_format:Y-m-d\TH:i:s\Z',
-            'session_end' => 'required|date_format:Y-m-d\TH:i:s\Z|after:session_start',
-            'start_position_ms' => 'required|integer|min:0',
-            'end_position_ms' => 'required|integer|min:0',
-            'playback_speed' => 'nullable|numeric|min:0.1|max:5.0',
-            'pauses_count' => 'nullable|integer|min:0',
-            'actual_duration_ms' => 'nullable|integer|min:0', // Now nullable
-            'events' => 'nullable|array', // Now nullable
-            'events.*.timestamp' => 'required|integer',
-            'events.*.type' => 'required|string',
+            'book_id'              => 'nullable|integer|exists:books,id',
+            'title'                => 'required_without:book_id|string|max:255',
+            'author'               => 'required_without:book_id|string|max:255',
+            'session_start'        => 'required|date_format:Y-m-d\TH:i:s\Z',
+            'session_end'          => 'required|date_format:Y-m-d\TH:i:s\Z|after:session_start',
+            'start_position_ms'    => 'required|integer|min:0',
+            'end_position_ms'      => 'required|integer|min:0',
+            'playback_speed'       => 'nullable|numeric|min:0.1|max:5.0',
+            'pauses_count'         => 'nullable|integer|min:0',
+            'actual_duration_ms'   => 'nullable|integer|min:0', // Now nullable
+            'events'               => 'nullable|array',         // Now nullable
+            'events.*.timestamp'   => 'required|integer',
+            'events.*.type'        => 'required|string',
             'events.*.position_ms' => 'required|integer|min:0',
-            'events.*.metadata' => 'nullable|array',
+            'events.*.metadata'    => 'nullable|array',
         ]);
 
         $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
-        $sessionStart = Carbon::parse($validated['session_start']);
-        $sessionEnd = Carbon::parse($validated['session_end']);
-        $sessionDuration = $sessionEnd->diffInSeconds($sessionStart);
+        $sessionStart    = Carbon::parse($validated['session_start']);
+        $sessionEnd      = Carbon::parse($validated['session_end']);
+        $sessionDuration = abs($sessionEnd->diffInSeconds($sessionStart));
 
-        $secondsListened = (int) floor($validated['end_position_ms'] / 1000);
+        // Use actual_duration_ms when available (real listening time from client),
+        // fall back to wall-clock session duration, never use end_position_ms which is a book position
+        $actualDurationMs = $validated['actual_duration_ms'] ?? 0;
+        $secondsListened  = $actualDurationMs > 0
+            ? (int) floor($actualDurationMs / 1000)
+            : (int) $sessionDuration;
         $playbackSpeed = $validated['playback_speed'] ?? 1.0;
 
         $statistic = ListeningStatistic::createSession(
@@ -201,13 +206,13 @@ class StatisticsController extends Controller
             (int) ($validated['end_position_ms'] / 1000),
             'listening',
             [
-                'session_start' => $validated['session_start'],
-                'session_end' => $validated['session_end'],
+                'session_start'  => $validated['session_start'],
+                'session_end'    => $validated['session_end'],
                 'playback_speed' => $playbackSpeed,
-                'pauses_count' => $validated['pauses_count'] ?? 0,
+                'pauses_count'   => $validated['pauses_count'] ?? 0,
             ],
             Auth::id(),
-            $validated['actual_duration_ms'],
+            $validated['actual_duration_ms'] ?? 0,
             $validated['events'] ?? [],
             $validated['title'] ?? null,
             $validated['author'] ?? null
@@ -215,26 +220,26 @@ class StatisticsController extends Controller
         // Check for badge achievements after recording the session
         try {
             $badgeService = app(\App\Services\BadgeService::class);
-            $newBadges = $badgeService->evaluateUserBadges($userId, $request->header('X-Device-ID'));
+            $newBadges    = $badgeService->evaluateUserBadges($userId, $request->header('X-Device-ID'));
 
             $response = [
                 'success' => true,
-                'message' => 'Session reported successfully'
+                'message' => 'Session reported successfully',
             ];
 
             // Include new badges in response if any were earned
-            if (!empty($newBadges)) {
+            if (! empty($newBadges)) {
                 $response['badges_earned'] = array_map(function ($userBadge) {
                     return [
-                        'id' => $userBadge->badge->id,
-                        'key' => $userBadge->badge->key,
-                        'name' => $userBadge->badge->name,
+                        'id'          => $userBadge->badge->id,
+                        'key'         => $userBadge->badge->key,
+                        'name'        => $userBadge->badge->name,
                         'description' => $userBadge->badge->description,
-                        'icon' => $userBadge->badge->icon,
-                        'tier' => $userBadge->badge->tier,
-                        'points' => $userBadge->badge->points,
-                        'earned_at' => $userBadge->earned_at->toISOString(),
-                        'tier_level' => $userBadge->tier_level,
+                        'icon'        => $userBadge->badge->icon,
+                        'tier'        => $userBadge->badge->tier,
+                        'points'      => $userBadge->badge->points,
+                        'earned_at'   => $userBadge->earned_at->toISOString(),
+                        'tier_level'  => $userBadge->tier_level,
                     ];
                 }, $newBadges);
             }
@@ -244,12 +249,12 @@ class StatisticsController extends Controller
             // Log badge evaluation error but don't fail the session recording
             Log::warning('Badge evaluation failed after session recording', [
                 'user_id' => $userId,
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Session reported successfully'
+                'message' => 'Session reported successfully',
             ], 201);
         }
     }
@@ -261,22 +266,22 @@ class StatisticsController extends Controller
     {
         try {
             $validated = $request->validate([
-                'book_id' => 'nullable|integer|exists:books,id',
-                'title' => 'required_without:book_id|string|max:255',
-                'author' => 'required_without:book_id|string|max:255',
-                'device_id' => 'required|string|max:255',
-                'seconds_listened' => 'required|integer|min:1',
+                'book_id'                => 'nullable|integer|exists:books,id',
+                'title'                  => 'required_without:book_id|string|max:255',
+                'author'                 => 'required_without:book_id|string|max:255',
+                'device_id'              => 'required|string|max:255',
+                'seconds_listened'       => 'required|integer|min:1',
                 'start_position_seconds' => 'nullable|integer|min:0',
-                'end_position_seconds' => 'nullable|integer|min:0',
-                'session_type' => 'nullable|string|in:listening,completed,resumed,paused',
-                'user_id' => 'nullable|string|max:255',
-                'metadata' => 'nullable|array',
+                'end_position_seconds'   => 'nullable|integer|min:0',
+                'session_type'           => 'nullable|string|in:listening,completed,resumed,paused',
+                'user_id'                => 'nullable|string|max:255',
+                'metadata'               => 'nullable|array',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
-                'error' => 'Validation failed',
+                'error'   => 'Validation failed',
                 'message' => 'Invalid input data',
-                'errors' => $e->errors()
+                'errors'  => $e->errors(),
             ], 422);
         }
 
@@ -288,7 +293,7 @@ class StatisticsController extends Controller
             $validated['end_position_seconds'] ?? null,
             $validated['session_type'] ?? 'listening',
             $validated['metadata'] ?? [],
-            $validated['user_id'] ?? null,
+            Auth::id() ?? $validated['user_id'] ?? null,
             0,
             [],
             $validated['title'] ?? null,
@@ -298,38 +303,40 @@ class StatisticsController extends Controller
         // Check for badge achievements after recording the session
         try {
             $badgeService = app(\App\Services\BadgeService::class);
-            $newBadges = $badgeService->evaluateUserBadges(
-                $validated['device_id'],
-                $validated['device_id'] // Use device_id as both user and device identifier
+            $authUserId   = Auth::id();
+            $badgeUserId  = $authUserId ? (string) $authUserId : $validated['device_id'];
+            $newBadges    = $badgeService->evaluateUserBadges(
+                $badgeUserId,
+                $validated['device_id']
             );
 
             $response = [
                 'success' => true,
                 'message' => 'Listening session recorded successfully',
-                'data' => [
-                    'id' => $statistic->id,
-                    'book_id' => $statistic->book_id,
-                    'device_id' => $statistic->device_id,
-                    'listening_date' => $statistic->listening_date->toDateString(),
-                    'seconds_listened' => $statistic->seconds_listened,
-                    'session_type' => $statistic->session_type,
+                'data'    => [
+                    'id'                 => $statistic->id,
+                    'book_id'            => $statistic->book_id,
+                    'device_id'          => $statistic->device_id,
+                    'listening_date'     => $statistic->listening_date->toDateString(),
+                    'seconds_listened'   => $statistic->seconds_listened,
+                    'session_type'       => $statistic->session_type,
                     'formatted_duration' => $statistic->formatted_duration,
-                ]
+                ],
             ];
 
             // Include new badges in response if any were earned
-            if (!empty($newBadges)) {
+            if (! empty($newBadges)) {
                 $response['badges_earned'] = array_map(function ($userBadge) {
                     return [
-                        'id' => $userBadge->badge->id,
-                        'key' => $userBadge->badge->key,
-                        'name' => $userBadge->badge->name,
+                        'id'          => $userBadge->badge->id,
+                        'key'         => $userBadge->badge->key,
+                        'name'        => $userBadge->badge->name,
                         'description' => $userBadge->badge->description,
-                        'icon' => $userBadge->badge->icon,
-                        'tier' => $userBadge->badge->tier,
-                        'points' => $userBadge->badge->points,
-                        'earned_at' => $userBadge->earned_at->toISOString(),
-                        'tier_level' => $userBadge->tier_level,
+                        'icon'        => $userBadge->badge->icon,
+                        'tier'        => $userBadge->badge->tier,
+                        'points'      => $userBadge->badge->points,
+                        'earned_at'   => $userBadge->earned_at->toISOString(),
+                        'tier_level'  => $userBadge->tier_level,
                     ];
                 }, $newBadges);
             }
@@ -339,21 +346,21 @@ class StatisticsController extends Controller
             // Log badge evaluation error but don't fail the session recording
             Log::warning('Badge evaluation failed after session recording', [
                 'device_id' => $validated['device_id'],
-                'error' => $e->getMessage()
+                'error'     => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Listening session recorded successfully',
-                'data' => [
-                    'id' => $statistic->id,
-                    'book_id' => $statistic->book_id,
-                    'device_id' => $statistic->device_id,
-                    'listening_date' => $statistic->listening_date->toDateString(),
-                    'seconds_listened' => $statistic->seconds_listened,
-                    'session_type' => $statistic->session_type,
+                'data'    => [
+                    'id'                 => $statistic->id,
+                    'book_id'            => $statistic->book_id,
+                    'device_id'          => $statistic->device_id,
+                    'listening_date'     => $statistic->listening_date->toDateString(),
+                    'seconds_listened'   => $statistic->seconds_listened,
+                    'session_type'       => $statistic->session_type,
                     'formatted_duration' => $statistic->formatted_duration,
-                ]
+                ],
             ], 201);
         }
     }
@@ -365,15 +372,15 @@ class StatisticsController extends Controller
     {
         $validated = $request->validate([
             'device_id' => 'required|string|max:255',
-            'date' => 'nullable|date_format:Y-m-d',
+            'date'      => 'nullable|date_format:Y-m-d',
         ]);
 
-        $date = $validated['date'] ?? now()->toDateString();
+        $date  = $validated['date'] ?? now()->toDateString();
         $stats = ListeningStatistic::getDailyStats($validated['device_id'], $date);
 
         return response()->json([
             'success' => true,
-            'data' => $stats
+            'data'    => $stats,
         ]);
     }
 
@@ -383,12 +390,12 @@ class StatisticsController extends Controller
     public function getWeeklyStats(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'device_id' => 'required|string|max:255',
+            'device_id'  => 'required|string|max:255',
             'start_date' => 'nullable|date_format:Y-m-d',
         ]);
 
         $startDate = $validated['start_date'] ? Carbon::parse($validated['start_date']) : now()->startOfWeek();
-        $endDate = $startDate->copy()->endOfWeek();
+        $endDate   = $startDate->copy()->endOfWeek();
 
         $stats = ListeningStatistic::where('device_id', $validated['device_id'])
             ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
@@ -404,30 +411,30 @@ class StatisticsController extends Controller
             ->get();
 
         $weeklyTotal = $stats->sum('total_seconds');
-        $totalBooks = ListeningStatistic::where('device_id', $validated['device_id'])
+        $totalBooks  = ListeningStatistic::where('device_id', $validated['device_id'])
             ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
             ->distinct('book_id')
             ->count();
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'week_start' => $startDate->toDateString(),
-                'week_end' => $endDate->toDateString(),
-                'total_seconds' => $weeklyTotal,
-                'total_books' => $totalBooks,
+            'data'    => [
+                'week_start'               => $startDate->toDateString(),
+                'week_end'                 => $endDate->toDateString(),
+                'total_seconds'            => $weeklyTotal,
+                'total_books'              => $totalBooks,
                 'formatted_total_duration' => $this->formatSeconds((int) $weeklyTotal),
-                'daily_breakdown' => $stats->map(function (object $stat) {
+                'daily_breakdown'          => $stats->map(function (object $stat) {
                     /** @var \stdClass&object{listening_date: string, total_seconds: int|float, books_listened: int, session_count: int} $stat */
                     return [
-                        'date' => $stat->listening_date,
-                        'total_seconds' => $stat->total_seconds,
-                        'books_listened' => $stat->books_listened,
-                        'session_count' => $stat->session_count,
+                        'date'               => $stat->listening_date,
+                        'total_seconds'      => $stat->total_seconds,
+                        'books_listened'     => $stat->books_listened,
+                        'session_count'      => $stat->session_count,
                         'formatted_duration' => $this->formatSeconds((int) $stat->total_seconds),
                     ];
-                })
-            ]
+                }),
+            ],
         ]);
     }
 
@@ -442,10 +449,10 @@ class StatisticsController extends Controller
 
         /** @var Book|null $book */
         $book = Book::find($bookId);
-        if (!$book) {
+        if (! $book) {
             return response()->json([
-                'error' => 'Book not found',
-                'message' => 'The specified book could not be found'
+                'error'   => 'Book not found',
+                'message' => 'The specified book could not be found',
             ], 404);
         }
 
@@ -453,13 +460,13 @@ class StatisticsController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => array_merge($stats, [
+            'data'    => array_merge($stats, [
                 'book' => [
-                    'id' => $book->id,
-                    'title' => $book->title,
+                    'id'          => $book->id,
+                    'title'       => $book->title,
                     'cover_image' => $book->cover_image,
-                ]
-            ])
+                ],
+            ]),
         ]);
     }
 
@@ -469,38 +476,38 @@ class StatisticsController extends Controller
     public function getListeningTrends(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'device_id' => 'required|string|max:255',
-            'period' => 'nullable|string|in:week,month,year',
+            'device_id'  => 'required|string|max:255',
+            'period'     => 'nullable|string|in:week,month,year',
             'start_date' => 'nullable|date_format:Y-m-d',
-            'end_date' => 'nullable|date_format:Y-m-d',
+            'end_date'   => 'nullable|date_format:Y-m-d',
         ]);
 
         $period = $validated['period'] ?? 'month';
 
         if (isset($validated['start_date']) && isset($validated['end_date'])) {
             $startDate = Carbon::parse($validated['start_date']);
-            $endDate = Carbon::parse($validated['end_date']);
+            $endDate   = Carbon::parse($validated['end_date']);
         } else {
             switch ($period) {
                 case 'week':
                     $startDate = now()->subWeeks(4)->startOfWeek();
-                    $endDate = now()->endOfWeek();
+                    $endDate   = now()->endOfWeek();
                     break;
                 case 'year':
                     $startDate = now()->subYear()->startOfMonth();
-                    $endDate = now()->endOfMonth();
+                    $endDate   = now()->endOfMonth();
                     break;
                 case 'month':
                 default:
                     $startDate = now()->subMonths(3)->startOfMonth();
-                    $endDate = now()->endOfMonth();
+                    $endDate   = now()->endOfMonth();
                     break;
             }
         }
 
         $groupBy = match ($period) {
-            'week' => 'listening_date',
-            'year' => 'YEAR(listening_date), MONTH(listening_date)',
+            'week'  => 'listening_date',
+            'year'  => 'YEAR(listening_date), MONTH(listening_date)',
             default => 'listening_date', // month
         };
 
@@ -519,34 +526,34 @@ class StatisticsController extends Controller
             ->get();
 
         $totalSeconds = $stats->sum('total_seconds');
-        $totalBooks = ListeningStatistic::where('device_id', $validated['device_id'])
+        $totalBooks   = ListeningStatistic::where('device_id', $validated['device_id'])
             ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
             ->distinct('book_id')
             ->count();
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'period' => $period,
-                'start_date' => $startDate->toDateString(),
-                'end_date' => $endDate->toDateString(),
-                'total_seconds' => $totalSeconds,
-                'total_books' => $totalBooks,
+            'data'    => [
+                'period'                   => $period,
+                'start_date'               => $startDate->toDateString(),
+                'end_date'                 => $endDate->toDateString(),
+                'total_seconds'            => $totalSeconds,
+                'total_books'              => $totalBooks,
                 'formatted_total_duration' => $this->formatSeconds((int) $totalSeconds),
-                'average_daily_seconds' => $stats->isNotEmpty() ? (int) round($totalSeconds / $stats->count()) : 0,
-                'trends' => $stats->map(function ($stat) {
+                'average_daily_seconds'    => $stats->isNotEmpty() ? (int) round($totalSeconds / $stats->count()) : 0,
+                'trends'                   => $stats->map(function ($stat) {
                     /** @var \stdClass $stat */
                     return [
-                        'date' => $stat->listening_date,
-                        'total_seconds' => $stat->total_seconds,
-                        'books_listened' => $stat->books_listened,
-                        'session_count' => $stat->session_count,
-                        'avg_session_duration' => round($stat->avg_session_duration),
-                        'formatted_duration' => $this->formatSeconds((int) $stat->total_seconds),
+                        'date'                  => $stat->listening_date,
+                        'total_seconds'         => $stat->total_seconds,
+                        'books_listened'        => $stat->books_listened,
+                        'session_count'         => $stat->session_count,
+                        'avg_session_duration'  => round($stat->avg_session_duration),
+                        'formatted_duration'    => $this->formatSeconds((int) $stat->total_seconds),
                         'formatted_avg_session' => $this->formatSeconds((int) round($stat->avg_session_duration)),
                     ];
-                })
-            ]
+                }),
+            ],
         ]);
     }
 
@@ -556,8 +563,8 @@ class StatisticsController extends Controller
     public function getTopBooks(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'device_id' => 'nullable|string|max:255',
-            'limit' => 'nullable|integer|min:1|max:50',
+            'device_id'   => 'nullable|string|max:255',
+            'limit'       => 'nullable|integer|min:1|max:50',
             'period_days' => 'nullable|integer|min:1|max:365',
         ]);
 
@@ -582,35 +589,35 @@ class StatisticsController extends Controller
             $query->where('listening_date', '>=', $startDate);
         }
 
-        $limit = $validated['limit'] ?? 10;
+        $limit    = $validated['limit'] ?? 10;
         $topBooks = $query->limit($limit)->get();
 
         return response()->json([
             'success' => true,
             // @phpstan-ignore-next-line
-            'data' => $topBooks->map(function ($stat) {
+            'data'    => $topBooks->map(function ($stat) {
                 /** @var \App\Models\ListeningStatistic $stat */
                 return [
-                    'book_id' => $stat->book_id,
-                    'book' => [
-                        'id' => $stat->book->id,
-                        'title' => $stat->book->title,
+                    'book_id'            => $stat->book_id,
+                    'book'               => [
+                        'id'          => $stat->book->id,
+                        'title'       => $stat->book->title,
                         'cover_image' => $stat->book->cover_image,
                     ],
                     // @phpstan-ignore-next-line
-                    'total_seconds' => (int) $stat->total_seconds,
+                    'total_seconds'      => (int) $stat->total_seconds,
                     // @phpstan-ignore-next-line
-                    'session_count' => $stat->session_count,
+                    'session_count'      => $stat->session_count,
                     // @phpstan-ignore-next-line
-                    'days_listened' => $stat->days_listened,
+                    'days_listened'      => $stat->days_listened,
                     // @phpstan-ignore-next-line
-                    'first_listened' => $stat->first_listened,
+                    'first_listened'     => $stat->first_listened,
                     // @phpstan-ignore-next-line
-                    'last_listened' => $stat->last_listened,
+                    'last_listened'      => $stat->last_listened,
                     // @phpstan-ignore-next-line
                     'formatted_duration' => $this->formatSeconds((int) $stat->total_seconds),
                 ];
-            })
+            }),
         ]);
     }
 
@@ -620,14 +627,14 @@ class StatisticsController extends Controller
     public function getDashboardStats(Request $request): JsonResponse
     {
         $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
-        $userId = Auth::id();
+        $userId   = Auth::id();
 
-        if (!$deviceId && !$userId) {
+        if (! $deviceId && ! $userId) {
             return response()->json(['message' => 'device_id or authentication required.'], 400);
         }
 
-        $today = now()->toDateString();
-        $thisWeek = now()->startOfWeek();
+        $today     = now()->toDateString();
+        $thisWeek  = now()->startOfWeek();
         $thisMonth = now()->startOfMonth();
 
         // Today's listening stats
@@ -635,10 +642,10 @@ class StatisticsController extends Controller
 
         // High-level user stats (from user_book_status)
         $userStats = [
-            'total_completed' => 0,
+            'total_completed'      => 0,
             'completed_this_month' => 0,
-            'upcoming_goals' => 0,
-            'overdue_goals' => 0,
+            'upcoming_goals'       => 0,
+            'overdue_goals'        => 0,
         ];
 
         if ($userId) {
@@ -680,21 +687,21 @@ class StatisticsController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'today' => [
-                    'total_seconds' => $todayStats['total_seconds'],
-                    'books_listened' => $todayStats['books_listened'],
-                    'session_count' => $todayStats['session_count'],
+            'data'    => [
+                'today'              => [
+                    'total_seconds'      => $todayStats['total_seconds'],
+                    'books_listened'     => $todayStats['books_listened'],
+                    'session_count'      => $todayStats['session_count'],
                     'formatted_duration' => $todayStats['formatted_duration'],
                 ],
-                'user_tracking' => $userStats,
+                'user_tracking'      => $userStats,
                 'listening_overview' => [
-                    'total_seconds' => $allTimeStats->total_seconds ?? 0,
-                    'total_books' => $allTimeStats->books_listened ?? 0,
-                    'days_active' => $allTimeStats->days_listened ?? 0,
+                    'total_seconds'            => $allTimeStats->total_seconds ?? 0,
+                    'total_books'              => $allTimeStats->books_listened ?? 0,
+                    'days_active'              => $allTimeStats->days_listened ?? 0,
                     'formatted_total_duration' => $this->formatSeconds($allTimeStats->total_seconds ?? 0),
                 ],
-            ]
+            ],
         ]);
     }
 
@@ -705,7 +712,7 @@ class StatisticsController extends Controller
     {
         /** @var User|null $user */
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Authentication required.'], 401);
         }
 
@@ -719,26 +726,24 @@ class StatisticsController extends Controller
         $statuses = $query->get();
 
         $stats = $statuses->groupBy(function ($item) use ($groupBy) {
-            $date = Carbon::parse((string)$item->finished_at);
+            $date = Carbon::parse((string) $item->finished_at);
             return $groupBy === 'year' ? $date->format('Y') : $date->format('Y-m');
         })->map(function ($items, $period) {
             return [
-                'period' => (string)$period,
-                'count' => $items->count(),
+                'period' => (string) $period,
+                'count'  => $items->count(),
             ];
         })->values();
 
         return response()->json($stats);
     }
 
-
-
     /**
      * Calculate current listening streak
      */
     private function calculateCurrentStreak(string $userId): int
     {
-        $streak = 0;
+        $streak      = 0;
         $currentDate = now();
 
         while (true) {
@@ -746,7 +751,7 @@ class StatisticsController extends Controller
                 ->where('listening_date', $currentDate->toDateString())
                 ->exists();
 
-            if (!$hasActivity) {
+            if (! $hasActivity) {
                 break;
             }
 
@@ -828,19 +833,19 @@ class StatisticsController extends Controller
             COUNT(*) as sessions_count,
             JSON_ARRAYAGG(DISTINCT book_id) as books_listened
         ')
-        ->groupBy('listening_date')
-        ->orderByDesc('listening_date')
-        ->limit(30)
-        ->toBase()
-        ->get();
+            ->groupBy('listening_date')
+            ->orderByDesc('listening_date')
+            ->limit(30)
+            ->toBase()
+            ->get();
 
         return $stats->map(function (object $stat) {
             /** @var \stdClass&object{date: string, listening_time_ms: int|float, sessions_count: int, books_listened: string} $stat */
             return [
-                'date' => (string)($stat->date ?? ''),
+                'date'              => (string) ($stat->date ?? ''),
                 'listening_time_ms' => (int) ($stat->listening_time_ms ?? 0),
-                'sessions_count' => (int) ($stat->sessions_count ?? 0),
-                'books_listened' => json_decode((string)($stat->books_listened ?? '[]'), true) ?? [],
+                'sessions_count'    => (int) ($stat->sessions_count ?? 0),
+                'books_listened'    => json_decode((string) ($stat->books_listened ?? '[]'), true) ?? [],
             ];
         })->toArray();
     }
@@ -850,9 +855,9 @@ class StatisticsController extends Controller
      */
     protected function formatSeconds(int $seconds): string
     {
-        $hours = floor($seconds / 3600);
+        $hours   = floor($seconds / 3600);
         $minutes = floor(($seconds % 3600) / 60);
-        $secs = $seconds % 60;
+        $secs    = $seconds % 60;
 
         if ($hours > 0) {
             return sprintf('%d:%02d:%02d', $hours, $minutes, $secs);

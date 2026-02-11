@@ -3,12 +3,13 @@
 namespace App\Services;
 
 use App\Models\Badge;
-use App\Models\UserBadge;
 use App\Models\ListeningStatistic;
+use App\Models\Message;
+use App\Models\UserBadge;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BadgeService
 {
@@ -48,13 +49,27 @@ class BadgeService
             return $newBadges;
         } catch (\Exception $e) {
             Log::error('Error evaluating user badges', [
-                'user_id' => $userId,
+                'user_id'   => $userId,
                 'device_id' => $deviceId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error'     => $e->getMessage(),
+                'trace'     => $e->getTraceAsString(),
             ]);
             return [];
         }
+    }
+
+    /**
+     * Build a base query for ListeningStatistic matching a user by user_id, device_id, or deviceId.
+     */
+    protected function userStatsQuery(string $userId, ?string $deviceId = null): \Illuminate\Database\Eloquent\Builder
+    {
+        return ListeningStatistic::where(function ($q) use ($userId, $deviceId) {
+            $q->where('device_id', $userId)
+                ->orWhere('user_id', $userId);
+            if ($deviceId) {
+                $q->orWhere('device_id', $deviceId);
+            }
+        });
     }
 
     /**
@@ -65,10 +80,7 @@ class BadgeService
         $cacheKey = "user_stats_{$userId}" . ($deviceId ? "_{$deviceId}" : '');
 
         return Cache::remember($cacheKey, 300, function () use ($userId, $deviceId) {
-            $query = ListeningStatistic::where('device_id', $userId);
-            if ($deviceId) {
-                $query->orWhere('device_id', $deviceId);
-            }
+            $query = $this->userStatsQuery($userId, $deviceId);
 
             $allTimeStats = $query->selectRaw('
                 SUM(seconds_listened) as total_listening_time,
@@ -86,8 +98,8 @@ class BadgeService
             $longestStreak = $this->calculateLongestStreak($userId, $deviceId);
 
             // Get genre and author variety
-            $genresExplored = $this->getGenresExplored($userId, $deviceId);
-            $authorsExplored = $this->getAuthorsExplored($userId, $deviceId);
+            $genresExplored    = $this->getGenresExplored($userId, $deviceId);
+            $authorsExplored   = $this->getAuthorsExplored($userId, $deviceId);
             $narratorsExplored = $this->getNarratorsExplored($userId, $deviceId);
 
             // Get weekend listening sessions
@@ -95,45 +107,45 @@ class BadgeService
 
             // Get recent completion stats
             $booksCompletedThisMonth = $this->getBooksCompletedInTimeframe($userId, $deviceId, 30);
-            $booksCompletedThisWeek = $this->getBooksCompletedInTimeframe($userId, $deviceId, 7);
+            $booksCompletedThisWeek  = $this->getBooksCompletedInTimeframe($userId, $deviceId, 7);
 
             // Get series completion count
             $seriesCompleted = $this->getSeriesCompleted($userId, $deviceId);
 
             // Get additional statistics for expanded badge categories
-            $bookmarksCreated = $this->getBookmarksCreated($userId, $deviceId);
-            $booksReviewed = $this->getBooksReviewed($userId, $deviceId);
-            $librarySize = $this->getLibrarySize($userId, $deviceId);
-            $completionRate = $this->getCompletionRate($userId, $deviceId);
+            $bookmarksCreated  = $this->getBookmarksCreated($userId, $deviceId);
+            $booksReviewed     = $this->getBooksReviewed($userId, $deviceId);
+            $librarySize       = $this->getLibrarySize($userId, $deviceId);
+            $completionRate    = $this->getCompletionRate($userId, $deviceId);
             $chapterCompletion = $this->getChapterCompletion($userId, $deviceId);
-            $deviceVariety = $this->getDeviceVariety($userId, $deviceId);
-            $repeatListening = $this->getRepeatListening($userId, $deviceId);
+            $deviceVariety     = $this->getDeviceVariety($userId, $deviceId);
+            $repeatListening   = $this->getRepeatListening($userId, $deviceId);
 
             return [
-                'total_listening_time' => (int) ($allTimeStats->total_listening_time ?? 0),
-                'session_count' => (int) ($allTimeStats->session_count ?? 0),
-                'books_started' => (int) ($allTimeStats->books_started ?? 0),
-                'books_completed' => (int) ($allTimeStats->books_completed ?? 0),
-                'total_listening_days' => (int) ($allTimeStats->total_listening_days ?? 0),
-                'longest_session' => (int) ($allTimeStats->longest_session ?? 0),
-                'current_streak' => $currentStreak,
-                'longest_streak' => $longestStreak,
-                'genres_explored' => $genresExplored,
-                'authors_explored' => $authorsExplored,
-                'narrator_variety' => $narratorsExplored,
-                'weekend_listening' => $weekendSessions,
+                'total_listening_time'       => (int) ($allTimeStats->total_listening_time ?? 0),
+                'session_count'              => (int) ($allTimeStats->session_count ?? 0),
+                'books_started'              => (int) ($allTimeStats->books_started ?? 0),
+                'books_completed'            => (int) ($allTimeStats->books_completed ?? 0),
+                'total_listening_days'       => (int) ($allTimeStats->total_listening_days ?? 0),
+                'longest_session'            => (int) ($allTimeStats->longest_session ?? 0),
+                'current_streak'             => $currentStreak,
+                'longest_streak'             => $longestStreak,
+                'genres_explored'            => $genresExplored,
+                'authors_explored'           => $authorsExplored,
+                'narrator_variety'           => $narratorsExplored,
+                'weekend_listening'          => $weekendSessions,
                 'books_completed_this_month' => $booksCompletedThisMonth,
-                'books_completed_this_week' => $booksCompletedThisWeek,
-                'series_completion' => $seriesCompleted,
-                'bookmarks_created' => $bookmarksCreated,
-                'books_reviewed' => $booksReviewed,
-                'library_size' => $librarySize,
-                'completion_rate' => $completionRate,
-                'chapter_completion' => $chapterCompletion,
-                'device_variety' => $deviceVariety,
-                'repeat_listening' => $repeatListening,
-                'first_listening_date' => $allTimeStats->first_listening_date,
-                'last_listening_date' => $allTimeStats->last_listening_date,
+                'books_completed_this_week'  => $booksCompletedThisWeek,
+                'series_completion'          => $seriesCompleted,
+                'bookmarks_created'          => $bookmarksCreated,
+                'books_reviewed'             => $booksReviewed,
+                'library_size'               => $librarySize,
+                'completion_rate'            => $completionRate,
+                'chapter_completion'         => $chapterCompletion,
+                'device_variety'             => $deviceVariety,
+                'repeat_listening'           => $repeatListening,
+                'first_listening_date'       => $allTimeStats->getAttribute('first_listening_date'),
+                'last_listening_date'        => $allTimeStats->getAttribute('last_listening_date'),
             ];
         });
     }
@@ -143,18 +155,14 @@ class BadgeService
      */
     protected function calculateCurrentStreak(string $userId, ?string $deviceId = null): int
     {
-        $streak = 0;
+        $streak      = 0;
         $currentDate = Carbon::now();
 
         while (true) {
-            $query = ListeningStatistic::where('device_id', $userId);
-            if ($deviceId) {
-                $query->orWhere('device_id', $deviceId);
-            }
+            $hasActivity = $this->userStatsQuery($userId, $deviceId)
+                ->where('listening_date', $currentDate->toDateString())->exists();
 
-            $hasActivity = $query->where('listening_date', $currentDate->toDateString())->exists();
-
-            if (!$hasActivity) {
+            if (! $hasActivity) {
                 break;
             }
 
@@ -175,12 +183,7 @@ class BadgeService
      */
     protected function calculateLongestStreak(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
-
-        $dates = $query->select('listening_date')
+        $dates = $this->userStatsQuery($userId, $deviceId)->select('listening_date')
             ->distinct()
             ->orderBy('listening_date')
             ->pluck('listening_date')
@@ -211,12 +214,8 @@ class BadgeService
      */
     protected function getGenresExplored(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('listening_statistics.device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('listening_statistics.device_id', $deviceId);
-        }
-
-        return $query->join('books', 'listening_statistics.book_id', '=', 'books.id')
+        return $this->userStatsQuery($userId, $deviceId)
+            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
             ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
             ->distinct('book_genre.genre_id')
             ->count();
@@ -227,12 +226,8 @@ class BadgeService
      */
     protected function getAuthorsExplored(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('listening_statistics.device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('listening_statistics.device_id', $deviceId);
-        }
-
-        return $query->join('books', 'listening_statistics.book_id', '=', 'books.id')
+        return $this->userStatsQuery($userId, $deviceId)
+            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
             ->join('author_book', 'books.id', '=', 'author_book.book_id')
             ->distinct('author_book.author_id')
             ->count();
@@ -243,10 +238,7 @@ class BadgeService
      */
     protected function getNarratorsExplored(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('listening_statistics.device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('listening_statistics.device_id', $deviceId);
-        }
+        $query = $this->userStatsQuery($userId, $deviceId);
 
         return $query->join('books', 'listening_statistics.book_id', '=', 'books.id')
             ->join('book_narrator', 'books.id', '=', 'book_narrator.book_id')
@@ -259,12 +251,15 @@ class BadgeService
      */
     protected function getWeekendSessions(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
+        $query = $this->userStatsQuery($userId, $deviceId);
+
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            return $query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN (0, 6)")
+                ->count();
         }
 
-        return $query->whereRaw('DAYOFWEEK(listening_date) IN (1, 7)') // Sunday = 1, Saturday = 7
+        return $query->whereRaw('DAYOFWEEK(listening_date) IN (1, 7)')
             ->count();
     }
 
@@ -273,10 +268,7 @@ class BadgeService
      */
     protected function getBooksCompletedInTimeframe(string $userId, ?string $deviceId, int $days): int
     {
-        $query = ListeningStatistic::where('device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
+        $query = $this->userStatsQuery($userId, $deviceId);
 
         $startDate = Carbon::now()->subDays($days);
 
@@ -287,13 +279,52 @@ class BadgeService
     }
 
     /**
-     * Get series completion count (simplified - would need more complex logic for actual series tracking)
+     * Get series completion count - counts series where all books have been completed
      */
     protected function getSeriesCompleted(string $userId, ?string $deviceId = null): int
     {
-        // This is a simplified implementation - in practice you'd need to track
-        // which books belong to series and whether all books in a series have been completed
-        return 0;
+        try {
+            // Find series where every book has a "completed" session for this user
+            $completedBookIds = ListeningStatistic::where(function ($q) use ($userId, $deviceId) {
+                $q->where('device_id', $userId);
+                if ($deviceId) {
+                    $q->orWhere('device_id', $deviceId);
+                }
+            })
+                ->where('session_type', 'completed')
+                ->distinct('book_id')
+                ->pluck('book_id');
+
+            if ($completedBookIds->isEmpty()) {
+                return 0;
+            }
+
+            // Get all series that have at least one completed book
+            $seriesWithCompleted = DB::table('books')
+                ->whereIn('id', $completedBookIds)
+                ->whereNotNull('series_id')
+                ->select('series_id')
+                ->distinct()
+                ->pluck('series_id');
+
+            $completedSeries = 0;
+            foreach ($seriesWithCompleted as $seriesId) {
+                $totalBooksInSeries = DB::table('books')->where('series_id', $seriesId)->count();
+                $completedInSeries  = DB::table('books')
+                    ->where('series_id', $seriesId)
+                    ->whereIn('id', $completedBookIds)
+                    ->count();
+
+                if ($totalBooksInSeries > 0 && $completedInSeries >= $totalBooksInSeries) {
+                    $completedSeries++;
+                }
+            }
+
+            return $completedSeries;
+        } catch (\Exception $e) {
+            Log::warning('Failed to calculate series completion', ['error' => $e->getMessage()]);
+            return 0;
+        }
     }
 
     /**
@@ -301,11 +332,7 @@ class BadgeService
      */
     protected function getBookmarksCreated(string $userId, ?string $deviceId = null): int
     {
-        $query = DB::table('bookmarks')->where('user_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
-        return $query->count();
+        return DB::table('bookmarks')->where('user_id', $userId)->count();
     }
 
     /**
@@ -323,12 +350,7 @@ class BadgeService
      */
     protected function getLibrarySize(string $userId, ?string $deviceId = null): int
     {
-        $query = DB::table('book_user')->where('user_id', $userId);
-        if ($deviceId) {
-            // If using device-based tracking, you might need a different approach
-            $query->orWhere('device_id', $deviceId);
-        }
-        return $query->count();
+        return DB::table('book_user')->where('user_id', $userId)->count();
     }
 
     /**
@@ -336,12 +358,9 @@ class BadgeService
      */
     protected function getCompletionRate(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
+        $query = $this->userStatsQuery($userId, $deviceId);
 
-        $totalBooks = $query->distinct('book_id')->count();
+        $totalBooks     = $query->distinct('book_id')->count();
         $completedBooks = $query->where('session_type', 'completed')->distinct('book_id')->count();
 
         if ($totalBooks === 0) {
@@ -358,13 +377,10 @@ class BadgeService
     {
         // This would require chapter tracking in your system
         // For now, estimate based on sessions (simplified)
-        $query = ListeningStatistic::where('device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
+        $query = $this->userStatsQuery($userId, $deviceId);
 
         // Rough estimate: assume average session covers 1-2 chapters
-        return $query->count() * 1.5;
+        return (int) ($query->count() * 1.5);
     }
 
     /**
@@ -372,13 +388,16 @@ class BadgeService
      */
     protected function getDeviceVariety(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
+        try {
+            if (is_numeric($userId)) {
+                return DB::table('devices')
+                    ->where('user_id', (int) $userId)
+                    ->count();
+            }
+            return 1;
+        } catch (\Exception $e) {
+            return 1;
         }
-
-        // This is simplified - you'd need to track actual device info
-        return 1; // For now, return 1 as they're using at least one device
     }
 
     /**
@@ -386,10 +405,7 @@ class BadgeService
      */
     protected function getRepeatListening(string $userId, ?string $deviceId = null): int
     {
-        $query = ListeningStatistic::where('device_id', $userId);
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
+        $query = $this->userStatsQuery($userId, $deviceId);
 
         // Count books that have been "completed" more than once
         return $query->where('session_type', 'completed')
@@ -406,12 +422,12 @@ class BadgeService
     protected function shouldEvaluateBadge(Badge $badge, string $userId, ?string $deviceId, array $userStats): bool
     {
         // Skip if badge is not active
-        if (!$badge->is_active) {
+        if (! $badge->is_active) {
             return false;
         }
 
         // Skip if user already has this badge and it's not repeatable
-        if (!$badge->is_repeatable && $badge->hasBeenEarnedByUser($userId, $deviceId)) {
+        if (! $badge->is_repeatable && $badge->hasBeenEarnedByUser($userId, $deviceId)) {
             return false;
         }
 
@@ -434,12 +450,15 @@ class BadgeService
             );
 
             Log::info('Badge awarded', [
-                'badge_id' => $badge->id,
+                'badge_id'   => $badge->id,
                 'badge_name' => $badge->name,
-                'user_id' => $userId,
-                'device_id' => $deviceId,
-                'tier_level' => $userBadge->tier_level
+                'user_id'    => $userId,
+                'device_id'  => $deviceId,
+                'tier_level' => $userBadge->tier_level,
             ]);
+
+            // Create a message for the user about the new badge
+            $this->createBadgeMessage($badge, $userId);
 
             // Clear user stats cache since they've earned a new badge
             $cacheKey = "user_stats_{$userId}" . ($deviceId ? "_{$deviceId}" : '');
@@ -448,11 +467,11 @@ class BadgeService
             return $userBadge;
         } catch (\Exception $e) {
             Log::error('Error awarding badge', [
-                'badge_id' => $badge->id,
+                'badge_id'   => $badge->id,
                 'badge_name' => $badge->name,
-                'user_id' => $userId,
-                'device_id' => $deviceId,
-                'error' => $e->getMessage()
+                'user_id'    => $userId,
+                'device_id'  => $deviceId,
+                'error'      => $e->getMessage(),
             ]);
             return null;
         }
@@ -463,23 +482,23 @@ class BadgeService
      */
     public function getUserBadgeProgress(string $userId, ?string $deviceId = null): array
     {
-        $userStats = $this->getUserListeningStatistics($userId, $deviceId);
-        $earnedBadges = UserBadge::getUserBadgesWithDetails($userId, $deviceId);
+        $userStats      = $this->getUserListeningStatistics($userId, $deviceId);
+        $earnedBadges   = UserBadge::getUserBadgesWithDetails($userId, $deviceId);
         $earnedBadgeIds = $earnedBadges->pluck('badge_id')->toArray();
 
         $availableBadges = Badge::active()->ordered()->get();
-        $badgeProgress = [];
+        $badgeProgress   = [];
 
         foreach ($availableBadges as $badge) {
             $hasEarned = in_array($badge->id, $earnedBadgeIds);
-            $progress = $badge->getProgressPercentage($userStats);
+            $progress  = $badge->getProgressPercentage($userStats);
 
             $badgeProgress[] = [
-                'badge' => $badge,
-                'earned' => $hasEarned,
-                'progress' => $progress,
-                'times_earned' => $badge->getTimesEarnedByUser($userId, $deviceId),
-                'can_earn_again' => $badge->is_repeatable || !$hasEarned
+                'badge'          => $badge,
+                'earned'         => $hasEarned,
+                'progress'       => $progress,
+                'times_earned'   => $badge->getTimesEarnedByUser($userId, $deviceId),
+                'can_earn_again' => $badge->is_repeatable || ! $hasEarned,
             ];
         }
 
@@ -516,5 +535,40 @@ class BadgeService
             ->whereIn('badge_id', $badgeIds)
             ->unnotified()
             ->update(['is_notified' => true]);
+    }
+
+    /**
+     * Create a message for the user when a badge is awarded
+     */
+    protected function createBadgeMessage(Badge $badge, string $userId): void
+    {
+        try {
+            // Only create messages for authenticated users (numeric user IDs)
+            if (! is_numeric($userId)) {
+                return;
+            }
+
+            Message::create([
+                'sender_id'    => null,
+                'recipient_id' => (int) $userId,
+                'type'         => 'badge_earned',
+                'content'      => "You earned the \"{$badge->name}\" badge! {$badge->description}",
+                'payload' => [
+                    'badge_id'       => $badge->id,
+                    'badge_key'      => $badge->key,
+                    'badge_name'     => $badge->name,
+                    'badge_icon'     => $badge->icon,
+                    'badge_tier'     => $badge->tier,
+                    'badge_points'   => $badge->points,
+                    'badge_category' => $badge->category,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Failed to create badge message', [
+                'badge_id' => $badge->id,
+                'user_id'  => $userId,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 }
