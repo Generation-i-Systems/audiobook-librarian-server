@@ -289,17 +289,7 @@ class ShowBookInfo extends Command
         }
 
         /** @var \Illuminate\Support\Collection<int, Book> $books */
-        $books = $this->queryBook()->where('directory_path', 'LIKE', $searchPath . '%')->get();
-        $isFuzzyMatch = false;
-
-        if ($books->isEmpty()) {
-            /** @var \Illuminate\Support\Collection<int, Book> $books */
-            $books = $this->queryBook()
-            ->where('directory_path', 'LIKE', '%' . basename($searchPath) . '%')
-            ->where('directory_path', 'LIKE', dirname($searchPath) . '%')
-            ->get();
-            $isFuzzyMatch = $books->isNotEmpty();
-        }
+        $books = $this->queryBook()->where('directory_path', 'LIKE', rtrim($searchPath, '/') . '/%')->get();
 
         if ($books->isEmpty()) {
             // Check if directory is under book root and has audio files
@@ -336,37 +326,7 @@ class ShowBookInfo extends Command
             return;
         }
 
-        if ($books->count() === 1 && $isFuzzyMatch) {
-            /** @var Book $book */
-            $book = $books->first();
-            $this->warn("Found book with mismatched path:");
-            $this->line("  Database: {$book->directoryPath}");
-            $this->line("  Actual:   {$searchPath}");
-            $this->newLine();
-
-            if ($this->confirm('Update database to match actual directory path?', true)) {
-                $oldPath = $book->directoryPath;
-                $book->directoryPath = $searchPath;
-                $book->save();
-                $this->info("✓ Updated directory path from '{$oldPath}' to '{$searchPath}'");
-                $this->newLine();
-            }
-
-            // Update book if any options were provided
-            if ($this->hasUpdateOptions()) {
-                $this->updateBookFields($book, $directory);
-            }
-
-            $this->displayBookInfo($book);
-
-            // Open edit page if requested
-            if ($this->option('edit')) {
-                $this->openEditPage($book);
-            }
-
-            $this->newLine();
-            return;
-        } else {
+        if ($books->count() > 1) {
             $this->info("Found {$books->count()} book(s) matching: {$directory}");
             $this->newLine();
         }
@@ -507,10 +467,11 @@ class ShowBookInfo extends Command
             );
         }
 
+        $publisherName = $book->publisher ? $book->publisher->name : 'N/A';
         $this->addRow(
             $tableData,
             'Publisher',
-            $book->publisher ?? 'N/A',
+            $publisherName,
             true,
             $hasCoverImage,
             $shortWidth,
@@ -870,7 +831,7 @@ class ShowBookInfo extends Command
             $this->printField('Genres', $genres, $leftWidth);
         }
 
-        $this->printField('Publisher', $book->publisher ?? 'N/A', $leftWidth);
+        $this->printField('Publisher', $book->publisher ? $book->publisher->name : 'N/A', $leftWidth);
         $this->printField('Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A', $leftWidth);
         $this->printField('Language', $book->language ?? 'N/A', $leftWidth);
 
