@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
+use App\Models\Narrator;
 use App\Models\Series;
 use App\Services\BookImportService;
 use App\Services\GenreMappingService;
@@ -328,6 +329,133 @@ class BookImportServiceMetadataTest extends TestCase
 
         $this->assertEquals(80, $metadata['confidence']);
         $this->assertEquals('Science Fiction', $metadata['genre']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function buildMergeMetadataAutoAcceptsMatchingFields(): void
+    {
+        $author = Author::create(['name' => 'Brandon Sanderson']);
+        $genre = Genre::create(['name' => 'Fantasy']);
+        $narrator = Narrator::create(['name' => 'Michael Kramer']);
+        $series = Series::create(['name' => 'Mistborn']);
+
+        $book = Book::create([
+            'title' => 'The Final Empire',
+            'directory_path' => 'Fantasy/Brandon Sanderson/Mistborn/The Final Empire',
+            'language' => 'en',
+        ]);
+        $book->authors()->attach($author);
+        $book->genres()->attach($genre);
+        $book->narrators()->attach($narrator);
+        $book->series()->attach($series, ['series_number' => 1]);
+
+        $newMetadata = [
+            'title' => 'The Final Empire',
+            'author' => ['Brandon Sanderson'],
+            'narrator' => ['Michael Kramer'],
+            'series' => 'Mistborn',
+            'series_number' => '1',
+            'genre' => ['Fantasy'],
+            'language' => 'en',
+            'description' => '',
+            'isbn' => '',
+            'year' => '',
+        ];
+
+        $selectCalled = false;
+        $result = $this->service->buildMergeMetadata(
+            $book,
+            $newMetadata,
+            function () use (&$selectCalled) {
+                $selectCalled = true;
+                return '1';
+            },
+            fn ($q, $d) => $d,
+            fn ($msg) => null
+        );
+
+        $this->assertNotNull($result);
+        $this->assertFalse($selectCalled);
+        $this->assertEquals('The Final Empire', $result['title']);
+        $this->assertEquals(['Brandon Sanderson'], $result['author']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function buildMergeMetadataFillsMissingExistingFields(): void
+    {
+        $author = Author::create(['name' => 'Brandon Sanderson']);
+
+        $book = Book::create([
+            'title' => 'The Final Empire',
+            'directory_path' => 'Fantasy/Brandon Sanderson/The Final Empire',
+            'language' => 'en',
+        ]);
+        $book->authors()->attach($author);
+
+        $newMetadata = [
+            'title' => 'The Final Empire',
+            'author' => ['Brandon Sanderson'],
+            'narrator' => ['Michael Kramer'],
+            'series' => 'Mistborn',
+            'series_number' => '1',
+            'genre' => ['Fantasy'],
+            'language' => 'en',
+            'description' => 'A great book',
+            'isbn' => '1234567890',
+            'year' => '2006',
+        ];
+
+        $result = $this->service->buildMergeMetadata(
+            $book,
+            $newMetadata,
+            fn ($q, $o, $d) => $d,
+            fn ($q, $d) => $d,
+            fn ($msg) => null
+        );
+
+        $this->assertNotNull($result);
+        $this->assertEquals('Mistborn', $result['series']);
+        $this->assertEquals(['Michael Kramer'], $result['narrator']);
+        $this->assertEquals('A great book', $result['description']);
+        $this->assertEquals('1234567890', $result['isbn']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function buildMergeMetadataReturnsNullWhenUserCancels(): void
+    {
+        $author = Author::create(['name' => 'Author A']);
+        $genre = Genre::create(['name' => 'Fantasy']);
+
+        $book = Book::create([
+            'title' => 'Book Title A',
+            'directory_path' => 'Fantasy/Author A/Book Title A',
+            'language' => 'en',
+        ]);
+        $book->authors()->attach($author);
+        $book->genres()->attach($genre);
+
+        $newMetadata = [
+            'title' => 'Book Title B',
+            'author' => ['Author A'],
+            'narrator' => [],
+            'series' => '',
+            'series_number' => '',
+            'genre' => ['Fantasy'],
+            'language' => 'en',
+            'description' => '',
+            'isbn' => '',
+            'year' => '',
+        ];
+
+        $result = $this->service->buildMergeMetadata(
+            $book,
+            $newMetadata,
+            fn ($q, $o, $d) => '4',
+            fn ($q, $d) => $d,
+            fn ($msg) => null
+        );
+
+        $this->assertNull($result);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

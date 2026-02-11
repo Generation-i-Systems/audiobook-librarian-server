@@ -1551,11 +1551,6 @@ class ShowBookInfo extends Command
             $this->newLine();
         }
 
-        if (!$this->option('force') && !$this->confirm("Proceed with deletion?", false)) {
-            $this->info("Cancelled");
-            return 0;
-        }
-
         $this->newLine();
 
         $successCount = 0;

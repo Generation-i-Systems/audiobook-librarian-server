@@ -23,6 +23,7 @@ class BookImportService
     protected SourceTrashService $sourceTrashService;
     protected ?OpenAudibleParser $openAudibleParser = null;
     protected array $config = [];
+    protected array $multiBookSharedOverrides = [];
 
     private const AUDIO_EXTENSIONS = [
         'mp3',
@@ -4073,6 +4074,14 @@ class BookImportService
             $metadata['confidence'] = 100;
             $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
 
+            if (!empty($audiobook['is_multi_book_part'])) {
+                foreach (['author', 'narrator', 'genre', 'series'] as $field) {
+                    if (!empty($metadata[$field])) {
+                        $this->multiBookSharedOverrides[$field] = $metadata[$field];
+                    }
+                }
+            }
+
             return $metadata;
         }
 
@@ -4175,6 +4184,14 @@ class BookImportService
             }
             $metadata['confidence'] = 100;
             $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+        }
+
+        if (!empty($audiobook['is_multi_book_part'])) {
+            foreach (['author', 'narrator', 'genre', 'series'] as $field) {
+                if (!empty($metadata[$field])) {
+                    $this->multiBookSharedOverrides[$field] = $metadata[$field];
+                }
+            }
         }
 
         return $metadata;
@@ -4374,6 +4391,138 @@ class BookImportService
         return 'skip';
     }
 
+    public function buildMergeMetadata(
+        Book $existingBook,
+        array $newMetadata,
+        callable $selectCallback,
+        callable $askCallback,
+        callable $infoCallback
+    ): ?array {
+        $existingBook->load(['authors', 'narrators', 'series', 'genres', 'publisher']);
+
+        $firstSeries = $existingBook->series->first();
+
+        $existingData = [
+            'title' => $existingBook->title ?? '',
+            'author' => $existingBook->authors->pluck('name')->toArray(),
+            'narrator' => $existingBook->narrators->pluck('name')->toArray(),
+            'series' => $firstSeries ? $firstSeries->name : '',
+            'series_number' => $firstSeries ? ($firstSeries->pivot->series_number ?? '') : '',
+            'year' => $existingBook->release_date ? substr((string) $existingBook->release_date, 0, 4) : '',
+            'genre' => $existingBook->genres->pluck('name')->toArray(),
+            'description' => $existingBook->description ?? '',
+            'isbn' => $existingBook->isbn ?? '',
+            'language' => $existingBook->language ?? 'en',
+        ];
+
+        $merged = $newMetadata;
+
+        $fields = [
+            'title' => 'Title',
+            'author' => 'Author',
+            'narrator' => 'Narrator',
+            'series' => 'Series',
+            'series_number' => 'Series Number',
+            'year' => 'Year',
+            'genre' => 'Genre',
+            'description' => 'Description',
+            'isbn' => 'ISBN',
+            'language' => 'Language',
+        ];
+
+        foreach ($fields as $key => $label) {
+            $existingVal = $existingData[$key];
+            $newVal = $newMetadata[$key] ?? '';
+
+            $existingStr = is_array($existingVal) ? implode(', ', $existingVal) : (string) $existingVal;
+            $newStr = is_array($newVal) ? implode(', ', (array) $newVal) : (string) $newVal;
+
+            if (strcasecmp(trim($existingStr), trim($newStr)) === 0) {
+                if ($existingStr !== '') {
+                    $merged[$key] = $existingVal;
+                }
+                continue;
+            }
+
+            if (trim($existingStr) === '' && trim($newStr) !== '') {
+                $infoCallback("  {$label}: using new value '{$newStr}'");
+                $merged[$key] = $newVal;
+                continue;
+            }
+
+            if (trim($newStr) === '' && trim($existingStr) !== '') {
+                $merged[$key] = $existingVal;
+                continue;
+            }
+
+            $options = [
+                '1' => "Keep existing: {$existingStr}",
+                '2' => "Use new: {$newStr}",
+                '3' => 'Edit manually',
+                '4' => 'Cancel merge',
+            ];
+
+            $choice = $selectCallback("{$label} differs", $options, '1');
+
+            switch ($choice) {
+                case '2':
+                    $merged[$key] = $newVal;
+                    break;
+                case '3':
+                    $editedValue = $askCallback("{$label}", $newStr);
+                    if (is_array($existingVal)) {
+                        $merged[$key] = array_map('trim', explode(',', $editedValue));
+                    } else {
+                        $merged[$key] = $editedValue;
+                    }
+                    break;
+                case '4':
+                    return null;
+                default:
+                    $merged[$key] = $existingVal;
+                    break;
+            }
+        }
+
+        return $merged;
+    }
+
+    public function mergeIntoExistingBook(
+        Book $existingBook,
+        array $audiobook,
+        array $mergedMetadata,
+        callable $warnCallback,
+        callable $infoCallback,
+        callable $getFileOperationCallback
+    ): Book {
+        if (empty($existingBook->directory_path)) {
+            $existingBook->directory_path = $this->generateDirectoryPath($mergedMetadata, ['include_title' => true]);
+            $existingBook->save();
+            $infoCallback("  Generated directory path: {$existingBook->directory_path}");
+        }
+
+        $book = $this->updateBookFromMetadata($existingBook, $mergedMetadata, $audiobook);
+        $infoCallback("  Updated book record (ID: {$book->id})");
+
+        $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
+        $targetDir = rtrim($bookStoragePath, '/') . '/' . ltrim($existingBook->directory_path, '/');
+
+        $operation = $getFileOperationCallback();
+        $this->moveFilesToLibrary(
+            $audiobook,
+            $book,
+            [
+                'storage_path' => $bookStoragePath,
+                'operation' => $operation === 'copy' ? 'copy' : 'move',
+                'target_directory' => $targetDir,
+            ]
+        );
+
+        $this->processCoverImage($book, $mergedMetadata);
+
+        return $book;
+    }
+
     /**
      * Process a single book (used for both regular books and split multi-books)
      */
@@ -4563,6 +4712,7 @@ class BookImportService
         }
 
         $books = [];
+        $this->multiBookSharedOverrides = [];
 
         foreach ($splitGroups as $bookNumber => $fileInfos) {
             if (empty($fileInfos)) {
@@ -4584,8 +4734,8 @@ class BookImportService
             // Extract file tags from this book's files to get embedded metadata
             $fileTagMetadata = $this->extractFileTagsFromFiles($files);
 
-            // Start with AI metadata as base
-            $bookMetadata = $aiMetadata;
+            // Start with AI metadata as base, applying shared overrides from previous edits
+            $bookMetadata = array_merge($aiMetadata, $this->multiBookSharedOverrides);
             $bookMetadata['series'] = $multiBookInfo['series_name'];
             $bookMetadata['series_number'] = $bookNumber;
             unset($bookMetadata['series_original']);
@@ -7546,19 +7696,97 @@ class BookImportService
                         }
                     }
                 } else {
-                    $warnCallback("📁 Cannot compare directories (existing directory not found)");
-                    $lineCallback("  Existing path: {$existingDir}");
-                    $shouldContinue = $promptForDuplicateActionCallback($audiobook, $existingBook);
-                    if (!$shouldContinue) {
+                    $infoCallback("📋 Existing book found but directory missing - merging into existing record");
+                    $lineCallback("  Existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
+                    $lineCallback("  Expected path: {$existingDir}");
+
+                    $selectCb = $uiService ? fn ($q, $o, $d) => $uiService->select($q, $o, $d) : fn ($q, $o, $d) => $d;
+                    $askCb = $uiService ? fn ($q, $d) => $uiService->ask($q, $d ?? '') : fn ($q, $d) => $d ?? '';
+
+                    $mergedMetadata = $this->buildMergeMetadata(
+                        $existingBook,
+                        $aiMetadata,
+                        $selectCb,
+                        $askCb,
+                        $infoCallback
+                    );
+
+                    if ($mergedMetadata === null) {
+                        $skippedBooks[] = [
+                            'path' => $audiobook['path'],
+                            'reason' => 'User cancelled merge into existing book',
+                        ];
                         return;
                     }
-                }
-            } else {
-                $warnCallback("📁 Cannot compare directories (storage path or directory path missing)");
-                $shouldContinue = $promptForDuplicateActionCallback($audiobook, $existingBook);
-                if (!$shouldContinue) {
+
+                    if (!$isDryRun) {
+                        $operation = $getFileOperationCallback();
+                        $book = $this->mergeIntoExistingBook(
+                            $existingBook,
+                            $audiobook,
+                            $mergedMetadata,
+                            $warnCallback,
+                            $infoCallback,
+                            fn () => $operation
+                        );
+
+                        $infoCallback("✅ Book merged successfully: {$book->title} (ID: {$book->id})");
+                        $processedBooks[] = [
+                            'path' => $audiobook['path'],
+                            'book_id' => $book->id,
+                            'title' => $book->title,
+                        ];
+                    } else {
+                        $infoCallback("🔍 [DRY RUN] Would merge into existing: {$existingBook->title} (ID: {$existingBook->id})");
+                    }
+
                     return;
                 }
+            } else {
+                $infoCallback("📋 Existing book found but directory path missing - merging into existing record");
+                $lineCallback("  Existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
+
+                $selectCb = $uiService ? fn ($q, $o, $d) => $uiService->select($q, $o, $d) : fn ($q, $o, $d) => $d;
+                $askCb = $uiService ? fn ($q, $d) => $uiService->ask($q, $d ?? '') : fn ($q, $d) => $d ?? '';
+
+                $mergedMetadata = $this->buildMergeMetadata(
+                    $existingBook,
+                    $aiMetadata,
+                    $selectCb,
+                    $askCb,
+                    $infoCallback
+                );
+
+                if ($mergedMetadata === null) {
+                    $skippedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'reason' => 'User cancelled merge into existing book',
+                    ];
+                    return;
+                }
+
+                if (!$isDryRun) {
+                    $operation = $getFileOperationCallback();
+                    $book = $this->mergeIntoExistingBook(
+                        $existingBook,
+                        $audiobook,
+                        $mergedMetadata,
+                        $warnCallback,
+                        $infoCallback,
+                        fn () => $operation
+                    );
+
+                    $infoCallback("✅ Book merged successfully: {$book->title} (ID: {$book->id})");
+                    $processedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'book_id' => $book->id,
+                        'title' => $book->title,
+                    ];
+                } else {
+                    $infoCallback("🔍 [DRY RUN] Would merge into existing: {$existingBook->title} (ID: {$existingBook->id})");
+                }
+
+                return;
             }
         }
 
