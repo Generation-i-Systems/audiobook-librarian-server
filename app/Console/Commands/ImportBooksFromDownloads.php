@@ -630,7 +630,8 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->processSpecificPaths(
             $paths,
             fn ($path) => $this->processSingleAudioFile($path),
-            fn ($path) => $this->processAudiobookDirectory($path)
+            fn ($path) => $this->processAudiobookDirectory($path),
+            fn ($msg) => $this->warn($msg)
         );
     }
 

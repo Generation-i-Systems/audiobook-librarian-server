@@ -3882,13 +3882,14 @@ class BookImportService
     /**
      * Process specific files or folders provided as arguments
      */
-    public function processSpecificPaths(array $paths, callable $processSingleAudioFileCallback, callable $processAudiobookDirectoryCallback): array
+    public function processSpecificPaths(array $paths, callable $processSingleAudioFileCallback, callable $processAudiobookDirectoryCallback, ?callable $warnCallback = null): array
     {
         $audiobooks = [];
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
         $processedDirectories = [];
 
         foreach ($paths as $path) {
+            $path = trim($path);
             $normalizedPath = str_replace('\ ', ' ', $path);
 
             $pathsToTry = [
@@ -3917,17 +3918,26 @@ class BookImportService
             }
 
             if (!$actualPath) {
+                $warn = $warnCallback ?? fn ($msg) => Log::warning($msg);
+                $warn("Path not found: {$path}");
                 continue;
             }
 
             $path = $actualPath;
 
+            $warn = $warnCallback ?? fn ($msg) => Log::warning($msg);
+
             if (is_file($path)) {
                 $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-                if (in_array($extension, $audioExtensions)) {
+                if (!in_array($extension, $audioExtensions)) {
+                    $warn("Skipping non-audio file: {$path} (extension: {$extension})");
+                } else {
                     $audiobook = $processSingleAudioFileCallback($path);
                     if ($audiobook) {
                         $audiobooks[] = $audiobook;
+                    } else {
+                        $fileSize = filesize($path);
+                        $warn("Skipping audio file (too small: " . round($fileSize / 1024 / 1024, 1) . " MB): {$path}");
                     }
                 }
             } elseif (is_dir($path)) {
