@@ -332,6 +332,83 @@ class BookImportServiceMetadataTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceInheritsGenreFromSeriesBooks(): void
+    {
+        $author = Author::create(['name' => 'Brandon Sanderson']);
+        $series = Series::create(['name' => 'Mistborn']);
+        $genre = Genre::create(['name' => 'Fantasy']);
+
+        $book = Book::create([
+            'title' => 'The Final Empire',
+            'directory_path' => 'Fantasy/Brandon Sanderson/Mistborn/The Final Empire',
+            'language' => 'en',
+        ]);
+        $book->authors()->attach($author);
+        $book->series()->attach($series, ['series_number' => 1]);
+        $book->genres()->attach($genre, ['is_primary' => true]);
+
+        $metadata = [
+            'title' => 'The Well of Ascension',
+            'author' => ['Brandon Sanderson'],
+            'series' => 'Mistborn',
+            'genre' => 'Other',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals('Fantasy', $metadata['genre']);
+        $this->assertEquals(90, $metadata['confidence']); // +10 series boost, no -30 penalty
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceAppliesPenaltyWhenNoSeriesGenreMatch(): void
+    {
+        $metadata = [
+            'title' => 'Some Book',
+            'author' => ['Unknown Author'],
+            'series' => 'Nonexistent Series',
+            'genre' => 'Other',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals(50, $metadata['confidence']); // -30 penalty
+        $this->assertEquals('Other', $metadata['genre']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function adjustConfidenceIgnoresOtherUnknownSeriesGenre(): void
+    {
+        $author = Author::create(['name' => 'Test Author']);
+        $series = Series::create(['name' => 'Test Series']);
+        $otherGenre = Genre::create(['name' => 'Other']);
+
+        $book = Book::create([
+            'title' => 'Existing Book',
+            'directory_path' => 'Other/Test Author/Test Series/Existing Book',
+            'language' => 'en',
+        ]);
+        $book->authors()->attach($author);
+        $book->series()->attach($series, ['series_number' => 1]);
+        $book->genres()->attach($otherGenre, ['is_primary' => true]);
+
+        $metadata = [
+            'title' => 'New Book',
+            'author' => ['Test Author'],
+            'series' => 'Test Series',
+            'genre' => 'Unknown',
+            'confidence' => 80,
+        ];
+
+        $this->service->adjustConfidence($metadata);
+
+        $this->assertEquals(60, $metadata['confidence']); // +10 series boost, -30 penalty
+        $this->assertEquals('Unknown', $metadata['genre']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function buildMergeMetadataAutoAcceptsMatchingFields(): void
     {
         $author = Author::create(['name' => 'Brandon Sanderson']);

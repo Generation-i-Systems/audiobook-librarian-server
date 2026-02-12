@@ -2837,9 +2837,43 @@ class BookImportService
         }
 
         if (in_array($genre, ['Other', 'Unknown'], true)) {
-            $confidence = max(0, $confidence - 30);
-            if ($infoCallback) {
-                $infoCallback("📉 Confidence -30% (genre is '{$genre}')");
+            $genreOverridden = false;
+
+            if (!empty($seriesName) && !empty($authors)) {
+                $matchingBook = Book::whereHas('series', function ($q) use ($seriesName) {
+                    $q->where('name', $seriesName);
+                })->whereHas('authors', function ($q) use ($authors) {
+                    $q->whereIn('name', $authors);
+                })->whereHas('genres', function ($q) {
+                    $q->where('book_genre.is_primary', true)
+                        ->whereNotIn('name', ['Other', 'Unknown']);
+                })->first();
+
+                if ($matchingBook) {
+                    $seriesGenre = Genre::join('book_genre', 'genres.id', '=', 'book_genre.genre_id')
+                        ->where('book_genre.book_id', $matchingBook->id)
+                        ->where('book_genre.is_primary', true)
+                        ->value('genres.name');
+
+                    if ($seriesGenre) {
+                        if (is_array($metadata['genre'])) {
+                            $metadata['genre'] = [$seriesGenre];
+                        } else {
+                            $metadata['genre'] = $seriesGenre;
+                        }
+                        $genreOverridden = true;
+                        if ($infoCallback) {
+                            $infoCallback("🔄 Genre updated from '{$genre}' to '{$seriesGenre}' (from existing series books)");
+                        }
+                    }
+                }
+            }
+
+            if (!$genreOverridden) {
+                $confidence = max(0, $confidence - 30);
+                if ($infoCallback) {
+                    $infoCallback("📉 Confidence -30% (genre is '{$genre}')");
+                }
             }
         } elseif ($genre === 'Action' && !empty($authors)) {
             $preferredGenre = $this->getAuthorPreferredGenre($authors);
