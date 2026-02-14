@@ -671,12 +671,8 @@ class AuthController extends Controller
                 $user = $this->documentStoreService->getUserByEmail($email);
             }
 
-            // Use query builder if needed for apple_id lookup if not found by email
             if (!$user) {
-                $userModel = \App\Models\User::where('apple_id', $appleId)->first();
-                if ($userModel) {
-                    $user = $userModel->toArray();
-                }
+                $user = $this->documentStoreService->getUserByAppleId((string) $appleId);
             }
 
             $isNewUser = false;

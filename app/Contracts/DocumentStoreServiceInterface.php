@@ -216,6 +216,15 @@ interface DocumentStoreServiceInterface
     public function getUserByEmail(string $email): ?array;
 
     /**
+     * Get a user by their Apple ID.
+     *
+     * @param string $appleId The Apple ID (sub claim) to search for
+     *
+     * @return array|null The user data or null if not found
+     */
+    public function getUserByAppleId(string $appleId): ?array;
+
+    /**
      * Check if a user with the given email exists.
      *
      * @param string $email The email address to check

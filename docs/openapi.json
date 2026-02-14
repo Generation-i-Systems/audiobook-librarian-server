@@ -8075,7 +8075,10 @@
                 },
                 "responses": {
                     "200": {"description": "Authenticated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}},
-                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
+                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}},
+                    "401": {"description": "Invalid Google ID token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "403": {"description": "Account pending approval", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "500": {"description": "Google authentication failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
                 }
             }
         },
@@ -8098,7 +8101,10 @@
                 },
                 "responses": {
                     "200": {"description": "Authenticated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}},
-                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
+                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}},
+                    "401": {"description": "Invalid Facebook token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "403": {"description": "Account pending approval", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "500": {"description": "Facebook authentication failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
                 }
             }
         },
@@ -8124,7 +8130,10 @@
                 },
                 "responses": {
                     "200": {"description": "Authenticated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AuthResponse"}}}},
-                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}}
+                    "400": {"description": "Validation error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiValidationError"}}}},
+                    "401": {"description": "Invalid Apple ID token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "403": {"description": "Account pending approval", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+                    "500": {"description": "Apple authentication failed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
                 }
             }
         },

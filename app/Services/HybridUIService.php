@@ -163,7 +163,10 @@ class HybridUIService extends ImportUIService
         }
 
         // Check if default exists
-        $defaultKey = $default !== '' && isset($formattedOptions[$default]) ? $default : (string) array_key_first($formattedOptions);
+        $defaultKey = (string) array_key_first($formattedOptions);
+        if ($default !== '' && isset($formattedOptions[$default])) {
+            $defaultKey = $default;
+        }
 
         // Compute scroll from available menu height minus Laravel Prompts rendering overhead
         $layout = $this->computeLayout();

@@ -2388,6 +2388,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $user->makeVisible(['password'])->toArray();
     }
 
+    public function getUserByAppleId(string $appleId): ?array
+    {
+        $appleId = trim($appleId);
+
+        if ($appleId === '') {
+            return null;
+        }
+
+        $user = User::where('apple_id', $appleId)->first();
+
+        if (!$user) {
+            return null;
+        }
+
+        return $user->makeVisible(['password'])->toArray();
+    }
+
     /**
      * Check if a user with the given email exists.
      *

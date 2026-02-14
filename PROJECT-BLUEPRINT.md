@@ -93,6 +93,9 @@ See `docs/requirements/reading-progress-and-stats.md`.
     - `POST /api/books` — Create book
     - `PUT /api/books/{id}` — Update book
     - `DELETE /api/books/{id}` — Delete book
+    - `POST /api/v1/auth/google` — Google Sign-In
+    - `POST /api/v1/auth/facebook` — Facebook Sign-In
+    - `POST /api/v1/auth/apple` — Apple Sign-In
     - `GET /api/authors` — List authors
     - `GET /api/series` — List series
     - (additional endpoints for Android app support)

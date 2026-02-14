@@ -7,12 +7,16 @@
   - Added `computeLayout()` centralized layout engine
   - Eliminated blank lines below submenus
 
+- Apple Sign-In now performs user lookup by `apple_id` via `DocumentStoreServiceInterface` (no direct DB access from controllers)
+
 ### Fixed
 - **CRITICAL**: Fixed auto-processing bug where books were imported without user confirmation
   - reviewAndApprove method was auto-approving books when no enrichment data existed
   - Restructured to always run the review loop regardless of enrichment data presence
   - Ensures user can review and approve ALL imports, set cover images, and verify metadata
   - Fixed default choice to prefer 'Edit' when enrichment data is missing
+
+- OpenAPI spec updated to document Apple/Facebook login responses (401/403/500)
 - **CRITICAL**: Import now verifies files exist in destination BEFORE deleting source to prevent data loss
   - Fixed moveSpecificFiles to verify destination before deleting cross-filesystem source files
   - Moved assertDirectoryHasAudioFiles check before cleanupSourceDirectory for regular moves

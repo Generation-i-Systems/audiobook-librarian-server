@@ -80,6 +80,12 @@ when doing autofill when results come back select the first option by default. a
 
 ---
 
+## 2026-02-13
+
+implement applie login and facebook login support and document in openapi.json
+
+---
+
 ## 2025-12-19
 
 admin/BookController.php is too large move functionality out of it where possible

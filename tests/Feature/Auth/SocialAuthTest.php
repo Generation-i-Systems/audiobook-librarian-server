@@ -224,4 +224,67 @@ class SocialAuthTest extends TestCase
                      'code' => 'ACCOUNT_PENDING_APPROVAL',
                  ]);
     }
+
+    public function testAppleLoginWithoutEmailFindsExistingUserByAppleId()
+    {
+        $existingUser = User::create([
+            'name' => 'Existing Apple User',
+            'email' => 'existing-apple-user@example.com',
+            'username' => 'existingappleuser',
+            'password' => 'password',
+            'role' => 'user',
+            'apple_id' => 'apple-stable-sub',
+        ]);
+
+        $privateKey = openssl_pkey_new([
+            'digest_alg' => 'sha256',
+            'private_key_bits' => 2048,
+            'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        ]);
+        openssl_pkey_export($privateKey, $pemPrivateKey);
+        $details = openssl_pkey_get_details($privateKey);
+
+        $b64Url = function ($data) {
+            return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+        };
+
+        $jwks = [
+            'keys' => [
+                [
+                    'kty' => 'RSA',
+                    'kid' => 'test-key-id',
+                    'use' => 'sig',
+                    'alg' => 'RS256',
+                    'n' => $b64Url($details['rsa']['n']),
+                    'e' => $b64Url($details['rsa']['e']),
+                ],
+            ],
+        ];
+
+        Http::fake([
+            'appleid.apple.com/auth/keys' => Http::response($jwks, 200),
+        ]);
+
+        $payload = [
+            'iss' => 'https://appleid.apple.com',
+            'aud' => 'test-apple-bundle-id',
+            'exp' => time() + 3600,
+            'iat' => time(),
+            'sub' => 'apple-stable-sub',
+        ];
+
+        $jwt = JWT::encode($payload, $pemPrivateKey, 'RS256', 'test-key-id');
+
+        $response = $this->postJson('/api/v1/auth/apple', [
+            'idToken' => $jwt,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure(['token', 'authToken']);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $existingUser->id,
+            'apple_id' => 'apple-stable-sub',
+        ]);
+    }
 }

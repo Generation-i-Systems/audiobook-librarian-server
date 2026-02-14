@@ -640,6 +640,24 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
+     * Get a user by their Apple ID.
+     *
+     * @param string $appleId The Apple ID (sub claim) to search for
+     *
+     * @return array|null The user data or null if not found
+     */
+    public function getUserByAppleId(string $appleId): ?array
+    {
+        foreach ($this->users as $user) {
+            if (isset($user['apple_id']) && $user['apple_id'] === $appleId) {
+                return $user;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Get a user by their email address.
      *
      * @param string $email The email address to search for
