@@ -830,7 +830,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         // Transform data
         $transformedData = $books->map(function (Book $book) use ($userId) {
             $request = request();
-            $coverUrl = $book->cover_image ? $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover' : null;
+            $coverUrl = null;
+            if ($book->cover_image) {
+                $coverUrl = $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover';
+            }
             $durationFormatted = $book->duration ? gmdate('H:i:s', $book->duration) : null;
 
             $seriesData = $book->series->map(function (Series $series): array {
@@ -1357,8 +1360,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
-    public function paginateAuthorsWithStats(int $perPage = 25, ?string $search = null, string $sort = 'name', string $direction = 'asc'): \Illuminate\Contracts\Pagination\LengthAwarePaginator
-    {
+    public function paginateAuthorsWithStats(
+        int $perPage = 25,
+        ?string $search = null,
+        string $sort = 'name',
+        string $direction = 'asc'
+    ): \Illuminate\Contracts\Pagination\LengthAwarePaginator {
         $query = DB::table('authors')
             ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
             ->leftJoin('books', function ($join) {
@@ -2046,7 +2053,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'duration' => $data['duration'] ?? $book->duration,
                 'publisher' => $data['publisher'] ?? $book->publisher,
                 'needs_review' => $data['needs_review'] ?? $data['needsReview'] ?? $book->needs_review,
-                'needs_review_reasons' => $data['needs_review_reasons'] ?? $data['needsReviewReasons'] ?? $book->needs_review_reasons,
+                'needs_review_reasons' => $this->resolveNeedsReviewReasons($data, $book),
                 'audio_file_count' => $data['audio_file_count'] ?? $book->audio_file_count,
                 'mongo_record' => $data['mongo_record'] ?? $book->mongo_record,
                 'file_tags' => $data['file_tags'] ?? $book->file_tags,
@@ -4096,11 +4103,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     }
 
                     if ($recipientId) {
+                        $content = "Your statistical data for '";
+                        $content .= $record->title;
+                        $content .= "' has been linked to '";
+                        $content .= $book->title;
+                        $content .= "' in the library.";
+
                         Message::create([
                             'sender_id' => null, // System message
                             'recipient_id' => $recipientId,
                             'type' => 'book_linked',
-                            'content' => "Your statistical data for '{$record->title}' has been linked to '{$book->title}' in the library.",
+                            'content' => $content,
                             'payload' => [
                                 'book_id' => $book->id,
                                 'title' => $book->title,
@@ -4114,5 +4127,18 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
 
         return $linkedCount;
+    }
+
+    private function resolveNeedsReviewReasons(array $data, Book $book)
+    {
+        if (array_key_exists('needs_review_reasons', $data)) {
+            return $data['needs_review_reasons'];
+        }
+
+        if (array_key_exists('needsReviewReasons', $data)) {
+            return $data['needsReviewReasons'];
+        }
+
+        return $book->needs_review_reasons;
     }
 }

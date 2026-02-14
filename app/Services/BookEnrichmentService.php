@@ -321,7 +321,7 @@ class BookEnrichmentService
         $isMissingGenre = $genre === null
             || $genre === ''
             || (is_array($genre) && count($genre) === 0)
-            || (!is_array($genre) && is_string($genre) && in_array(trim($genre), ['Other', 'Unknown'], true));
+            || (!is_array($genre) && is_string($genre) && in_array(trim($genre), ['Other', 'Unknown', 'Classic'], true));
         if ($isMissingGenre) {
             $missing[] = 'genre';
         }

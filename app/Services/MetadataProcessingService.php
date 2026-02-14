@@ -299,7 +299,7 @@ class MetadataProcessingService
         // If genre is empty, invalid, or "Other", try to use author's preferred genre
         if (
             empty($metadata['genre']) ||
-            (count($metadata['genre']) === 1 && in_array($metadata['genre'][0], ['Other', 'Unknown', 'Audiobook', null]))
+            (count($metadata['genre']) === 1 && in_array($metadata['genre'][0], ['Other', 'Unknown', 'Classic', 'Audiobook', null]))
         ) {
             $preferredGenre = $this->getAuthorPreferredGenre($metadata['author'] ?? null);
             if ($preferredGenre) {

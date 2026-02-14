@@ -2836,7 +2836,7 @@ class BookImportService
             $genre = $genre[0] ?? '';
         }
 
-        if (in_array($genre, ['Other', 'Unknown'], true)) {
+        if (in_array($genre, ['Other', 'Unknown', 'Classic'], true)) {
             $genreOverridden = false;
 
             if (!empty($seriesName) && !empty($authors)) {
@@ -2846,7 +2846,7 @@ class BookImportService
                     $q->whereIn('name', $authors);
                 })->whereHas('genres', function ($q) {
                     $q->where('book_genre.is_primary', true)
-                        ->whereNotIn('name', ['Other', 'Unknown']);
+                        ->whereNotIn('name', ['Other', 'Unknown', 'Classic']);
                 })->first();
 
                 if ($matchingBook) {

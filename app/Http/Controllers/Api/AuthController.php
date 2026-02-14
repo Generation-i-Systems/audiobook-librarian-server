@@ -21,8 +21,10 @@ class AuthController extends Controller
 
     protected NewUserRegistrationNotifier $registrationNotifier;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService, NewUserRegistrationNotifier $registrationNotifier)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        NewUserRegistrationNotifier $registrationNotifier
+    ) {
         $this->documentStoreService = $documentStoreService;
         $this->registrationNotifier = $registrationNotifier;
     }
@@ -122,7 +124,12 @@ class AuthController extends Controller
         $lookupValue = $request->input($lookupBy);
         Log::debug('Auth login lookup', ['by' => $lookupBy, 'value' => $lookupValue]);
 
-        $user = $request->filled('email') ? $this->documentStoreService->getUserByEmail($request->input('email')) : $this->documentStoreService->getUserByUsername($request->input('username'));
+        $user = null;
+        if ($request->filled('email')) {
+            $user = $this->documentStoreService->getUserByEmail((string) $request->input('email'));
+        } else {
+            $user = $this->documentStoreService->getUserByUsername((string) $request->input('username'));
+        }
 
         Log::debug('Auth login user fetched', [
             'found' => (bool) $user,
@@ -307,7 +314,10 @@ class AuthController extends Controller
             if ($isNewUser) {
                 // @phpstan-ignore-next-line
                 $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
-                $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
+                $completeUserData = $user;
+                if ($userIdForNotification !== '') {
+                    $completeUserData = $this->documentStoreService->getUserById($userIdForNotification) ?? $user;
+                }
 
                 $this->registrationNotifier->send((array) $completeUserData, 'api-google', $request);
             }
@@ -315,7 +325,10 @@ class AuthController extends Controller
             // Check if user is approved
             if (($user['role'] ?? '') === 'unverified') {
                 $isGoogleVerified = $payload['email_verified'] ?? false;
-                $message = $isGoogleVerified ? 'Google account verified. Waiting for admin approval.' : 'Account created. Waiting for admin approval.';
+                $message = 'Account created. Waiting for admin approval.';
+                if ($isGoogleVerified) {
+                    $message = 'Google account verified. Waiting for admin approval.';
+                }
 
                 return response()->json([
                     'code' => 'ACCOUNT_PENDING_APPROVAL',
@@ -572,7 +585,10 @@ class AuthController extends Controller
             if ($isNewUser) {
                 // @phpstan-ignore-next-line
                 $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
-                $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
+                $completeUserData = $user;
+                if ($userIdForNotification !== '') {
+                    $completeUserData = $this->documentStoreService->getUserById($userIdForNotification) ?? $user;
+                }
                 $this->registrationNotifier->send((array) $completeUserData, 'api-facebook', $request);
             }
 
@@ -714,7 +730,10 @@ class AuthController extends Controller
             if ($isNewUser) {
                 // @phpstan-ignore-next-line
                 $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
-                $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
+                $completeUserData = $user;
+                if ($userIdForNotification !== '') {
+                    $completeUserData = $this->documentStoreService->getUserById($userIdForNotification) ?? $user;
+                }
                 $this->registrationNotifier->send((array) $completeUserData, 'api-apple', $request);
             }
 
