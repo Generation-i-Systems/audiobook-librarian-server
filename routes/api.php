@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\BookImportApiController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\PositionSyncController;
 use App\Http\Controllers\Api\BookmarkSyncController;
 use Illuminate\Http\Request;
@@ -100,6 +101,11 @@ Route::prefix('v1')->group(function () {
                 Route::get('/bookmarks/{bookId}', [BookmarkSyncController::class, 'show']);
                 Route::post('/bookmarks', [BookmarkSyncController::class, 'store'])->middleware('idempotency');
                 Route::delete('/bookmarks/{stringId}', [BookmarkSyncController::class, 'destroy']);
+
+                // Event Sync Routes
+                Route::post('/events', [EventController::class, 'sync'])->middleware('idempotency');
+                Route::get('/events/book/{bookId}', [EventController::class, 'getBookEvents']);
+                Route::get('/events/stats', [EventController::class, 'getStats']);
             });
         });
 
