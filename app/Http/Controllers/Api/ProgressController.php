@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BookProgress;
 use App\Models\Book;
+use App\Models\ListeningEvent;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class ProgressController extends Controller
 {
@@ -78,16 +81,18 @@ class ProgressController extends Controller
 
         $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
 
+        $attributes = [
+            'book_id' => $bookId,
+            'device_id' => $userId,
+        ];
+
+        $values = [];
+        if (Auth::id()) {
+            $values['user_id'] = Auth::id();
+        }
+
         /** @var BookProgress $progress */
-        $progress = BookProgress::updateOrCreate(
-            [
-                'book_id' => $bookId,
-                'device_id' => $userId,
-            ],
-            [
-                'user_id' => Auth::id(),
-            ]
-        );
+        $progress = BookProgress::updateOrCreate($attributes, $values);
 
         $progress->updateProgress(
             (int) ($validated['position_ms'] / 1000),
@@ -106,7 +111,11 @@ class ProgressController extends Controller
         if ($progress->completed && !$progress->completed_at) {
             $progress->completed_at = now();
         }
+
         $progress->save();
+
+        // Record event in new system
+        $this->recordListeningEvent($progress, $progress->completed ? 'BOOK_FINISH' : 'SESSION_END');
 
         return response()->json([
             'book_id' => $progress->book_id,
@@ -239,17 +248,22 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        $progress = BookProgress::updateOrCreate(
-            [
-                'book_id' => $bookId,
-                'device_id' => $validated['device_id'],
-            ],
-            [
-                'user_id' => $validated['user_id'] ?? null,
-                'current_chapter' => $validated['current_chapter'] ?? null,
-                'current_chapter_name' => $validated['current_chapter_name'] ?? null,
-            ]
-        );
+        $attributes = [
+            'book_id' => $bookId,
+            'device_id' => $validated['device_id'],
+        ];
+
+        $values = [
+            'current_chapter' => $validated['current_chapter'] ?? null,
+            'current_chapter_name' => $validated['current_chapter_name'] ?? null,
+        ];
+
+        $newUserId = Auth::id() ?? $validated['user_id'] ?? null;
+        if ($newUserId) {
+            $values['user_id'] = $newUserId;
+        }
+
+        $progress = BookProgress::updateOrCreate($attributes, $values);
 
         $progress->updateProgress(
             $validated['current_position_seconds'],
@@ -257,6 +271,9 @@ class ProgressController extends Controller
         );
 
         $progress->save();
+
+        // Record event in new system
+        $this->recordListeningEvent($progress, 'SESSION_END');
 
         return response()->json([
             'success' => true,
@@ -363,6 +380,9 @@ class ProgressController extends Controller
         $progress->last_listened_at = now();
         $progress->save();
 
+        // Record event in new system
+        $this->recordListeningEvent($progress, 'BOOK_FINISH');
+
         return response()->json([
             'success' => true,
             'message' => 'Book marked as completed',
@@ -434,5 +454,37 @@ class ProgressController extends Controller
         $request->merge(['device_id' => $deviceId]);
 
         return $this->getDeviceProgress($request);
+    }
+
+    /**
+     * Record a listening event for the new system
+     */
+    private function recordListeningEvent(BookProgress $progress, string $eventType): void
+    {
+        try {
+            if (!$progress->user_id) {
+                return;
+            }
+
+            ListeningEvent::create([
+                'id' => (string) Str::uuid(),
+                'user_id' => $progress->user_id,
+                'book_id' => $progress->book_id,
+                'event_type' => $eventType,
+                'timestamp_ms' => now()->timestamp * 1000,
+                'position_ms' => ($progress->current_position_seconds ?? 0) * 1000,
+                'metadata' => [
+                    'source' => 'legacy_api',
+                    'progress_percentage' => $progress->progress_percentage
+                ],
+                'device_id' => $progress->device_id ?? 'unknown',
+                'timezone' => 'UTC',
+                'sync_status' => 'SYNCED',
+                'created_at' => now()->timestamp * 1000,
+                'synced_at' => now()->timestamp * 1000,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to record listening event: ' . $e->getMessage());
+        }
     }
 }

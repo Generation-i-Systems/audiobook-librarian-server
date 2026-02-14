@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use App\Models\ListeningEvent;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -249,6 +250,27 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $progress->last_listened_at = now();
 
             $progress->save();
+
+            try {
+                ListeningEvent::create([
+                    'id' => (string) Str::uuid(),
+                    'user_id' => $userId,
+                    'book_id' => $bookIdInt,
+                    'event_type' => 'SESSION_END',
+                    'timestamp_ms' => now()->timestamp * 1000,
+                    'position_ms' => ($progress->current_position_seconds ?? 0) * 1000,
+                    'metadata' => [
+                        'source' => 'mysql_service',
+                    ],
+                    'device_id' => $deviceId,
+                    'timezone' => 'UTC',
+                    'sync_status' => 'SYNCED',
+                    'created_at' => now()->timestamp * 1000,
+                    'synced_at' => now()->timestamp * 1000,
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Failed to record listening event in MySqlService: ' . $e->getMessage());
+            }
 
             return true;
         } catch (\Exception $e) {
@@ -2829,15 +2851,52 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 })->all();
             });
 
+            // Derive progress from ListeningEvents (New System)
+            $listeningEvents = \App\Models\ListeningEvent::where('user_id', $userId)
+                ->with('book')
+                ->orderBy('timestamp_ms', 'desc')
+                ->get()
+                ->groupBy('book_id');
+
+            $derivedProgress = $listeningEvents->map(function ($events) {
+                /** @var ListeningEvent $latest */
+                $latest = $events->first();
+                /** @var Book|null $book */
+                $book = $latest->book;
+
+                // Calculate percentage
+                $percentage = 0;
+                $metadata = $latest->metadata ?? [];
+                if (isset($metadata['progress_percentage'])) {
+                    $percentage = $metadata['progress_percentage'];
+                } elseif ($book instanceof Book && $book->duration) {
+                    $percentage = ($latest->position_ms / ($book->duration * 1000)) * 100;
+                }
+
+                $isCompleted = $latest->event_type === 'BOOK_FINISH' || $latest->event_type === 'BOOK_MARK_COMPLETE' || $percentage >= 95;
+
+                return [
+                    'book_id' => $latest->book_id,
+                    'book_title' => $book ? $book->title : 'Unknown Book',
+                    'percentage' => (float) $percentage,
+                    'last_listened_at' => \Carbon\Carbon::createFromTimestampMs($latest->timestamp_ms),
+                    'completed' => $isCompleted,
+                ];
+            })->values();
+
+            // Derive statuses from listening activity
+            $derivedStatuses = $derivedProgress->map(function ($item) {
+                return [
+                    'book_id' => $item['book_id'],
+                    'book_title' => $item['book_title'],
+                    'status' => $item['completed'] ? 'Finished' : 'In Progress',
+                    'updated_at' => $item['last_listened_at'],
+                ];
+            });
+
             return [
                 'badges_by_category' => $badgesByCategory->toArray(),
-                'progress' => $user->progress->map(fn ($p) => [
-                    'book_id' => $p->book_id,
-                    'book_title' => $p->book->title,
-                    'percentage' => $p->progress_percentage,
-                    'last_listened_at' => $p->last_listened_at,
-                    'completed' => $p->completed,
-                ])->toArray(),
+                'progress' => $derivedProgress->toArray(),
                 'reviews' => $user->reviews->map(fn ($r) => [
                     'book_id' => $r->book_id,
                     'book_title' => $r->book->title,
@@ -2854,12 +2913,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     'created_at' => $rec->created_at,
                     'acknowledged_at' => $rec->acknowledged_at,
                 ])->toArray(),
-                'statuses' => $user->bookStatuses->map(fn ($s) => [
-                    'book_id' => $s->book_id,
-                    'book_title' => $s->book?->title,
-                    'status' => $s->status,
-                    'updated_at' => $s->updated_at,
-                ])->toArray(),
+                'statuses' => $derivedStatuses->toArray(),
                 'tips' => $this->getBadgeTips($userId),
             ];
         } catch (\Exception $e) {
