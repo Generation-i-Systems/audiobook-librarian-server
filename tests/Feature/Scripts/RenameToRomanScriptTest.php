@@ -31,9 +31,9 @@ class RenameToRomanScriptTest extends TestCase
         if (!is_dir($dir)) {
             return;
         }
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($files as $file) {
             if ($file->isDir()) {
