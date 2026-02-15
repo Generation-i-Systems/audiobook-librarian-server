@@ -13,24 +13,37 @@ class EmbeddedCoverExtractionTest extends TestCase
 
     protected BookImportService $importService;
     protected string $testDir;
+    protected string $testBookRoot;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Ensure consistent configuration
+        $this->testBookRoot = storage_path('app/test_books');
+        config(['app.book_root' => $this->testBookRoot]);
+        config(['filesystems.disks.books.root' => $this->testBookRoot]);
+
         $this->importService = app(BookImportService::class);
         $this->testDir = storage_path('app/test_covers');
 
-        // Create test directory
+        // Create test directories
         if (!is_dir($this->testDir)) {
             mkdir($this->testDir, 0775, true);
+        }
+        if (!is_dir($this->testBookRoot)) {
+            mkdir($this->testBookRoot, 0775, true);
         }
     }
 
     protected function tearDown(): void
     {
-        // Clean up test directory
+        // Clean up test directories
         if (is_dir($this->testDir)) {
             File::deleteDirectory($this->testDir);
+        }
+        if (is_dir($this->testBookRoot)) {
+            File::deleteDirectory($this->testBookRoot);
         }
         parent::tearDown();
     }
@@ -61,7 +74,7 @@ class EmbeddedCoverExtractionTest extends TestCase
         $this->assertNotNull($book->id);
 
         // Create book directory before processing cover
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = $this->testBookRoot;
         $bookDir = $bookRoot . '/' . $book->directory_path;
         if (!is_dir($bookDir)) {
             mkdir($bookDir, 0775, true);
@@ -108,7 +121,7 @@ class EmbeddedCoverExtractionTest extends TestCase
         $book = $this->importService->createBookFromMetadata($metadata, $audiobook);
 
         // Create book directory before processing cover
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = $this->testBookRoot;
         $bookDir = $bookRoot . '/' . $book->directory_path;
         if (!is_dir($bookDir)) {
             mkdir($bookDir, 0775, true);
@@ -135,7 +148,7 @@ class EmbeddedCoverExtractionTest extends TestCase
     public function existing_cover_has_priority_over_embedded()
     {
         // Create existing cover file
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = $this->testBookRoot;
         $testBookDir = 'Test/Test Author/Test Book';
         $fullPath = $bookRoot . '/' . $testBookDir;
 

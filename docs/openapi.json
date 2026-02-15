@@ -2108,6 +2108,24 @@
                     "first_started_at": {"type": "string", "format": "date-time", "nullable": true},
                     "last_ended_at": {"type": "string", "format": "date-time", "nullable": true}
                 }
+            },
+            "ListeningEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "bookId": {"type": "integer"},
+                    "eventType": {"type": "string"},
+                    "timestampMs": {"type": "integer"},
+                    "positionMs": {"type": "integer"},
+                    "metadata": {"type": "object", "nullable": true},
+                    "deviceId": {"type": "string"},
+                    "timezone": {"type": "string"},
+                    "syncStatus": {"type": "string"},
+                    "createdAt": {"type": "integer"},
+                    "syncedAt": {"type": "integer", "nullable": true},
+                    "migratedFrom": {"type": "string", "nullable": true},
+                    "migrationSourceId": {"type": "string", "nullable": true}
+                }
             }
         }
     },
@@ -2202,6 +2220,182 @@
                     "401": {
                         "$ref": "#/components/responses/Unauthorized"
                     }
+                }
+            }
+        },
+        "/sync/events": {
+            "post": {
+                "tags": ["Sync"],
+                "summary": "Sync events",
+                "description": "Synchronize listening events across devices.",
+                "operationId": "syncEvents",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "X-Device-ID",
+                        "in": "header",
+                        "required": true,
+                        "schema": {"type": "string"}
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "events": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/ListeningEvent"}
+                                    },
+                                    "lastSyncTimestamp": {"type": "integer"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful sync",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "received": {"type": "integer"},
+                                        "remoteEvents": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/ListeningEvent"}
+                                        },
+                                        "serverTimestamp": {"type": "integer"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/sync/events/book/{bookId}": {
+            "get": {
+                "tags": ["Sync"],
+                "summary": "Get book events",
+                "description": "Get listening events for a specific book.",
+                "operationId": "getBookEvents",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "bookId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "integer"}
+                    },
+                    {
+                        "name": "startTime",
+                        "in": "query",
+                        "required": false,
+                        "schema": {"type": "integer"}
+                    },
+                    {
+                        "name": "endTime",
+                        "in": "query",
+                        "required": false,
+                        "schema": {"type": "integer"}
+                    },
+                    {
+                        "name": "eventType",
+                        "in": "query",
+                        "required": false,
+                        "schema": {"type": "string"}
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {"type": "integer", "default": 100}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Book events",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "bookId": {"type": "integer"},
+                                        "events": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/ListeningEvent"}
+                                        },
+                                        "count": {"type": "integer"},
+                                        "hasMore": {"type": "boolean"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+                }
+            }
+        },
+        "/sync/events/stats": {
+            "get": {
+                "tags": ["Sync"],
+                "summary": "Get event statistics",
+                "description": "Get aggregated listening statistics.",
+                "operationId": "getEventStats",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "startTime",
+                        "in": "query",
+                        "required": false,
+                        "schema": {"type": "integer"}
+                    },
+                    {
+                        "name": "endTime",
+                        "in": "query",
+                        "required": false,
+                        "schema": {"type": "integer"}
+                    },
+                    {
+                        "name": "bookId",
+                        "in": "query",
+                        "required": false,
+                        "schema": {"type": "integer"}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Statistics",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {"type": "boolean"},
+                                        "stats": {
+                                            "type": "object",
+                                            "properties": {
+                                                "totalEvents": {"type": "integer"},
+                                                "totalListeningTime": {"type": "integer"},
+                                                "booksStarted": {"type": "integer"},
+                                                "booksFinished": {"type": "integer"},
+                                                "booksFinishedByListening": {"type": "integer"},
+                                                "booksMarkedComplete": {"type": "integer"}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Unauthorized", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
                 }
             }
         },
