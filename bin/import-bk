@@ -42,6 +42,19 @@ while [[ $# -gt 0 ]]; do
             opts+=("$1")
             shift
             ;;
+        --directory|--model|--min-confidence|--limit|--collection|--genre|--pattern|--ui)
+            if [[ "$#" -gt 1 && ! "$2" =~ ^- ]]; then
+                opts+=("$1" "$2")
+                shift 2
+            else
+                opts+=("$1")
+                shift
+            fi
+            ;;
+        --*)
+            opts+=("$1")
+            shift
+            ;;
         -nv|-vn)
             DEBUG=1
             opts+=("--dry-run" "--verbose")

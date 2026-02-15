@@ -50,7 +50,10 @@ class ImportBooksFromDownloads extends Command
                             {--clear-cache : Clear background processing cache before starting}
                             {--force-audio : Force audio transcription even when AI confidence is high}
                             {--include-narrator : Include narrator in generated directory paths}
-                            {--include-old : Include OpenAudible books_old directory when scanning}
+                             {--include-old : Include OpenAudible books_old directory when scanning}
+                            {--collection= : Add all imported items to this collection}
+                            {--genre= : Set a default genre for all imported items}
+                            {--pattern= : Alternate storage pattern, e.g., "[genre]/VA/[series]/[title] ([author])"}
                             {--ui=hybrid : UI layer (prompts|ncurses|plain|hybrid)}';
 
     /**
@@ -432,6 +435,9 @@ class ImportBooksFromDownloads extends Command
         // Initialize import service config
         $this->getImportService()->setConfig([
             'include_narrator' => (bool) $this->option('include-narrator'),
+            'collection' => $this->option('collection'),
+            'genre' => $this->option('genre'),
+            'directory_pattern' => $this->option('pattern'),
         ]);
 
         try {

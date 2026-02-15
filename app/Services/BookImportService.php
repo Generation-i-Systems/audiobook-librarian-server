@@ -555,7 +555,10 @@ class BookImportService
                     }
 
                     // Map the genre to a valid library genre
-                    $name = $this->validateAndMapGenre($name);
+                    // If genre is forced via config, we skip mapping to ensure user intent
+                    if (empty($this->config['genre']) || $name !== trim((string) $this->config['genre'])) {
+                        $name = $this->validateAndMapGenre($name);
+                    }
 
                     $genre = Genre::firstOrCreate(['name' => $name]);
 
@@ -823,6 +826,12 @@ class BookImportService
             return $path;
         }
 
+        // Handle custom directory pattern if provided
+        $pattern = $options['directory_pattern'] ?? $this->config['directory_pattern'] ?? null;
+        if ($pattern && str_contains($pattern, '[')) {
+            return $this->generatePathFromPattern($pattern, $metadata, $options);
+        }
+
         $structure = $options['directory_structure'] ?? $this->config['directory_structure'] ?? 'genre/author/series';
         $includeNarrator = $options['include_narrator'] ?? $this->config['include_narrator'] ?? false;
         $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
@@ -900,6 +909,110 @@ class BookImportService
         }
 
         return $path;
+    }
+
+    /**
+     * Generate directory path from a custom pattern template
+     * Supported placeholders: [genre], [author], [series], [title], [series_number], [year], [narrator]
+     */
+    protected function generatePathFromPattern(string $pattern, array $metadata, array $options = []): string
+    {
+        $includeTitle = $options['include_title'] ?? false;
+
+        // Extract basic metadata values
+        $authors = is_array($metadata['author'] ?? []) ? $metadata['author'] : (array) ($metadata['author'] ?? []);
+        $author = $this->formatAuthorsForDirectory($authors);
+        if ($this->isGraphicAudio($metadata)) {
+            $author = 'Graphic Audio';
+        }
+
+        $genreData = $metadata['genre'] ?? 'Unknown';
+        $genre = is_array($genreData) ? ($genreData[0] ?? 'Unknown') : $genreData;
+        if (is_string($genre) && str_contains($genre, ':')) {
+            $genre = trim(explode(':', $genre)[0]);
+        }
+        $genre = empty($genre) ? 'Unknown' : $genre;
+
+        $series = $metadata['series'] ?? '';
+        if ($series !== '') {
+            $series = $this->addGraphicAudioMarker($series, $metadata);
+        }
+
+        $title = $metadata['title'] ?? 'Unknown';
+        // Prefix series number to title if available and [series_number] is not explicitly in pattern
+        if (!empty($metadata['series_number']) && !str_contains($pattern, '[series_number]')) {
+            $seriesNumberPrefix = $this->formatSeriesNumberForTitlePrefix($metadata['series_number']);
+            if ($seriesNumberPrefix !== '') {
+                $title = $seriesNumberPrefix . ' ' . $title;
+            }
+        }
+        $title = $this->addGraphicAudioMarker($title, $metadata);
+
+        $seriesNumber = '';
+        if (!empty($metadata['series_number'])) {
+            $seriesNumber = $this->formatSeriesNumberForTitlePrefix($metadata['series_number']);
+        }
+
+        $year = $metadata['year'] ?? '';
+        $narrator = '';
+        if (!empty($metadata['narrator'])) {
+            $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
+            $narrator = implode(', ', $narrators);
+        }
+
+        // Replacements
+        $replacements = [
+            '[genre]' => $genre,
+            '[author]' => $author,
+            '[series]' => $series,
+            '[title]' => $title,
+            '[series_number]' => $seriesNumber,
+            '[year]' => $year,
+            '[narrator]' => $narrator,
+        ];
+
+        $path = $pattern;
+        foreach ($replacements as $placeholder => $value) {
+            $path = str_replace($placeholder, (string) $value, $path);
+        }
+
+        // Clean up path (remove empty segments, multiple slashes, leading/trailing slashes)
+        $segments = explode('/', $path);
+        $cleanSegments = [];
+        foreach ($segments as $segment) {
+            $segment = trim($segment);
+            // Remove empty parentheticals or brackets resulting from missing metadata
+            $segment = preg_replace('/\s*\(\s*\)/', '', $segment);
+            $segment = preg_replace('/\s*\[\s*\]/', '', $segment);
+            $segment = trim($segment, ' -_');
+            if ($segment !== '') {
+                $cleanSegments[] = $segment;
+            }
+        }
+
+        // If include_title is false, and the pattern likely includes the title at the end,
+        // we might want to strip the last segment.
+        // However, custom patterns are explicit. If the user wants the parent,
+        // they should probably provide a pattern for the parent.
+        // But for compatibility with existing code that expects parent when include_title is false:
+        if (!$includeTitle && !empty($cleanSegments) && str_contains($pattern, '[title]')) {
+            // Find where [title] was in the pattern
+            $patternSegments = explode('/', $pattern);
+            $titleSegmentIndex = -1;
+            foreach ($patternSegments as $index => $seg) {
+                if (str_contains($seg, '[title]')) {
+                    $titleSegmentIndex = $index;
+                    break;
+                }
+            }
+
+            if ($titleSegmentIndex !== -1) {
+                // Return segments before the title segment
+                $cleanSegments = array_slice($cleanSegments, 0, $titleSegmentIndex);
+            }
+        }
+
+        return implode('/', $cleanSegments);
     }
 
     private function formatSeriesNumberForTitlePrefix(mixed $seriesNumber): string
@@ -4089,22 +4202,27 @@ class BookImportService
             }
             $metadata['year'] = $askInlineCallback('Year', (string) $currentYear);
 
-            $validGenres = $getValidGenresCallback();
-            $genreOptions = [];
-            foreach ($validGenres as $idx => $g) {
-                $genreOptions[(string) ($idx + 1)] = $g;
-            }
-            $currentGenre = $metadata['genre'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
-            $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
-            $currentGenreIdx = array_search($displayGenre, $validGenres, true);
-            $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
-            $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
-            $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
-            if (is_array($metadata['genre'] ?? null)) {
-                $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
-                $metadata['genre'] = array_values(array_merge([$newGenre], $others));
+            if (!empty($this->config['genre'])) {
+                $uiServiceLogCallback('⚠️  Genre is forced to "' . $this->config['genre'] . '" by CLI option.');
+                $metadata['genre'] = $this->config['genre'];
             } else {
-                $metadata['genre'] = $newGenre;
+                $validGenres = $getValidGenresCallback();
+                $genreOptions = [];
+                foreach ($validGenres as $idx => $g) {
+                    $genreOptions[(string) ($idx + 1)] = $g;
+                }
+                $currentGenre = $metadata['genre'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
+                $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
+                $currentGenreIdx = array_search($displayGenre, $validGenres, true);
+                $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
+                $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
+                $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
+                if (is_array($metadata['genre'] ?? null)) {
+                    $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
+                    $metadata['genre'] = array_values(array_merge([$newGenre], $others));
+                } else {
+                    $metadata['genre'] = $newGenre;
+                }
             }
 
             $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
@@ -4201,6 +4319,11 @@ class BookImportService
                     $metadata['year'] = $askInlineCallback('Year', (string) $currentYear);
                     break;
                 case '7':
+                    if (!empty($this->config['genre'])) {
+                        $uiServiceLogCallback('⚠️  Genre is forced to "' . $this->config['genre'] . '" by CLI option.');
+                        $metadata['genre'] = $this->config['genre'];
+                        break;
+                    }
                     $validGenres = $getValidGenresCallback();
                     $genreOptions = [];
                     foreach ($validGenres as $idx => $g) {
@@ -4589,8 +4712,23 @@ class BookImportService
         array &$skippedBooks = null,
         array &$processedBooks = null
     ): ?Book {
+        // Inject collection from config if provided
+        if (!empty($this->config['collection']) && empty($metadata['collection'])) {
+            $metadata['collection'] = $this->config['collection'];
+        }
+
         if ($infoCallback && !$skipEnrichment) {
             $infoCallback("🔍 Enriching with external data...");
+            $enriched = $enrichWithExternalDataCallback($metadata);
+            if ($enriched) {
+                $metadata = array_merge($metadata, $enriched);
+            }
+        }
+
+        // Force genre from config if provided - do this after potential enrichment calls
+        // to ensure it takes priority.
+        if (!empty($this->config['genre'])) {
+            $metadata['genre'] = $this->config['genre'];
         }
 
         // Clean series name from title before display
@@ -7848,6 +7986,12 @@ class BookImportService
             } else {
                 $warnCallback("⚠️  No enrichment data found");
             }
+        }
+
+        // Force genre from config if provided - do this after enrichment
+        // so it overrides anything found externally
+        if (!empty($this->config['genre'])) {
+            $aiMetadata['genre'] = $this->config['genre'];
         }
 
         // Clean series name from title after enrichment (enrichment may override with unclean title)
