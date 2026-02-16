@@ -20,6 +20,8 @@
         "laravel/ui": "^4.6",
         "league/flysystem-aws-s3-v3": "^3.30",
         "mozex/anthropic-php": "^1.1",
+        "neuron-core/neuron-ai": "^2.12.3",
+        "neuron-core/neuron-laravel": "^0.4.0",
         "openai-php/client": "^0.14.0",
         "predis/predis": "^3.3",
         "soloterm/screen": "^1.1"
