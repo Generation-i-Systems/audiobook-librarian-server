@@ -38,11 +38,11 @@ class BookImportApiTest extends ApiTestCase
 
     public function testSearchAuthorsReturnsMatchingAuthors(): void
     {
-        Author::factory()->create(['name' => 'Brandon Sanderson']);
-        Author::factory()->create(['name' => 'Brandon Mull']);
+        Author::factory()->create(['name' => 'UniqueSearchSanderson']);
+        Author::factory()->create(['name' => 'UniqueSearchMull']);
         Author::factory()->create(['name' => 'Stephen King']);
 
-        $response = $this->getJson('/api/v1/authors/search?q=Brandon');
+        $response = $this->getJson('/api/v1/authors/search?q=UniqueSearch');
 
         $response->assertOk()
             ->assertJsonStructure([
@@ -54,7 +54,7 @@ class BookImportApiTest extends ApiTestCase
         $data = $response->json('data');
         $this->assertCount(2, $data);
         $this->assertTrue(
-            collect($data)->every(fn ($author) => str_contains($author['name'], 'Brandon'))
+            collect($data)->every(fn ($author) => str_contains($author['name'], 'UniqueSearch'))
         );
     }
 
