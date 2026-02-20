@@ -561,6 +561,14 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
         ->name('users.verify');
 
+    // Event timeline
+    Route::get('users/{user}/events', [Admin\EventTimelineController::class, 'index'])
+        ->name('events.timeline');
+
+    // Books in progress (materialized positions)
+    Route::get('users/{user}/book-positions', [Admin\BookPositionController::class, 'index'])
+        ->name('books.positions');
+
     // Queue management (admin only)
     Route::middleware(['auth', 'admin'])->group(function (): void {
         Route::get('/queue', [Admin\QueueController::class, 'index'])->name('queue.index');

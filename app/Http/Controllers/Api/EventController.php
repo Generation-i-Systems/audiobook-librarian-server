@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ListeningEvent;
+use App\Services\BadgeService;
+use App\Services\PositionMaterializer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,10 +15,16 @@ use Illuminate\Support\Facades\Log;
 
 class EventController extends Controller
 {
+    public function __construct(
+        private readonly PositionMaterializer $positionMaterializer,
+    ) {
+    }
+
     /**
      * Sync events (bidirectional).
      *
      * Push local events to backend and pull remote events from other devices.
+     * Supports time-range cursor pagination for pulling remote events.
      */
     public function sync(Request $request): JsonResponse
     {
@@ -44,26 +52,24 @@ class EventController extends Controller
             'events.*.migratedFrom'      => 'nullable|string|max:50',
             'events.*.migrationSourceId' => 'nullable|string|max:255',
             'lastSyncTimestamp'          => 'required|integer|min:0',
+            'syncAfter'                  => 'nullable|integer|min:0',
         ]);
 
         $receivedCount   = 0;
-        $serverTimestamp = (int) (now()->timestamp * 1000);
+        $serverTimestamp  = (int) (now()->timestamp * 1000);
+        $hasSessionEnd   = false;
 
         DB::beginTransaction();
         try {
-            // Process incoming events
             foreach ($validated['events'] as $eventData) {
-                // Skip if event already exists (deduplication)
                 if (ListeningEvent::where('id', $eventData['id'])->exists()) {
                     continue;
                 }
 
-                // Skip migrated events (LOCAL_ONLY)
                 if (! empty($eventData['migratedFrom'])) {
                     continue;
                 }
 
-                // Create event
                 ListeningEvent::create([
                     'id'                  => $eventData['id'],
                     'user_id'             => $user->id,
@@ -81,42 +87,101 @@ class EventController extends Controller
                     'migration_source_id' => $eventData['migrationSourceId'] ?? null,
                 ]);
 
+                $this->positionMaterializer->materialize([
+                    'id'           => $eventData['id'],
+                    'user_id'      => $user->id,
+                    'book_id'      => $eventData['bookId'],
+                    'event_type'   => $eventData['eventType'],
+                    'timestamp_ms' => $eventData['timestampMs'],
+                    'position_ms'  => $eventData['positionMs'],
+                    'metadata'     => $eventData['metadata'] ?? [],
+                    'device_id'    => $eventData['deviceId'],
+                ]);
+
+                if ($eventData['eventType'] === 'SESSION_END') {
+                    $hasSessionEnd = true;
+                }
+
                 $receivedCount++;
             }
 
-            // Get remote events (from other devices since lastSyncTimestamp)
-            $remoteEvents = ListeningEvent::where('user_id', $user->id)
-                ->where('synced_at', '>', $validated['lastSyncTimestamp'])
+            // Time-range cursor pagination for remote events
+            $syncAfter = $validated['syncAfter'] ?? $validated['lastSyncTimestamp'];
+
+            $remoteQuery = ListeningEvent::where('user_id', $user->id)
+                ->where('synced_at', '>', $syncAfter)
                 ->where('device_id', '!=', $deviceId)
-                ->whereNull('migrated_from') // Don't sync migrated events
+                ->whereNull('migrated_from')
                 ->orderBy('synced_at', 'asc')
-                ->limit(100)
-                ->get()
-                ->map(function ($event) {
-                    return [
-                        'id'                => $event->id,
-                        'bookId'            => $event->book_id,
-                        'eventType'         => $event->event_type,
-                        'timestampMs'       => $event->timestamp_ms,
-                        'positionMs'        => $event->position_ms,
-                        'metadata'          => $event->metadata,
-                        'deviceId'          => $event->device_id,
-                        'timezone'          => $event->timezone,
-                        'syncStatus'        => $event->sync_status,
-                        'createdAt'         => $event->created_at,
-                        'syncedAt'          => $event->synced_at,
-                        'migratedFrom'      => $event->migrated_from,
-                        'migrationSourceId' => $event->migration_source_id,
-                    ];
-                });
+                ->limit(101);
+
+            $remoteEvents = $remoteQuery->get();
+            $hasMore = $remoteEvents->count() > 100;
+            if ($hasMore) {
+                $remoteEvents = $remoteEvents->take(100);
+            }
+
+            $nextSyncAfter = null;
+            if ($hasMore && $remoteEvents->isNotEmpty()) {
+                $nextSyncAfter = $remoteEvents->last()->synced_at;
+            }
+
+            $mappedEvents = $remoteEvents->map(function ($event) {
+                return [
+                    'id'                => $event->id,
+                    'bookId'            => $event->book_id,
+                    'eventType'         => $event->event_type,
+                    'timestampMs'       => $event->timestamp_ms,
+                    'positionMs'        => $event->position_ms,
+                    'metadata'          => $event->metadata,
+                    'deviceId'          => $event->device_id,
+                    'timezone'          => $event->timezone,
+                    'syncStatus'        => $event->sync_status,
+                    'createdAt'         => $event->created_at,
+                    'syncedAt'          => $event->synced_at,
+                    'migratedFrom'      => $event->migrated_from,
+                    'migrationSourceId' => $event->migration_source_id,
+                ];
+            });
 
             DB::commit();
+
+            // Evaluate badges on SESSION_END events (outside transaction)
+            $badgesEarned = [];
+            if ($hasSessionEnd) {
+                try {
+                    $badgeService = app(BadgeService::class);
+                    $newBadges    = $badgeService->evaluateUserBadges((string) $user->id, $deviceId);
+                    if (! empty($newBadges)) {
+                        $badgesEarned = array_map(function ($userBadge) {
+                            return [
+                                'id'          => $userBadge->badge->id,
+                                'key'         => $userBadge->badge->key,
+                                'name'        => $userBadge->badge->name,
+                                'description' => $userBadge->badge->description,
+                                'icon'        => $userBadge->badge->icon,
+                                'tier'        => $userBadge->badge->tier,
+                                'points'      => $userBadge->badge->points,
+                                'earned_at'   => $userBadge->earned_at->toISOString(),
+                            ];
+                        }, $newBadges);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Badge evaluation failed during event sync', [
+                        'user_id' => $user->id,
+                        'error'   => $e->getMessage(),
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success'         => true,
                 'received'        => $receivedCount,
-                'remoteEvents'    => $remoteEvents,
-                'serverTimestamp' => $serverTimestamp,
+                'remoteEvents'    => $mappedEvents,
+                'serverTimestamp'  => $serverTimestamp,
+                'hasMore'         => $hasMore,
+                'nextSyncAfter'   => $nextSyncAfter,
+                'badgesEarned'    => $badgesEarned,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -164,7 +229,7 @@ class EventController extends Controller
 
         $limit  = $validated['limit'] ?? 100;
         $events = $query->orderBy('timestamp_ms', 'desc')
-            ->limit($limit + 1) // Get one extra to check if there are more
+            ->limit($limit + 1)
             ->get();
 
         $hasMore = $events->count() > $limit;
@@ -208,35 +273,39 @@ class EventController extends Controller
             $query->where('book_id', $validated['bookId']);
         }
 
-        // Calculate statistics
         $totalEvents = $query->count();
 
-        $totalListeningTime = ListeningEvent::where('user_id', $user->id)
+        $startTime = $validated['startTime'] ?? null;
+        $endTime = $validated['endTime'] ?? null;
+        $bookId = $validated['bookId'] ?? null;
+
+        $scopeQuery = fn ($q) => $q
+            ->where('user_id', $user->id)
+            ->when($startTime, fn ($q) => $q->where('timestamp_ms', '>=', $startTime))
+            ->when($endTime, fn ($q) => $q->where('timestamp_ms', '<=', $endTime))
+            ->when($bookId, fn ($q) => $q->where('book_id', $bookId));
+
+        $totalListeningTime = ListeningEvent::query()
             ->where('event_type', 'SESSION_END')
-            ->when(! empty($validated['startTime']), fn ($q) => $q->where('timestamp_ms', '>=', $validated['startTime']))
-            ->when(! empty($validated['endTime']), fn ($q) => $q->where('timestamp_ms', '<=', $validated['endTime']))
-            ->when(! empty($validated['bookId']), fn ($q) => $q->where('book_id', $validated['bookId']))
+            ->tap($scopeQuery)
             ->get()
             ->sum(fn ($event) => $event->metadata['adjustedDurationMs'] ?? 0);
 
-        $booksStarted = ListeningEvent::where('user_id', $user->id)
+        $booksStarted = ListeningEvent::query()
             ->where('event_type', 'BOOK_START')
-            ->when(! empty($validated['startTime']), fn ($q) => $q->where('timestamp_ms', '>=', $validated['startTime']))
-            ->when(! empty($validated['endTime']), fn ($q) => $q->where('timestamp_ms', '<=', $validated['endTime']))
+            ->tap($scopeQuery)
             ->distinct('book_id')
             ->count('book_id');
 
-        $booksFinishedByListening = ListeningEvent::where('user_id', $user->id)
+        $booksFinishedByListening = ListeningEvent::query()
             ->where('event_type', 'BOOK_FINISH')
-            ->when(! empty($validated['startTime']), fn ($q) => $q->where('timestamp_ms', '>=', $validated['startTime']))
-            ->when(! empty($validated['endTime']), fn ($q) => $q->where('timestamp_ms', '<=', $validated['endTime']))
+            ->tap($scopeQuery)
             ->distinct('book_id')
             ->count('book_id');
 
-        $booksMarkedComplete = ListeningEvent::where('user_id', $user->id)
+        $booksMarkedComplete = ListeningEvent::query()
             ->where('event_type', 'BOOK_MARK_COMPLETE')
-            ->when(! empty($validated['startTime']), fn ($q) => $q->where('timestamp_ms', '>=', $validated['startTime']))
-            ->when(! empty($validated['endTime']), fn ($q) => $q->where('timestamp_ms', '<=', $validated['endTime']))
+            ->tap($scopeQuery)
             ->distinct('book_id')
             ->count('book_id');
 

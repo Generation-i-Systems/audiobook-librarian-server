@@ -62,6 +62,14 @@
                     <p><strong>Role:</strong> {{ ucfirst($user['role'] ?? 'User') }}</p>
                     <p><strong>Joined:</strong> {{ !empty($user['created_at']) ? \Carbon\Carbon::parse($user['created_at'])->format('M j, Y') : 'N/A' }}</p>
                     <p><strong>Last Active:</strong> {{ !empty($user['last_active_at']) ? \Carbon\Carbon::parse($user['last_active_at'])->diffForHumans() : 'N/A' }}</p>
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{{ route('admin.events.timeline', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
+                            Event Timeline
+                        </a>
+                        <a href="{{ route('admin.books.positions', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
+                            Books in Progress
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
