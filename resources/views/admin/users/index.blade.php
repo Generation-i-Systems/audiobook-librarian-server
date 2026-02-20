@@ -83,6 +83,16 @@
                                                 </button>
                                             @endif
 
+                                            <a href="{{ route('admin.events.timeline', $user['id']) }}"
+                                                class="btn btn-outline-secondary btn-sm" title="Event Timeline">
+                                                <i class="fas fa-stream"></i>
+                                            </a>
+
+                                            <a href="{{ route('admin.books.positions', $user['id']) }}"
+                                                class="btn btn-outline-secondary btn-sm" title="Books in Progress">
+                                                <i class="fas fa-book-open"></i>
+                                            </a>
+
                                             <a href="{{ route('admin.users.edit', $user['id']) }}"
                                                 class="btn btn-warning btn-sm" title="Edit User">
                                                 <i class="fas fa-edit"></i>
