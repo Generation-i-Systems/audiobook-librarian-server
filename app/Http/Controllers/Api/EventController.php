@@ -78,13 +78,10 @@ class EventController extends Controller
                     $bookPath = $eventData['bookPath'] ?? null;
                     if ($bookPath) {
                         $book = Book::where('directory_path', 'like', '%' . basename($bookPath) . '%')->first();
-                        $resolvedBookId = $book?->id;
+                        if ($book) {
+                            $resolvedBookId = $book->id;
+                        }
                     }
-                }
-
-                if (! $resolvedBookId) {
-                    $skippedCount++;
-                    continue;
                 }
 
                 ListeningEvent::create([
