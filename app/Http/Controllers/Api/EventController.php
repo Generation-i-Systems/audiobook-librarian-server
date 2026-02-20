@@ -40,7 +40,7 @@ class EventController extends Controller
         }
 
         $validated = $request->validate([
-            'events'                     => 'required|array|max:100',
+            'events'                     => 'present|array|max:100',
             'events.*.id'                => 'required|string|max:255',
             'events.*.bookId'            => 'required|integer',
             'events.*.bookPath'          => 'nullable|string|max:500',
