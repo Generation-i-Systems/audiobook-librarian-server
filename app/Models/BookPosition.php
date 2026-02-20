@@ -12,6 +12,15 @@ class BookPosition extends Model
     protected $table = 'book_positions';
 
     public $incrementing = false;
+    protected $primaryKey = null;
+
+    protected function setKeysForSaveQuery($query)
+    {
+        return $query
+            ->where('user_id', $this->getAttribute('user_id'))
+            ->where('book_id', $this->getAttribute('book_id'))
+            ->where('device_id', $this->getAttribute('device_id'));
+    }
 
     protected $fillable = [
         'user_id',
