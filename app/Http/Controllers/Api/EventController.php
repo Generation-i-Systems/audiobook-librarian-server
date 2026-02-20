@@ -20,33 +20,33 @@ class EventController extends Controller
      */
     public function sync(Request $request): JsonResponse
     {
-        $user = auth()->user();
+        $user     = auth()->user();
         $deviceId = $request->header('X-Device-ID');
 
         if (! $deviceId) {
             return response()->json([
                 'success' => false,
-                'error' => 'X-Device-ID header is required',
+                'error'   => 'X-Device-ID header is required',
             ], 400);
         }
 
         $validated = $request->validate([
-            'events' => 'required|array|max:100',
-            'events.*.id' => 'required|string|max:255',
-            'events.*.bookId' => 'required|integer',
-            'events.*.eventType' => 'required|string',
-            'events.*.timestampMs' => 'required|integer|min:0',
-            'events.*.positionMs' => 'required|integer|min:0',
-            'events.*.metadata' => 'nullable|array',
-            'events.*.deviceId' => 'required|string|max:255',
-            'events.*.timezone' => 'required|string|max:50',
-            'events.*.createdAt' => 'required|integer|min:0',
-            'events.*.migratedFrom' => 'nullable|string|max:50',
+            'events'                     => 'required|array|max:100',
+            'events.*.id'                => 'required|string|max:255',
+            'events.*.bookId'            => 'required|integer',
+            'events.*.eventType'         => 'required|string|max:50',
+            'events.*.timestampMs'       => 'required|integer|min:0',
+            'events.*.positionMs'        => 'required|integer|min:0',
+            'events.*.metadata'          => 'nullable|array',
+            'events.*.deviceId'          => 'required|string|max:255',
+            'events.*.timezone'          => 'required|string|max:50',
+            'events.*.createdAt'         => 'required|integer|min:0',
+            'events.*.migratedFrom'      => 'nullable|string|max:50',
             'events.*.migrationSourceId' => 'nullable|string|max:255',
-            'lastSyncTimestamp' => 'required|integer|min:0',
+            'lastSyncTimestamp'          => 'required|integer|min:0',
         ]);
 
-        $receivedCount = 0;
+        $receivedCount   = 0;
         $serverTimestamp = (int) (now()->timestamp * 1000);
 
         DB::beginTransaction();
@@ -65,19 +65,19 @@ class EventController extends Controller
 
                 // Create event
                 ListeningEvent::create([
-                    'id' => $eventData['id'],
-                    'user_id' => $user->id,
-                    'book_id' => $eventData['bookId'],
-                    'event_type' => $eventData['eventType'],
-                    'timestamp_ms' => $eventData['timestampMs'],
-                    'position_ms' => $eventData['positionMs'],
-                    'metadata' => $eventData['metadata'] ?? null,
-                    'device_id' => $eventData['deviceId'],
-                    'timezone' => $eventData['timezone'],
-                    'sync_status' => 'SYNCED',
-                    'created_at' => $eventData['createdAt'],
-                    'synced_at' => $serverTimestamp,
-                    'migrated_from' => $eventData['migratedFrom'] ?? null,
+                    'id'                  => $eventData['id'],
+                    'user_id'             => $user->id,
+                    'book_id'             => $eventData['bookId'],
+                    'event_type'          => $eventData['eventType'],
+                    'timestamp_ms'        => $eventData['timestampMs'],
+                    'position_ms'         => $eventData['positionMs'],
+                    'metadata'            => $eventData['metadata'] ?? null,
+                    'device_id'           => $eventData['deviceId'],
+                    'timezone'            => $eventData['timezone'],
+                    'sync_status'         => 'SYNCED',
+                    'created_at'          => $eventData['createdAt'],
+                    'synced_at'           => $serverTimestamp,
+                    'migrated_from'       => $eventData['migratedFrom'] ?? null,
                     'migration_source_id' => $eventData['migrationSourceId'] ?? null,
                 ]);
 
@@ -88,24 +88,24 @@ class EventController extends Controller
             $remoteEvents = ListeningEvent::where('user_id', $user->id)
                 ->where('synced_at', '>', $validated['lastSyncTimestamp'])
                 ->where('device_id', '!=', $deviceId)
-                ->whereNull('migrated_from')  // Don't sync migrated events
+                ->whereNull('migrated_from') // Don't sync migrated events
                 ->orderBy('synced_at', 'asc')
                 ->limit(100)
                 ->get()
                 ->map(function ($event) {
                     return [
-                        'id' => $event->id,
-                        'bookId' => $event->book_id,
-                        'eventType' => $event->event_type,
-                        'timestampMs' => $event->timestamp_ms,
-                        'positionMs' => $event->position_ms,
-                        'metadata' => $event->metadata,
-                        'deviceId' => $event->device_id,
-                        'timezone' => $event->timezone,
-                        'syncStatus' => $event->sync_status,
-                        'createdAt' => $event->created_at,
-                        'syncedAt' => $event->synced_at,
-                        'migratedFrom' => $event->migrated_from,
+                        'id'                => $event->id,
+                        'bookId'            => $event->book_id,
+                        'eventType'         => $event->event_type,
+                        'timestampMs'       => $event->timestamp_ms,
+                        'positionMs'        => $event->position_ms,
+                        'metadata'          => $event->metadata,
+                        'deviceId'          => $event->device_id,
+                        'timezone'          => $event->timezone,
+                        'syncStatus'        => $event->sync_status,
+                        'createdAt'         => $event->created_at,
+                        'syncedAt'          => $event->synced_at,
+                        'migratedFrom'      => $event->migrated_from,
                         'migrationSourceId' => $event->migration_source_id,
                     ];
                 });
@@ -113,22 +113,22 @@ class EventController extends Controller
             DB::commit();
 
             return response()->json([
-                'success' => true,
-                'received' => $receivedCount,
-                'remoteEvents' => $remoteEvents,
+                'success'         => true,
+                'received'        => $receivedCount,
+                'remoteEvents'    => $remoteEvents,
                 'serverTimestamp' => $serverTimestamp,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Event sync failed', [
-                'user_id' => $user->id,
+                'user_id'   => $user->id,
                 'device_id' => $deviceId,
-                'error' => $e->getMessage(),
+                'error'     => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to sync events',
+                'error'   => 'Failed to sync events',
             ], 500);
         }
     }
@@ -142,9 +142,9 @@ class EventController extends Controller
 
         $validated = $request->validate([
             'startTime' => 'nullable|integer|min:0',
-            'endTime' => 'nullable|integer|min:0',
+            'endTime'   => 'nullable|integer|min:0',
             'eventType' => 'nullable|string',
-            'limit' => 'nullable|integer|min:1|max:1000',
+            'limit'     => 'nullable|integer|min:1|max:1000',
         ]);
 
         $query = ListeningEvent::where('user_id', $user->id)
@@ -162,9 +162,9 @@ class EventController extends Controller
             $query->where('event_type', $validated['eventType']);
         }
 
-        $limit = $validated['limit'] ?? 100;
+        $limit  = $validated['limit'] ?? 100;
         $events = $query->orderBy('timestamp_ms', 'desc')
-            ->limit($limit + 1)  // Get one extra to check if there are more
+            ->limit($limit + 1) // Get one extra to check if there are more
             ->get();
 
         $hasMore = $events->count() > $limit;
@@ -174,9 +174,9 @@ class EventController extends Controller
 
         return response()->json([
             'success' => true,
-            'bookId' => $bookId,
-            'events' => $events,
-            'count' => $events->count(),
+            'bookId'  => $bookId,
+            'events'  => $events,
+            'count'   => $events->count(),
             'hasMore' => $hasMore,
         ]);
     }
@@ -190,8 +190,8 @@ class EventController extends Controller
 
         $validated = $request->validate([
             'startTime' => 'nullable|integer|min:0',
-            'endTime' => 'nullable|integer|min:0',
-            'bookId' => 'nullable|integer',
+            'endTime'   => 'nullable|integer|min:0',
+            'bookId'    => 'nullable|integer',
         ]);
 
         $query = ListeningEvent::where('user_id', $user->id);
@@ -242,13 +242,13 @@ class EventController extends Controller
 
         return response()->json([
             'success' => true,
-            'stats' => [
-                'totalEvents' => $totalEvents,
-                'totalListeningTime' => $totalListeningTime,
-                'booksStarted' => $booksStarted,
-                'booksFinished' => $booksFinishedByListening + $booksMarkedComplete,
+            'stats'   => [
+                'totalEvents'              => $totalEvents,
+                'totalListeningTime'       => $totalListeningTime,
+                'booksStarted'             => $booksStarted,
+                'booksFinished'            => $booksFinishedByListening + $booksMarkedComplete,
                 'booksFinishedByListening' => $booksFinishedByListening,
-                'booksMarkedComplete' => $booksMarkedComplete,
+                'booksMarkedComplete'      => $booksMarkedComplete,
             ],
         ]);
     }

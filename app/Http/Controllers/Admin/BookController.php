@@ -14,6 +14,7 @@ use App\Services\GoogleBooksApiService;
 use App\Services\HardcoverService;
 use App\Traits\BookImportTrait;
 use App\Traits\HandlesLibraryJson;
+use App\Traits\ProcessesBookData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -24,37 +25,7 @@ class BookController extends Controller
 {
     use BookImportTrait;
     use HandlesLibraryJson;
-
-    /**
-     * Store the cover image from a file, URL, or base64 string.
-     *
-     * @param \Illuminate\Http\UploadedFile|string $coverSource
-     * @param string $bookId
-     * @return string|null
-     */
-    private function storeCoverImage($coverSource, string $bookId): ?string
-    {
-        if ($coverSource instanceof \Illuminate\Http\UploadedFile) {
-            return $coverSource->store($bookId, 'covers');
-        }
-
-        if (filter_var($coverSource, FILTER_VALIDATE_URL)) {
-            return $this->importCoverImageFromUrl($coverSource, $bookId);
-        }
-
-        /** @phpstan-ignore-next-line function.alreadyNarrowedType */
-        if (is_string($coverSource) && Str::startsWith($coverSource, 'data:image')) {
-            $extension = Str::after(Str::before($coverSource, ';'), 'data:image/');
-            $data = base64_decode(Str::after($coverSource, ','));
-            $path = $bookId . '/cover.' . $extension;
-            Storage::disk('covers')->put($path, $data);
-
-            Log::debug('BookController@storeCoverImage: Method completed', ['path' => $path]);
-            return $path;
-        }
-
-        return null;
-    }
+    use ProcessesBookData;
 
     public function plannedActions(Request $request, string $id)
     {
@@ -875,12 +846,50 @@ class BookController extends Controller
     public function show($book)
     {
         $documentStore = $this->documentStoreService;
-        $book = $documentStore->getBook($book);
+        $bookId = $book;
+        $book = $documentStore->getBook($bookId);
         if (!$book) {
             abort(404, 'Book not found');
         }
 
-        return view('admin.books.show', ['book' => $book]);
+        // Ensure all required fields are present (mimic BookController@show)
+        $book = $this->ensureBookFields($book);
+
+        // Get related books (mimic BookController@show)
+        $result = $this->documentStoreService->listBooks(1, 100);
+        $allBooks = $result['data'];
+
+        $relatedBooks = array_filter($allBooks, function ($relatedBook) use ($book, $bookId) {
+            // Skip the current book
+            if ($relatedBook['id'] === $bookId) {
+                return false;
+            }
+
+            // Check if same author
+            if (!empty($relatedBook['authors']) && !empty($book['authors'])) {
+                if (count(array_intersect($relatedBook['authors'], $book['authors'])) > 0) {
+                    return true;
+                }
+            }
+
+            // Check if same series
+            if (!empty($relatedBook['series']) && !empty($book['series'])) {
+                $seriesNames = array_column($relatedBook['series'], 'seriesName');
+                $bookSeriesNames = array_column($book['series'], 'seriesName');
+                if (count(array_intersect($seriesNames, $bookSeriesNames)) > 0) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+
+        // Limit to 6 related books and ensure they're valid arrays before processing
+        $relatedBooks = array_slice($relatedBooks, 0, 6);
+        $relatedBooks = array_filter($relatedBooks, 'is_array'); // Filter out non-array values
+        $relatedBooks = array_map([$this, 'ensureBookFields'], $relatedBooks);
+
+        return view('books.show', compact('book', 'relatedBooks'));
     }
 
     /**

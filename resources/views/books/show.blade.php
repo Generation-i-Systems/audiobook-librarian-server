@@ -1,8 +1,29 @@
 @extends('layouts.app')
 
 @section('content')
+    @php
+        $isAdmin = request()->is('admin/*');
+        $showRoute = $isAdmin ? 'admin.books.show' : 'books.show';
+    @endphp
+
     <div class="container">
-        <h1>{{ $book['title'] }}</h1>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>{{ $book['title'] }}</h1>
+            @if($isAdmin)
+                @php
+                    $returnUrl = request()->input('returnUrl') ?? session('last_admin_list_url') ?? request()->headers->get('referer');
+                    $backHref = $returnUrl ?: route('admin.books.index');
+                @endphp
+                <div>
+                    <a href="{{ route('admin.books.rawJson', $book['id']) }}" class="btn btn-outline-info btn-sm me-2" target="_blank">
+                        <i class="bi bi-filetype-json"></i> Raw JSON
+                    </a>
+                    <a href="{{ $backHref }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i> Back to List
+                    </a>
+                </div>
+            @endif
+        </div>
         <p><strong>Path:</strong>
             {{ isset($book['directoryPath']) ? $book['directoryPath'] : (isset($book['path']) ? $book['path'] : 'N/A') }}
         </p>
@@ -14,7 +35,7 @@
                         ? $book['coverImage']
                         : url('/images/placeholder.png');
                 @endphp
-                <img src="{{ $cover }}" alt="{{ $book['title'] }}" class="img-fluid">
+                <img src="{{ $cover }}" alt="{{ $book['title'] }}" class="img-fluid rounded shadow-sm">
             </div>
             <div class="col-md-8">
                 <p><strong>Author:</strong>
@@ -40,20 +61,22 @@
                 </p>
                 <p>{{ isset($book['description']) ? $book['description'] : 'No description available.' }}</p>
 
-                <a href="{{ route('books.play', $book['id']) }}" class="btn btn-success me-2">
-                    <i class="bi bi-play-circle-fill"></i> Play
-                </a>
-                <a href="{{ route('books.download', $book['id']) }}" class="btn btn-primary">
-                    <i class="bi bi-download"></i> Download
-                </a>
+                <div class="mb-3">
+                    <a href="{{ route('books.play', $book['id']) }}" class="btn btn-success me-2">
+                        <i class="bi bi-play-circle-fill"></i> Play
+                    </a>
+                    <a href="{{ route('books.download', $book['id']) }}" class="btn btn-primary">
+                        <i class="bi bi-download"></i> Download
+                    </a>
 
-                @auth
-                    @if(Auth::user()->is_admin)
-                        <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary float-end ms-2">
-                            <i class="bi bi-pencil"></i> Edit
-                        </a>
-                    @endif
-                @endauth
+                    @auth
+                        @if(Auth::user()->is_admin)
+                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-warning float-end">
+                                <i class="bi bi-pencil"></i> Edit Book
+                            </a>
+                        @endif
+                    @endauth
+                </div>
                 <hr>
 
                 @if(!empty($relatedBooks))
@@ -61,24 +84,28 @@
                     <div class="row">
                         @foreach($relatedBooks as $relatedBook)
                             <div class="col-md-4 mb-3">
-                                <div class="card h-100">
+                                <div class="card h-100 shadow-sm">
                                     @php
                                         $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage']
                                             ? $relatedBook['coverImage']
                                             : url('/images/placeholder.png');
                                     @endphp
-                                    <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"
-                                        style="height: 150px; object-fit: contain;">
+                                    <div class="text-center p-2 bg-light">
+                                        <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"
+                                            style="height: 150px; object-fit: contain;">
+                                    </div>
                                     <div class="card-body">
-                                        @if(auth()->check() && (auth()->user()->is_admin ?? false))
-                                            <a href="{{ route('admin.books.edit', $book['id']) }}"
-                                                class="btn btn-sm btn-primary float-end ms-2">
-                                                <i class="bi bi-pencil"></i> Edit
-                                            </a>
-                                        @endif
-                                        <h5 class="card-title">{{ $relatedBook['title'] }}</h5>
-                                        <a href="{{ route('books.show', $relatedBook['id']) }}"
-                                            class="btn btn-sm btn-primary">View</a>
+                                        <h6 class="card-title text-truncate" title="{{ $relatedBook['title'] }}">{{ $relatedBook['title'] }}</h6>
+                                        <div class="d-flex justify-content-between align-items-center mt-2">
+                                            <a href="{{ route($showRoute, $relatedBook['id']) }}"
+                                                class="btn btn-sm btn-outline-primary">View</a>
+                                            @if(auth()->check() && (auth()->user()->is_admin ?? false))
+                                                <a href="{{ route('admin.books.edit', $relatedBook['id']) }}"
+                                                    class="btn btn-sm btn-outline-warning">
+                                                    <i class="bi bi-pencil"></i> Edit
+                                                </a>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             </div>

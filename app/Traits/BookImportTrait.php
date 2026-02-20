@@ -10,6 +10,35 @@ use Symfony\Component\Process\Process;
 trait BookImportTrait
 {
     /**
+     * Store the cover image from a file, URL, or base64 string.
+     *
+     * @param \Illuminate\Http\UploadedFile|string $coverSource
+     * @param string $bookId
+     * @return string|null
+     */
+    protected function storeCoverImage($coverSource, string $bookId): ?string
+    {
+        if ($coverSource instanceof \Illuminate\Http\UploadedFile) {
+            return $coverSource->store($bookId, 'covers');
+        }
+
+        if (filter_var($coverSource, FILTER_VALIDATE_URL)) {
+            return $this->importCoverImageFromUrl($coverSource, $bookId);
+        }
+
+        if (\Illuminate\Support\Str::startsWith($coverSource, 'data:image')) {
+            $extension = \Illuminate\Support\Str::after(\Illuminate\Support\Str::before($coverSource, ';'), 'data:image/');
+            $data = base64_decode(\Illuminate\Support\Str::after($coverSource, ','));
+            $path = $bookId . '/cover.' . $extension;
+            \Illuminate\Support\Facades\Storage::disk('covers')->put($path, $data);
+
+            return $path;
+        }
+
+        return null;
+    }
+
+    /**
      * Scan a directory and return its contents.
      *
      * @param  string  $path  The directory path to scan

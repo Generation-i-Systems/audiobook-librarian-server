@@ -75,12 +75,7 @@
         }
 
         .table-striped>tbody>tr:nth-of-type(odd) {
-            background-color: rgba(255, 0, 0, 0.005);
-            /* Even lighter zebra striping */
-        }
-
-        .table-striped>tbody>tr:nth-of-type(even) {
-            background-color: rgba(255, 0, 255, 1);
+            background-color: rgba(0, 0, 0, 0.05);
         }
 
         .load-more-btn {

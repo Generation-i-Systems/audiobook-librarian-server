@@ -194,13 +194,23 @@ class BookController extends Controller
         if ($request->has('search') && !empty($request->input('search'))) {
             $filters['search'] = $request->input('search');
         }
-        if ($request->has('author_id') && !empty($request->input('author_id'))) {
+
+        // Support both xxx and xxx_id for author, genre, and series
+        if ($request->has('author') && !empty($request->input('author'))) {
+            $filters['author'] = $request->input('author');
+        } elseif ($request->has('author_id') && !empty($request->input('author_id'))) {
             $filters['author'] = $request->input('author_id');
         }
-        if ($request->has('genre_id') && !empty($request->input('genre_id'))) {
+
+        if ($request->has('genre') && !empty($request->input('genre'))) {
+            $filters['genre'] = $request->input('genre');
+        } elseif ($request->has('genre_id') && !empty($request->input('genre_id'))) {
             $filters['genre'] = $request->input('genre_id');
         }
-        if ($request->has('series_id') && !empty($request->input('series_id'))) {
+
+        if ($request->has('series') && !empty($request->input('series'))) {
+            $filters['series'] = $request->input('series');
+        } elseif ($request->has('series_id') && !empty($request->input('series_id'))) {
             $filters['series'] = $request->input('series_id');
         }
 
