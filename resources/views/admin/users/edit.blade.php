@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="container">
-    <div class="d-flex align-items-center mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-4">
         @php
             $initial = strtoupper(substr($user['name'] ?? '?', 0, 1));
             $fallbackSvg = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2264%22%20height%3D%2264%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2232%22%20ry%3D%2232%22%20fill%3D%22%236c757d%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20font-family%3D%22Arial%2Csans-serif%22%20font-size%3D%2232%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%20dominant-baseline%3D%22middle%22%3E' . $initial . '%3C%2Ftext%3E%3C%2Fsvg%3E';
@@ -40,6 +40,17 @@
                     </span>
                 @endif
             </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ route('admin.events.timeline', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
+                Event Timeline
+            </a>
+            <a href="{{ route('admin.books.positions', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
+                Books in Progress
+            </a>
+            <a href="{{ route('admin.users.show', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
+                View Profile
+            </a>
         </div>
     </div>
 
