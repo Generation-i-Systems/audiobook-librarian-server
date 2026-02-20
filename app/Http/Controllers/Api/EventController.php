@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\Book;
 
 class EventController extends Controller
 {
@@ -42,6 +43,7 @@ class EventController extends Controller
             'events'                     => 'required|array|max:100',
             'events.*.id'                => 'required|string|max:255',
             'events.*.bookId'            => 'required|integer',
+            'events.*.bookPath'          => 'nullable|string|max:500',
             'events.*.eventType'         => 'required|string|max:50',
             'events.*.timestampMs'       => 'required|integer|min:0',
             'events.*.positionMs'        => 'required|integer|min:0',
@@ -56,6 +58,7 @@ class EventController extends Controller
         ]);
 
         $receivedCount   = 0;
+        $skippedCount    = 0;
         $serverTimestamp  = (int) (now()->timestamp * 1000);
         $hasSessionEnd   = false;
 
@@ -70,10 +73,24 @@ class EventController extends Controller
                     continue;
                 }
 
+                $resolvedBookId = $eventData['bookId'];
+                if (! Book::where('id', $resolvedBookId)->exists()) {
+                    $bookPath = $eventData['bookPath'] ?? null;
+                    if ($bookPath) {
+                        $book = Book::where('directory_path', 'like', '%' . basename($bookPath) . '%')->first();
+                        $resolvedBookId = $book?->id;
+                    }
+                }
+
+                if (! $resolvedBookId) {
+                    $skippedCount++;
+                    continue;
+                }
+
                 ListeningEvent::create([
                     'id'                  => $eventData['id'],
                     'user_id'             => $user->id,
-                    'book_id'             => $eventData['bookId'],
+                    'book_id'             => $resolvedBookId,
                     'event_type'          => $eventData['eventType'],
                     'timestamp_ms'        => $eventData['timestampMs'],
                     'position_ms'         => $eventData['positionMs'],
@@ -90,7 +107,7 @@ class EventController extends Controller
                 $this->positionMaterializer->materialize([
                     'id'           => $eventData['id'],
                     'user_id'      => $user->id,
-                    'book_id'      => $eventData['bookId'],
+                    'book_id'      => $resolvedBookId,
                     'event_type'   => $eventData['eventType'],
                     'timestamp_ms' => $eventData['timestampMs'],
                     'position_ms'  => $eventData['positionMs'],
@@ -177,6 +194,7 @@ class EventController extends Controller
             return response()->json([
                 'success'         => true,
                 'received'        => $receivedCount,
+                'skipped'         => $skippedCount,
                 'remoteEvents'    => $mappedEvents,
                 'serverTimestamp'  => $serverTimestamp,
                 'hasMore'         => $hasMore,
