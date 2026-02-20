@@ -58,6 +58,14 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="recommendations-tab" data-bs-toggle="tab" data-bs-target="#recommendations" type="button" role="tab">Recommendations</button>
             </li>
+            @if(isset($userId))
+                <li class="nav-item ms-auto" role="presentation">
+                    <a class="nav-link" href="{{ route('admin.events.timeline', $userId) }}">Event Timeline</a>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" href="{{ route('admin.books.positions', $userId) }}">Books in Progress</a>
+                </li>
+            @endif
         </ul>
         <div class="tab-content" id="activityTabsContent">
 

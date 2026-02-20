@@ -76,7 +76,7 @@
 
         <!-- Badge Tips and Activity Sections -->
         <div class="col-md-9">
-            @include('partials.activity-summary', ['activityData' => $activityData])
+            @include('partials.activity-summary', ['activityData' => $activityData, 'userId' => $user['id']])
         </div>
     </div>
 </div>
