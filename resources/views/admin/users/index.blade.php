@@ -39,7 +39,8 @@
                         </thead>
                         <tbody>
                             @forelse($users as $user)
-                                <tr>
+                                <tr style="cursor: pointer;"
+                                    onclick="if(event.target.closest('a,button,form')) return; window.location='{{ route('admin.users.show', $user['id']) }}'">
                                     <td>{{ $user['id'] }}</td>
                                     <td>
                                         @php
