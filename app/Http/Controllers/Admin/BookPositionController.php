@@ -16,7 +16,7 @@ class BookPositionController extends Controller
     public function index(Request $request, User $user): View
     {
         $query = BookPosition::where('user_id', $user->id)
-            ->with(['book:id,title', 'device'])
+            ->with(['book:id,title', 'device', 'lastEvent:id,metadata'])
             ->orderBy('last_event_timestamp_ms', 'desc');
 
         if ($request->filled('device_id')) {

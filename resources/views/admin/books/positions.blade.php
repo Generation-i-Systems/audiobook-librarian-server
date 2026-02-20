@@ -61,7 +61,26 @@
                             @if($position->book)
                                 <small>{{ Str::limit($position->book->title, 40) }}</small>
                             @else
-                                <small class="text-muted">Book #{{ $position->book_id }}</small>
+                                @php
+                                    $meta = $position->lastEvent?->metadata ?? [];
+                                    $fallbackTitle = $meta['fallbackTitle'] ?? null;
+                                    $fallbackAuthor = $meta['fallbackAuthor'] ?? null;
+                                    $fallbackSeries = $meta['fallbackSeries'] ?? null;
+                                    $fallbackSeriesNum = $meta['fallbackSeriesNumber'] ?? null;
+
+                                    $display = $fallbackTitle;
+                                    if ($display && $fallbackAuthor) {
+                                        $display .= " by " . $fallbackAuthor;
+                                    }
+                                    if ($display && $fallbackSeries) {
+                                        $display .= " ($fallbackSeries" . ($fallbackSeriesNum ? " #$fallbackSeriesNum" : "") . ")";
+                                    }
+                                @endphp
+                                @if($display)
+                                    <small class="text-secondary" title="Book not on server">{{ Str::limit($display, 40) }}</small>
+                                @else
+                                    <small class="text-muted">Book #{{ $position->book_id }}</small>
+                                @endif
                             @endif
                         </td>
                         <td>

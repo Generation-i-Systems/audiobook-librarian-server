@@ -57,4 +57,9 @@ class BookPosition extends Model
     {
         return $this->belongsTo(Device::class, 'device_id', 'device_id');
     }
+
+    public function lastEvent(): BelongsTo
+    {
+        return $this->belongsTo(ListeningEvent::class, 'last_event_id', 'id');
+    }
 }
