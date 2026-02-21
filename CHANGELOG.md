@@ -22,7 +22,7 @@
     - Fixed default choice to prefer 'Edit' when enrichment data is missing
 
 - OpenAPI spec updated to document Apple/Facebook login responses (401/403/500)
-- Badge API now normalizes `criteria_met.first_listening_date` and `criteria_met.last_listening_date` to unix timestamps (0 when unknown) to prevent client JSON decoding errors
+- Badge API `/badges/unnotified` now returns complete badge fields required by clients (e.g. `key`, `name`, `description`, `icon`, `category`, `tier`, `points`, `is_repeatable`)
 - SQLite test runs no longer fail on MySQL-specific `ALTER TABLE ... MODIFY ...` in listening events migration
 - **CRITICAL**: Import now verifies files exist in destination BEFORE deleting source to prevent data loss
     - Fixed moveSpecificFiles to verify destination before deleting cross-filesystem source files

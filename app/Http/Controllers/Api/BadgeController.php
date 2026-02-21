@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Badge;
 use App\Models\UserBadge;
 use App\Services\BadgeService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -240,67 +239,28 @@ class BadgeController extends Controller
         $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
-        $unnotifiedBadges = $this->badgeService->getUnnotifiedBadges($userId, $deviceId);
+        $unnotifiedUserBadges = $this->badgeService->getUnnotifiedBadges($userId, $deviceId);
 
-        $unnotifiedBadges = array_map(function (array $userBadge) {
-            if (array_key_exists('criteria_met', $userBadge) && is_array($userBadge['criteria_met'])) {
-                $userBadge['criteria_met'] = $this->normalizeCriteriaMet($userBadge['criteria_met']);
-            }
+        $badges = array_map(function (array $userBadge) {
+            $badge = $userBadge['badge'] ?? [];
 
-            return $userBadge;
-        }, $unnotifiedBadges);
+            return [
+                'id' => (int) ($badge['id'] ?? 0),
+                'key' => (string) ($badge['key'] ?? ''),
+                'name' => (string) ($badge['name'] ?? ''),
+                'description' => (string) ($badge['description'] ?? ''),
+                'icon' => $badge['icon'] ?? null,
+                'category' => (string) ($badge['category'] ?? ''),
+                'tier' => (string) ($badge['tier'] ?? ''),
+                'points' => (int) ($badge['points'] ?? 0),
+                'is_repeatable' => (bool) ($badge['is_repeatable'] ?? false),
+            ];
+        }, $unnotifiedUserBadges);
 
         return response()->json([
-            'badges' => $unnotifiedBadges,
-            'count' => count($unnotifiedBadges),
+            'badges' => $badges,
+            'count' => count($badges),
         ]);
-    }
-
-    private function normalizeCriteriaMet(array $criteriaMet): array
-    {
-        $dateKeys = [
-            'first_listening_date',
-            'last_listening_date',
-        ];
-
-        foreach ($dateKeys as $dateKey) {
-            if (!array_key_exists($dateKey, $criteriaMet)) {
-                continue;
-            }
-
-            $criteriaMet[$dateKey] = $this->normalizeTimestampValue($criteriaMet[$dateKey]);
-        }
-
-        return $criteriaMet;
-    }
-
-    private function normalizeTimestampValue(mixed $value): int
-    {
-        if ($value === null) {
-            return 0;
-        }
-
-        if (is_int($value)) {
-            return $value;
-        }
-
-        if (is_numeric($value)) {
-            return (int) $value;
-        }
-
-        if ($value instanceof Carbon) {
-            return $value->timestamp;
-        }
-
-        if (is_string($value)) {
-            try {
-                return Carbon::parse($value)->timestamp;
-            } catch (\Exception) {
-                return 0;
-            }
-        }
-
-        return 0;
     }
 
     /**

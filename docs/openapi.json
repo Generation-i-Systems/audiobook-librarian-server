@@ -1879,19 +1879,15 @@
                         "items": {
                             "type": "object",
                             "properties": {
-                                "criteria_met": {
-                                    "type": "object",
-                                    "properties": {
-                                        "first_listening_date": {
-                                            "type": "integer",
-                                            "description": "Unix timestamp (seconds). 0 when unknown."
-                                        },
-                                        "last_listening_date": {
-                                            "type": "integer",
-                                            "description": "Unix timestamp (seconds). 0 when unknown."
-                                        }
-                                    }
-                                }
+                                "id": {"type": "integer"},
+                                "key": {"type": "string"},
+                                "name": {"type": "string"},
+                                "description": {"type": "string"},
+                                "icon": {"type": "string", "nullable": true},
+                                "category": {"type": "string"},
+                                "tier": {"type": "string"},
+                                "points": {"type": "integer"},
+                                "is_repeatable": {"type": "boolean"}
                             }
                         }
                     },

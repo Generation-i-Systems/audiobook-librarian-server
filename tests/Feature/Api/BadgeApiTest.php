@@ -199,7 +199,7 @@ class BadgeApiTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function unnotified_badges_normalizes_criteria_met_date_fields_to_integers(): void
+    public function unnotified_badges_returns_badge_fields_required_by_client(): void
     {
         [$user, $headers] = $this->authenticateUser();
 
@@ -236,7 +236,13 @@ class BadgeApiTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('count', 1)
-            ->assertJsonPath('badges.0.criteria_met.first_listening_date', 0)
-            ->assertJsonPath('badges.0.criteria_met.last_listening_date', 0);
+            ->assertJsonPath('badges.0.id', $badge->id)
+            ->assertJsonPath('badges.0.key', $badge->key)
+            ->assertJsonPath('badges.0.name', $badge->name)
+            ->assertJsonPath('badges.0.description', $badge->description)
+            ->assertJsonPath('badges.0.category', $badge->category)
+            ->assertJsonPath('badges.0.tier', $badge->tier)
+            ->assertJsonPath('badges.0.points', $badge->points)
+            ->assertJsonPath('badges.0.is_repeatable', $badge->is_repeatable);
     }
 }
