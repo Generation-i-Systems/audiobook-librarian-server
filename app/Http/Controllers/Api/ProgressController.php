@@ -29,13 +29,17 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        // Use authenticated user's device/session instead of requiring device_id
-        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
+        $deviceId = $request->header('X-Device-ID', 'unknown');
+
+        $query = BookProgress::where('book_id', $bookId);
+        if (Auth::id()) {
+            $query->where('user_id', Auth::id());
+        } else {
+            $query->where('device_id', $deviceId);
+        }
 
         /** @var BookProgress|null $progress */
-        $progress = BookProgress::where('book_id', $bookId)
-            ->where('device_id', $userId)
-            ->first();
+        $progress = $query->orderBy('last_listened_at', 'desc')->first();
 
         if (!$progress) {
             return response()->json([
@@ -79,11 +83,11 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
+        $deviceId = $request->header('X-Device-ID', 'unknown');
 
         $attributes = [
             'book_id' => $bookId,
-            'device_id' => $userId,
+            'device_id' => $deviceId,
         ];
 
         $values = [];
@@ -137,17 +141,25 @@ class ProgressController extends Controller
             'active_only' => 'nullable|boolean',
         ]);
 
-        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
-
         $query = BookProgress::with('book')
-            ->where('device_id', $userId)
             ->orderBy('last_listened_at', 'desc');
+
+        if (Auth::id()) {
+            $query->where('user_id', Auth::id());
+        } else {
+            $deviceId = $request->header('X-Device-ID', 'unknown');
+            $query->where('device_id', $deviceId);
+        }
 
         if ($validated['active_only'] ?? false) {
             $query->where('completed', false);
         }
 
-        $progressList = $query->get();
+        if (Auth::id()) {
+            $progressList = $query->get()->unique('book_id')->values();
+        } else {
+            $progressList = $query->get();
+        }
 
         $progress = $progressList->map(function ($progress) {
             return [
@@ -181,9 +193,13 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        $progress = BookProgress::where('book_id', $bookId)
-            ->where('device_id', $validated['device_id'])
-            ->first();
+        $query = BookProgress::where('book_id', $bookId);
+        if (Auth::id()) {
+            $query->where('user_id', Auth::id());
+        } else {
+            $query->where('device_id', $validated['device_id']);
+        }
+        $progress = $query->orderBy('last_listened_at', 'desc')->first();
 
         if (!$progress) {
             return response()->json([
@@ -307,15 +323,25 @@ class ProgressController extends Controller
         ]);
 
         $query = BookProgress::with('book')
-            ->where('device_id', $validated['device_id'])
             ->orderBy('last_listened_at', 'desc');
+
+        if (Auth::id()) {
+            $query->where('user_id', Auth::id());
+        } else {
+            $query->where('device_id', $validated['device_id']);
+        }
 
         if (isset($validated['completed'])) {
             $query->where('completed', $validated['completed']);
         }
 
         $limit = $validated['limit'] ?? 20;
-        $progressList = $query->limit($limit)->get();
+
+        if (Auth::id()) {
+            $progressList = $query->get()->unique('book_id')->take($limit)->values();
+        } else {
+            $progressList = $query->limit($limit)->get();
+        }
 
         $data = $progressList->map(function ($progress) {
             return [
@@ -362,9 +388,13 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        $progress = BookProgress::where('book_id', $bookId)
-            ->where('device_id', $validated['device_id'])
-            ->first();
+        $query = BookProgress::where('book_id', $bookId);
+        if (Auth::id()) {
+            $query->where('user_id', Auth::id());
+        } else {
+            $query->where('device_id', $validated['device_id']);
+        }
+        $progress = $query->orderBy('last_listened_at', 'desc')->first();
 
         if (!$progress) {
             return response()->json([
@@ -413,9 +443,13 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        $progress = BookProgress::where('book_id', $bookId)
-            ->where('device_id', $validated['device_id'])
-            ->first();
+        $query = BookProgress::where('book_id', $bookId);
+        if (Auth::id()) {
+            $query->where('user_id', Auth::id());
+        } else {
+            $query->where('device_id', $validated['device_id']);
+        }
+        $progress = $query->orderBy('last_listened_at', 'desc')->first();
 
         if (!$progress) {
             return response()->json([

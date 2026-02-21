@@ -113,6 +113,7 @@ class ProgressControllerTest extends TestCase
         $book = Book::factory()->create();
         $progress = BookProgress::create([
             'book_id' => $book->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
             'current_position_seconds' => 3600,
             'progress_percentage' => 50.00,
@@ -148,6 +149,7 @@ class ProgressControllerTest extends TestCase
 
         BookProgress::create([
             'book_id' => $book1->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
             'current_position_seconds' => 1800,
             'progress_percentage' => 25.00,
@@ -156,6 +158,7 @@ class ProgressControllerTest extends TestCase
 
         BookProgress::create([
             'book_id' => $book2->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
             'current_position_seconds' => 3600,
             'progress_percentage' => 50.00,
@@ -197,6 +200,7 @@ class ProgressControllerTest extends TestCase
         $book = Book::factory()->create();
         $progress = BookProgress::create([
             'book_id' => $book->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
             'current_position_seconds' => 1800,
             'progress_percentage' => 25.00,

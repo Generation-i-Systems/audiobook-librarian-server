@@ -114,11 +114,13 @@ class ProgressControllerTest extends TestCase
     public function test_mark_completed_sets_book_as_finished()
     {
         $book = Book::factory()->create();
+
         $progress = BookProgress::create([
             'book_id' => $book->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
             'current_position_seconds' => 3600,
-            'progress_percentage' => 50.00,
+            'total_duration_seconds' => 7200,
         ]);
 
         $response = $this->withHeaders([
@@ -147,36 +149,46 @@ class ProgressControllerTest extends TestCase
 
     public function test_get_device_progress_returns_recent_books()
     {
-        $book1 = Book::factory()->create(['title' => 'Book One']);
-        $book2 = Book::factory()->create(['title' => 'Book Two']);
+        $book1 = Book::factory()->create();
+        $book2 = Book::factory()->create();
+        $book3 = Book::factory()->create();
 
+        // Book 1 - Listened recently
         BookProgress::create([
             'book_id' => $book1->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
             'current_position_seconds' => 1800,
-            'progress_percentage' => 25.00,
-            'last_listened_at' => now()->subHour(),
+            'last_listened_at' => now(),
         ]);
 
+        // Book 2 - Listened yesterday
         BookProgress::create([
             'book_id' => $book2->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
             'current_position_seconds' => 3600,
-            'progress_percentage' => 50.00,
-            'last_listened_at' => now(),
+            'last_listened_at' => now()->subDay(),
+        ]);
+
+        // Book 3 - Different device
+        BookProgress::create([
+            'book_id' => $book3->id,
+            'user_id' => $this->user->id,
+            'device_id' => 'other-device',
+            'current_position_seconds' => 7200,
+            'last_listened_at' => now()->subDays(2),
         ]);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
-            'X-Acting-As-Test' => '1',
         ])
             ->getJson("/api/v1/progress/device?device_id=test-device");
-
 
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'count' => 2,
+                'count' => 3,
             ])
             ->assertJsonStructure([
                 'success',
@@ -200,11 +212,13 @@ class ProgressControllerTest extends TestCase
     public function test_reset_progress_deletes_record()
     {
         $book = Book::factory()->create();
+
         $progress = BookProgress::create([
             'book_id' => $book->id,
+            'user_id' => $this->user->id,
             'device_id' => 'test-device',
-            'current_position_seconds' => 1800,
-            'progress_percentage' => 25.00,
+            'current_position_seconds' => 3600,
+            'last_listened_at' => now(),
         ]);
 
         $response = $this->withHeaders([
