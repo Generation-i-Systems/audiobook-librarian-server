@@ -85,14 +85,18 @@ class ProgressController extends Controller
 
         $deviceId = $request->header('X-Device-ID', 'unknown');
 
-        $attributes = [
-            'book_id' => $bookId,
-            'device_id' => $deviceId,
-        ];
-
-        $values = [];
         if (Auth::id()) {
-            $values['user_id'] = Auth::id();
+            $attributes = [
+                'book_id' => $bookId,
+                'user_id' => Auth::id(),
+            ];
+            $values = ['device_id' => $deviceId];
+        } else {
+            $attributes = [
+                'book_id' => $bookId,
+                'device_id' => $deviceId,
+            ];
+            $values = [];
         }
 
         /** @var BookProgress $progress */
@@ -264,19 +268,27 @@ class ProgressController extends Controller
             ], 404);
         }
 
-        $attributes = [
-            'book_id' => $bookId,
-            'device_id' => $validated['device_id'],
-        ];
-
-        $values = [
-            'current_chapter' => $validated['current_chapter'] ?? null,
-            'current_chapter_name' => $validated['current_chapter_name'] ?? null,
-        ];
-
         $newUserId = Auth::id() ?? $validated['user_id'] ?? null;
+
         if ($newUserId) {
-            $values['user_id'] = $newUserId;
+            $attributes = [
+                'book_id' => $bookId,
+                'user_id' => $newUserId,
+            ];
+            $values = [
+                'device_id' => $validated['device_id'],
+                'current_chapter' => $validated['current_chapter'] ?? null,
+                'current_chapter_name' => $validated['current_chapter_name'] ?? null,
+            ];
+        } else {
+            $attributes = [
+                'book_id' => $bookId,
+                'device_id' => $validated['device_id'],
+            ];
+            $values = [
+                'current_chapter' => $validated['current_chapter'] ?? null,
+                'current_chapter_name' => $validated['current_chapter_name'] ?? null,
+            ];
         }
 
         $progress = BookProgress::updateOrCreate($attributes, $values);
