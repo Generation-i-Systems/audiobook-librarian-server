@@ -12,6 +12,10 @@ return new class () extends Migration {
      */
     public function up(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         // MySQL requires raw SQL to change enum to varchar
         DB::statement("ALTER TABLE listening_events MODIFY event_type VARCHAR(50) NOT NULL");
     }
@@ -21,6 +25,10 @@ return new class () extends Migration {
      */
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement("ALTER TABLE listening_events MODIFY event_type ENUM(
             'PLAY_START', 'PLAY_PAUSE', 'PLAY_RESUME', 'PLAY_STOP',
             'SESSION_START', 'SESSION_END',

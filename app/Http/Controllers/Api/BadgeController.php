@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Badge;
 use App\Models\UserBadge;
 use App\Services\BadgeService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -27,8 +28,12 @@ class BadgeController extends Controller
         $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
+        $categoryRule = 'nullable|string|in:listening,milestone,streak,variety,social,completion,speed,exploration,';
+        $categoryRule .= 'dedication,discovery,seasonal,collection,challenge,time_based,quality,community,special,';
+        $categoryRule .= 'habit,mastery';
+
         $validated = $request->validate([
-            'category' => 'nullable|string|in:listening,milestone,streak,variety,social,completion,speed,exploration,dedication,discovery,seasonal,collection,challenge,time_based,quality,community,special,habit,mastery',
+            'category' => $categoryRule,
             'tier' => 'nullable|string|in:bronze,silver,gold,platinum,diamond',
             'earned_only' => 'nullable|boolean',
         ]);
@@ -237,10 +242,65 @@ class BadgeController extends Controller
 
         $unnotifiedBadges = $this->badgeService->getUnnotifiedBadges($userId, $deviceId);
 
+        $unnotifiedBadges = array_map(function (array $userBadge) {
+            if (array_key_exists('criteria_met', $userBadge) && is_array($userBadge['criteria_met'])) {
+                $userBadge['criteria_met'] = $this->normalizeCriteriaMet($userBadge['criteria_met']);
+            }
+
+            return $userBadge;
+        }, $unnotifiedBadges);
+
         return response()->json([
             'badges' => $unnotifiedBadges,
             'count' => count($unnotifiedBadges),
         ]);
+    }
+
+    private function normalizeCriteriaMet(array $criteriaMet): array
+    {
+        $dateKeys = [
+            'first_listening_date',
+            'last_listening_date',
+        ];
+
+        foreach ($dateKeys as $dateKey) {
+            if (!array_key_exists($dateKey, $criteriaMet)) {
+                continue;
+            }
+
+            $criteriaMet[$dateKey] = $this->normalizeTimestampValue($criteriaMet[$dateKey]);
+        }
+
+        return $criteriaMet;
+    }
+
+    private function normalizeTimestampValue(mixed $value): int
+    {
+        if ($value === null) {
+            return 0;
+        }
+
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->timestamp;
+        }
+
+        if (is_string($value)) {
+            try {
+                return Carbon::parse($value)->timestamp;
+            } catch (\Exception) {
+                return 0;
+            }
+        }
+
+        return 0;
     }
 
     /**
@@ -282,9 +342,13 @@ class BadgeController extends Controller
         $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
+        $categoryRule = 'nullable|string|in:listening,milestone,streak,variety,social,completion,speed,exploration,';
+        $categoryRule .= 'dedication,discovery,seasonal,collection,challenge,time_based,quality,community,special,';
+        $categoryRule .= 'habit,mastery';
+
         $validated = $request->validate([
             'show_earned' => 'nullable|boolean',
-            'category' => 'nullable|string|in:listening,milestone,streak,variety,social,completion,speed,exploration,dedication,discovery,seasonal,collection,challenge,time_based,quality,community,special,habit,mastery',
+            'category' => $categoryRule,
             'min_progress' => 'nullable|integer|min:0|max:100',
         ]);
 

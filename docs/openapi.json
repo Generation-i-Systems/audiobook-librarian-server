@@ -1874,7 +1874,27 @@
             "BadgeUnnotifiedResponse": {
                 "type": "object",
                 "properties": {
-                    "badges": {"type": "array", "items": {"type": "object"}},
+                    "badges": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "criteria_met": {
+                                    "type": "object",
+                                    "properties": {
+                                        "first_listening_date": {
+                                            "type": "integer",
+                                            "description": "Unix timestamp (seconds). 0 when unknown."
+                                        },
+                                        "last_listening_date": {
+                                            "type": "integer",
+                                            "description": "Unix timestamp (seconds). 0 when unknown."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "count": {"type": "integer"}
                 }
             },

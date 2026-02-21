@@ -197,4 +197,46 @@ class BadgeApiTest extends TestCase
             'is_notified' => 1,
         ]);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function unnotified_badges_normalizes_criteria_met_date_fields_to_integers(): void
+    {
+        [$user, $headers] = $this->authenticateUser();
+
+        $badge = Badge::create([
+            'key' => 'unnotified_' . Str::random(6),
+            'name' => 'Unnotified',
+            'description' => 'Unnotified badge',
+            'icon' => 'unnotified.png',
+            'image_url' => null,
+            'category' => 'listening',
+            'tier' => 'bronze',
+            'points' => 10,
+            'criteria' => ['session_count' => 1],
+            'is_active' => true,
+            'is_repeatable' => false,
+            'sort_order' => 1,
+        ]);
+
+        UserBadge::create([
+            'user_id' => (string) $user->id,
+            'device_id' => null,
+            'badge_id' => $badge->id,
+            'earned_at' => now(),
+            'tier_level' => 1,
+            'criteria_met' => [
+                'session_count' => 1,
+                'first_listening_date' => null,
+                'last_listening_date' => null,
+            ],
+            'is_notified' => false,
+        ]);
+
+        $response = $this->withHeaders($headers)->getJson('/api/v1/badges/unnotified');
+
+        $response->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('badges.0.criteria_met.first_listening_date', 0)
+            ->assertJsonPath('badges.0.criteria_met.last_listening_date', 0);
+    }
 }
