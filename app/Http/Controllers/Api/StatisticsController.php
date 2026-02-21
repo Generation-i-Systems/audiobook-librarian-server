@@ -16,6 +16,19 @@ use Illuminate\Validation\ValidationException;
 
 class StatisticsController extends Controller
 {
+    private function listeningStatsQuery(?int $userId, string $deviceId): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = ListeningStatistic::query();
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        } else {
+            $query->where('device_id', $deviceId);
+        }
+
+        return $query;
+    }
+
     /**
      * Get listening statistics overview (OpenAPI spec)
      */
@@ -26,7 +39,8 @@ class StatisticsController extends Controller
         ]);
 
         $period = $validated['period'] ?? 'month';
-        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id();
+        $deviceId = (string) ($request->header('X-Device-ID', 'unknown'));
 
         // Calculate date ranges based on period
         switch ($period) {
@@ -48,7 +62,7 @@ class StatisticsController extends Controller
                 break;
         }
 
-        $query = ListeningStatistic::where('device_id', $userId);
+        $query = $this->listeningStatsQuery($userId, $deviceId);
 
         if ($startDate) {
             $query->where('listening_date', '>=', $startDate->toDateString());
@@ -63,14 +77,14 @@ class StatisticsController extends Controller
         ')->first();
 
         // Calculate streaks
-        $currentStreak = $this->calculateCurrentStreak($userId);
-        $longestStreak = $this->calculateLongestStreak($userId);
+        $currentStreak = $this->calculateCurrentStreak($userId, $deviceId);
+        $longestStreak = $this->calculateLongestStreak($userId, $deviceId);
 
         // Get favorite genres (top 5 most listened)
-        $favoriteGenres = $this->getFavoriteGenres($userId, $startDate);
+        $favoriteGenres = $this->getFavoriteGenres($userId, $deviceId, $startDate);
 
         // Get daily stats for the period
-        $dailyStats = $this->getDailyStatsForPeriod($userId, $startDate);
+        $dailyStats = $this->getDailyStatsForPeriod($userId, $deviceId, $startDate);
 
         return response()->json([
             'daily_stats'                 => $dailyStats,
@@ -95,13 +109,14 @@ class StatisticsController extends Controller
             'limit'      => 'nullable|integer|min:1|max:365',
         ]);
 
-        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id();
+        $deviceId = (string) ($request->header('X-Device-ID', 'unknown'));
 
         $startDate = ($validated['start_date'] ?? null) ? Carbon::parse($validated['start_date']) : now()->subDays(29);
         $endDate   = ($validated['end_date'] ?? null) ? Carbon::parse($validated['end_date']) : now();
         $limit     = $validated['limit'] ?? 30;
 
-        $stats = ListeningStatistic::where('device_id', $userId)
+        $stats = $this->listeningStatsQuery($userId, $deviceId)
             ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
             ->groupBy('listening_date')
             ->orderByDesc('listening_date')
@@ -120,9 +135,9 @@ class StatisticsController extends Controller
 
             // Get book IDs separately for each date
             /** @var \Illuminate\Support\Collection<int, object> $rawStats */
-            $dailyStats = $rawStats->map(function ($stat) use ($userId) {
+            $dailyStats = $rawStats->map(function ($stat) use ($userId, $deviceId) {
                 /** @var \stdClass $stat */
-                $bookIds = ListeningStatistic::where('device_id', $userId)
+                $bookIds = $this->listeningStatsQuery($userId, $deviceId)
                     ->where('listening_date', $stat->listening_date ?? $stat->date ?? '')
                     ->distinct('book_id')
                     ->pluck('book_id')
@@ -184,7 +199,8 @@ class StatisticsController extends Controller
             'events.*.metadata'    => 'nullable|array',
         ]);
 
-        $userId = Auth::id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = Auth::id();
+        $deviceId = (string) ($request->header('X-Device-ID', 'unknown'));
 
         $sessionStart    = Carbon::parse($validated['session_start']);
         $sessionEnd      = Carbon::parse($validated['session_end']);
@@ -193,14 +209,15 @@ class StatisticsController extends Controller
         // Use actual_duration_ms when available (real listening time from client),
         // fall back to wall-clock session duration, never use end_position_ms which is a book position
         $actualDurationMs = $validated['actual_duration_ms'] ?? 0;
-        $secondsListened  = $actualDurationMs > 0
-            ? (int) floor($actualDurationMs / 1000)
-            : (int) $sessionDuration;
+        $secondsListened = (int) $sessionDuration;
+        if ($actualDurationMs > 0) {
+            $secondsListened = (int) floor($actualDurationMs / 1000);
+        }
         $playbackSpeed = $validated['playback_speed'] ?? 1.0;
 
         $statistic = ListeningStatistic::createSession(
             $validated['book_id'] ?? null,
-            $userId,
+            $deviceId,
             $secondsListened,
             (int) ($validated['start_position_ms'] / 1000),
             (int) ($validated['end_position_ms'] / 1000),
@@ -211,7 +228,7 @@ class StatisticsController extends Controller
                 'playback_speed' => $playbackSpeed,
                 'pauses_count'   => $validated['pauses_count'] ?? 0,
             ],
-            Auth::id(),
+            $userId !== null ? (string) $userId : null,
             $validated['actual_duration_ms'] ?? 0,
             $validated['events'] ?? [],
             $validated['title'] ?? null,
@@ -220,7 +237,8 @@ class StatisticsController extends Controller
         // Check for badge achievements after recording the session
         try {
             $badgeService = app(\App\Services\BadgeService::class);
-            $newBadges    = $badgeService->evaluateUserBadges($userId, $request->header('X-Device-ID'));
+            $badgeUserId = $userId !== null ? (string) $userId : $deviceId;
+            $newBadges    = $badgeService->evaluateUserBadges($badgeUserId, $deviceId);
 
             $response = [
                 'success' => true,
@@ -638,7 +656,15 @@ class StatisticsController extends Controller
         $thisMonth = now()->startOfMonth();
 
         // Today's listening stats
-        $todayStats = $deviceId ? ListeningStatistic::getDailyStats($deviceId, $today) : ['total_seconds' => 0, 'books_listened' => 0, 'session_count' => 0, 'formatted_duration' => '0:00'];
+        $todayStats = [
+            'total_seconds' => 0,
+            'books_listened' => 0,
+            'session_count' => 0,
+            'formatted_duration' => '0:00',
+        ];
+        if ($deviceId) {
+            $todayStats = ListeningStatistic::getDailyStats($deviceId, $today);
+        }
 
         // High-level user stats (from user_book_status)
         $userStats = [
@@ -741,13 +767,13 @@ class StatisticsController extends Controller
     /**
      * Calculate current listening streak
      */
-    private function calculateCurrentStreak(string $userId): int
+    private function calculateCurrentStreak(?int $userId, string $deviceId): int
     {
         $streak      = 0;
         $currentDate = now();
 
         while (true) {
-            $hasActivity = ListeningStatistic::where('device_id', $userId)
+            $hasActivity = $this->listeningStatsQuery($userId, $deviceId)
                 ->where('listening_date', $currentDate->toDateString())
                 ->exists();
 
@@ -765,9 +791,9 @@ class StatisticsController extends Controller
     /**
      * Calculate longest listening streak
      */
-    private function calculateLongestStreak(string $userId): int
+    private function calculateLongestStreak(?int $userId, string $deviceId): int
     {
-        $dates = ListeningStatistic::where('device_id', $userId)
+        $dates = $this->listeningStatsQuery($userId, $deviceId)
             ->select('listening_date')
             ->distinct()
             ->orderBy('listening_date')
@@ -797,9 +823,9 @@ class StatisticsController extends Controller
     /**
      * Get favorite genres for a user
      */
-    private function getFavoriteGenres(string $userId, ?Carbon $startDate): array
+    private function getFavoriteGenres(?int $userId, string $deviceId, ?Carbon $startDate): array
     {
-        $query = ListeningStatistic::where('listening_statistics.device_id', $userId)
+        $query = $this->listeningStatsQuery($userId, $deviceId)
             ->join('books', 'listening_statistics.book_id', '=', 'books.id')
             ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
             ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
@@ -819,12 +845,42 @@ class StatisticsController extends Controller
     /**
      * Get daily stats for a period
      */
-    private function getDailyStatsForPeriod(string $userId, ?Carbon $startDate): array
+    private function getDailyStatsForPeriod(?int $userId, string $deviceId, ?Carbon $startDate): array
     {
-        $query = ListeningStatistic::where('device_id', $userId);
+        $query = $this->listeningStatsQuery($userId, $deviceId);
 
         if ($startDate) {
             $query->where('listening_date', '>=', $startDate->toDateString());
+        }
+
+        if (DB::getDriverName() === 'sqlite') {
+            $rawStats = $query->selectRaw('
+                listening_date as date,
+                SUM(seconds_listened) * 1000 as listening_time_ms,
+                COUNT(*) as sessions_count
+            ')
+                ->groupBy('listening_date')
+                ->orderByDesc('listening_date')
+                ->limit(30)
+                ->toBase()
+                ->get();
+
+            /** @var \Illuminate\Support\Collection<int, object> $rawStats */
+            return $rawStats->map(function (object $stat) use ($userId, $deviceId) {
+                /** @var \stdClass $stat */
+                $bookIds = $this->listeningStatsQuery($userId, $deviceId)
+                    ->where('listening_date', $stat->date ?? '')
+                    ->distinct('book_id')
+                    ->pluck('book_id')
+                    ->toArray();
+
+                return [
+                    'date'              => (string) ($stat->date ?? ''),
+                    'listening_time_ms' => (int) ($stat->listening_time_ms ?? 0),
+                    'sessions_count'    => (int) ($stat->sessions_count ?? 0),
+                    'books_listened'    => $bookIds,
+                ];
+            })->toArray();
         }
 
         $stats = $query->selectRaw('

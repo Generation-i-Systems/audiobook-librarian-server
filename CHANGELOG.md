@@ -23,6 +23,7 @@
 
 - OpenAPI spec updated to document Apple/Facebook login responses (401/403/500)
 - Badge API `/badges/unnotified` now returns complete badge fields required by clients (e.g. `key`, `name`, `description`, `icon`, `category`, `tier`, `points`, `is_repeatable`)
+- Listening statistics endpoints now aggregate correctly across devices for authenticated users by querying `user_id` (and `reportSession` stores `user_id` and `device_id` correctly)
 - SQLite test runs no longer fail on MySQL-specific `ALTER TABLE ... MODIFY ...` in listening events migration
 - **CRITICAL**: Import now verifies files exist in destination BEFORE deleting source to prevent data loss
     - Fixed moveSpecificFiles to verify destination before deleting cross-filesystem source files

@@ -124,6 +124,8 @@ I am trying to save an update that changes the coverimage and the series but nei
 
 Android client crashes parsing `/api/v1/badges/unnotified` with: `Unexpected symbol 'n' in numeric literal` at `criteria_met.first_listening_date` because the API returns `null` for date fields where the client expects a number. Fix the API response to be type-stable and update OpenAPI + tests.
 
+still not seeing recent activity not from this device
+
 all cover images should be relative to the directoryPath. So   "coverImage": "Romance/J.R. Ward/Black Dagger Brotherhood/02 Lover Eternal/cover_audible_1765842643.jpg", should just be cover_audible_1765842643.jpg. Look at import edit and display logics to make sure we are using the new format. But also support existing data that includes the directoryPath
 
 ---

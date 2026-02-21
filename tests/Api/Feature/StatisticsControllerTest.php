@@ -142,6 +142,43 @@ class StatisticsControllerTest extends TestCase
             ]);
     }
 
+    public function test_overview_aggregates_listening_stats_across_multiple_devices_for_authenticated_user()
+    {
+        $book1 = Book::factory()->create();
+        $book2 = Book::factory()->create();
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book1->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 600,
+            'session_type' => 'listening',
+            'listening_date' => now()->toDateString(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book2->id,
+            'device_id' => 'device-b',
+            'seconds_listened' => 900,
+            'session_type' => 'listening',
+            'listening_date' => now()->toDateString(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'device-a',
+        ])->getJson('/api/v1/statistics/overview?period=all_time');
+
+        $response->assertOk()
+            ->assertJsonPath('total_listening_time_ms', (600 + 900) * 1000)
+            ->assertJsonPath('books_started', 2);
+    }
+
     public function test_get_weekly_stats_returns_aggregated_data()
     {
         $book = Book::factory()->create();
