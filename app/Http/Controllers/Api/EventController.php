@@ -135,9 +135,10 @@ class EventController extends Controller
                 $remoteEvents = $remoteEvents->take(100);
             }
 
-            $nextSyncAfter = null;
-            if ($hasMore && $remoteEvents->isNotEmpty()) {
+            if ($remoteEvents->isNotEmpty()) {
                 $nextSyncAfter = $remoteEvents->last()->synced_at;
+            } else {
+                $nextSyncAfter = $serverTimestamp;
             }
 
             $mappedEvents = $remoteEvents->map(function ($event) {

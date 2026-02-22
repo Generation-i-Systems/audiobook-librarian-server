@@ -108,6 +108,60 @@ class EventSyncTest extends TestCase
         ]);
     }
 
+    public function testSyncReturnsRemoteEventsFromOtherDevices(): void
+    {
+        $user = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create();
+        $this->actingAs($user, 'api');
+
+        ListeningEvent::create([
+            'id' => 'remote-event-1',
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'event_type' => 'SESSION_END',
+            'timestamp_ms' => 1707945600000,
+            'position_ms' => 5000000,
+            'device_id' => 'other-device',
+            'timezone' => 'UTC',
+            'sync_status' => 'SYNCED',
+            'created_at' => 1707945600000,
+            'synced_at' => 1707945605000,
+        ]);
+
+        $response = $this->postJson('/api/v1/sync/events', [
+            'events' => [],
+            'lastSyncTimestamp' => 0,
+        ], [
+            'X-Device-ID' => 'requesting-device',
+            'X-Acting-As-Test' => 'true',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonPath('remoteEvents.0.id', 'remote-event-1')
+            ->assertJsonPath('remoteEvents.0.deviceId', 'other-device');
+    }
+
+    public function testSyncAlwaysReturnsNextSyncAfter(): void
+    {
+        $user = User::factory()->create(['role' => 'library-user']);
+        $this->actingAs($user, 'api');
+
+        $response = $this->postJson('/api/v1/sync/events', [
+            'events' => [],
+            'lastSyncTimestamp' => 9999999999999,
+        ], [
+            'X-Device-ID' => 'test-device',
+            'X-Acting-As-Test' => 'true',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true, 'hasMore' => false]);
+
+        $this->assertNotNull($response->json('nextSyncAfter'));
+        $this->assertGreaterThan(0, $response->json('nextSyncAfter'));
+    }
+
     public function testSyncSkipsMigratedEvents(): void
     {
         $user = User::factory()->create(['role' => 'library-user']);
