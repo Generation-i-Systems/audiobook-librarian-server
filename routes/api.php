@@ -1,33 +1,34 @@
 <?php
 
+use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\ApiHealthController;
 use App\Http\Controllers\Api\ApiRootController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\AuthorController;
 use App\Http\Controllers\Api\BadgeController;
 use App\Http\Controllers\Api\BookApiController;
+use App\Http\Controllers\Api\BookImportApiController;
 use App\Http\Controllers\Api\BookmarkApiController;
+use App\Http\Controllers\Api\BookmarkSyncController;
+use App\Http\Controllers\Api\BookMatchController;
 use App\Http\Controllers\Api\BookRequestApiController;
+use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\ExternalReadApiController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
+use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\PositionSyncController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
 use App\Http\Controllers\Api\RecommendationController;
+use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\SkinController;
 use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\UserStatusController;
-use App\Http\Controllers\Api\AuthorController;
-use App\Http\Controllers\Api\SeriesController;
-use App\Http\Controllers\Api\BookImportApiController;
-use App\Http\Controllers\Api\AnalyticsController;
-use App\Http\Controllers\Api\DeviceController;
-use App\Http\Controllers\Api\EventController;
-use App\Http\Controllers\Api\PositionSyncController;
-use App\Http\Controllers\Api\BookmarkSyncController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -42,7 +43,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/openapi.json', function () {
         $path = base_path('docs/openapi.json');
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             return response()->json(['error' => 'OpenAPI spec not found'], 404);
         }
         return response()->file($path, ['Content-Type' => 'application/json']);
@@ -107,6 +108,13 @@ Route::prefix('v1')->group(function () {
                 Route::get('/events/book/{bookId}', [EventController::class, 'getBookEvents']);
                 Route::get('/events/stats', [EventController::class, 'getStats']);
             });
+        });
+
+        // Book Match Routes
+        Route::prefix('books/match')->group(function () {
+            Route::post('/search', [BookMatchController::class, 'search']);
+            Route::get('/{bookId}/details', [BookMatchController::class, 'details']);
+            Route::post('/reassign-events', [BookMatchController::class, 'reassignEvents']);
         });
 
         // Book Routes
@@ -270,8 +278,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/leaderboard', [BadgeController::class, 'leaderboard']);
         });
 
-
-
         // Analytics Routes
         Route::post('/analytics/event', [AnalyticsController::class, 'recordEvent']);
 
@@ -305,7 +311,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
             Route::get('/genres', [BookImportApiController::class, 'getGenres']);
         });
-
 
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);
