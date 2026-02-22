@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Book;
 use App\Models\ListeningEvent;
 use App\Services\BadgeService;
 use App\Services\PositionMaterializer;
@@ -12,7 +13,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Models\Book;
 
 class EventController extends Controller
 {
@@ -59,7 +59,7 @@ class EventController extends Controller
 
         $receivedCount   = 0;
         $skippedCount    = 0;
-        $serverTimestamp  = (int) (now()->timestamp * 1000);
+        $serverTimestamp = (int) (now()->timestamp * 1000);
         $hasSessionEnd   = false;
 
         DB::beginTransaction();
@@ -123,14 +123,14 @@ class EventController extends Controller
             $syncAfter = $validated['syncAfter'] ?? $validated['lastSyncTimestamp'];
 
             $remoteQuery = ListeningEvent::where('user_id', $user->id)
-                ->where('synced_at', '>', $syncAfter)
+                ->where('synced_at', '>=', $syncAfter)
                 ->where('device_id', '!=', $deviceId)
                 ->whereNull('migrated_from')
                 ->orderBy('synced_at', 'asc')
                 ->limit(101);
 
             $remoteEvents = $remoteQuery->get();
-            $hasMore = $remoteEvents->count() > 100;
+            $hasMore      = $remoteEvents->count() > 100;
             if ($hasMore) {
                 $remoteEvents = $remoteEvents->take(100);
             }
@@ -138,7 +138,9 @@ class EventController extends Controller
             if ($remoteEvents->isNotEmpty()) {
                 $nextSyncAfter = $remoteEvents->last()->synced_at;
             } else {
-                $nextSyncAfter = $serverTimestamp;
+                // Keep cursor where it was — do not advance past events
+                // that other devices may push between now and the next sync.
+                $nextSyncAfter = $syncAfter;
             }
 
             $mappedEvents = $remoteEvents->map(function ($event) {
@@ -194,7 +196,7 @@ class EventController extends Controller
                 'received'        => $receivedCount,
                 'skipped'         => $skippedCount,
                 'remoteEvents'    => $mappedEvents,
-                'serverTimestamp'  => $serverTimestamp,
+                'serverTimestamp' => $serverTimestamp,
                 'hasMore'         => $hasMore,
                 'nextSyncAfter'   => $nextSyncAfter,
                 'badgesEarned'    => $badgesEarned,
@@ -292,8 +294,8 @@ class EventController extends Controller
         $totalEvents = $query->count();
 
         $startTime = $validated['startTime'] ?? null;
-        $endTime = $validated['endTime'] ?? null;
-        $bookId = $validated['bookId'] ?? null;
+        $endTime   = $validated['endTime'] ?? null;
+        $bookId    = $validated['bookId'] ?? null;
 
         $scopeQuery = fn ($q) => $q
             ->where('user_id', $user->id)
