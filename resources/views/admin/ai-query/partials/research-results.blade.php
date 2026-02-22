@@ -24,7 +24,7 @@
                                         @foreach($stat['result'] as $row)
                                             <tr>
                                                 @foreach($row as $value)
-                                                    <td>{{ $value }}</td>
+                                                    <td>{{ is_array($value) ? json_encode($value) : $value }}</td>
                                                 @endforeach
                                             </tr>
                                         @endforeach

@@ -262,7 +262,7 @@
                             </div>
 
                             {{-- View mode --}}
-                            <pre class="bg-white p-2 rounded border border-secondary small mb-0 query-view" style="max-height: 200px; overflow-y: auto;"><code>{{ $query['query'] }}</code></pre>
+                            <pre class="bg-white p-2 rounded border border-secondary small mb-0 query-view" style="max-height: 200px; overflow-y: auto;"><code>{{ is_array($query['query']) ? json_encode($query['query'], JSON_PRETTY_PRINT) : $query['query'] }}</code></pre>
 
                             {{-- Edit mode --}}
                             <div class="query-edit" style="display: none;">
@@ -270,7 +270,7 @@
                                     class="form-control font-monospace small"
                                     name="queries[{{ $index }}][query]"
                                     rows="5"
-                                    style="font-size: 12px;">{{ $query['query'] }}</textarea>
+                                    style="font-size: 12px;">{{ is_array($query['query']) ? json_encode($query['query'], JSON_PRETTY_PRINT) : $query['query'] }}</textarea>
                                 <input type="hidden" name="queries[{{ $index }}][type]" value="{{ $query['type'] }}">
                                 <input type="hidden" name="queries[{{ $index }}][purpose]" value="{{ $query['purpose'] }}">
                             </div>
