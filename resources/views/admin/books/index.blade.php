@@ -20,10 +20,6 @@
                     <option value="author_desc" {{ (request('sort') == 'author_desc') ? 'selected' : '' }}>Author Z-A</option>
                     <option value="series_asc" {{ (request('sort') == 'series_asc') ? 'selected' : '' }}>Series A-Z</option>
                     <option value="series_desc" {{ (request('sort') == 'series_desc') ? 'selected' : '' }}>Series Z-A</option>
-                    <option value="series_number_asc" {{ (request('sort') == 'series_number_asc') ? 'selected' : '' }}>Series
-                        # Asc</option>
-                    <option value="series_number_desc" {{ (request('sort') == 'series_number_desc') ? 'selected' : '' }}>
-                        Series # Desc</option>
                     <option value="genre_asc" {{ (request('sort') == 'genre_asc') ? 'selected' : '' }}>Genre A-Z</option>
                     <option value="genre_desc" {{ (request('sort') == 'genre_desc') ? 'selected' : '' }}>Genre Z-A</option>
                     <option value="year_asc" {{ (request('sort') == 'year_asc') ? 'selected' : '' }}>Year Asc</option>
@@ -86,10 +82,7 @@
                             style="text-decoration: none; color: inherit;">Author{{ $getSortIndicator('author') }}</a></th>
                     <th style="cursor: pointer;"><a href="{{ $getSortUrl('series') }}"
                             style="text-decoration: none; color: inherit;">Series{{ $getSortIndicator('series') }}</a></th>
-                    <th style="width: 60px; text-align: center; cursor: pointer;"><a
-                            href="{{ $getSortUrl('series_number') }}"
-                            style="text-decoration: none; color: inherit;">#{{ $getSortIndicator('series_number') }}</a>
-                    </th>
+                    <th style="width: 60px; text-align: center;">#</th>
                     <th style="cursor: pointer;"><a href="{{ $getSortUrl('genre') }}"
                             style="text-decoration: none; color: inherit;">Genre{{ $getSortIndicator('genre') }}</a></th>
                     @if($showYear)

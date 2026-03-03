@@ -43,12 +43,12 @@ class BookControllerSeriesSortTest extends TestCase
     }
 
     #[Test]
-    public function it_defaults_to_series_number_sorting_when_series_filter_is_applied(): void
+    public function it_defaults_to_series_sorting_when_series_filter_is_applied(): void
     {
-        // Mock the listBooks method to expect series_number_asc sort
+        // Mock the listBooks method to expect series sort (secondary sort by number handled in service)
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 20, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series_number', 'asc', true)
+            ->with(1, 20, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series', 'asc', true)
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -58,7 +58,7 @@ class BookControllerSeriesSortTest extends TestCase
         $response = $this->get(route('admin.books.index', ['series' => 'Test Series']));
 
         $response->assertOk();
-        $response->assertViewHas('sort', 'series_number_asc');
+        $response->assertViewHas('sort', 'series_asc');
     }
 
     #[Test]

@@ -784,12 +784,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 $query->leftJoin('book_series', 'books.id', '=', 'book_series.book_id')
                     ->leftJoin('series', 'book_series.series_id', '=', 'series.id')
                     ->orderBy('series.name', $order)
-                    ->select('books.*')
-                    ->distinct();
-                break;
-            case 'series_number':
-                $query->leftJoin('book_series', 'books.id', '=', 'book_series.book_id')
-                    ->orderByRaw('CAST(book_series.series_number AS DECIMAL(10,2)) ' . $order)
+                    ->orderByRaw('CAST(book_series.series_number AS DECIMAL(10,2)) ASC')
                     ->select('books.*')
                     ->distinct();
                 break;

@@ -155,9 +155,9 @@ class BookController extends Controller
             // Get sorting parameters
             $sortParam = $request->input('sort', 'recent_desc');
 
-            // Default to series number sorting when series filter is applied
+            // Default to series name sorting when series filter is applied
             if ($request->filled('series') && !$request->has('sort')) {
-                $sortParam = 'series_number_asc';
+                $sortParam = 'series_asc';
             }
 
             $sort = 'created_at'; // Default internal sort
@@ -195,14 +195,6 @@ class BookController extends Controller
                     break;
                 case 'series_desc':
                     $sort = 'series';
-                    $order = 'desc';
-                    break;
-                case 'series_number_asc':
-                    $sort = 'series_number';
-                    $order = 'asc';
-                    break;
-                case 'series_number_desc':
-                    $sort = 'series_number';
                     $order = 'desc';
                     break;
                 case 'genre_asc':
