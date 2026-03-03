@@ -374,6 +374,28 @@ class BookImportService
      */
     public function createBookFromMetadata(array $metadata, array $audiobook, array $options = []): ?Book
     {
+        // Validate that author is not listed as series - clear series if it matches author
+        $authors = $metadata['author'] ?? [];
+        $authors = is_array($authors) ? $authors : [$authors];
+        $seriesName = $metadata['series'] ?? null;
+
+        if ($seriesName && !empty($authors)) {
+            $seriesNormalized = strtolower(trim($seriesName));
+            foreach ($authors as $authorName) {
+                $authorNormalized = strtolower(trim($authorName));
+                if ($authorNormalized === $seriesNormalized) {
+                    Log::info('Clearing series that matches author', [
+                        'title' => $metadata['title'] ?? 'Unknown',
+                        'author' => $authorName,
+                        'series' => $seriesName,
+                    ]);
+                    $metadata['series'] = null;
+                    $metadata['series_number'] = null;
+                    break;
+                }
+            }
+        }
+
         try {
             DB::beginTransaction();
 
@@ -5341,6 +5363,14 @@ class BookImportService
         $originalSeries = $seriesName;
         $cleanedSeries = $seriesName;
 
+        // If series exactly matches any author, return empty string
+        $seriesNormalized = strtolower(trim($seriesName));
+        foreach ($authors as $author) {
+            if (strtolower(trim($author)) === $seriesNormalized) {
+                return '';
+            }
+        }
+
         // If the series name contains " - ", the part after is likely the actual series name
         // This handles "Author Name - Series Name" format from directory names
         if (str_contains($cleanedSeries, ' - ')) {
@@ -6203,6 +6233,14 @@ class BookImportService
 
         if (empty($authors)) {
             return $series;
+        }
+
+        // If series exactly matches any author, return empty string
+        $seriesNormalized = strtolower(trim($series));
+        foreach ($authors as $author) {
+            if (strtolower(trim($author)) === $seriesNormalized) {
+                return '';
+            }
         }
 
         foreach ($authors as $author) {
