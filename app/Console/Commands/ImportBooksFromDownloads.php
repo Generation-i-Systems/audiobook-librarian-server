@@ -43,6 +43,7 @@ class ImportBooksFromDownloads extends Command
                             {--dry-run : Show what would be imported without making changes}
                             {--limit=0 : Maximum number of books to process per run (0 = no limit)}
                             {--force : Skip confirmation prompts}
+                            {--force-include : Force inclusion of files that would otherwise be skipped (e.g., too small)}
                             {--skip-enrichment : Skip external data enrichment (Audible, Google Books)}
                             {--copy-files : Copy files after successful import instead of moving (default is move)}
                             {--no-backup : Skip automatic database backup}
@@ -637,7 +638,8 @@ class ImportBooksFromDownloads extends Command
             $paths,
             fn ($path) => $this->processSingleAudioFile($path),
             fn ($path) => $this->processAudiobookDirectory($path),
-            fn ($msg) => $this->warn($msg)
+            fn ($msg) => $this->warn($msg),
+            (bool) $this->option('force-include')
         );
     }
 

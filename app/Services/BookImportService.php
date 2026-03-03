@@ -3822,7 +3822,8 @@ class BookImportService
 
         $fileSize = filesize($filePath);
 
-        if ($fileSize < 10 * 1024 * 1024) {
+        $forceInclude = $this->config['force_include'] ?? false;
+        if (!$forceInclude && $fileSize < 10 * 1024 * 1024) {
             return null;
         }
 
@@ -4029,11 +4030,14 @@ class BookImportService
     /**
      * Process specific files or folders provided as arguments
      */
-    public function processSpecificPaths(array $paths, callable $processSingleAudioFileCallback, callable $processAudiobookDirectoryCallback, ?callable $warnCallback = null): array
+    public function processSpecificPaths(array $paths, callable $processSingleAudioFileCallback, callable $processAudiobookDirectoryCallback, ?callable $warnCallback = null, bool $forceInclude = false): array
     {
         $audiobooks = [];
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
         $processedDirectories = [];
+
+        // Store for use in callbacks
+        $this->config['force_include'] = $forceInclude;
 
         foreach ($paths as $path) {
             $path = trim($path);
