@@ -1240,6 +1240,25 @@
                         },
                         "description": "List of genres for this book"
                     },
+                    "narrators": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer",
+                                    "description": "Narrator ID",
+                                    "example": 78
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Narrator name",
+                                    "example": "Michael Kramer"
+                                }
+                            }
+                        },
+                        "description": "List of narrators for this book"
+                    },
                     "series": {
                         "type": "array",
                         "items": {
@@ -6139,7 +6158,7 @@
                     {
                         "name": "search",
                         "in": "query",
-                        "description": "Search books by title",
+                        "description": "Full-text search across title, description, authors, narrators, and series name",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -6165,7 +6184,7 @@
                         "required": false,
                         "schema": {
                             "type": "integer",
-                            "default": 50,
+                            "default": 15,
                             "minimum": 1,
                             "maximum": 100,
                             "example": 50
@@ -6228,6 +6247,36 @@
                         "schema": {
                             "type": "boolean"
                         }
+                    },
+                    {
+                        "name": "device_id",
+                        "in": "query",
+                        "description": "Device identifier used to scope per-device listening progress and status",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "my-iphone"
+                        }
+                    },
+                    {
+                        "name": "with_cover",
+                        "in": "query",
+                        "description": "Whether to include a cover_url in each book object (default true)",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
+                        }
+                    },
+                    {
+                        "name": "inlineCovers",
+                        "in": "query",
+                        "description": "When true, cover image is returned as a base64 data URI in cover_url instead of a URL (default false)",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
 
@@ -6276,6 +6325,12 @@
                                                         {
                                                             "id": 1,
                                                             "name": "Fantasy"
+                                                        }
+                                                    ],
+                                                    "narrators": [
+                                                        {
+                                                            "id": 78,
+                                                            "name": "Michael Kramer"
                                                         }
                                                     ],
                                                     "series": [
