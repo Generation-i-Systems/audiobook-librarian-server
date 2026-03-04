@@ -233,6 +233,11 @@
                                                         </button>
                                                     </div>
                                                 </form>
+                                            @elseif($issue['issueType'] === \App\Enums\LibraryRepairIssueType::DUPLICATE_DIRECTORY->value)
+                                                <a href="{{ route('admin.library-repair.compare', $issue['id']) }}"
+                                                    class="btn btn-sm btn-warning w-100">
+                                                    View &amp; Resolve Duplicates
+                                                </a>
                                             @else
                                                 <form method="POST" action="{{ route('admin.library-repair.resolve', $issue['id']) }}"
                                                     class="w-100" style="min-width: 220px;">

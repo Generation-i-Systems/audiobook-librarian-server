@@ -62,7 +62,7 @@ class LibraryRepairControllerRefreshTest extends TestCase
         $response = $this->post(route('admin.library-repair.refresh'));
 
         $response->assertRedirect(route('admin.library-repair.index'));
-        $response->assertSessionHas('success', 'Library repair scan has been started. The page will refresh automatically to show updated results.');
+        $response->assertSessionHas('success', 'Library repair scan started. The page will refresh to show updated results.');
     }
 
     #[Test]

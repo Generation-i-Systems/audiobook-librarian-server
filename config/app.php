@@ -204,6 +204,7 @@ return [
         'File' => Illuminate\Support\Facades\File::class,
         'Auth' => Illuminate\Support\Facades\Auth::class,
         'Queue' => Illuminate\Support\Facades\Queue::class,
+        'Str' => Illuminate\Support\Str::class,
         // ... other aliases ...
     ],
 ];

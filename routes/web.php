@@ -305,6 +305,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     )->name('library-repair.import-missing');
     Route::post('/library-repair/refresh', [Admin\LibraryRepairController::class, 'refresh'])
         ->name('library-repair.refresh');
+    Route::get('/library-repair/{issue}/compare', [Admin\LibraryRepairController::class, 'compare'])
+        ->name('library-repair.compare');
+    Route::post('/library-repair/{issue}/resolve-duplicate', [Admin\LibraryRepairController::class, 'resolveDuplicate'])
+        ->name('library-repair.resolve-duplicate');
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 
