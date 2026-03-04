@@ -190,9 +190,22 @@ class EnrichVsiBooks extends Command
         }
 
         if (empty($results)) {
-            $this->warn("      no Hardcover results for \"{$searchTitle}\"");
-            $this->skipped++;
-            return;
+            // Fallback: try bare title without the VSI/Bolinda suffix
+            try {
+                $results = $this->hardcoverService->searchBooks($book->title, ['limit' => 5]);
+            } catch (\Throwable $e) {
+                $this->warn("      Hardcover API error (fallback): " . $e->getMessage());
+                $this->errors++;
+                return;
+            }
+
+            if (empty($results)) {
+                $this->warn("      no Hardcover results for \"{$book->title}\"");
+                $this->skipped++;
+                return;
+            }
+
+            $this->line("      fallback search: \"{$book->title}\"");
         }
 
         $match = $this->pickBestMatch($results, $book->title);
