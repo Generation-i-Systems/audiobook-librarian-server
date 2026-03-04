@@ -313,7 +313,7 @@ class EnrichVsiBooks extends Command
      * Pick the best match from Hardcover results.
      * Prefers results where our short title appears in the result title.
      */
-    private function pickBestMatch(array $results, string $bookTitle): ?array
+    private function pickBestMatch(array $results, string $bookTitle, int $minScore = 2): ?array
     {
         $bookTitleLower = mb_strtolower($bookTitle);
         $bestScore = -1;
@@ -341,10 +341,7 @@ class EnrichVsiBooks extends Command
             }
         }
 
-        // Require meaningful relevance — score of 1 means only title substring match,
-        // which risks wrong results (e.g. "The Brain" matching "The Brain Storm").
-        // Require score >= 2 (either title-starts-with match, or substring + VSI marker).
-        if ($bestScore < 2) {
+        if ($bestScore < $minScore) {
             return null;
         }
 
@@ -444,15 +441,16 @@ class EnrichVsiBooks extends Command
                 $q->where('directory_path', 'like', self::VSI_BASE_PATH . '/%')
                   ->orWhere('directory_path', 'like', self::BOLINDA_BASE_PATH . '/%');
             })
-            ->whereNotNull('cover_image')
-            ->where('cover_image', '!=', '')
-            ->get(['id', 'title', 'directory_path', 'cover_image', 'file_tags']);
+            ->get();
 
         $checked = 0;
         foreach ($books as $book) {
-            $absPath = $bookRoot . '/' . $book->directory_path . '/' . $book->cover_image;
-            if (file_exists($absPath)) {
-                continue;
+            // Skip if cover_image is set and the file exists on disk
+            if (!empty($book->cover_image)) {
+                $absPath = $bookRoot . '/' . $book->directory_path . '/' . $book->cover_image;
+                if (file_exists($absPath)) {
+                    continue;
+                }
             }
 
             $checked++;
@@ -462,9 +460,9 @@ class EnrichVsiBooks extends Command
             $this->line("  [{$book->id}] \"{$book->title}\" — missing cover, searching...");
 
             try {
-                $results = $this->hardcoverService->searchBooks($searchTitle, ['limit' => 5]);
+                $results = $this->hardcoverService->searchBooks($searchTitle, ['limit' => 5]) ?? [];
                 if (empty($results)) {
-                    $results = $this->hardcoverService->searchBooks($book->title, ['limit' => 5]);
+                    $results = $this->hardcoverService->searchBooks($book->title, ['limit' => 5]) ?? [];
                 }
             } catch (\Throwable $e) {
                 $this->warn("    Hardcover error: " . $e->getMessage());
@@ -472,21 +470,34 @@ class EnrichVsiBooks extends Command
                 continue;
             }
 
-            $match = $this->pickBestMatch($results, $book->title);
+            // Use minScore=0 for cover searches — any title match is acceptable for a cover image
+            $match = !empty($results) ? $this->pickBestMatch($results, $book->title, 0) : null;
 
-            // Also try Goodreads if enabled and no Hardcover match
-            if ($match === null && $this->option('goodreads')) {
-                $goodreads = $this->fetchFromGoodreads($book->title, $isBolinda);
-                if ($goodreads !== null && !empty($goodreads['coverImageUrl'])) {
-                    $filename = $this->importService->downloadCoverImage($goodreads['coverImageUrl'], $book->directory_path, 'goodreads');
-                    if ($filename) {
-                        if (!$this->dryRun) {
+            // Also try Goodreads then Amazon if enabled and no Hardcover cover URL
+            if (($match === null || empty($match['coverImageUrl'])) && $this->option('goodreads')) {
+                $external = $this->fetchFromGoodreads($book->title, $isBolinda);
+                $source = 'goodreads';
+                if ($external === null || empty($external['coverImageUrl'])) {
+                    $external = $this->fetchFromAmazon($book->title, $isBolinda);
+                    $source = 'amazon';
+                }
+                if ($external !== null && !empty($external['coverImageUrl'])) {
+                    if (!$this->dryRun) {
+                        $filename = $this->importService->downloadCoverImage($external['coverImageUrl'], $book->directory_path, $source);
+                        if ($filename) {
                             $book->cover_image = $filename;
                             $book->save();
+                            $this->line("    cover re-downloaded ({$source}) → {$filename}");
+                            $this->coversFixed++;
+                        } else {
+                            $this->warn("    download failed");
                         }
-                        $this->line("    cover re-downloaded (Goodreads) → {$filename}");
+                    } else {
+                        $this->line("    would re-download ({$source}) from {$external['coverImageUrl']}");
                         $this->coversFixed++;
                     }
+                } else {
+                    $this->warn("    no cover URL found from any source");
                 }
                 continue;
             }
@@ -524,7 +535,12 @@ class EnrichVsiBooks extends Command
         $data = $this->fetchFromGoodreads($book->title, $isBolinda);
 
         if ($data === null) {
-            $this->warn('      no Goodreads results');
+            $this->line('      trying Amazon...');
+            $data = $this->fetchFromAmazon($book->title, $isBolinda);
+        }
+
+        if ($data === null) {
+            $this->warn('      no results from Goodreads or Amazon');
             $this->skipped++;
             return;
         }
@@ -583,8 +599,8 @@ class EnrichVsiBooks extends Command
      */
     private function fetchFromGoodreads(string $title, bool $isBolinda): ?array
     {
-        $suffix = $isBolinda ? 'Beginner Guide' : 'Very Short Introduction';
-        $query = urlencode($title . ' ' . $suffix);
+        $searchTitle = $this->buildSearchTitle($title, $isBolinda);
+        $query = urlencode($searchTitle);
         $searchUrl = 'https://www.goodreads.com/search?q=' . $query;
 
         $searchHtml = $this->curlGet($searchUrl);
@@ -637,6 +653,67 @@ class EnrichVsiBooks extends Command
                 if ($name !== '') {
                     $result['author'] = [$name];
                 }
+            }
+        }
+
+        return !empty($result) ? $result : null;
+    }
+
+    /**
+     * Fetch author, description, and cover from Amazon book search + product page.
+     * Returns array with keys: author[], description, coverImageUrl — or null.
+     */
+    private function fetchFromAmazon(string $title, bool $isBolinda): ?array
+    {
+        $searchTitle = $this->buildSearchTitle($title, $isBolinda);
+        $query = urlencode($searchTitle);
+        $searchUrl = 'https://www.amazon.com/s?k=' . $query . '&i=stripbooks';
+
+        $searchHtml = $this->curlGet($searchUrl);
+        if ($searchHtml === null) {
+            return null;
+        }
+
+        // Extract first ASIN from search results
+        if (!preg_match('/data-asin="([A-Z0-9]{10})"/', $searchHtml, $m)) {
+            return null;
+        }
+
+        $asin = $m[1];
+        $productUrl = 'https://www.amazon.com/dp/' . $asin;
+        $productHtml = $this->curlGet($productUrl);
+        if ($productHtml === null) {
+            return null;
+        }
+
+        $result = [];
+
+        // Cover image — prefer high-res from image data JSON, fall back to landing image
+        if (preg_match('#"large"\s*:\s*"(https://[^"]+\.jpg)"#', $productHtml, $cm)) {
+            $result['coverImageUrl'] = $cm[1];
+        } elseif (preg_match('#id="landingImage"[^>]+src="(https://[^"]+)"#', $productHtml, $cm)) {
+            $result['coverImageUrl'] = html_entity_decode($cm[1]);
+        } elseif (preg_match('#id="imgBlkFront"[^>]+src="(https://[^"]+)"#', $productHtml, $cm)) {
+            $result['coverImageUrl'] = html_entity_decode($cm[1]);
+        }
+
+        // Author — byline contrib link text
+        if (preg_match('/class="[^"]*contributorNameID[^"]*"[^>]*>([^<]+)</', $productHtml, $am)) {
+            $result['author'] = [preg_replace('/\s+/', ' ', trim(html_entity_decode($am[1])))];
+        } elseif (preg_match('/id="bylineInfo"[^>]*>.*?<a[^>]+>([^<]+)<\/a>/s', $productHtml, $am)) {
+            $name = preg_replace('/\s+/', ' ', trim(html_entity_decode($am[1])));
+            if (!empty($name)) {
+                $result['author'] = [$name];
+            }
+        }
+
+        // Description — editorial review or book description
+        if (preg_match('/<div[^>]+id="bookDescription_feature_div"[^>]*>.*?<noscript[^>]*>(.*?)<\/noscript>/s', $productHtml, $dm)) {
+            $result['description'] = trim(strip_tags(html_entity_decode($dm[1])));
+        } elseif (preg_match('/<div[^>]+class="[^"]*a-expander-content[^"]*"[^>]*>(.*?)<\/div>/s', $productHtml, $dm)) {
+            $desc = trim(strip_tags(html_entity_decode($dm[1])));
+            if (strlen($desc) > 50) {
+                $result['description'] = $desc;
             }
         }
 

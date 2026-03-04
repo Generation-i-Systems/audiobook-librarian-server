@@ -115,11 +115,15 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
         // Then, specifically handle the relationships with the correct keys and structures
         if (!empty($bookArray['authors'])) {
-            $camelCasedBook['author'] = collect($bookArray['authors'])->pluck('name')->all();
+            $names = collect($bookArray['authors'])->pluck('name')->all();
+            $camelCasedBook['author']  = $names;
+            $camelCasedBook['authors'] = $names;
         }
 
         if (!empty($bookArray['genres'])) {
-            $camelCasedBook['genre'] = collect($bookArray['genres'])->pluck('name')->all();
+            $names = collect($bookArray['genres'])->pluck('name')->all();
+            $camelCasedBook['genre']  = $names;
+            $camelCasedBook['genres'] = $names;
         }
 
         if (!empty($bookArray['narrators'])) {
