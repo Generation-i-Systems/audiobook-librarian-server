@@ -23,6 +23,8 @@ class EnrichVsiBooks extends Command
                             {--dry-run : Preview changes without applying them}
                             {--genre-only : Only fix genre, skip Hardcover enrichment}
                             {--split-bolinda : Also move Bolinda Beginner Guides to their own collection}
+                            {--fix-covers : Re-download covers that are recorded in DB but missing from disk}
+                            {--goodreads : Also try Goodreads for books still missing author after Hardcover}
                             {--id= : Only process a specific book ID}
                             {--limit= : Maximum number of books to process}';
 
@@ -61,6 +63,8 @@ class EnrichVsiBooks extends Command
     private int $skipped = 0;
 
     private int $errors = 0;
+
+    private int $coversFixed = 0;
 
     public function handle(BookImportService $importService, HardcoverService $hardcoverService): int
     {
@@ -107,15 +111,23 @@ class EnrichVsiBooks extends Command
             }
         });
 
+        // ── Fix-covers pass: re-download covers recorded in DB but missing on disk ──
+        if ($this->option('fix-covers')) {
+            $this->newLine();
+            $this->info('Re-downloading missing cover files...');
+            $this->fixMissingCovers($bookRoot);
+        }
+
         $this->newLine();
         $this->info('══ Summary ═══════════════════════════════════════════');
-        $this->info("  Genre fixed:   {$this->genreFixed}");
-        $this->info("  Authors added: {$this->authorFixed}");
-        $this->info("  Covers added:  {$this->coverFixed}");
-        $this->info("  Descs added:   {$this->descFixed}");
-        $this->info("  Bolinda moved: {$this->bolindaMoved}");
-        $this->info("  Skipped:       {$this->skipped}");
-        $this->info("  Errors:        {$this->errors}");
+        $this->info("  Genre fixed:      {$this->genreFixed}");
+        $this->info("  Authors added:    {$this->authorFixed}");
+        $this->info("  Covers added:     {$this->coverFixed}");
+        $this->info("  Covers re-dl:     {$this->coversFixed}");
+        $this->info("  Descs added:      {$this->descFixed}");
+        $this->info("  Bolinda moved:    {$this->bolindaMoved}");
+        $this->info("  Skipped:          {$this->skipped}");
+        $this->info("  Errors:           {$this->errors}");
 
         if ($this->dryRun) {
             $this->warn('DRY-RUN: no changes were written');
@@ -210,8 +222,13 @@ class EnrichVsiBooks extends Command
 
         $match = $this->pickBestMatch($results, $book->title);
         if ($match === null) {
-            $this->warn("      no suitable match found");
-            $this->skipped++;
+            // Fallback to Goodreads if flag set
+            if ($this->option('goodreads')) {
+                $this->enrichFromGoodreads($book, $isBolinda);
+            } else {
+                $this->warn("      no suitable match found");
+                $this->skipped++;
+            }
             return;
         }
 
@@ -258,11 +275,13 @@ class EnrichVsiBooks extends Command
 
         // Apply cover
         if (!$hasCover && !empty($match['coverImageUrl'])) {
-            $dirPath = $bookRoot . '/' . $book->directory_path;
             if (!$this->dryRun) {
-                $coverPath = $this->importService->downloadCoverImage($match['coverImageUrl'], $dirPath, 'hardcover');
-                if ($coverPath) {
-                    $book->cover_image = ltrim(str_replace($bookRoot, '', $coverPath), '/');
+                // downloadCoverImage expects the relative directory_path (not absolute).
+                // It saves the file under book_root/directory_path/ and returns just the filename.
+                // cover_image in DB stores just the filename (new convention).
+                $coverFilename = $this->importService->downloadCoverImage($match['coverImageUrl'], $book->directory_path, 'hardcover');
+                if ($coverFilename) {
+                    $book->cover_image = $coverFilename;
                     $book->save();
                     $this->line("      cover → {$book->cover_image}");
                     $this->coverFixed++;
@@ -411,5 +430,247 @@ class EnrichVsiBooks extends Command
         });
 
         $this->bolindaMoved++;
+    }
+
+    /**
+     * Re-download covers that are stored in DB but whose file is missing on disk.
+     * Searches Hardcover again to get the URL, then downloads to the correct location.
+     */
+    private function fixMissingCovers(string $bookRoot): void
+    {
+        /** @var iterable<Book> $books */
+        $books = Book::query()
+            ->where(function ($q) {
+                $q->where('directory_path', 'like', self::VSI_BASE_PATH . '/%')
+                  ->orWhere('directory_path', 'like', self::BOLINDA_BASE_PATH . '/%');
+            })
+            ->whereNotNull('cover_image')
+            ->where('cover_image', '!=', '')
+            ->get(['id', 'title', 'directory_path', 'cover_image', 'file_tags']);
+
+        $checked = 0;
+        foreach ($books as $book) {
+            $absPath = $bookRoot . '/' . $book->directory_path . '/' . $book->cover_image;
+            if (file_exists($absPath)) {
+                continue;
+            }
+
+            $checked++;
+            $isBolinda = $this->isBolindaBook($book);
+            $searchTitle = $this->buildSearchTitle($book->title, $isBolinda);
+
+            $this->line("  [{$book->id}] \"{$book->title}\" — missing cover, searching...");
+
+            try {
+                $results = $this->hardcoverService->searchBooks($searchTitle, ['limit' => 5]);
+                if (empty($results)) {
+                    $results = $this->hardcoverService->searchBooks($book->title, ['limit' => 5]);
+                }
+            } catch (\Throwable $e) {
+                $this->warn("    Hardcover error: " . $e->getMessage());
+                $this->errors++;
+                continue;
+            }
+
+            $match = $this->pickBestMatch($results, $book->title);
+
+            // Also try Goodreads if enabled and no Hardcover match
+            if ($match === null && $this->option('goodreads')) {
+                $goodreads = $this->fetchFromGoodreads($book->title, $isBolinda);
+                if ($goodreads !== null && !empty($goodreads['coverImageUrl'])) {
+                    $filename = $this->importService->downloadCoverImage($goodreads['coverImageUrl'], $book->directory_path, 'goodreads');
+                    if ($filename) {
+                        if (!$this->dryRun) {
+                            $book->cover_image = $filename;
+                            $book->save();
+                        }
+                        $this->line("    cover re-downloaded (Goodreads) → {$filename}");
+                        $this->coversFixed++;
+                    }
+                }
+                continue;
+            }
+
+            if ($match === null || empty($match['coverImageUrl'])) {
+                $this->warn("    no cover URL found");
+                continue;
+            }
+
+            if (!$this->dryRun) {
+                $filename = $this->importService->downloadCoverImage($match['coverImageUrl'], $book->directory_path, 'hardcover');
+                if ($filename) {
+                    $book->cover_image = $filename;
+                    $book->save();
+                    $this->line("    cover re-downloaded → {$filename}");
+                    $this->coversFixed++;
+                } else {
+                    $this->warn("    download failed");
+                }
+            } else {
+                $this->line("    would re-download from {$match['coverImageUrl']}");
+                $this->coversFixed++;
+            }
+        }
+
+        $this->info("  Checked {$checked} books with missing cover files.");
+    }
+
+    /**
+     * Apply Goodreads data directly to a Book model (author, description, cover).
+     */
+    private function enrichFromGoodreads(Book $book, bool $isBolinda): void
+    {
+        $this->line('      goodreads search: "' . $book->title . '"');
+        $data = $this->fetchFromGoodreads($book->title, $isBolinda);
+
+        if ($data === null) {
+            $this->warn('      no Goodreads results');
+            $this->skipped++;
+            return;
+        }
+
+        if (!empty($data['author']) && $book->authors()->count() === 0) {
+            if (!$this->dryRun) {
+                $book->authors()->detach();
+                $authorIds = [];
+                foreach ($data['author'] as $name) {
+                    $name = preg_replace('/\s+/', ' ', trim((string) $name));
+                    if ($name === '') {
+                        continue;
+                    }
+
+                    $author = Author::firstOrCreate(['name' => $name]);
+                    $authorIds[] = $author->id;
+                }
+                if (!empty($authorIds)) {
+                    $book->authors()->syncWithoutDetaching(array_unique($authorIds));
+                }
+            }
+            $this->line('      author (GR) → ' . implode(', ', $data['author']));
+            $this->authorFixed++;
+        }
+
+        if (!empty($data['description']) && empty($book->description)) {
+            if (!$this->dryRun) {
+                $book->description = $data['description'];
+                $book->save();
+            }
+            $this->line('      desc (GR) → ' . mb_substr($data['description'], 0, 60) . '...');
+            $this->descFixed++;
+        }
+
+        if (!empty($data['coverImageUrl']) && empty($book->cover_image)) {
+            if (!$this->dryRun) {
+                $filename = $this->importService->downloadCoverImage($data['coverImageUrl'], $book->directory_path, 'goodreads');
+                if ($filename) {
+                    $book->cover_image = $filename;
+                    $book->save();
+                    $this->line('      cover (GR) → ' . $filename);
+                    $this->coverFixed++;
+                }
+            } else {
+                $this->line('      cover (GR) → (would download)');
+                $this->coverFixed++;
+            }
+        }
+    }
+
+    /**
+     * Fetch author, description, and cover from Goodreads.
+     * Uses curl (file_get_contents is blocked by Goodreads) and parses the
+     * __NEXT_DATA__ JSON blob embedded in the page for structured data.
+     * Returns array with keys: author[], description, coverImageUrl — or null.
+     */
+    private function fetchFromGoodreads(string $title, bool $isBolinda): ?array
+    {
+        $suffix = $isBolinda ? 'Beginner Guide' : 'Very Short Introduction';
+        $query = urlencode($title . ' ' . $suffix);
+        $searchUrl = 'https://www.goodreads.com/search?q=' . $query;
+
+        $searchHtml = $this->curlGet($searchUrl);
+        if ($searchHtml === null) {
+            return null;
+        }
+
+        // Extract first /book/show/ path from search results
+        if (!preg_match('|/book/show/(\d+[^"\'&\s]*)|', $searchHtml, $m)) {
+            return null;
+        }
+
+        $bookUrl = 'https://www.goodreads.com/book/show/' . $m[1];
+        $bookHtml = $this->curlGet($bookUrl);
+        if ($bookHtml === null) {
+            return null;
+        }
+
+        // Parse __NEXT_DATA__ JSON blob (Next.js SSR data)
+        if (!preg_match('/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s', $bookHtml, $nd)) {
+            return null;
+        }
+
+        $nextData = json_decode($nd[1], true);
+        if (!is_array($nextData)) {
+            return null;
+        }
+
+        $apollo = $nextData['props']['pageProps']['apolloState'] ?? [];
+        $result = [];
+
+        foreach ($apollo as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            // Book node: title, cover, description
+            if (($entry['__typename'] ?? '') === 'Book' && empty($result['coverImageUrl'])) {
+                if (!empty($entry['imageUrl'])) {
+                    $result['coverImageUrl'] = $entry['imageUrl'];
+                }
+                if (!empty($entry['description'])) {
+                    $result['description'] = trim(strip_tags($entry['description']));
+                }
+            }
+
+            // Contributor/author node
+            if (($entry['__typename'] ?? '') === 'Contributor' && empty($result['author']) && !empty($entry['name'])) {
+                $name = preg_replace('/\s+/', ' ', trim($entry['name']));
+                if ($name !== '') {
+                    $result['author'] = [$name];
+                }
+            }
+        }
+
+        return !empty($result) ? $result : null;
+    }
+
+    /**
+     * Perform a GET request via curl with a browser User-Agent.
+     * Returns the response body or null on failure.
+     */
+    private function curlGet(string $url): ?string
+    {
+        if (!function_exists('curl_init')) {
+            return null;
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER     => ['Accept-Language: en-US,en;q=0.9'],
+        ]);
+
+        $body = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $error !== '') {
+            return null;
+        }
+
+        return $body;
     }
 }
