@@ -261,7 +261,7 @@ trait HandlesLibraryJson
                 $seriesData = [
                     'id' => $firstSeries['id'] ?? null,
                     'name' => $firstSeries['name'] ?? '',
-                    'is_collection' => $firstSeries['is_collection'] ?? false,
+                    'is_collection' => $firstSeries['is_collection'] ?? $firstSeries['isCollection'] ?? false,
                 ];
                 $seriesName = $firstSeries['name'] ?? '';
                 $seriesNumber = $firstSeries['pivot']['series_number'] ?? null;
@@ -280,7 +280,7 @@ trait HandlesLibraryJson
                     'id' => $series['id'] ?? null,
                     /** @phpstan-ignore-next-line nullCoalesce.offset */
                     'name' => $series['name'] ?? '',
-                    'is_collection' => $series['is_collection'] ?? false,
+                    'is_collection' => $series['is_collection'] ?? $series['isCollection'] ?? false,
                 ];
                 $seriesName = $series['name'];
                 $seriesNumber = $series['pivot']['series_number'] ?? null;
