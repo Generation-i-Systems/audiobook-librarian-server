@@ -374,6 +374,62 @@ class BookDeletionService
         }
     }
 
+    public function moveOrphanDirectoryToTrash(string $directoryPath): array
+    {
+        try {
+            $booksDisk = Storage::disk('books');
+            $directoryPath = trim($directoryPath, '/');
+
+            if (!$booksDisk->exists($directoryPath)) {
+                return ['success' => false, 'error' => 'Directory not found'];
+            }
+
+            $timestamp = now()->format('Y-m-d_His');
+            $trashItemId = $timestamp . '_orphan_' . md5($directoryPath);
+            $trashDisk = Storage::disk('trash');
+
+            $trashDisk->makeDirectory($trashItemId);
+            $trashPath = $trashDisk->path($trashItemId);
+            @chmod($trashPath, 0775);
+            @chown($trashPath, 'eric');
+            @chgrp($trashPath, 'audio');
+
+            $result = $this->moveFilesToTrash($directoryPath, $trashItemId);
+
+            $metadata = [
+                'deleted_at' => now()->toIso8601String(),
+                'deleted_by' => Auth::id(),
+                'book_id' => null,
+                'book_title' => basename($directoryPath),
+                'directory_path' => $directoryPath,
+                'file_count' => $result['file_count'],
+                'files_moved' => $result['moved'],
+                'type' => 'orphan_directory',
+            ];
+
+            $trashDisk->put($trashItemId . '/metadata.json', json_encode($metadata, JSON_PRETTY_PRINT));
+
+            Log::info('Orphan directory moved to trash', [
+                'directory_path' => $directoryPath,
+                'trash_item_id' => $trashItemId,
+                'file_count' => $result['file_count'],
+            ]);
+
+            return [
+                'success' => true,
+                'trash_item_id' => $trashItemId,
+                'file_count' => $result['file_count'],
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to move orphan directory to trash', [
+                'directory_path' => $directoryPath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
     private function moveFilesToTrash(string $directoryPath, string $trashItemId): array
     {
         $booksDisk = Storage::disk('books');

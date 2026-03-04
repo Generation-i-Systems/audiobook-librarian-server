@@ -1164,11 +1164,11 @@ Straight-line gradients from one point to another.
 }
 ```
 
-**Angle guide:**
-- `0°` = Left to right (→)
-- `90°` = Top to bottom (↓)
-- `180°` = Right to left (←)
-- `270°` = Bottom to top (↑)
+**Angle guide** — `0°` (default) flows colors[0] → colors[last] top-to-bottom; rotating clockwise shifts the direction:
+- `0°` = Top → Bottom (↓) — *default*
+- `90°` = Left → Right (→)
+- `180°` = Bottom → Top (↑) — reverses color order visually
+- `270°` = Right → Left (←)
 
 #### Radial Gradients
 
@@ -1278,7 +1278,7 @@ All gradient properties:
 | `type`    | string   | No       | `"linear"` | Gradient type: `"linear"`, `"radial"`, or `"sweep"` |
 | `colors`  | string[] | Yes      | -       | Array of hex colors or `"cover"` (e.g., `["cover", "#000000"]`) |
 | `stops`   | float[]  | No       | Even    | Color stop positions (0.0-1.0). Must match `colors` length if provided |
-| `angle`   | float    | No       | `0`     | Angle in degrees for linear gradients (0 = →, 90 = ↓) |
+| `angle`   | float    | No       | `0`     | Direction: 0=top→bottom, 90=left→right, 180=bottom→top, 270=right→left |
 | `centerX` | float    | No       | `0.5`   | Center X position for radial/sweep (0.0-1.0)        |
 | `centerY` | float    | No       | `0.5`   | Center Y position for radial/sweep (0.0-1.0)        |
 | `radius`  | float    | No       | `0.5`   | Radius for radial gradients (0.0-1.0)               |

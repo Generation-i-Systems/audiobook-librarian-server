@@ -14,6 +14,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 class ShowBookInfo extends Command
 {
@@ -1446,6 +1447,7 @@ class ShowBookInfo extends Command
 
         $items = array_map('trim', explode(',', $deleteInput));
         $booksToDelete = collect();
+        $orphanDirectories = [];
         $notFoundItems = [];
 
         foreach ($items as $item) {
@@ -1471,6 +1473,7 @@ class ShowBookInfo extends Command
 
                 // Shell CWD from wrapper script (getcwd/PWD return artisan project dir)
                 $cwd = getenv('SHELL_CWD') ?: (getenv('PWD') ?: getcwd());
+                $cwd = realpath($cwd) ?: $cwd;
                 if ($cwd && str_starts_with($cwd, $trimmedBookRoot)) {
                     $cwdRelative = ltrim(substr($cwd, strlen($trimmedBookRoot)), '/');
                     $searchPaths[] = $cwdRelative ? $cwdRelative . '/' . $item : $item;
@@ -1492,7 +1495,20 @@ class ShowBookInfo extends Command
                 }
 
                 if ($books->isEmpty()) {
-                    $notFoundItems[] = "Directory: {$item}";
+                    // No DB record — check if the directory exists on disk (orphan)
+                    $resolvedRelativePath = null;
+                    foreach ($searchPaths as $searchPath) {
+                        if (Storage::disk('books')->exists($searchPath)) {
+                            $resolvedRelativePath = $searchPath;
+                            break;
+                        }
+                    }
+
+                    if ($resolvedRelativePath !== null) {
+                        $orphanDirectories[] = $resolvedRelativePath;
+                    } else {
+                        $notFoundItems[] = "Directory: {$item}";
+                    }
                 }
 
                 foreach ($books as $book) {
@@ -1516,7 +1532,7 @@ class ShowBookInfo extends Command
             }
         }
 
-        if ($booksToDelete->isEmpty()) {
+        if ($booksToDelete->isEmpty() && empty($orphanDirectories)) {
             $this->error("No books found to delete");
             return 1;
         }
@@ -1640,6 +1656,36 @@ class ShowBookInfo extends Command
             } catch (\Exception $e) {
                 $failCount++;
                 $this->error("✗ Failed to delete book: " . $e->getMessage());
+            }
+
+            $this->newLine();
+        }
+
+        foreach ($orphanDirectories as $orphanPath) {
+            $this->line("<fg=yellow>Orphan directory (no DB record):</> {$orphanPath}");
+
+            if (!$this->option('force') && !$this->confirm("Move orphan directory to trash?", true)) {
+                $skippedCount++;
+                $this->info("Skipped");
+                $this->newLine();
+                continue;
+            }
+
+            try {
+                $result = $this->deletionService->moveOrphanDirectoryToTrash($orphanPath);
+
+                if ($result['success']) {
+                    $successCount++;
+                    $this->info("✓ Orphan directory moved to trash");
+                    $this->line("  Trash ID: {$result['trash_item_id']}");
+                    $this->line("  Files moved: {$result['file_count']}");
+                } else {
+                    $failCount++;
+                    $this->error("✗ Failed to move orphan directory: " . ($result['error'] ?? 'Unknown error'));
+                }
+            } catch (\Exception $e) {
+                $failCount++;
+                $this->error("✗ Failed to move orphan directory: " . $e->getMessage());
             }
 
             $this->newLine();

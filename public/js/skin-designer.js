@@ -686,8 +686,9 @@ class SkinRenderer {
             if (type === 'radial') {
                 div.style.backgroundImage = `radial-gradient(${colors.join(', ')})`;
             } else {
-                const angle = (grad.angle || 0);
-                div.style.backgroundImage = `linear-gradient(${angle}deg, ${colors.join(', ')})`;
+                // Skin angle 0=top→bottom, 90=left→right; convert to CSS: cssAngle = angle + 180
+                const cssAngle = ((grad.angle || 0) + 180) % 360;
+                div.style.backgroundImage = `linear-gradient(${cssAngle}deg, ${colors.join(', ')})`;
             }
             if (colors.some((_, i) => (grad.colors || [])[i] === 'cover')) {
                 div.title = 'Contains "cover" color: uses dominant cover art color at runtime';
