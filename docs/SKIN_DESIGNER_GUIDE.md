@@ -791,6 +791,7 @@ Static decorative image with advanced background modes, gradient support, and de
 - `"tile"` - Tile image to fill area (both directions)
 - `"tile-horizontal"` - Tile horizontally, fit vertically
 - `"tile-vertical"` - Tile vertically, fit horizontally
+- `"cover-gradient"` - ⭐ Gradient from dominant cover art color (top) to `backgroundColor` (bottom). Use on `rectangle` elements. The end color defaults to `#000000` if `backgroundColor` is not set.
 
 **Decorative Images**:
 Decorative images are additional images positioned relative to the element:
@@ -1600,6 +1601,41 @@ Gestures define touch interactions:
 
 ---
 
+## Text Format Tokens
+
+Use `textFormat` on `text` elements to combine multiple values into a single display string.
+Tokens are wrapped in `{curly braces}`:
+
+```json
+{
+  "id": "time-remaining-label",
+  "type": "text",
+  "textFormat": "{chapterTimeRemainingHuman} ({speed})"
+}
+```
+
+### Available Tokens
+
+| Token | Example | Description |
+|-------|---------|-------------|
+| `{currentTime}` | "2:15:42" | Full book current time |
+| `{totalTime}` | "10:53:07" | Full book total time |
+| `{timeRemaining}` | "8:37:25" | Full book time remaining (speed-adjusted, H:MM:SS) |
+| `{timeRemainingHuman}` | "8h 37m 25s" | Full book time remaining (speed-adjusted, human-readable) |
+| `{timeRemainingLabel}` | "left" | Localized label (e.g. "left") |
+| `{speed}` | "1.5x" | Current playback speed |
+| `{chapterTitle}` | "Chapter 3" | Current chapter name |
+| `{chapterCurrentTime}` | "0:12:30" | Chapter current time |
+| `{chapterTotalTime}` | "0:45:00" | Chapter total duration |
+| `{chapterTimeRemaining}` | "0:32:30" | Chapter time remaining (speed-adjusted, M:SS) |
+| `{chapterTimeRemainingHuman}` | "32m 30s" | Chapter time remaining (speed-adjusted, human-readable) |
+| `{bookTitle}` | "The Martian" | Book title |
+| `{bookAuthor}` | "Andy Weir" | Book author |
+
+> **Tip**: Use `{chapterTimeRemainingHuman}` instead of `{chapterTimeRemaining}` for a more readable display like "32m 30s" instead of "0:32:30".
+
+---
+
 ## Data Bindings
 
 Data bindings connect elements to live player data. Use these in the `dataBinding` property of text
@@ -1640,8 +1676,12 @@ elements:
 ### Chapter Information
 
 ```json
-"dataBinding": "chapter.current"  // "Chapter 3: The Storm"
-"dataBinding": "chapter.index"    // "3"
+"dataBinding": "chapter.current"       // "Chapter 3: The Storm"
+"dataBinding": "chapter.index"         // "3"
+"dataBinding": "chapter.currentTime"   // "0:12:30"
+"dataBinding": "chapter.totalTime"     // "0:45:00"
+"dataBinding": "chapter.timeRemaining" // "0:32:30"
+"dataBinding": "chapter.position"      // 0.0 to 1.0 (for progress bars)
 ```
 
 ### Example: Complete Time Display
@@ -2867,6 +2907,10 @@ License: CC BY 4.0
 | `playback.speed`       | "1.5x"          | Speed display        |
 | `chapter.current`      | "Chapter 3"     | Chapter name         |
 | `chapter.index`        | "3"             | Chapter number       |
+| `chapter.currentTime`  | "0:12:30"       | Chapter current time |
+| `chapter.totalTime`    | "0:45:00"       | Chapter total time   |
+| `chapter.timeRemaining`| "0:32:30"       | Chapter time left    |
+| `chapter.position`     | 0.278 (0.0-1.0) | Chapter progress bar |
 
 ---
 

@@ -260,7 +260,11 @@ class SampleData {
             'playback.totalTime': '5:51:00',
             'playback.percentage': '25%',
             'playback.speed': '1.0x',
-            'playback.chapter': 'Chapter 3'
+            'playback.chapter': 'Chapter 3',
+            'chapter.currentTime': '0:12:30',
+            'chapter.totalTime': '0:45:00',
+            'chapter.timeRemaining': '0:32:30',
+            'chapter.position': '0.278'
         };
     }
 
@@ -291,6 +295,10 @@ class SampleData {
             case 'playback.percentage': return '24%';
             case 'playback.speed': return '1.0x';
             case 'playback.chapter': return 'Chapter 3';
+            case 'chapter.currentTime': return '0:12:30';
+            case 'chapter.totalTime': return '0:45:00';
+            case 'chapter.timeRemaining': return '0:32:30';
+            case 'chapter.position': return '0.278';
             default: return `[${binding}]`;
         }
     }
@@ -671,7 +679,11 @@ class SkinRenderer {
         div.style.height = `${actualHeight}px`;
 
         // Background
-        if (el.backgroundColor) {
+        if (el.backgroundMode === 'cover-gradient') {
+            const endColor = el.backgroundColor || '#000000';
+            div.style.backgroundImage = `linear-gradient(to bottom, #4a7c5f, ${endColor})`;
+            div.title = 'cover-gradient: Dominant cover color → ' + endColor;
+        } else if (el.backgroundColor) {
             if (el.backgroundColor.includes('gradient')) {
                 div.style.backgroundImage = el.backgroundColor;
             } else {
@@ -1028,7 +1040,8 @@ const VALIDATORS = {
             'toggle-play-pause', 'play', 'pause', 'stop',
             'next-chapter', 'prev-chapter', 'next-book', 'prev-book',
             'show-chapters', 'show-bookmarks', 'create-bookmark',
-            'sleep-timer', 'playback-speed', 'exit-drive-mode'
+            'sleep-timer', 'playback-speed', 'exit-drive-mode',
+            'show-sleep-timer', 'enter-drive-mode', 'show-speed-selector'
         ];
         if (validActions.includes(val)) return null;
         if (/^skip-(forward|backward)-\d+$/.test(val)) return null;
@@ -1137,7 +1150,7 @@ class PropertyEditor {
         if (el.type === 'text') {
             this.addInput('Text', el.text || '', (val) => this.state.updateElement(el.id, { text: val }));
             // Data Binding Dropdown
-            const bindings = ['', 'book.title', 'book.author', 'book.narrator', 'book.series', 'book.duration', 'book.description', 'playback.currentTime', 'playback.timeLeft', 'playback.percentage', 'playback.speed', 'playback.chapter', 'playback.totalTime'];
+            const bindings = ['', 'book.title', 'book.author', 'book.narrator', 'book.series', 'book.duration', 'book.description', 'playback.currentTime', 'playback.timeLeft', 'playback.percentage', 'playback.speed', 'playback.chapter', 'playback.totalTime', 'chapter.currentTime', 'chapter.totalTime', 'chapter.timeRemaining', 'chapter.position'];
             this.addSelect('Data Binding', el.dataBinding || '', bindings, (val) => this.state.updateElement(el.id, { dataBinding: val }), { tooltip: TOOLTIPS.dataBinding });
 
             this.addNumberInput('Font Size', el.fontSize, (val) => this.state.updateElement(el.id, { fontSize: val }));
@@ -1159,6 +1172,10 @@ class PropertyEditor {
         if (el.type === 'progress-bar') {
              this.addThemeColorInput('Active Color', el.themeable?.activeColor || '#2196F3', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, activeColor: val } }));
              this.addThemeColorInput('Inactive Color', el.themeable?.inactiveColor || '#424242', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, inactiveColor: val } }));
+        }
+
+        if (el.type === 'rectangle') {
+            this.addSelect('Background Mode', el.backgroundMode || '', ['', 'cover-gradient'], (val) => this.state.updateElement(el.id, { backgroundMode: val || undefined }), { tooltip: 'cover-gradient: Gradient from dominant cover art color to backgroundColor' });
         }
     }
 
@@ -1201,8 +1218,11 @@ class PropertyEditor {
             { label: 'Bookmarks', value: 'show-bookmarks' },
             { label: 'Add Bookmark', value: 'create-bookmark' },
             { label: 'Sleep Timer', value: 'sleep-timer' },
+            { label: 'Show Sleep Timer', value: 'show-sleep-timer' },
             { label: 'Playback Speed', value: 'playback-speed' },
-            { label: 'Exit Drive Mode', value: 'exit-drive-mode' }
+            { label: 'Show Speed Selector', value: 'show-speed-selector' },
+            { label: 'Exit Drive Mode', value: 'exit-drive-mode' },
+            { label: 'Enter Drive Mode', value: 'enter-drive-mode' }
         ];
 
         const currentValue = value || '';
