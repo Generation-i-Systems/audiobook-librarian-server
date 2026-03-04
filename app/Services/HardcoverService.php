@@ -355,7 +355,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 'authors' => $formattedAuthors, // Nested format
                 'publisher' => null, // Not in search results
                 'published_date' => $item['release_date'] ?? null,
-                'publishedYear' => $item['release_year'] ?? ($item['release_date'] ? substr($item['release_date'], 0, 4) : null),
+                'publishedYear' => $item['release_year'] ?? (!empty($item['release_date']) ? substr($item['release_date'], 0, 4) : null),
                 'description' => $item['description'] ?? null,
                 'page_count' => $item['pages'] ?? null,
                 'genres' => $item['genres'] ?? [],
