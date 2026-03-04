@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Cli\Feature\Commands;
+namespace Tests\Deprecated;
 
 use App\Models\Book;
 use App\Models\Series;
@@ -11,6 +11,7 @@ use App\Services\HardcoverService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+#[\PHPUnit\Framework\Attributes\Group('deprecated')]
 class EnrichVsiBooksCommandTest extends TestCase
 {
     use RefreshDatabase;

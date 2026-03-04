@@ -16,6 +16,7 @@
   <groups>
     <exclude>
       <group>slow</group>
+      <group>deprecated</group>
     </exclude>
   </groups>
   <php>

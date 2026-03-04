@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Deprecated;
 
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Series;
 use App\Services\BookImportService;
+use App\Services\BookMetadataScraperService;
 use App\Services\HardcoverService;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Console\Command;
@@ -19,7 +20,7 @@ class EnrichVsiBooks extends Command
 {
     use HandlesLibraryJson;
 
-    protected $signature = 'books:enrich-vsi
+    protected $signature = 'deprecated:enrich-vsi
                             {--dry-run : Preview changes without applying them}
                             {--genre-only : Only fix genre, skip Hardcover enrichment}
                             {--split-bolinda : Also move Bolinda Beginner Guides to their own collection}
@@ -591,163 +592,15 @@ class EnrichVsiBooks extends Command
         }
     }
 
-    /**
-     * Fetch author, description, and cover from Goodreads.
-     * Uses curl (file_get_contents is blocked by Goodreads) and parses the
-     * __NEXT_DATA__ JSON blob embedded in the page for structured data.
-     * Returns array with keys: author[], description, coverImageUrl — or null.
-     */
     private function fetchFromGoodreads(string $title, bool $isBolinda): ?array
     {
-        $searchTitle = $this->buildSearchTitle($title, $isBolinda);
-        $query = urlencode($searchTitle);
-        $searchUrl = 'https://www.goodreads.com/search?q=' . $query;
-
-        $searchHtml = $this->curlGet($searchUrl);
-        if ($searchHtml === null) {
-            return null;
-        }
-
-        // Extract first /book/show/ path from search results
-        if (!preg_match('|/book/show/(\d+[^"\'&\s]*)|', $searchHtml, $m)) {
-            return null;
-        }
-
-        $bookUrl = 'https://www.goodreads.com/book/show/' . $m[1];
-        $bookHtml = $this->curlGet($bookUrl);
-        if ($bookHtml === null) {
-            return null;
-        }
-
-        // Parse __NEXT_DATA__ JSON blob (Next.js SSR data)
-        if (!preg_match('/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s', $bookHtml, $nd)) {
-            return null;
-        }
-
-        $nextData = json_decode($nd[1], true);
-        if (!is_array($nextData)) {
-            return null;
-        }
-
-        $apollo = $nextData['props']['pageProps']['apolloState'] ?? [];
-        $result = [];
-
-        foreach ($apollo as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            // Book node: title, cover, description
-            if (($entry['__typename'] ?? '') === 'Book' && empty($result['coverImageUrl'])) {
-                if (!empty($entry['imageUrl'])) {
-                    $result['coverImageUrl'] = $entry['imageUrl'];
-                }
-                if (!empty($entry['description'])) {
-                    $result['description'] = trim(strip_tags($entry['description']));
-                }
-            }
-
-            // Contributor/author node
-            if (($entry['__typename'] ?? '') === 'Contributor' && empty($result['author']) && !empty($entry['name'])) {
-                $name = preg_replace('/\s+/', ' ', trim($entry['name']));
-                if ($name !== '') {
-                    $result['author'] = [$name];
-                }
-            }
-        }
-
-        return !empty($result) ? $result : null;
+        return app(BookMetadataScraperService::class)
+            ->fetchFromGoodreads($this->buildSearchTitle($title, $isBolinda));
     }
 
-    /**
-     * Fetch author, description, and cover from Amazon book search + product page.
-     * Returns array with keys: author[], description, coverImageUrl — or null.
-     */
     private function fetchFromAmazon(string $title, bool $isBolinda): ?array
     {
-        $searchTitle = $this->buildSearchTitle($title, $isBolinda);
-        $query = urlencode($searchTitle);
-        $searchUrl = 'https://www.amazon.com/s?k=' . $query . '&i=stripbooks';
-
-        $searchHtml = $this->curlGet($searchUrl);
-        if ($searchHtml === null) {
-            return null;
-        }
-
-        // Extract first ASIN from search results
-        if (!preg_match('/data-asin="([A-Z0-9]{10})"/', $searchHtml, $m)) {
-            return null;
-        }
-
-        $asin = $m[1];
-        $productUrl = 'https://www.amazon.com/dp/' . $asin;
-        $productHtml = $this->curlGet($productUrl);
-        if ($productHtml === null) {
-            return null;
-        }
-
-        $result = [];
-
-        // Cover image — prefer high-res from image data JSON, fall back to landing image
-        if (preg_match('#"large"\s*:\s*"(https://[^"]+\.jpg)"#', $productHtml, $cm)) {
-            $result['coverImageUrl'] = $cm[1];
-        } elseif (preg_match('#id="landingImage"[^>]+src="(https://[^"]+)"#', $productHtml, $cm)) {
-            $result['coverImageUrl'] = html_entity_decode($cm[1]);
-        } elseif (preg_match('#id="imgBlkFront"[^>]+src="(https://[^"]+)"#', $productHtml, $cm)) {
-            $result['coverImageUrl'] = html_entity_decode($cm[1]);
-        }
-
-        // Author — byline contrib link text
-        if (preg_match('/class="[^"]*contributorNameID[^"]*"[^>]*>([^<]+)</', $productHtml, $am)) {
-            $result['author'] = [preg_replace('/\s+/', ' ', trim(html_entity_decode($am[1])))];
-        } elseif (preg_match('/id="bylineInfo"[^>]*>.*?<a[^>]+>([^<]+)<\/a>/s', $productHtml, $am)) {
-            $name = preg_replace('/\s+/', ' ', trim(html_entity_decode($am[1])));
-            if (!empty($name)) {
-                $result['author'] = [$name];
-            }
-        }
-
-        // Description — editorial review or book description
-        if (preg_match('/<div[^>]+id="bookDescription_feature_div"[^>]*>.*?<noscript[^>]*>(.*?)<\/noscript>/s', $productHtml, $dm)) {
-            $result['description'] = trim(strip_tags(html_entity_decode($dm[1])));
-        } elseif (preg_match('/<div[^>]+class="[^"]*a-expander-content[^"]*"[^>]*>(.*?)<\/div>/s', $productHtml, $dm)) {
-            $desc = trim(strip_tags(html_entity_decode($dm[1])));
-            if (strlen($desc) > 50) {
-                $result['description'] = $desc;
-            }
-        }
-
-        return !empty($result) ? $result : null;
-    }
-
-    /**
-     * Perform a GET request via curl with a browser User-Agent.
-     * Returns the response body or null on failure.
-     */
-    private function curlGet(string $url): ?string
-    {
-        if (!function_exists('curl_init')) {
-            return null;
-        }
-
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_USERAGENT      => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_HTTPHEADER     => ['Accept-Language: en-US,en;q=0.9'],
-        ]);
-
-        $body = curl_exec($ch);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($body === false || $error !== '') {
-            return null;
-        }
-
-        return $body;
+        return app(BookMetadataScraperService::class)
+            ->fetchFromAmazon($this->buildSearchTitle($title, $isBolinda));
     }
 }
