@@ -791,7 +791,6 @@ Static decorative image with advanced background modes, gradient support, and de
 - `"tile"` - Tile image to fill area (both directions)
 - `"tile-horizontal"` - Tile horizontally, fit vertically
 - `"tile-vertical"` - Tile vertically, fit horizontally
-- `"cover-gradient"` - ⭐ Gradient from dominant cover art color (top) to `backgroundColor` (bottom). Use on `rectangle` elements. The end color defaults to `#000000` if `backgroundColor` is not set.
 
 **Decorative Images**:
 Decorative images are additional images positioned relative to the element:
@@ -1207,6 +1206,37 @@ Circular gradients that sweep around a center point like a color wheel.
 }
 ```
 
+### Cover Art Color Token
+
+Use `"cover"` as a color in any gradient to dynamically use the dominant color extracted from the current book's cover art. This enables backgrounds that automatically match the album art.
+
+```json
+{
+  "backgroundGradient": {
+    "type": "linear",
+    "angle": 180,
+    "colors": ["cover", "#000000"]
+  }
+}
+```
+
+This creates a gradient from the cover's dominant color at the top to black at the bottom. For a light skin, use `"#FFFFFF"` as the end color instead.
+
+**Other examples with `"cover"`:**
+
+```json
+// Left-to-right (landscape split)
+{ "type": "linear", "angle": 90, "colors": ["cover", "#000000"] }
+
+// Radial burst from cover color
+{ "type": "radial", "colors": ["cover", "#000000"], "radius": 0.8 }
+
+// Soft vignette (cover color in center)
+{ "type": "radial", "colors": ["cover", "#00000099"], "centerX": 0.5, "centerY": 0.3 }
+```
+
+> **Note**: The `"cover"` token resolves to `Color.Transparent` if no cover art is loaded, so the gradient gracefully falls back to the remaining colors.
+
 ### Color Stops
 
 Control exact positioning of colors in gradients:
@@ -1246,7 +1276,7 @@ All gradient properties:
 | Property  | Type     | Required | Default | Description                                          |
 |-----------|----------|----------|---------|------------------------------------------------------|
 | `type`    | string   | No       | `"linear"` | Gradient type: `"linear"`, `"radial"`, or `"sweep"` |
-| `colors`  | string[] | Yes      | -       | Array of hex colors (e.g., `["#FF0000", "#0000FF"]`) |
+| `colors`  | string[] | Yes      | -       | Array of hex colors or `"cover"` (e.g., `["cover", "#000000"]`) |
 | `stops`   | float[]  | No       | Even    | Color stop positions (0.0-1.0). Must match `colors` length if provided |
 | `angle`   | float    | No       | `0`     | Angle in degrees for linear gradients (0 = →, 90 = ↓) |
 | `centerX` | float    | No       | `0.5`   | Center X position for radial/sweep (0.0-1.0)        |

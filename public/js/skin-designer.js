@@ -679,10 +679,19 @@ class SkinRenderer {
         div.style.height = `${actualHeight}px`;
 
         // Background
-        if (el.backgroundMode === 'cover-gradient') {
-            const endColor = el.backgroundColor || '#000000';
-            div.style.backgroundImage = `linear-gradient(to bottom, #4a7c5f, ${endColor})`;
-            div.title = 'cover-gradient: Dominant cover color → ' + endColor;
+        if (el.backgroundGradient) {
+            const grad = el.backgroundGradient;
+            const colors = (grad.colors || []).map(c => c === 'cover' ? '#4a7c5f' : c);
+            const type = grad.type || 'linear';
+            if (type === 'radial') {
+                div.style.backgroundImage = `radial-gradient(${colors.join(', ')})`;
+            } else {
+                const angle = (grad.angle || 0);
+                div.style.backgroundImage = `linear-gradient(${angle}deg, ${colors.join(', ')})`;
+            }
+            if (colors.some((_, i) => (grad.colors || [])[i] === 'cover')) {
+                div.title = 'Contains "cover" color: uses dominant cover art color at runtime';
+            }
         } else if (el.backgroundColor) {
             if (el.backgroundColor.includes('gradient')) {
                 div.style.backgroundImage = el.backgroundColor;
@@ -1175,7 +1184,7 @@ class PropertyEditor {
         }
 
         if (el.type === 'rectangle') {
-            this.addSelect('Background Mode', el.backgroundMode || '', ['', 'cover-gradient'], (val) => this.state.updateElement(el.id, { backgroundMode: val || undefined }), { tooltip: 'cover-gradient: Gradient from dominant cover art color to backgroundColor' });
+            this.addInput('Background Mode', el.backgroundMode || '', (val) => this.state.updateElement(el.id, { backgroundMode: val || undefined }), { tooltip: 'Image fill mode: stretch, fit, fit-width, fit-height, center, crop, tile, tile-horizontal, tile-vertical' });
         }
     }
 
