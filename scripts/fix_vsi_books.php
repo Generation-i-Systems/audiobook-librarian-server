@@ -1,25 +1,24 @@
 <?php
 
 /**
- * Fix Very Short Introductions (VSI) books.
+ * Fix and import Very Short Introductions (VSI) books.
  *
- * Problems:
- *   1. Books were imported into Non Fiction/VA/ directly with pattern '[title] ([author])'
- *      but many have title "A Very Short Introduction" instead of the real subject title.
- *   2. Books should be in a "Very Short Introductions" collection (Series with is_collection=true).
- *   3. Directories should be moved to Non Fiction/VA/Very Short Introductions/[Title] ([Author]).
- *   4. DB directory_path, title, and series links must be updated.
- *   5. librarian.json files must be updated to reflect the new state.
+ * Part A — Fix existing books already in Non Fiction/VA/:
+ *   1. Moves books into Non Fiction/VA/Very Short Introductions/[Title] ([Author]).
+ *   2. Fixes titles that were imported as "A Very Short Introduction".
+ *   3. Creates "Very Short Introductions" collection and links all books.
+ *   4. Updates DB directory_path, title, series links, and librarian.json.
  *
- * Identification: books with id >= 12928 in Non Fiction/VA/ (excluding sub-collections already fixed).
- *
- * Title extraction priority:
- *   1. Audio filename (most reliable — filename often contains the real title)
- *   2. Description patterns like "TITLE: A Very Short Introduction..."
- *   3. If unresolvable: show cover image + description and prompt user.
+ * Part B — Import new books from download directory:
+ *   Source: /media/lyra_data/download/Bolinda and Oxford Very Short Introductions/
+ *   Two source formats:
+ *     - Subdirectories (multi-file): dirname is the title, ID3 artist tag = author.
+ *     - Flat mp3 files: filename is the title, no author available.
+ *   Skips any book whose normalised title already exists in the VSI library.
+ *   Moves source files into Non Fiction/VA/Very Short Introductions/[Title] ([Author])/.
  *
  * Usage:
- *   php scripts/fix_vsi_books.php [--dry-run]
+ *   php scripts/fix_vsi_books.php [--dry-run] [--import-only] [--fix-only]
  */
 
 declare(strict_types=1);
@@ -29,19 +28,24 @@ require __DIR__ . '/../vendor/autoload.php';
 $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
+use App\Models\Author;
 use App\Models\Book;
 use App\Models\Series;
+use App\Services\BookImportService;
 use Illuminate\Support\Facades\DB;
 
-$dryRun = in_array('--dry-run', $argv, true);
+$dryRun      = in_array('--dry-run', $argv, true);
+$importOnly  = in_array('--import-only', $argv, true);
+$fixOnly     = in_array('--fix-only', $argv, true);
 
 if ($dryRun) {
     echo "[DRY RUN] No changes will be written.\n\n";
 }
 
-$bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
-$vsiCollectionName = 'Very Short Introductions';
-$targetSubDir = 'Non Fiction/VA/Very Short Introductions';
+$bookRoot           = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+$vsiCollectionName  = 'Very Short Introductions';
+$targetSubDir       = 'Non Fiction/VA/Very Short Introductions';
+$downloadSourceDir  = '/media/lyra_data/download/Bolinda and Oxford Very Short Introductions';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,10 +58,9 @@ function stripVsiSuffix(string $base): string
 {
     // Remove "A Very Short Intro[duction[s]]..." with any separator (or none) before it
     $base = preg_replace('/[\s:,()\-]*\bA Very Short Intro\w*\b.*$/i', '', $base);
-    // Remove "Very Short Intro[duction[s]]" suffix with a separator before it
-    $base = preg_replace('/[\s:,()\-]+Very Short Intro\w*\s*$/i', '', $base);
-    // Remove trailing "- Very Short Intro..." (hyphen separator, no leading "A")
-    $base = preg_replace('/\s+-\s+Very Short Intro\w*.*$/i', '', $base);
+    // Remove bare "Very Short Intro[duction[s]]" suffix with any separator before it
+    // (covers "Philosophy of Science Very Short Introduction")
+    $base = preg_replace('/[\s:,()\-]+Very Short Intro\w*.*$/i', '', $base);
     // Strip leftover trailing separators: " -", ":", ","
     $base = preg_replace('/[\s:,\-]+$/', '', $base);
     return $base;
@@ -476,14 +479,473 @@ if (!empty($needsUserInput)) {
     }
 }
 
-// ── Summary ──────────────────────────────────────────────────────────────────
+// ── Summary (Part A) ─────────────────────────────────────────────────────────
 
-echo "\n══ Summary ══════════════════════════════════════════════════════════════════\n";
+echo "\n══ Part A Summary ════════════════════════════════════════════════════════════\n";
 echo "Books fixed:   {$fixed}\n";
 echo "Books skipped: {$skipped}\n";
 if (!empty($needsUserInput) && $dryRun) {
     echo "Need input:    " . count($needsUserInput) . "\n";
 }
+
+if ($fixOnly) {
+    if ($dryRun) {
+        echo "\n[DRY RUN] Re-run without --dry-run to apply changes.\n";
+    }
+    exit(0);
+}
+
+// ── Part B: Import new books from download directory ─────────────────────────
+
+echo "\n══ Part B: Importing from download directory ═════════════════════════════════\n";
+echo "Source: {$downloadSourceDir}\n\n";
+
+if (!is_dir($downloadSourceDir)) {
+    echo "ERROR: Download directory not found: {$downloadSourceDir}\n";
+    exit(1);
+}
+
+// Build a normalised set of titles already in the VSI library (for dedup)
+$existingTitles = DB::table('books')
+    ->where('directory_path', 'like', '%Non Fiction/VA/Very Short Introductions/%')
+    ->pluck('title')
+    ->map(fn ($t) => mb_strtolower(trim($t)))
+    ->flip()
+    ->all();
+
+$importService = app(BookImportService::class);
+
+$imported  = 0;
+$importSkipped = 0;
+
+/**
+ * Get the duration in seconds of a set of audio files using ffprobe.
+ */
+function getAudioDuration(array $files): int
+{
+    $total = 0.0;
+    foreach ($files as $file) {
+        $out = shell_exec('ffprobe -v quiet -print_format json -show_format ' . escapeshellarg($file) . ' 2>/dev/null');
+        if ($out) {
+            $data = json_decode($out, true);
+            $total += (float) ($data['format']['duration'] ?? 0);
+        }
+    }
+    return (int) round($total);
+}
+
+/**
+ * Get ID3 artist from the first audio file in a set.
+ */
+function getArtistFromFile(string $file): string
+{
+    $out = shell_exec('ffprobe -v quiet -print_format json -show_format ' . escapeshellarg($file) . ' 2>/dev/null');
+    if ($out) {
+        $data = json_decode($out, true);
+        $artist = $data['format']['tags']['artist'] ?? '';
+        // ffprobe sometimes puts it under 'ARTIST'
+        if (!$artist) {
+            $artist = $data['format']['tags']['ARTIST'] ?? '';
+        }
+        return trim($artist);
+    }
+    return '';
+}
+
+/**
+ * Collect audio files from a directory.
+ */
+function collectAudioFiles(string $dir): array
+{
+    $files = [];
+    $exts  = ['mp3', 'm4b', 'm4a', 'mp4', 'aac', 'ogg', 'flac'];
+    foreach (scandir($dir) as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
+        if (in_array($ext, $exts, true)) {
+            $files[] = $dir . '/' . $entry;
+        }
+    }
+    sort($files);
+    return $files;
+}
+
+/**
+ * Write a librarian.json for a newly imported VSI book.
+ */
+function writeVsiLibrarianJson(
+    string $targetDir,
+    Book $book,
+    string $dirPath,
+    array $audioFiles
+): void {
+    $fileCount = count($audioFiles);
+    $fileTags  = [];
+    foreach ($audioFiles as $f) {
+        $fileTags[basename($f)] = [];
+    }
+
+    $data = [
+        'id'               => $book->id,
+        'title'            => $book->title,
+        'description'      => $book->description,
+        'isbn'             => null,
+        'asin'             => null,
+        'release_date'     => null,
+        'language'         => 'en',
+        'duration'         => $book->duration,
+        'cover_image'      => is_file($targetDir . '/folder.jpg') ? 'folder.jpg'
+                             : (is_file($targetDir . '/cover.jpg') ? 'cover.jpg' : null),
+        'directoryPath'    => $dirPath,
+        'audioFileCount'   => $fileCount,
+        'durationFormatted' => null,
+        'needsReview'      => false,
+        'dateAdded'        => now()->toISOString(),
+        'source'           => 'import',
+        'fileTags'         => $fileTags,
+        'metadata'         => [
+            'updated_at' => now()->toISOString(),
+        ],
+        'chapters'         => [],
+        'authors'          => $book->authors->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])->values()->toArray(),
+        'narrators'        => [],
+        'genres'           => [],
+        'series'           => $book->series->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->toArray(),
+    ];
+
+    file_put_contents(
+        $targetDir . '/librarian.json',
+        json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"
+    );
+}
+
+/**
+ * Clean a title string from the download directory — handles both dirname and filename patterns.
+ *
+ * Patterns encountered:
+ *   - "AncientEgypt_AVeryShortIntroduction_mp332.mp3"  (CamelCase + underscores)
+ *   - "Ancient Egypt A Very Short Introduction 2nd Ed"  (spaced dirname)
+ *   - "AestheticsBolindaBeginnerGuides_mp332.mp3"        (Bolinda Beginner Guides series)
+ *   - "International Migration VSI 2nd Edition"          (VSI abbreviation in dirname)
+ *   - "Philosophy of Science Very Short Introduction 2nd Ed" (no "A" before Very Short)
+ */
+function cleanDownloadTitle(string $raw): string
+{
+    // Step 1: strip file extension
+    $base = pathinfo($raw, PATHINFO_EXTENSION) ? pathinfo($raw, PATHINFO_FILENAME) : $raw;
+
+    // Step 2: strip quality/format suffixes BEFORE touching underscores
+    $base = preg_replace('/[\s_]+mp3\d+\s*$/i', '', $base);
+    $base = preg_replace('/[\s_]+\d+kbps\s*$/i', '', $base);
+    // Run-on suffix without underscore: "introductionmp332" or bare "mp3"
+    $base = preg_replace('/mp3\d*\s*$/i', '', $base);
+
+    // Step 3: strip BolindaBeginnerGuides label (CamelCase or spaced, Beginner/Beginners)
+    $base = preg_replace('/[\s_]*Bolinda[\s_]*Beginners?[\s_]*Guides?/i', '', $base);
+    // Strip PartN multi-part suffix
+    $base = preg_replace('/[\s_]*Part\s*\d+\s*$/i', '', $base);
+    // Strip "Audiobook" label
+    $base = preg_replace('/[\s_]*Audiobook\s*$/i', '', $base);
+
+    // Step 4a: Fix known short-word CamelCase glue patterns explicitly before splitting
+    $base = preg_replace('/(?<=[a-z]{4})(and|or|of)(?=[A-Z])/u', ' $1 ', $base);
+    // Handle short words: "Bookof", "Lifein", "as" glued to next capitalised word
+    $base = preg_replace('/\bBook(of)([A-Z])/u', 'Book $1 $2', $base);
+    $base = preg_replace('/\bLife(in)(the)([A-Z])/u', 'Life $1 $2 $3', $base);
+    $base = preg_replace('/(\w+)(as)(Literature|History|Art)/u', '$1 $2 $3', $base);
+
+    // Step 4b: CamelCase split — "TheColdWar" → "The Cold War"
+    $base = preg_replace('/(?<=[a-z])(?=[A-Z])/u', ' ', $base);
+    $base = preg_replace('/(?<=[A-Z])(?=[A-Z][a-z])/u', ' ', $base);
+
+    // Step 4c: Insert space after dot followed by uppercase (acronym): "U.S.Congress" → "U.S. Congress"
+    $base = preg_replace('/(\.)(?=[A-Z][a-z])/u', '$1 ', $base);
+    $base = preg_replace('/\s+/', ' ', trim($base));
+
+    // Step 5: replace underscores and hyphens with spaces, normalise
+    $base = str_replace(['_', '-'], ' ', $base);
+    $base = preg_replace('/\s+/', ' ', trim($base));
+
+    // Step 6: strip VSI abbreviation and all suffix forms (spaced and previously-CamelCase)
+    $base = preg_replace('/\s+VSI\b.*/i', '', $base);
+    // Fix run-on "Avery short introduction" → strip from "Avery" onward
+    $base = preg_replace('/\s+Avery\s+short\s+intro\w*/i', '', $base);
+    $base = stripVsiSuffix($base);
+
+    // Step 7: strip edition suffixes
+    $base = preg_replace('/\s+\d+(?:st|nd|rd|th)\s+Ed(?:ition)?\s*$/i', '', $base);
+
+    return trim(preg_replace('/\s+/', ' ', $base));
+}
+
+/**
+ * Move a file across filesystem boundaries (copy + unlink, fallback to rename).
+ */
+function moveFileXfs(string $src, string $dst): bool
+{
+    if (@rename($src, $dst)) {
+        return true;
+    }
+    if (!copy($src, $dst)) {
+        return false;
+    }
+    unlink($src);
+    return true;
+}
+
+// ── B1: Process subdirectories ────────────────────────────────────────────────
+
+echo "── B1: Subdirectories ───────────────────────────────────────────────────────\n";
+
+$entries = scandir($downloadSourceDir);
+
+foreach ($entries as $entry) {
+    if ($entry === '.' || $entry === '..') {
+        continue;
+    }
+
+    $sourcePath = $downloadSourceDir . '/' . $entry;
+
+    if (!is_dir($sourcePath)) {
+        continue;
+    }
+
+    // Extract title from directory name
+    $title = cleanDownloadTitle($entry);
+
+    if (strlen($title) < 2) {
+        echo "  SKIP (no title): {$entry}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    // Dedup check
+    if (isset($existingTitles[mb_strtolower($title)])) {
+        echo "  SKIP (exists): {$title}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    // Get audio files
+    $audioFiles = collectAudioFiles($sourcePath);
+    if (empty($audioFiles)) {
+        echo "  SKIP (no audio): {$entry}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    // Get author from ID3 tag of first file
+    $author     = getArtistFromFile($audioFiles[0]);
+    $authorStr  = $author ?: '';
+
+    // Build target path
+    $safeTitleDir  = sanitizeForFilesystem($title);
+    $safeAuthorDir = $authorStr ? sanitizeForFilesystem($authorStr) : '';
+    $newDirName    = $safeAuthorDir ? "{$safeTitleDir} ({$safeAuthorDir})" : $safeTitleDir;
+    $newDirPath    = "Non Fiction/VA/Very Short Introductions/{$newDirName}";
+    $targetDir     = $bookRoot . '/' . $newDirPath;
+
+    $duration = getAudioDuration($audioFiles);
+
+    printf("  [new] \"%s\"%s → %s\n", $title, $authorStr ? " ({$authorStr})" : '', $newDirPath);
+    printf("        %d files, %ds\n", count($audioFiles), $duration);
+
+    if ($dryRun) {
+        $importSkipped++;
+        // Add to dedup so we don't double-report
+        $existingTitles[mb_strtolower($title)] = true;
+        continue;
+    }
+
+    // Create target directory
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true)) {
+        echo "  ERROR: Could not create {$targetDir}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    // Move all files (audio + cover images) — use copy+unlink for cross-filesystem moves
+    foreach (scandir($sourcePath) as $file) {
+        if ($file === '.' || $file === '..') {
+            continue;
+        }
+        if (!moveFileXfs($sourcePath . '/' . $file, $targetDir . '/' . $file)) {
+            echo "  WARN: Could not move file {$file}\n";
+        }
+    }
+    // Remove source directory only if now empty
+    $remaining = array_diff(scandir($sourcePath), ['.', '..']);
+    if (empty($remaining)) {
+        rmdir($sourcePath);
+    }
+
+    // Create DB record
+    $newBook = null;
+    DB::transaction(function () use (
+        $title,
+        $authorStr,
+        $author,
+        $duration,
+        $newDirPath,
+        $audioFiles,
+        $vsiSeries,
+        $targetDir,
+        &$newBook,
+        &$imported,
+        &$existingTitles
+    ) {
+        $newBook                 = new Book();
+        $newBook->title          = $title;
+        $newBook->directory_path = $newDirPath;
+        $newBook->duration       = $duration ?: null;
+        $newBook->audio_file_count = count($audioFiles);
+        $newBook->language       = 'en';
+        $newBook->source         = 'import';
+
+        $fileTags = [];
+        foreach ($audioFiles as $f) {
+            $fileTags[basename($f)] = [];
+        }
+        $newBook->file_tags = $fileTags;
+
+        // Cover image
+        foreach (['folder.jpg', 'cover.jpg', 'folder.png', 'cover.png'] as $coverFile) {
+            if (is_file($targetDir . '/' . $coverFile)) {
+                $newBook->cover_image = $coverFile;
+                break;
+            }
+        }
+
+        $newBook->save();
+
+        if ($author) {
+            $authorModel = Author::firstOrCreate(['name' => $author]);
+            $newBook->authors()->attach($authorModel->id);
+        }
+
+        if ($vsiSeries) {
+            $newBook->series()->attach($vsiSeries->id, ['series_number' => null]);
+        }
+
+        $newBook->load(['authors', 'series']);
+        writeVsiLibrarianJson($targetDir, $newBook, $newDirPath, $audioFiles);
+
+        $existingTitles[mb_strtolower($title)] = true;
+    });
+
+    echo "    → Imported (id=" . ($newBook ? $newBook->id : '?') . ")\n";
+    $imported++;
+}
+
+// ── B2: Process flat mp3 files ────────────────────────────────────────────────
+
+echo "\n── B2: Flat mp3 files ───────────────────────────────────────────────────────\n";
+
+foreach ($entries as $entry) {
+    if ($entry === '.' || $entry === '..') {
+        continue;
+    }
+
+    $sourcePath = $downloadSourceDir . '/' . $entry;
+
+    if (!is_file($sourcePath)) {
+        continue;
+    }
+
+    $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['mp3', 'm4b', 'm4a'], true)) {
+        continue;
+    }
+
+    // Extract title from filename
+    $title = cleanDownloadTitle($entry);
+
+    if (strlen($title) < 2) {
+        echo "  SKIP (no title after clean): {$entry}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    // Dedup check
+    if (isset($existingTitles[mb_strtolower($title)])) {
+        echo "  SKIP (exists): {$title}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    $safeTitleDir = sanitizeForFilesystem($title);
+    $newDirName   = $safeTitleDir;
+    $newDirPath   = "Non Fiction/VA/Very Short Introductions/{$newDirName}";
+    $targetDir    = $bookRoot . '/' . $newDirPath;
+
+    // Duration from file
+    $duration = getAudioDuration([$sourcePath]);
+
+    printf("  [new] \"%s\" → %s (%ds)\n", $title, $newDirPath, $duration);
+
+    if ($dryRun) {
+        $importSkipped++;
+        $existingTitles[mb_strtolower($title)] = true;
+        continue;
+    }
+
+    // Create target directory and move file
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true)) {
+        echo "  ERROR: Could not create {$targetDir}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    $newFilePath = $targetDir . '/' . $entry;
+    if (!moveFileXfs($sourcePath, $newFilePath)) {
+        echo "  ERROR: Could not move {$entry}\n";
+        $importSkipped++;
+        continue;
+    }
+
+    // Create DB record
+    DB::transaction(function () use (
+        $title,
+        $duration,
+        $newDirPath,
+        $entry,
+        $targetDir,
+        $newFilePath,
+        $vsiSeries,
+        &$imported,
+        &$existingTitles
+    ) {
+        $newBook                   = new Book();
+        $newBook->title            = $title;
+        $newBook->directory_path   = $newDirPath;
+        $newBook->duration         = $duration ?: null;
+        $newBook->audio_file_count = 1;
+        $newBook->language         = 'en';
+        $newBook->source           = 'import';
+        $newBook->file_tags        = [$entry => []];
+        $newBook->save();
+
+        if ($vsiSeries) {
+            $newBook->series()->attach($vsiSeries->id, ['series_number' => null]);
+        }
+
+        $newBook->load(['authors', 'series']);
+        writeVsiLibrarianJson($targetDir, $newBook, $newDirPath, [$newFilePath]);
+
+        $existingTitles[mb_strtolower($title)] = true;
+    });
+
+    echo "    → Imported\n";
+    $imported++;
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+
+echo "\n══ Part B Summary ════════════════════════════════════════════════════════════\n";
+echo "Imported:      {$imported}\n";
+echo "Skipped:       {$importSkipped}\n";
 
 if ($dryRun) {
     echo "\n[DRY RUN] Re-run without --dry-run to apply changes.\n";
