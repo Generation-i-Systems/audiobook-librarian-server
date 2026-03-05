@@ -150,7 +150,7 @@
     </div>
 
     <div class="d-flex justify-content-center">
-        {{ $positions->withQueryString()->links() }}
+        {{ $positions->withQueryString()->links('pagination::bootstrap-5') }}
     </div>
 </div>
 @endsection

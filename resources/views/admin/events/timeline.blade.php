@@ -183,7 +183,7 @@
     </div>
 
     <div class="d-flex justify-content-center">
-        {{ $events->withQueryString()->links() }}
+        {{ $events->withQueryString()->links('pagination::bootstrap-5') }}
     </div>
 </div>
 @endsection

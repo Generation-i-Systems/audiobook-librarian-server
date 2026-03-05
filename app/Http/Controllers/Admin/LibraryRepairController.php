@@ -226,6 +226,22 @@ class LibraryRepairController extends Controller
         $directoryPath = $issue['directoryPath'] ?? '';
         $fileGroups = $this->buildFileGroups($directoryPath);
 
+        $coverUrls = $books->map(function (Book $book): string {
+            $coverImage = $book->cover_image ?? '';
+
+            if ($coverImage === '') {
+                return asset('images/placeholder.png');
+            }
+
+            if (str_starts_with($coverImage, 'http://') || str_starts_with($coverImage, 'https://') || str_starts_with($coverImage, '/')) {
+                return $coverImage;
+            }
+
+            $relativePath = rtrim($book->directory_path ?? '', '/') . '/' . basename($coverImage);
+
+            return route('cover.proxy', ['path' => ltrim($relativePath, '/')]);
+        })->all();
+
         return view('admin.library-repair.compare', [
             'issue' => $issue,
             'books' => $books,
@@ -233,6 +249,7 @@ class LibraryRepairController extends Controller
             'fieldValues' => $fieldValues,
             'hasDiff' => $hasDiff,
             'fileGroups' => $fileGroups,
+            'coverUrls' => $coverUrls,
         ]);
     }
 
@@ -271,8 +288,9 @@ class LibraryRepairController extends Controller
             return redirect()->back()->with('error', 'Keeper book not found.');
         }
 
-        // Step 1: Merge selected field values into keeper
+        // Step 1: Merge selected field values into keeper, then clear review flags
         $this->applyFieldSources($keeper, $books, $request->input('field_sources', []));
+        $keeper->forceFill(['needs_review' => false, 'needs_review_reasons' => null])->save();
 
         // Step 2: Move unchecked files to trash
         $directoryPath = $issue['directoryPath'] ?? '';
@@ -319,7 +337,7 @@ class LibraryRepairController extends Controller
      */
     private function applyFieldSources(Book $keeper, $books, array $fieldSources): void
     {
-        $scalarFields = ['title', 'description', 'language', 'asin', 'release_date', 'isbn'];
+        $scalarFields = ['title', 'description', 'language', 'asin', 'release_date', 'isbn', 'cover_image'];
         $relationFields = ['authors', 'narrators', 'series', 'genres'];
 
         $scalarUpdates = [];

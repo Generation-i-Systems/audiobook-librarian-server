@@ -123,7 +123,7 @@
 
                         @if(method_exists($jobs, 'hasPages') && $jobs->hasPages())
                             <div class="d-flex justify-content-center mt-4">
-                                {{ $jobs->appends(request()->query())->links() }}
+                                {{ $jobs->appends(request()->query())->links('pagination::bootstrap-5') }}
                             </div>
                         @endif
                     @endif

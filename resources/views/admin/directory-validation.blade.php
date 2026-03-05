@@ -278,7 +278,7 @@
                         </div>
 
                         <div class="mt-3">
-                            {{ $missingBooks->links() }}
+                            {{ $missingBooks->links('pagination::bootstrap-5') }}
                         </div>
                     </div>
                 </div>
