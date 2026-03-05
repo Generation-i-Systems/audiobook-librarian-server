@@ -186,11 +186,13 @@ class ExternalCoverService
                 }
 
                 $result['success'] = true;
-                $result['path'] = $storagePath;
+                // Return just the filename - cover_image stores filename only, resolved relative to directory_path
+                $result['path'] = $fileName;
 
                 Log::info('External cover image downloaded successfully', [
                     'source' => $source,
-                    'path' => $storagePath,
+                    'filename' => $fileName,
+                    'storagePath' => $storagePath,
                 ]);
             } else {
                 $result['error'] = 'Failed to download image: HTTP ' . $response->status();

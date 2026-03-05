@@ -1883,7 +1883,8 @@ class BookImportService
 
             $lowerFile = strtolower($file);
             if (in_array($lowerFile, $targetNames, true)) {
-                return $directoryPath . '/' . $file;
+                // Return just the filename - cover_image stores filename only, resolved relative to directory_path
+                return $file;
             }
         }
 

@@ -431,11 +431,11 @@ class LibraryRepairController extends Controller
                 continue;
             }
 
-            $trashDisk->makeDirectory($trashItemId);
+            $trashDisk->makeDirectory($trashItemId . '/files');
             $trashPath = $trashItemId . '/files/' . $filename;
 
             try {
-                $booksDisk->move($relativePath, Storage::disk('trash')->path($trashPath));
+                rename($booksDisk->path($relativePath), $trashDisk->path($trashPath));
             } catch (\Throwable $e) {
                 Log::warning('library-repair.resolve-duplicate: failed to trash file', [
                     'file' => $relativePath,

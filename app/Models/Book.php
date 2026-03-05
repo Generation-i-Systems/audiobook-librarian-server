@@ -204,6 +204,36 @@ class Book extends Model
     }
 
     /**
+     * Set cover_image attribute - normalize to just filename.
+     *
+     * cover_image should store only the filename (e.g., "cover.jpg"),
+     * resolved relative to the book's directory_path at runtime.
+     * This setter auto-converts full paths and URLs to filenames.
+     */
+    public function setCoverImageAttribute($value): void
+    {
+        if ($value === null || $value === '') {
+            $this->attributes['cover_image'] = null;
+            return;
+        }
+
+        // If it's a remote URL, keep as-is (handled by proxy at runtime)
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $this->attributes['cover_image'] = $value;
+            return;
+        }
+
+        // If it contains a path separator, extract just the filename
+        if (str_contains($value, '/')) {
+            $this->attributes['cover_image'] = basename($value);
+            return;
+        }
+
+        // Already just a filename
+        $this->attributes['cover_image'] = $value;
+    }
+
+    /**
      * Scope to filter books with missing directories
      */
     public function scopeWithMissingDirectories($query)

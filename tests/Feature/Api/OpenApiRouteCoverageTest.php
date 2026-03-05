@@ -110,6 +110,9 @@ class OpenApiRouteCoverageTest extends TestCase
 
         $strippedSkipPatterns = [
             '/^\/up$/', // Health check
+            // Web-only AJAX routes (not part of v1 API)
+            '/^\/books\/json$/',
+            '/^\/books\/recent\/json$/',
             // TODO: Document these routes in openapi.json and remove from skip list
             '/^\\/book-requests/',
             '/^\\/follow/',

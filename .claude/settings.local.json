@@ -33,7 +33,8 @@
       "Bash(git -C /home/devel/src/audiobook-librarian-server log --oneline -5)",
       "Bash(git -C /home/devel/src/audiobook-librarian-server diff --cached --stat)",
       "Bash(php artisan route:list *)",
-      "Bash(vendor/bin/phpcs *)"
+      "Bash(vendor/bin/phpcs *)",
+      "Bash(php artisan list | grep repair 2>&1)"
     ],
     "deny": []
   },
