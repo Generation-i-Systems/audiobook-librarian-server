@@ -136,7 +136,10 @@ class EventController extends Controller
             }
 
             if ($remoteEvents->isNotEmpty()) {
-                $nextSyncAfter = $remoteEvents->last()->synced_at;
+                // Advance cursor by 1ms past the last returned event so the next
+                // >= syncAfter request does not re-fetch boundary events.
+                // Duplicates that slip through are de-duplicated on the client by ID.
+                $nextSyncAfter = $remoteEvents->last()->synced_at + 1;
             } else {
                 // Keep cursor where it was — do not advance past events
                 // that other devices may push between now and the next sync.
