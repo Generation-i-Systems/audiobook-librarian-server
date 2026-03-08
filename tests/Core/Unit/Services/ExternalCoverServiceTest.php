@@ -55,8 +55,8 @@ class ExternalCoverServiceTest extends TestCase
         $this->assertNotNull($result['path']);
         $this->assertNull($result['error']);
 
-        // Assert the result contains the expected path
-        $this->assertStringContainsString($this->testDirectoryPath, $result['path']);
+        // Assert the result contains just the filename (cover_image stores filename only)
+        $this->assertMatchesRegularExpression('/^cover_test_123\.jpg$/', $result['path']);
 
         // We can't use assertExists because we're using a fake storage
         // Instead, check that the path is valid and not null

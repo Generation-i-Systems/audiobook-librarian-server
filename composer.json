@@ -143,6 +143,11 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "audit": {
+            "ignore": {
+                "PKSA-y2cr-5h3j-g3ys": "firebase/php-jwt CVE-2025-45769 (low): used only for Apple ID token RS256 verification; weak encryption CVE affects signing, not verification. Constrained to ^6.0 by google/apiclient and google/auth."
+            }
         }
     },
     "minimum-stability": "stable",
