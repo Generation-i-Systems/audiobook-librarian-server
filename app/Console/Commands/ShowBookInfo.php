@@ -8,6 +8,7 @@ use App\Models\Genre;
 use App\Models\Publisher;
 use App\Models\Series;
 use App\Services\BookDeletionService;
+use App\Services\BookFilesystemService;
 use App\Services\TerminalImageService;
 use App\Traits\BookImportTrait;
 use Carbon\CarbonImmutable;
@@ -22,10 +23,13 @@ class ShowBookInfo extends Command
 
     private array $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'aac', 'wav', 'wma'];
 
+    private const AUDIO_EXTENSIONS = ['mp3', 'm4b', 'm4a', 'flac', 'ogg', 'opus', 'aac', 'wav', 'wma', 'aiff'];
+    private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
     protected $signature = 'books:info {directories?*}
                 {--compact : Use compact view instead of table}
                 {--show-paths : Show full paths being checked}
-                {--delete= : Delete book(s) by ID(s) or directory}
+                {--D|delete= : Delete book(s) by ID(s) or directory}
                 {--c|cover= : Update cover image (filename or path)}
                 {--t|title= : Update book title}
                 {--a|author=* : Update authors (+add, -remove, or replace all)}
@@ -37,6 +41,7 @@ class ShowBookInfo extends Command
                 {--d|description= : Update book description}
                 {--S|source= : Update source of the book data}
                 {--e|edit : Open book edit page in browser}
+                {--merge : Interactively merge duplicate book directories into one}
                 {--merge-directories : Merge multiple directories (or subdirectories) into one}
                 {--force : Skip confirmation prompts}';
 
@@ -48,7 +53,8 @@ class ShowBookInfo extends Command
         protected TerminalImageService $terminalImageService,
         protected BookDeletionService $deletionService,
         protected Book $bookModel,
-        protected Publisher $publisherModel
+        protected Publisher $publisherModel,
+        protected BookFilesystemService $bookFilesystemService
     ) {
         parent::__construct();
     }
@@ -58,6 +64,11 @@ class ShowBookInfo extends Command
         // Handle delete option first
         if ($deleteId = $this->option('delete')) {
             return $this->handleDelete($deleteId);
+        }
+
+        // Handle --merge option
+        if ($this->option('merge')) {
+            return $this->handleMerge();
         }
 
         // Handle edit option - will open browser after displaying book info
@@ -1434,6 +1445,316 @@ class ShowBookInfo extends Command
         } else {
             $this->warn("Unknown OS. Please open this URL manually:");
             $this->line("  {$editUrl}");
+        }
+    }
+
+    /**
+     * Interactively merge duplicate book directories.
+     */
+    protected function handleMerge(): int
+    {
+        $directories = $this->argument('directories');
+
+        // Clean + deduplicate as in handle()
+        $cleaned = [];
+        foreach ($directories as $dir) {
+            foreach (preg_split('/[\r\n]+/', $dir) as $part) {
+                $part = trim($part);
+                if ($part !== '') {
+                    $cleaned[] = $part;
+                }
+            }
+        }
+        $directories = array_unique($cleaned);
+
+        if (count($directories) < 2) {
+            $this->error('--merge requires at least two directories.');
+            return Command::FAILURE;
+        }
+
+        $bookRoot = realpath(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books')) ?: config('filesystems.disks.books.root');
+
+        // Resolve each argument (ID or directory path) to a Book
+        $books = collect();
+        foreach ($directories as $dir) {
+            if (ctype_digit($dir)) {
+                /** @var Book|null $book */
+                $book = $this->queryBook()->find($dir);
+                if (!$book) {
+                    $this->error("Book not found with ID: {$dir}");
+                    return Command::FAILURE;
+                }
+                $books->push($book);
+                continue;
+            }
+
+            $realDir = realpath($dir) ?: (realpath(rtrim($bookRoot, '/') . '/' . ltrim($dir, '/')) ?: null);
+            if (!$realDir || !is_dir($realDir)) {
+                $this->error("Directory not found: {$dir}");
+                return Command::FAILURE;
+            }
+
+            $searchPath = str_starts_with($realDir, $bookRoot)
+                ? ltrim(substr($realDir, strlen($bookRoot)), '/')
+                : $realDir;
+
+            /** @var Book|null $book */
+            $book = $this->queryBook()->where('directory_path', $searchPath)->first();
+            if (!$book) {
+                $this->error("No book found in database for: {$dir}");
+                return Command::FAILURE;
+            }
+
+            $books->push($book);
+        }
+
+        // ---- Display comparison table ----
+        $this->newLine();
+        $this->line('<fg=cyan>Comparing ' . $books->count() . ' books:</fg=cyan>');
+        $this->newLine();
+
+        $compareFields = [
+            'title'       => 'Title',
+            'authors'     => 'Authors',
+            'narrators'   => 'Narrators',
+            'series'      => 'Series',
+            'genres'      => 'Genres',
+            'language'    => 'Language',
+            'release_date' => 'Release Date',
+            'isbn'        => 'ISBN',
+            'asin'        => 'ASIN',
+            'description' => 'Description',
+        ];
+
+        $fieldValues = [];
+        foreach ($compareFields as $field => $label) {
+            $fieldValues[$field] = $books->map(function (Book $book) use ($field): string {
+                return match ($field) {
+                    'authors'   => $book->authors->pluck('name')->join(', '),
+                    'narrators' => $book->narrators->pluck('name')->join(', '),
+                    'series'    => $book->series->map(function (Series $s): string {
+                        $n = $s->pivot?->getAttribute('series_number');
+                        return $s->name . ($n ? " #{$n}" : '');
+                    })->join(', '),
+                    'genres'    => $book->genres->pluck('name')->join(', '),
+                    'release_date' => $book->release_date?->format('Y-m-d') ?? '',
+                    default     => (string) ($book->$field ?? ''),
+                };
+            })->all();
+        }
+
+        // Render comparison table
+        $headers = ['Field', ...$books->map(fn (Book $b) => "Book #{$b->id}")->all()];
+        $rows = [];
+        foreach ($compareFields as $field => $label) {
+            $values = $fieldValues[$field];
+            $differs = count(array_unique($values)) > 1;
+            $labelText = $differs ? "<fg=yellow>{$label}</>" : $label;
+            $row = [$labelText];
+            foreach ($values as $val) {
+                $row[] = mb_strimwidth($val ?: '—', 0, 50, '…');
+            }
+            $rows[] = $row;
+        }
+
+        $this->table($headers, $rows);
+
+        // ---- Choose keeper ----
+        $keeperChoices = $books->map(fn (Book $b) => "Book #{$b->id}: " . ($b->title ?? '(no title)'))->all();
+        $keeperAnswer = $this->choice('Which book should be kept (the DB record that survives)?', $keeperChoices, 0);
+        $keeperIndex = array_search($keeperAnswer, $keeperChoices, true);
+        /** @var Book $keeper */
+        $keeper = $books->get($keeperIndex);
+
+        // ---- Per-field source selection (only for differing fields) ----
+        $fieldSources = [];
+        $mergeableFields = array_keys(array_filter($compareFields, function ($label, $field) use ($fieldValues): bool {
+            return count(array_unique($fieldValues[$field])) > 1;
+        }, ARRAY_FILTER_USE_BOTH));
+
+        if (!empty($mergeableFields)) {
+            $this->newLine();
+            $this->line('<fg=cyan>Select field sources (fields that differ between books):</fg=cyan>');
+            $this->line('Press Enter to use the keeper\'s value for each field.');
+            $this->newLine();
+
+            foreach ($mergeableFields as $field) {
+                $label = $compareFields[$field];
+                $choices = $books->map(fn (Book $b, int $i) => "Book #{$b->id}: " . mb_strimwidth($fieldValues[$field][$i] ?: '(empty)', 0, 60, '…'))->all();
+                $defaultIndex = $keeperIndex;
+                $answer = $this->choice("  {$label}?", $choices, $defaultIndex);
+                $chosenIdx = array_search($answer, $choices, true);
+                $chosenBook = $books->get($chosenIdx);
+                if ($chosenBook && $chosenBook->id !== $keeper->id) {
+                    $fieldSources[$field] = $chosenBook->id;
+                }
+            }
+        }
+
+        // ---- File selection ----
+        $directoryPath = trim($keeper->directory_path ?? '', '/');
+        $listing = $this->bookFilesystemService->listFiles($directoryPath);
+        $keepFiles = [];
+
+        if ($listing['exists'] && !empty($listing['files'])) {
+            $this->newLine();
+            $this->line('<fg=cyan>Files in shared directory (select files to KEEP):</fg=cyan>');
+            $this->newLine();
+
+            foreach ($listing['files'] as $file) {
+                $ext = strtolower($file['extension'] ?? '');
+                $sizeMb = number_format(($file['size'] ?? 0) / 1048576, 1);
+                $isAudioOrImage = in_array($ext, self::AUDIO_EXTENSIONS, true)
+                    || in_array($ext, self::IMAGE_EXTENSIONS, true);
+                $default = $isAudioOrImage;
+                if ($this->confirm("  Keep {$file['name']} ({$sizeMb} MB)?", $default)) {
+                    $keepFiles[] = $file['name'];
+                }
+            }
+        }
+
+        // ---- Summary + confirm ----
+        $this->newLine();
+        $this->line('<fg=yellow>Summary:</fg=yellow>');
+        $this->line("  Keeper book: #{$keeper->id} — " . ($keeper->title ?? '(no title)'));
+        $duplicateIds = $books->reject(fn (Book $b) => $b->id === $keeper->id)->pluck('id')->all();
+        $this->line('  Books to trash: ' . implode(', ', array_map(fn ($id) => "#{$id}", $duplicateIds)));
+        if (!empty($fieldSources)) {
+            $this->line('  Field overrides:');
+            foreach ($fieldSources as $field => $sourceId) {
+                $this->line("    {$compareFields[$field]}: from Book #{$sourceId}");
+            }
+        }
+        $trashedFiles = collect($listing['files'] ?? [])->pluck('name')->diff($keepFiles)->all();
+        if (!empty($trashedFiles)) {
+            $this->line('  Files to trash: ' . implode(', ', $trashedFiles));
+        }
+
+        $this->newLine();
+        if (!$this->option('force') && !$this->confirm('Proceed with merge?', false)) {
+            $this->info('Cancelled.');
+            return Command::SUCCESS;
+        }
+
+        // ---- Execute merge ----
+        $booksById = $books->keyBy('id');
+
+        $this->applyMergeFieldSources($keeper, $booksById, $fieldSources);
+        $keeper->forceFill(['needs_review' => false, 'needs_review_reasons' => null])->save();
+        $this->info('✓ Keeper metadata updated.');
+
+        if (!empty($listing['files'])) {
+            $this->trashMergeFiles($directoryPath, $keepFiles);
+            $this->info('✓ Unchecked files moved to trash.');
+        }
+
+        foreach ($duplicateIds as $dupId) {
+            $result = $this->deletionService->moveToTrash((string) $dupId, false);
+            if ($result['success'] ?? false) {
+                $this->info("✓ Book #{$dupId} trashed (DB only).");
+            } else {
+                $this->warn("⚠ Could not trash Book #{$dupId}: " . ($result['error'] ?? 'Unknown error'));
+            }
+        }
+
+        $this->newLine();
+        $this->info('Merge complete.');
+        return Command::SUCCESS;
+    }
+
+    /**
+     * Apply field source overrides to keeper book (mirrors controller applyFieldSources).
+     *
+     * @param \Illuminate\Database\Eloquent\Collection<int,Book> $books
+     * @param array<string,int> $fieldSources field => source book id
+     */
+    private function applyMergeFieldSources(Book $keeper, $books, array $fieldSources): void
+    {
+        $scalarFields = ['title', 'description', 'language', 'asin', 'release_date', 'isbn', 'cover_image'];
+        $relationFields = ['authors', 'narrators', 'series', 'genres'];
+
+        $scalarUpdates = [];
+        foreach ($scalarFields as $field) {
+            $sourceId = $fieldSources[$field] ?? null;
+            if ($sourceId === null || $sourceId === $keeper->id) {
+                continue;
+            }
+            $source = $books->get($sourceId);
+            if ($source === null) {
+                continue;
+            }
+            $scalarUpdates[$field] = $source->$field;
+        }
+        if (!empty($scalarUpdates)) {
+            $keeper->forceFill($scalarUpdates)->save();
+        }
+
+        foreach ($relationFields as $field) {
+            $sourceId = $fieldSources[$field] ?? null;
+            if ($sourceId === null || $sourceId === $keeper->id) {
+                continue;
+            }
+            $source = $books->get($sourceId);
+            if ($source === null) {
+                continue;
+            }
+            $this->syncMergeRelation($keeper, $source, $field);
+        }
+    }
+
+    private function syncMergeRelation(Book $keeper, Book $source, string $field): void
+    {
+        if ($field === 'series') {
+            $syncData = [];
+            foreach ($source->series as $series) {
+                $seriesNumber = $series->pivot->getAttribute('series_number');
+                $syncData[$series->id] = ['series_number' => $seriesNumber];
+            }
+            $keeper->series()->sync($syncData);
+            return;
+        }
+
+        $ids = $source->$field->pluck('id')->all();
+        match ($field) {
+            'authors'   => $keeper->authors()->sync($ids),
+            'narrators' => $keeper->narrators()->sync($ids),
+            'genres'    => $keeper->genres()->sync($ids),
+            default     => null,
+        };
+    }
+
+    /**
+     * @param array<int,string> $keepFiles
+     */
+    private function trashMergeFiles(string $directoryPath, array $keepFiles): void
+    {
+        $directoryPath = trim($directoryPath, '/');
+        $listing = $this->bookFilesystemService->listFiles($directoryPath);
+        if (!$listing['exists']) {
+            return;
+        }
+
+        $timestamp = now()->format('Y-m-d_His');
+        $trashItemId = $timestamp . '_files_' . md5($directoryPath);
+        $trashDisk = Storage::disk('trash');
+        $booksDisk = Storage::disk('books');
+
+        foreach ($listing['files'] as $file) {
+            $filename = $file['name'];
+            if (in_array($filename, $keepFiles, true)) {
+                continue;
+            }
+            $relativePath = $directoryPath . '/' . $filename;
+            if (!$booksDisk->exists($relativePath)) {
+                continue;
+            }
+            $trashDisk->makeDirectory($trashItemId . '/files');
+            $trashPath = $trashItemId . '/files/' . $filename;
+            try {
+                rename($booksDisk->path($relativePath), $trashDisk->path($trashPath));
+            } catch (\Throwable $e) {
+                $this->warn("Could not trash file {$filename}: " . $e->getMessage());
+            }
         }
     }
 

@@ -7,6 +7,8 @@ namespace Tests\Unit\Console\Commands;
 use App\Console\Commands\ShowBookInfo;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\BookDeletionService;
+use App\Services\BookFilesystemService;
+use App\Services\BookPathService;
 use App\Models\Book;
 use App\Models\Publisher;
 use App\Services\TerminalImageService;
@@ -48,15 +50,17 @@ class ShowBookInfoCommandTest extends TestCase
         $bookDeletionService = $this->bookDeletionService;
         $bookModel = new Book();
         $publisherModel = new Publisher();
+        $bookFilesystemService = new BookFilesystemService($this->documentStore, new BookPathService());
 
-        $this->command = new class ($terminalImageService, $bookDeletionService, $bookModel, $publisherModel) extends ShowBookInfo {
+        $this->command = new class ($terminalImageService, $bookDeletionService, $bookModel, $publisherModel, $bookFilesystemService) extends ShowBookInfo {
             public function __construct(
                 TerminalImageService $terminalImageService,
                 BookDeletionService $bookDeletionService,
                 Book $bookModel,
-                Publisher $publisherModel
+                Publisher $publisherModel,
+                BookFilesystemService $bookFilesystemService
             ) {
-                parent::__construct($terminalImageService, $bookDeletionService, $bookModel, $publisherModel);
+                parent::__construct($terminalImageService, $bookDeletionService, $bookModel, $publisherModel, $bookFilesystemService);
             }
 
             public function wrapTextPublic(string $text, int $maxWidth): string

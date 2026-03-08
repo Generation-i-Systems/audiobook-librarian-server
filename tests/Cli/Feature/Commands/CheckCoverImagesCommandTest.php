@@ -74,14 +74,15 @@ class CheckCoverImagesCommandTest extends TestCase
                 ]);
         });
 
-        // Mock ExternalCoverService to download successfully
+        // Mock ExternalCoverService to download successfully.
+        // Since cover_image now stores filename only, the service returns the filename.
         $this->mock(ExternalCoverService::class, function ($mock) {
             $mock->shouldReceive('downloadCoverImage')
                 ->once()
                 ->with('https://example.com/audible-cover.jpg', 'Fiction/Author/Book2', 'audible', 'B00TESTASIN')
                 ->andReturn([
                     'success' => true,
-                    'path' => 'Fiction/Author/Book2/cover_audible_B00TESTASIN.jpg',
+                    'path' => 'cover_audible_B00TESTASIN.jpg',
                 ]);
         });
 
@@ -90,7 +91,7 @@ class CheckCoverImagesCommandTest extends TestCase
             ->assertExitCode(0);
 
         $book->refresh();
-        $this->assertSame('Fiction/Author/Book2/cover_audible_B00TESTASIN.jpg', $book->cover_image);
+        $this->assertSame('cover_audible_B00TESTASIN.jpg', $book->cover_image);
         $this->assertFalse($book->needs_review);
         // Because ExternalCoverService is mocked, it does not write to storage.
         // Simulate the downloaded file to satisfy existence assertion on the faked disk.
