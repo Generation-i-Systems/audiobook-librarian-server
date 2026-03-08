@@ -14,6 +14,33 @@ NC='\033[0m' # No Color
 # Track overall status
 FAILED=false
 
+# =============================================================================
+# STASH UNCOMMITTED CHANGES
+# CI only sees committed code — we must validate the same.
+# =============================================================================
+STASH_NAME="pre-push-hook-$(date +%s)"
+STASH_CREATED=false
+
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo -e "${YELLOW}⚠️  Uncommitted changes detected. Stashing before validation...${NC}"
+    if git stash push --include-untracked -m "$STASH_NAME" > /dev/null 2>&1; then
+        STASH_CREATED=true
+        echo -e "${YELLOW}   Stashed as: ${STASH_NAME}${NC}"
+    else
+        echo -e "${RED}❌ Failed to stash uncommitted changes. Aborting push.${NC}"
+        exit 1
+    fi
+fi
+
+# Restore stash on exit (success or failure)
+restore_stash() {
+    if [ "$STASH_CREATED" = true ]; then
+        echo -e "${YELLOW}Restoring stashed changes...${NC}"
+        git stash pop > /dev/null 2>&1 || echo -e "${RED}⚠️  Failed to restore stash '${STASH_NAME}' — restore manually with: git stash pop${NC}"
+    fi
+}
+trap restore_stash EXIT
+
 echo ""
 echo -e "${BOLD}${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${BLUE}║          🚀 Pre-Push Validation Suite                      ║${NC}"
