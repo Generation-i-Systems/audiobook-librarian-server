@@ -124,7 +124,6 @@ class EventController extends Controller
 
             $remoteQuery = ListeningEvent::where('user_id', $user->id)
                 ->where('synced_at', '>=', $syncAfter)
-                ->where('device_id', '!=', $deviceId)
                 ->whereNull('migrated_from')
                 ->orderBy('synced_at', 'asc')
                 ->limit(101);
