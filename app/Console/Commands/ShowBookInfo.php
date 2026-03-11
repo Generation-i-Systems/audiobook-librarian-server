@@ -1410,12 +1410,9 @@ class ShowBookInfo extends Command
     /**
      * Open the book's edit page in browser
      */
-    protected function openEditPage(Book $book): void
+    protected function openUrlInBrowser(string $url): void
     {
-        $appUrl = rtrim(config('app.url', 'http://localhost'), '/');
-        $editUrl = $appUrl . '/admin/books/' . $book->id . '/edit';
-
-        $this->info("Opening edit page: {$editUrl}");
+        $this->info("Opening page in browser: {$url}");
 
         // Skip browser opening when running tests
         if (app()->environment('testing')) {
@@ -1432,20 +1429,30 @@ class ShowBookInfo extends Command
             foreach ($commands as $cmd) {
                 $check = shell_exec("which {$cmd} 2>/dev/null");
                 if ($check) {
-                    exec("{$cmd} " . escapeshellarg($editUrl) . " > /dev/null 2>&1 &");
+                    exec("{$cmd} " . escapeshellarg($url) . " > /dev/null 2>&1 &");
                     return;
                 }
             }
             $this->warn("Could not find a browser to open the URL. Please open manually:");
-            $this->line("  {$editUrl}");
+            $this->line("  {$url}");
         } elseif ($os === 'Darwin') {
-            exec("open " . escapeshellarg($editUrl));
+            exec("open " . escapeshellarg($url));
         } elseif ($os === 'Windows') {
-            exec("start " . escapeshellarg($editUrl));
+            exec("start " . escapeshellarg($url));
         } else {
             $this->warn("Unknown OS. Please open this URL manually:");
-            $this->line("  {$editUrl}");
+            $this->line("  {$url}");
         }
+    }
+
+    /**
+     * Open the book's edit page in browser
+     */
+    protected function openEditPage(Book $book): void
+    {
+        $appUrl = rtrim(config('app.url', 'http://localhost'), '/');
+        $editUrl = $appUrl . '/admin/books/' . $book->id . '/edit';
+        $this->openUrlInBrowser($editUrl);
     }
 
     /**
@@ -1458,7 +1465,7 @@ class ShowBookInfo extends Command
         // Clean + deduplicate as in handle()
         $cleaned = [];
         foreach ($directories as $dir) {
-            foreach (preg_split('/[\r\n]+/', $dir) as $part) {
+            foreach (preg_split('/[\r\n,]+/', $dir) as $part) {
                 $part = trim($part);
                 if ($part !== '') {
                     $cleaned[] = $part;
@@ -1506,6 +1513,27 @@ class ShowBookInfo extends Command
             }
 
             $books->push($book);
+        }
+
+        if ($this->option('edit')) {
+            $bookIds = $books->pluck('id')->sort()->values()->all();
+            $directoryPath = $books->first()->directory_path ?? 'cli-merge-' . time();
+
+            /** @var \App\Models\LibraryRepairIssue $issue */
+            $issue = \App\Models\LibraryRepairIssue::query()->firstOrNew([
+                'issue_type' => \App\Enums\LibraryRepairIssueType::DUPLICATE_DIRECTORY->value,
+                'directory_path' => $directoryPath,
+            ]);
+
+            $issue->metadata = ['book_ids' => $bookIds];
+            $issue->status = 'pending';
+            $issue->save();
+
+            $appUrl = rtrim(config('app.url', 'http://localhost'), '/');
+            $url = $appUrl . '/admin/library-repair/' . $issue->id . '/compare';
+            $this->openUrlInBrowser($url);
+
+            return Command::SUCCESS;
         }
 
         // ---- Display comparison table ----
