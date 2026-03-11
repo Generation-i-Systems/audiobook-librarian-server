@@ -229,6 +229,22 @@
                         const badge = size
                             ? '<span class="text-muted">' + size + "</span>"
                             : "";
+                        const playBtn =
+                            type === "audio"
+                                ? '<button type="button" class="btn btn-sm btn-outline-primary me-1 play-audio-btn" data-file="' +
+                                  dirPath +
+                                  "/" +
+                                  filename +
+                                  '" title="Play Audio"><i class="fas fa-play"></i></button>'
+                                : "";
+                        const viewBtn =
+                            type === "image"
+                                ? '<button type="button" class="btn btn-sm btn-outline-secondary me-1 view-image-btn" data-file="' +
+                                  dirPath +
+                                  "/" +
+                                  filename +
+                                  '" title="View Image"><i class="fas fa-image"></i></button>'
+                                : "";
                         const metadataBtn =
                             type === "audio"
                                 ? '<a href="#" class="btn btn-sm btn-outline-primary view-metadata" data-file="' +
@@ -257,6 +273,8 @@
                             "</span>" +
                             '<span class="d-flex align-items-center gap-2">' +
                             badge +
+                            playBtn +
+                            viewBtn +
                             metadataBtn +
                             "</span></div>"
                         );
@@ -561,6 +579,32 @@
             });
     }
 
+    function registerAudioPlayerHandler() {
+        $(document)
+            .off("click.audioPlayer", ".play-audio-btn")
+            .on("click.audioPlayer", ".play-audio-btn", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const filePath = $(this).data("file");
+                const filename = filePath.split("/").pop();
+                const coverUrl = "/cover/" + filePath;
+                window.openAudioPlayer(filename, coverUrl);
+            });
+    }
+
+    function registerImageViewerHandler() {
+        $(document)
+            .off("click.imageViewer", ".view-image-btn")
+            .on("click.imageViewer", ".view-image-btn", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const filePath = $(this).data("file");
+                const filename = filePath.split("/").pop();
+                const imageUrl = "/cover/" + filePath;
+                window.openImageViewer(filename, imageUrl);
+            });
+    }
+
     function displayMetadata(metadata, filename) {
         let html = '<div class="metadata-display">';
         if (metadata.file) {
@@ -688,6 +732,8 @@
         registerGenreChangeHandler();
         registerUpdatePathFromGenreHandler();
         registerMetadataHandler();
+        registerAudioPlayerHandler();
+        registerImageViewerHandler();
     }
 
     bookForm.loadDirectoryFiles = loadDirectoryFiles;
@@ -700,4 +746,30 @@
 
     window.showToast = showToast;
     window.resyncFromDirectoryPath = resyncFromDirectoryPath;
+
+    // Audio player popup
+    window.openAudioPlayer = function (filename, url) {
+        const player = document.getElementById("audioPlayer");
+        document.getElementById("audioModalTitle").textContent = filename;
+        player.pause();
+        player.src = url;
+        player.load();
+        const modal = new bootstrap.Modal(document.getElementById("audioModal"));
+        modal.show();
+        document.getElementById("audioModal").addEventListener(
+            "hidden.bs.modal",
+            function () {
+                player.pause();
+                player.src = "";
+            },
+            { once: true },
+        );
+    };
+
+    // Image viewer popup
+    window.openImageViewer = function (filename, url) {
+        document.getElementById("imageModalTitle").textContent = filename;
+        document.getElementById("imageModalImg").src = url;
+        new bootstrap.Modal(document.getElementById("imageModal")).show();
+    };
 })(window, window.jQuery);

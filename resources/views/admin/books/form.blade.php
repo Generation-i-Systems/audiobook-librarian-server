@@ -555,6 +555,10 @@
                                     class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
                              <button type="button" class="btn btn-success ms-2" id="magic-autofill-btn"
                                   title="Auto-search and apply first result from Audible" aria-label="Magic Autofill"><i class="fas fa-magic"></i></button>
+                            @if(!empty($initial['sourcePath']) || !empty($initial['sourceRelPath']))
+                                <button type="button" class="btn btn-primary ms-2" id="ai-extract-btn"
+                                    title="Extract and enrich metadata using AI" aria-label="AI Extraction"><i class="fas fa-robot me-2"></i>AI Extract</button>
+                            @endif
                             @if(isset($book))
                                 <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i
                                         class="fas fa-code me-2"></i>Raw JSON Edit</button>
@@ -606,7 +610,7 @@
                     // Only use referer if it's not a form URL and not the current page
                     // We also check that it's an internal URL to books.thelin.org
                     $isInternal = $referer && (strpos($referer, config('app.url')) !== false || strpos($referer, 'localhost') !== false);
-                    
+
                     $safeReferer = ($isInternal && !$isFormUrl($referer) && strpos($referer, $currentUrl) === false)
                         ? $referer
                         : (session('last_admin_list_url') ?? route('admin.books.index'));
@@ -616,6 +620,9 @@
                 @endphp
                 @if($finalReturnUrl)
                     <input type="hidden" name="returnUrl" value="{{ $finalReturnUrl }}">
+                @endif
+                @if(request('close_on_success') || session('close_on_success'))
+                    <input type="hidden" name="close_on_success" value="1">
                 @endif
                 @csrf
                 @if(isset($book))
@@ -2133,5 +2140,35 @@
         </div>
 
         {{-- Removed duplicate book-autocomplete.js - form.js already handles autocomplete with jQuery UI --}}
+
+        {{-- Audio player modal --}}
+        <div class="modal fade" id="audioModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title mb-0" id="audioModalTitle"></h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center py-3">
+                        <audio id="audioPlayer" controls style="width:100%;" preload="metadata">Your browser does not support audio.</audio>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Image viewer modal --}}
+        <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title mb-0" id="imageModalTitle"></h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center p-2">
+                        <img id="imageModalImg" src="" alt="" style="max-width:100%;max-height:80vh;object-fit:contain;">
+                    </div>
+                </div>
+            </div>
+        </div>
 
 @endsection
