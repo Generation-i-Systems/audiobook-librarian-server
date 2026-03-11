@@ -309,6 +309,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('library-repair.compare');
     Route::post('/library-repair/{issue}/resolve-duplicate', [Admin\LibraryRepairController::class, 'resolveDuplicate'])
         ->name('library-repair.resolve-duplicate');
+    Route::post('/library-repair/{issue}/split-duplicate', [Admin\LibraryRepairController::class, 'splitDuplicate'])
+        ->name('library-repair.split-duplicate');
+    Route::patch('/library-repair/books/{book}/field', [Admin\LibraryRepairController::class, 'updateBookField'])
+        ->name('library-repair.update-book-field');
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 

@@ -7,7 +7,10 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Enums\LibraryRepairIssueType;
 use App\Http\Controllers\Controller;
+use App\Models\Author;
 use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Narrator;
 use App\Models\SystemSetting;
 use App\Services\AudiobookBayService;
 use App\Services\BookDeletionService;
@@ -243,24 +246,33 @@ class LibraryRepairController extends Controller
         })->all();
 
         return view('admin.library-repair.compare', [
-            'issue' => $issue,
-            'books' => $books,
-            'compareFields' => $compareFields,
-            'fieldValues' => $fieldValues,
-            'hasDiff' => $hasDiff,
-            'fileGroups' => $fileGroups,
-            'coverUrls' => $coverUrls,
+            'issue'          => $issue,
+            'books'          => $books,
+            'compareFields'  => $compareFields,
+            'fieldValues'    => $fieldValues,
+            'hasDiff'        => $hasDiff,
+            'fileGroups'     => $fileGroups,
+            'coverUrls'      => $coverUrls,
+            'genreList'      => config('genres.list', []),
+            'autocompleteUrls' => [
+                'authors'   => route('admin.books.autocomplete.authors'),
+                'narrators' => route('admin.books.autocomplete.narrators'),
+                'genres'    => route('admin.books.autocomplete.genres'),
+            ],
         ]);
     }
 
     public function resolveDuplicate(Request $request, int $issueId): RedirectResponse
     {
         $request->validate([
-            'keep_book_id' => ['required', 'integer'],
-            'field_sources' => ['nullable', 'array'],
-            'field_sources.*' => ['integer'],
-            'keep_files' => ['nullable', 'array'],
-            'keep_files.*' => ['string'],
+            'keep_book_id'          => ['required', 'integer'],
+            'field_sources'         => ['nullable', 'array'],
+            'field_sources.*'       => ['integer'],
+            'keep_files'            => ['nullable', 'array'],
+            'keep_files.*'          => ['string'],
+            'book_edits'            => ['nullable', 'array'],
+            'book_edits.*'          => ['array'],
+            'book_edits.*.*'        => ['nullable', 'string', 'max:5000'],
         ]);
 
         $issue = $this->documentStore->getLibraryRepairIssue($issueId);
@@ -288,17 +300,20 @@ class LibraryRepairController extends Controller
             return redirect()->back()->with('error', 'Keeper book not found.');
         }
 
-        // Step 1: Merge selected field values into keeper, then clear review flags
-        $this->applyFieldSources($keeper, $books, $request->input('field_sources', []));
-        $keeper->forceFill(['needs_review' => false, 'needs_review_reasons' => null])->save();
+        // Step 1: Apply any inline-edited field values to each book
+        $this->applyBookEdits($books, $request->input('book_edits', []));
 
-        // Step 2: Move unchecked files to trash
+        // Step 2: Merge selected field values into keeper, then clear review flags on all involved books
+        $this->applyFieldSources($keeper, $books, $request->input('field_sources', []));
+        $books->each(fn (Book $b) => $b->forceFill(['needs_review' => false, 'needs_review_reasons' => null])->save());
+
+        // Step 3: Move unchecked files to trash
         $directoryPath = $issue['directoryPath'] ?? '';
         if ($directoryPath !== '') {
             $this->trashUncheckedFiles($directoryPath, $request->input('keep_files', []));
         }
 
-        // Step 3: Trash duplicate DB records (DB only — shared directory)
+        // Step 4: Trash duplicate DB records (DB only — shared directory)
         $errors = [];
 
         foreach ($bookIds as $bookId) {
@@ -317,7 +332,7 @@ class LibraryRepairController extends Controller
             return redirect()->back()->with('error', 'Some books could not be trashed: ' . implode('; ', $errors));
         }
 
-        // Step 4: Rescan + redirect
+        // Step 5: Rescan + redirect
         try {
             $this->libraryRepairService->rescanIssue($issueId);
         } catch (\Throwable $e) {
@@ -329,6 +344,81 @@ class LibraryRepairController extends Controller
 
         return redirect()->route('admin.library-repair.index')
             ->with('success', 'Duplicate resolved. Keeper book updated and duplicates trashed.');
+    }
+
+    public function splitDuplicate(Request $request, int $issueId): RedirectResponse
+    {
+        $request->validate([
+            'splits'                   => ['required', 'array', 'min:1'],
+            'splits.*.book_id'         => ['required', 'integer'],
+            'splits.*.dir'             => ['required', 'string', 'max:500'],
+            'splits.*.move_files'      => ['nullable', 'array'],
+            'splits.*.move_files.*'    => ['string'],
+            'splits.*.copy_files'      => ['nullable', 'array'],
+            'splits.*.copy_files.*'    => ['string'],
+            'book_edits'               => ['nullable', 'array'],
+            'book_edits.*'             => ['array'],
+            'book_edits.*.*'           => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $issue = $this->documentStore->getLibraryRepairIssue($issueId);
+
+        if ($issue === null || ($issue['issueType'] ?? '') !== LibraryRepairIssueType::DUPLICATE_DIRECTORY->value) {
+            return redirect()->route('admin.library-repair.index')
+                ->with('error', 'Issue not found or not a duplicate directory issue.');
+        }
+
+        $directoryPath = $issue['directoryPath'] ?? '';
+        $splits = $request->input('splits', []);
+
+        $splitBookIds = array_column($splits, 'book_id');
+        $splitBooks   = Book::withTrashed()->whereIn('id', $splitBookIds)->get()->keyBy('id');
+        $this->applyBookEdits($splitBooks, $request->input('book_edits', []));
+        $splitBooks->each(fn (Book $b) => $b->forceFill(['needs_review' => false, 'needs_review_reasons' => null])->save());
+
+        $result = $this->bookFilesystemService->splitDirectory($directoryPath, $splits);
+
+        if (!$result['success']) {
+            $errorMsg = implode('; ', $result['errors']);
+            return redirect()->back()->with('error', "Split partially failed: {$errorMsg}");
+        }
+
+        try {
+            $this->libraryRepairService->rescanIssue($issueId);
+        } catch (\Throwable $e) {
+            Log::warning('library-repair.split-duplicate: rescan failed after split', [
+                'issueId' => $issueId,
+                'error'   => $e->getMessage(),
+            ]);
+        }
+
+        return redirect()->route('admin.library-repair.index')
+            ->with('success', 'Directory split successfully. Each book now has its own directory.');
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Collection<int,Book> $books
+     * @param array<string,array<string,string>> $bookEdits
+     */
+    private function applyBookEdits($books, array $bookEdits): void
+    {
+        $allowed = ['title', 'description', 'release_date', 'isbn', 'language', 'subtitle'];
+
+        foreach ($bookEdits as $bookId => $fields) {
+            $book = $books->get((int) $bookId);
+            if ($book === null) {
+                continue;
+            }
+            $updates = [];
+            foreach ($fields as $field => $value) {
+                if (in_array($field, $allowed, true)) {
+                    $updates[$field] = $value !== '' ? $value : null;
+                }
+            }
+            if (!empty($updates)) {
+                $book->forceFill($updates)->save();
+            }
+        }
     }
 
     /**
@@ -572,5 +662,52 @@ class LibraryRepairController extends Controller
         }
 
         return $this->audiobookBayService->buildSearchUrl($normalized);
+    }
+
+    public function updateBookField(Request $request, int $book): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'field'  => ['required', 'string', 'max:100'],
+            'value'  => ['nullable', 'string', 'max:5000'],
+            'values' => ['nullable', 'array'],
+            'values.*' => ['string', 'max:500'],
+        ]);
+
+        $scalarAllowed   = ['title', 'description', 'release_date', 'isbn', 'language', 'subtitle'];
+        $relationAllowed = ['authors', 'narrators', 'genres'];
+        $field           = $request->input('field');
+
+        if (!in_array($field, [...$scalarAllowed, ...$relationAllowed], true)) {
+            return response()->json(['error' => 'Field not editable via this endpoint.'], 422);
+        }
+
+        try {
+            $bookModel = Book::withTrashed()->findOrFail($book);
+
+            if (in_array($field, $relationAllowed, true)) {
+                $names = array_filter(array_map('trim', $request->input('values', [])));
+
+                match ($field) {
+                    'authors' => $bookModel->authors()->sync(
+                        collect($names)->map(fn ($n) => Author::firstOrCreate(['name' => $n])->id)->all()
+                    ),
+                    'narrators' => $bookModel->narrators()->sync(
+                        collect($names)->map(fn ($n) => Narrator::firstOrCreate(['name' => $n])->id)->all()
+                    ),
+                    'genres' => $bookModel->genres()->sync(
+                        collect($names)->map(fn ($n) => Genre::firstOrCreate(['name' => $n])->id)->all()
+                    ),
+                };
+            } else {
+                $this->documentStore->updateBook((string) $book, [$field => $request->input('value')]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('LibraryRepairController::updateBookField failed', [
+                'book' => $book, 'field' => $field, 'error' => $e->getMessage(),
+            ]);
+            return response()->json(['error' => 'Update failed.'], 500);
+        }
+
+        return response()->json(['ok' => true]);
     }
 }

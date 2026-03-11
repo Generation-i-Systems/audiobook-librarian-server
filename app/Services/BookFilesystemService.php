@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Book;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\Log;
 
 class BookFilesystemService
 {
+    use HandlesLibraryJson;
+
     public function __construct(
         private readonly DocumentStoreServiceInterface $documentStoreService,
         private readonly BookPathService $bookPathService
@@ -164,6 +168,96 @@ class BookFilesystemService
             'canGoUp' => $canGoUp,
             'parentPath' => $canGoUp ? str_replace($bookRoot . '/', '', $parentPath) : null,
         ];
+    }
+
+    /**
+     * Split a shared directory into separate subdirectories, one per book.
+     *
+     * Each entry in $splits is:
+     *   [
+     *     'book_id'    => int,
+     *     'dir'        => string  (new relative path for this book),
+     *     'move_files' => string[]  (filenames to move exclusively here),
+     *     'copy_files' => string[]  (filenames to copy to both dirs),
+     *   ]
+     *
+     * Files not listed in any split entry remain in the original directory.
+     *
+     * @param  array<int, array{book_id: int, dir: string, move_files: string[], copy_files: string[]}> $splits
+     * @return array{success: bool, errors: string[]}
+     */
+    public function splitDirectory(string $sourceRelativePath, array $splits): array
+    {
+        $bookRoot  = $this->bookPathService->getBookRoot();
+        $sourceFull = $bookRoot . '/' . trim($sourceRelativePath, '/');
+        $errors = [];
+
+        if (!is_dir($sourceFull)) {
+            return ['success' => false, 'errors' => ["Source directory does not exist: {$sourceRelativePath}"]];
+        }
+
+        // Remove the shared librarian.json before splitting — it belongs to neither destination.
+        // Each book will get a fresh one generated from its own DB record after files are moved.
+        $sharedLibrarianJson = $sourceFull . '/librarian.json';
+        if (file_exists($sharedLibrarianJson)) {
+            @unlink($sharedLibrarianJson);
+        }
+
+        foreach ($splits as $split) {
+            $destRelative = trim($split['dir'], '/');
+            $destFull = $bookRoot . '/' . $destRelative;
+
+            if (!is_dir($destFull) && !@mkdir($destFull, 0775, true)) {
+                $errors[] = "Could not create directory: {$destRelative}";
+                continue;
+            }
+
+            foreach ($split['move_files'] as $filename) {
+                $src = $sourceFull . '/' . $filename;
+                $dst = $destFull . '/' . $filename;
+                if (!file_exists($src)) {
+                    continue;
+                }
+                if (!@rename($src, $dst)) {
+                    $errors[] = "Could not move {$filename} to {$destRelative}";
+                }
+            }
+
+            foreach ($split['copy_files'] as $filename) {
+                $src = $sourceFull . '/' . $filename;
+                $dst = $destFull . '/' . $filename;
+                if (!file_exists($src)) {
+                    continue;
+                }
+                if (!@copy($src, $dst)) {
+                    $errors[] = "Could not copy {$filename} to {$destRelative}";
+                }
+            }
+
+            $bookId = (string) $split['book_id'];
+            if ($bookId !== '0') {
+                try {
+                    $this->documentStoreService->updateBook($bookId, ['directoryPath' => $destRelative]);
+                } catch (\Throwable $e) {
+                    Log::warning('BookFilesystemService::splitDirectory: failed to update book path', [
+                        'bookId' => $bookId,
+                        'newPath' => $destRelative,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $errors[] = "Could not update DB path for book #{$bookId}";
+                    continue;
+                }
+
+                // Regenerate librarian.json in the new directory from the book's DB record
+                $book = Book::with(['authors', 'narrators', 'genres', 'series', 'publisher'])->find((int) $bookId);
+                if ($book !== null) {
+                    $book->directory_path = $destRelative;
+                    $this->updateLibraryJson($book);
+                }
+            }
+        }
+
+        return ['success' => empty($errors), 'errors' => $errors];
     }
 
     private function buildNewRelativePath(string $oldRelativePath, string $newName): string
