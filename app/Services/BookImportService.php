@@ -4421,14 +4421,16 @@ class BookImportService
             '6' => 'Request enrichment (Audible/Google Books)',
         ];
 
+        $options['7'] = 'Add narrator to directory name';
+
         // Only show "Reprocess as Multi-Book Archive" if NOT already a multi-book part AND has more than 1 file
         if (!$isMultiBookPart && $fileCount > 1) {
-            $options['7'] = 'Reprocess as Multi-Book Archive (Split)';
+            $options['8'] = 'Reprocess as Multi-Book Archive (Split)';
         }
 
         // Only show "Merge into Parent Book" if this IS a multi-book part
         if ($isMultiBookPart) {
-            $options['8'] = 'Merge into Parent Book';
+            $options['9'] = 'Merge into Parent Book';
         }
 
         return $options;
@@ -7705,7 +7707,19 @@ class BookImportService
             );
         }
 
+        // Detect if the source path is already inside the book root.
+        // If so, lock the directory to its current relative path — no rename will occur.
+        $bookStorageRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', ''), '/');
+        $sourcePath = rtrim($audiobook['path'], '/');
+        $isInBookRoot = $bookStorageRoot !== '' && str_starts_with($sourcePath, $bookStorageRoot . '/');
+
         $aiMetadata = $processWithAICallback($audiobook);
+
+        if ($isInBookRoot) {
+            $relativeDir = substr($sourcePath, strlen($bookStorageRoot) + 1);
+            $aiMetadata['custom_directory_path'] = $relativeDir;
+            $infoCallback("📍 Path is inside book root — directory locked: {$relativeDir}");
+        }
 
         // Check for OpenAudible metadata - if found, merge it with AI metadata
         // OpenAudible metadata is superior and enables skipping enrichment
@@ -8282,11 +8296,31 @@ class BookImportService
             }
 
             if ($choice === '7') {
+                $narrators = $metadata['narrator'] ?? null;
+                $narratorString = '';
+                if ($narrators !== null) {
+                    $narratorString = is_array($narrators) ? implode(', ', $narrators) : (string) $narrators;
+                }
+                if ($narratorString === '') {
+                    $narratorString = $askInlineCallback('Narrator name', '');
+                }
+                if (trim($narratorString) !== '') {
+                    $base = rtrim($metadata['custom_directory_path'] ?? $generateDirectoryPathCallback($metadata, ['include_title' => true]), '/');
+                    // Remove any existing narrator suffix before appending
+                    $base = preg_replace('/\s*\([^)]+\)$/', '', $base);
+                    $metadata['custom_directory_path'] = $base . " ({$narratorString})";
+                    $currentDirectoryPath = $metadata['custom_directory_path'];
+                    $uiServiceLogCallback("📁 Directory updated: {$currentDirectoryPath}");
+                }
+                continue;
+            }
+
+            if ($choice === '8') {
                 $metadata['_action'] = 'reprocess_multi';
                 return true;
             }
 
-            if ($choice === '8') {
+            if ($choice === '9') {
                 $metadata['_action'] = 'merge_parent';
                 return true;
             }
