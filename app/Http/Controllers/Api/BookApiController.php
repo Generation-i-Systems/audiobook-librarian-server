@@ -2053,6 +2053,26 @@ class BookApiController extends Controller
 
         $total = $countQuery->distinct()->count('authors.id');
 
+        // Calculate pagination info
+        $totalPages = (int) ceil($total / $perPage);
+        $hasNext = $page < $totalPages;
+        $hasPrev = $page > 1;
+
+        // If requested page is beyond the last page, return empty results
+        if ($totalPages > 0 && $page > $totalPages) {
+            return response()->json([
+                'authors' => [],
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'total_pages' => $totalPages,
+                    'has_next' => false,
+                    'has_prev' => true,
+                ],
+            ]);
+        }
+
         // Execute query with pagination
         $offset = ($page - 1) * $perPage;
         $authors = $query->offset($offset)->limit($perPage)->get();
@@ -2115,11 +2135,6 @@ class BookApiController extends Controller
                 'isFavorite' => (bool) $author->isFavorite,
             ];
         });
-
-        // Calculate pagination info
-        $totalPages = ceil($total / $perPage);
-        $hasNext = $page < $totalPages;
-        $hasPrev = $page > 1;
 
         return response()->json([
             'authors' => $authorsWithDetails,
@@ -2409,6 +2424,26 @@ class BookApiController extends Controller
 
         $total = $countQuery->distinct()->count('series.id');
 
+        // Calculate pagination info
+        $totalPages = (int) ceil($total / $perPage);
+        $hasNext = $page < $totalPages;
+        $hasPrev = $page > 1;
+
+        // If requested page is beyond the last page, return empty results
+        if ($totalPages > 0 && $page > $totalPages) {
+            return response()->json([
+                'series' => [],
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'total_pages' => $totalPages,
+                    'has_next' => false,
+                    'has_prev' => true,
+                ],
+            ]);
+        }
+
         // Execute query with pagination
         $offset = ($page - 1) * $perPage;
         $series = $query->offset($offset)->limit($perPage)->get();
@@ -2446,11 +2481,6 @@ class BookApiController extends Controller
                 'isFavorite' => (bool) $series->isFavorite,
             ];
         });
-
-        // Calculate pagination info
-        $totalPages = ceil($total / $perPage);
-        $hasNext = $page < $totalPages;
-        $hasPrev = $page > 1;
 
         return response()->json([
             'series' => $seriesWithAuthors,

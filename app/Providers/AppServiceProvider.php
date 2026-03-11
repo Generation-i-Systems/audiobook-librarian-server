@@ -61,8 +61,16 @@ class AppServiceProvider extends ServiceProvider
         });
 
 
+        // Dynamically set the application's base URL based on the incoming request.
+        // This allows the app to respond correctly via multiple domains
+        // (like books.thelin.org, api.ablibrarian.com, etc.)
+        if (!app()->runningInConsole()) {
+            $scheme = (bool) config('app.force_https', true) ? 'https' : request()->getScheme();
+            URL::forceRootUrl($scheme . '://' . request()->getHost());
+        }
+
         // Force HTTPS scheme for generated links when enabled (but not during unit tests)
-        if ((bool) env('FORCE_HTTPS', true) && !app()->runningUnitTests()) {
+        if ((bool) config('app.force_https', true) && !app()->runningUnitTests()) {
             URL::forceScheme('https');
         }
     }
