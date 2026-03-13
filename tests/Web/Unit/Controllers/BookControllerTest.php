@@ -5,6 +5,7 @@ namespace Tests\Web\Unit\Controllers;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Admin\BookController;
+use App\Http\Controllers\Admin\BookImportController;
 use App\Http\Controllers\Admin\BookMetadataSearchController;
 use App\Http\Controllers\Admin\ImportFileController;
 use App\Services\AudibleService;
@@ -23,6 +24,8 @@ use Tests\TestCase;
 class BookControllerTest extends TestCase
 {
     protected BookController $controller;
+
+    protected BookImportController $importController;
 
     protected BookMetadataSearchController $metadataSearchController;
 
@@ -125,6 +128,10 @@ class BookControllerTest extends TestCase
         $this->controller = new BookController(
             $this->documentStore,
             $this->externalCoverService
+        );
+
+        $this->importController = new BookImportController(
+            $this->documentStore
         );
 
         $this->metadataSearchController = new BookMetadataSearchController(
@@ -710,7 +717,7 @@ class BookControllerTest extends TestCase
         $this->app->instance(ImportFileController::class, $importFileController);
 
         // Call the processImport method
-        $response = $this->controller->processImport($request);
+        $response = $this->importController->processImport($request);
 
         // Assert the response is a redirect to the edit page
         $this->assertEquals(302, $response->getStatusCode());
@@ -760,7 +767,7 @@ class BookControllerTest extends TestCase
         ]);
 
         // Process the request and expect a redirect with errors
-        $response = $this->controller->processImport($request);
+        $response = $this->importController->processImport($request);
 
         // Assert that the response is a redirect back with errors
         $this->assertInstanceOf(\Illuminate\Http\RedirectResponse::class, $response);

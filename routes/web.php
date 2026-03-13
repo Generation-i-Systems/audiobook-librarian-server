@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\Admin\BookAutocompleteController;
 use App\Http\Controllers\Admin\BookCoverAdminController;
+use App\Http\Controllers\Admin\BookExportController;
+use App\Http\Controllers\Admin\BookFormController;
+use App\Http\Controllers\Admin\BookImportController;
 use App\Http\Controllers\Admin\BookJsonController;
 use App\Http\Controllers\Admin\BookMetadataSearchController;
 use App\Http\Controllers\Admin\BookPathController;
@@ -319,7 +322,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('library-repair.split-duplicate');
     Route::patch('/library-repair/books/{book}/field', [Admin\LibraryRepairController::class, 'updateBookField'])
         ->name('library-repair.update-book-field');
-    Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
+    Route::post('/books/resync-from-path', [BookFormController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 
     // AI Query routes (SQL-based)
@@ -386,8 +389,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         '/users/{user}/update-role',
         [Admin\AdminController::class, 'updateRole']
     )->name('users.updateRole');
-    Route::get('/books/import', [Admin\BookController::class, 'import'])->name('books.import');
-    Route::get('/books/import-file', [Admin\BookController::class, 'importFile'])->name('books.importFile');
+    Route::get('/books/import', [BookImportController::class, 'import'])->name('books.import');
+    Route::get('/books/import-file', [BookImportController::class, 'importFile'])->name('books.importFile');
 
     // Import file browser routes
     Route::prefix('import')->group(function (): void {
@@ -463,7 +466,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('books.executeImmediateMove');
 
     // AJAX: Planned actions preview for edit form
-    Route::post('books/{id}/planned-actions', [Admin\BookController::class, 'plannedActions'])
+    Route::post('books/{id}/planned-actions', [BookFormController::class, 'plannedActions'])
         ->name('books.plannedActions');
 
     Route::get('genres/{genre}/authors', [Admin\GenreController::class, 'authors'])->name('genres.authors');
@@ -476,7 +479,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
 
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
-    Route::resource('books', Admin\BookController::class);
+    Route::resource('books', Admin\BookController::class)->except(['create']);
+    Route::get('books/create', [BookFormController::class, 'create'])->name('books.create');
+    Route::get('books/{id}/download-zip', [BookExportController::class, 'download'])->name('books.downloadZip');
     Route::get('books/{id}/raw-json', [BookJsonController::class, 'getRawJson'])->name('books.rawJson');
     Route::post('books/{id}/raw-json', [BookJsonController::class, 'saveRawJson'])->name('books.saveRawJson');
 
@@ -549,7 +554,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     ])->name('books.importFromGoogleBooks');
 
     Route::post('/books/processImport', [
-        Admin\BookController::class,
+        BookImportController::class,
         'processImport',
     ])->name('books.processImport');
     Route::get(
