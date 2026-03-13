@@ -29,7 +29,7 @@ return [
         'enabled' => env('CDN_ENABLED', false),
         'url' => env('CDN_URL', 'https://cdn.example.com'),
         'path' => env('CDN_PATH', 'assets'),
-        'cache_ttl' => env('CDN_CACHE_TTL', 86400), // 24 hours in seconds
+        'cache_ttl' => env('CDN_CACHE_TTL', 86400),
     ],
 
     'ses' => [
@@ -74,6 +74,12 @@ return [
         'redirect' => env('APPLE_REDIRECT_URI'),
     ],
 
+    'discord' => [
+        'client_id' => env('DISCORD_CLIENT_ID'),
+        'client_secret' => env('DISCORD_CLIENT_SECRET'),
+        'redirect' => env('DISCORD_REDIRECT_URI'),
+    ],
+
     'audiobook_bay' => [
         'base_url' => env('AUDIOBOOK_BAY_BASE_URL'),
         'username' => env('AUDIOBOOK_BAY_USERNAME'),
@@ -84,29 +90,29 @@ return [
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'), // Default to highest daily limit model
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),
         'timeout' => env('GEMINI_TIMEOUT', 30),
-        'paid_tier' => env('GEMINI_PAID_TIER', false), // Set to true if you have billing enabled
+        'paid_tier' => env('GEMINI_PAID_TIER', false),
     ],
 
     'claude' => [
         'api_key' => env('CLAUDE_API_KEY'),
-        'model' => env('CLAUDE_MODEL', 'claude-3-5-haiku'), // Default to most cost-effective Claude model
+        'model' => env('CLAUDE_MODEL', 'claude-3-5-haiku'),
         'timeout' => env('CLAUDE_TIMEOUT', 30),
-        'paid_tier' => true, // Claude only has paid tier
+        'paid_tier' => true,
     ],
 
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
-        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'), // Default to most cost-effective OpenAI model
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
         'timeout' => env('OPENAI_TIMEOUT', 30),
-        'paid_tier' => true, // OpenAI only has paid tier
-        'organization' => env('OPENAI_ORGANIZATION'), // Optional organization ID
+        'paid_tier' => true,
+        'organization' => env('OPENAI_ORGANIZATION'),
     ],
 
     'ai' => [
-        'default_model' => env('AI_DEFAULT_MODEL', 'gemini-2.5-flash-lite'), // Can be changed to any supported model
-        'default_provider' => env('AI_DEFAULT_PROVIDER', 'gemini'), // 'gemini', 'claude', or 'openai'
+        'default_model' => env('AI_DEFAULT_MODEL', 'gemini-2.5-flash-lite'),
+        'default_provider' => env('AI_DEFAULT_PROVIDER', 'gemini'),
     ],
 
 ];

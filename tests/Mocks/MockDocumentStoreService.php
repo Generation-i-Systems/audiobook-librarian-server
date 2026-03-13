@@ -657,6 +657,17 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return null;
     }
 
+    public function getUserByDiscordId(string $discordId): ?array
+    {
+        foreach ($this->users as $user) {
+            if (isset($user['discord_id']) && $user['discord_id'] === $discordId) {
+                return $user;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Get a user by their email address.
      *

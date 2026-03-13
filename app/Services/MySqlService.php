@@ -2433,6 +2433,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $user->makeVisible(['password'])->toArray();
     }
 
+    public function getUserByDiscordId(string $discordId): ?array
+    {
+        $discordId = trim($discordId);
+
+        if ($discordId === '') {
+            return null;
+        }
+
+        $user = User::where('discord_id', $discordId)->first();
+
+        if (!$user) {
+            return null;
+        }
+
+        return $user->makeVisible(['password'])->toArray();
+    }
+
     /**
      * Check if a user with the given email exists.
      *

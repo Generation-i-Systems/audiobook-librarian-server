@@ -225,6 +225,15 @@ interface DocumentStoreServiceInterface
     public function getUserByAppleId(string $appleId): ?array;
 
     /**
+     * Get a user by their Discord ID.
+     *
+     * @param string $discordId The Discord ID to search for
+     *
+     * @return array|null The user data or null if not found
+     */
+    public function getUserByDiscordId(string $discordId): ?array;
+
+    /**
      * Check if a user with the given email exists.
      *
      * @param string $email The email address to check

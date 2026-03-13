@@ -771,4 +771,141 @@ class AuthController extends Controller
             return response()->json(['message' => 'Apple authentication failed'], 500);
         }
     }
+
+    public function discordLogin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'accessToken' => 'required|string',
+            'codeVerifier' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        $code = $request->input('accessToken');
+        $codeVerifier = $request->input('codeVerifier');
+
+        try {
+            $clientId = config('services.discord.client_id');
+            $clientSecret = config('services.discord.client_secret');
+            $redirectUri = config('services.discord.redirect');
+
+            if (empty($clientId) || empty($clientSecret)) {
+                Log::error('Discord client credentials not configured');
+                return response()->json(['message' => 'Discord authentication not configured on server'], 500);
+            }
+
+            $tokenResponse = Http::asForm()->post('https://discord.com/api/oauth2/token', [
+                'client_id' => $clientId,
+                'client_secret' => $clientSecret,
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+                'redirect_uri' => $redirectUri,
+                'code_verifier' => $codeVerifier,
+            ]);
+
+            if ($tokenResponse->failed()) {
+                Log::error('Discord token exchange failed', ['error' => $tokenResponse->body()]);
+                return response()->json(['message' => 'Failed to exchange Discord code'], 401);
+            }
+
+            $accessToken = $tokenResponse->json()['access_token'];
+
+            $userResponse = Http::withToken($accessToken)->get('https://discord.com/api/users/@me');
+
+            if ($userResponse->failed()) {
+                Log::error('Discord user fetch failed', ['error' => $userResponse->body()]);
+                return response()->json(['message' => 'Failed to fetch Discord user profile'], 401);
+            }
+
+            $discordUser = $userResponse->json();
+            $discordId = $discordUser['id'] ?? null;
+            $email = $discordUser['email'] ?? null;
+            $name = $discordUser['global_name'] ?? $discordUser['username'] ?? null;
+            $avatar = $discordUser['avatar'] ?? null;
+            $photoUrl = $avatar ? "https://cdn.discordapp.com/avatars/{$discordId}/{$avatar}.png" : null;
+
+            if (!$discordId || !$email) {
+                return response()->json(['message' => 'Discord account must have a verified email'], 400);
+            }
+
+            $user = $this->documentStoreService->getUserByDiscordId($discordId);
+            if (!$user) {
+                $user = $this->documentStoreService->getUserByEmail($email);
+            }
+
+            $isNewUser = false;
+            $createdId = null;
+
+            if (!$user) {
+                $userData = [
+                    'name' => $name,
+                    'username' => $discordUser['username'] ?? explode('@', $email)[0],
+                    'email' => $email,
+                    'discord_id' => $discordId,
+                    'photo_url' => $photoUrl,
+                    'role' => 'unverified',
+                    'password' => null,
+                    'email_verified_at' => ($discordUser['verified'] ?? false) ? now() : null,
+                ];
+
+                $createdId = $this->documentStoreService->createUser($userData);
+                if (!$createdId) {
+                    return response()->json(['message' => 'Registration failed'], 500);
+                }
+
+                $user = $this->documentStoreService->getUserByEmail($email);
+                $isNewUser = true;
+                Log::info('New Discord user created', ['email' => $email, 'id' => $createdId]);
+            } else {
+                if (empty($user['discord_id'])) {
+                    $this->documentStoreService->updateUser((string) $user['id'], [
+                        'discord_id' => $discordId,
+                        'photo_url' => $photoUrl ?? $user['photo_url'],
+                    ]);
+                }
+            }
+
+            if ($isNewUser) {
+                $userIdForNotification = (string) ($user['id'] ?? '');
+                $completeUserData = $user;
+                if ($userIdForNotification !== '') {
+                    $completeUserData = $this->documentStoreService->getUserById($userIdForNotification) ?? $user;
+                }
+                $this->registrationNotifier->send((array) $completeUserData, 'api-discord', $request);
+            }
+
+            if (($user['role'] ?? '') === 'unverified') {
+                return response()->json([
+                    'code' => 'ACCOUNT_PENDING_APPROVAL',
+                    'message' => 'Discord account verified. Waiting for admin approval.',
+                ], 403);
+            }
+
+            $tokenValue = bin2hex(random_bytes(32));
+            $tokenData = [
+                'user_id' => (string) ($user['id'] ?? ''),
+                'token' => $tokenValue,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            $this->documentStoreService->createApiToken($tokenData);
+
+            return response()->json([
+                'id' => (string) ($user['id'] ?? ''),
+                'name' => $user['name'] ?? null,
+                'username' => $user['username'] ?? null,
+                'email' => $user['email'] ?? null,
+                'photo_url' => $user['photo_url'] ?? null,
+                'role' => $user['role'] ?? null,
+                'authToken' => $tokenValue,
+                'refreshToken' => $tokenValue,
+                'token' => $tokenValue,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Discord login failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Discord authentication failed: ' . $e->getMessage()], 500);
+        }
+    }
 }
