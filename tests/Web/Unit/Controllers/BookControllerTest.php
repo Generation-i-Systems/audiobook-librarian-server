@@ -5,6 +5,7 @@ namespace Tests\Web\Unit\Controllers;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Admin\BookController;
+use App\Http\Controllers\Admin\BookMetadataSearchController;
 use App\Http\Controllers\Admin\ImportFileController;
 use App\Services\AudibleService;
 use App\Services\BookImportService;
@@ -22,6 +23,8 @@ use Tests\TestCase;
 class BookControllerTest extends TestCase
 {
     protected BookController $controller;
+
+    protected BookMetadataSearchController $metadataSearchController;
 
     protected $documentStore;
 
@@ -119,25 +122,15 @@ class BookControllerTest extends TestCase
         $this->importFileController = Mockery::mock(ImportFileController::class);
         $this->importFileController->shouldReceive('processImportedFile')->andReturn(true);
 
-        // Create a custom controller class that extends BookController and overrides the setGoogleBooksApiService method
-        $controllerClass = new class ($this->documentStore, $this->googleBooksApiService, $this->audibleService, $this->externalCoverService) extends BookController {
-            public function setGoogleBooksApiService($service)
-            {
-                $this->googleBooksApiService = $service;
-                return $this;
-            }
+        $this->controller = new BookController(
+            $this->documentStore,
+            $this->externalCoverService
+        );
 
-            public function jsonResponse($message, $success = true, $data = [])
-            {
-                return response()->json([
-                    'success' => $success,
-                    'message' => $message,
-                    'id' => $data['id'] ?? null
-                ]);
-            }
-        };
-
-        $this->controller = $controllerClass;
+        $this->metadataSearchController = new BookMetadataSearchController(
+            $this->googleBooksApiService,
+            $this->audibleService
+        );
 
         // Set up storage
         Storage::fake('books');
@@ -166,16 +159,14 @@ class BookControllerTest extends TestCase
                 ['title' => 'Test Book', 'author' => 'Test Author'],
             ]);
 
-        // Recreate the controller with the updated mock
-        $this->controller = new BookController(
-            $this->documentStore,
+        // Recreate the search controller with the updated mock
+        $this->metadataSearchController = new BookMetadataSearchController(
             $this->googleBooksApiService,
-            $this->audibleService,
-            $this->externalCoverService
+            $this->audibleService
         );
 
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $this->metadataSearchController->searchBooks($request);
 
         // Assert that the response is a JSON response
         $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
@@ -200,7 +191,7 @@ class BookControllerTest extends TestCase
         ]);
 
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $this->metadataSearchController->searchBooks($request);
 
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());
@@ -245,7 +236,7 @@ class BookControllerTest extends TestCase
         ]);
 
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $this->metadataSearchController->searchBooks($request);
 
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());
@@ -281,7 +272,7 @@ class BookControllerTest extends TestCase
         ]);
 
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $this->metadataSearchController->searchBooks($request);
 
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());

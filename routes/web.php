@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin;
+use App\Http\Controllers\Admin\BookAutocompleteController;
+use App\Http\Controllers\Admin\BookCoverAdminController;
+use App\Http\Controllers\Admin\BookJsonController;
+use App\Http\Controllers\Admin\BookMetadataSearchController;
+use App\Http\Controllers\Admin\BookPathController;
+use App\Http\Controllers\Admin\BookSeriesController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FollowController;
@@ -276,7 +282,7 @@ Route::get('/skin-asset/{skinId}/{path}', [
 ])->where('path', '.*')->name('skin.asset.proxy');
 
 // Admin series autocomplete endpoint for book form (accessible to admin users)
-Route::get('/admin/series-autocomplete', [Admin\BookController::class, 'autocompleteSeries'])
+Route::get('/admin/series-autocomplete', [BookAutocompleteController::class, 'autocompleteSeries'])
     ->name('admin.series.autocomplete')
     ->middleware(['auth', 'admin']);
 
@@ -411,16 +417,16 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ])->name('import.move');
     });
     // Unified search endpoint for all book APIs
-    Route::get('/books/search', action: [Admin\BookController::class, 'searchBooks'])
+    Route::get('/books/search', action: [BookMetadataSearchController::class, 'searchBooks'])
         ->name('books.search');
 
     // Legacy endpoints (deprecated)
-    Route::get('/books/googleBooks', action: [Admin\BookController::class, 'googleBooks'])->name('books.googleBooks');
-    Route::get('/books/audible', action: [Admin\BookController::class, 'audible'])->name('books.audible');
+    Route::get('/books/googleBooks', action: [BookMetadataSearchController::class, 'googleBooks'])->name('books.googleBooks');
+    Route::get('/books/audible', action: [BookMetadataSearchController::class, 'audible'])->name('books.audible');
 
     // AJAX endpoints for Tom Select
     Route::get('/authors/ajax', [Admin\AuthorController::class, 'ajax'])->name('authors.ajax');
-    Route::get('/series/ajax', [Admin\BookController::class, 'seriesAjax'])->name('series.ajax');
+    Route::get('/series/ajax', [BookSeriesController::class, 'seriesAjax'])->name('series.ajax');
     Route::post(
         '/import/rename',
         [Admin\BookFilesystemController::class, 'renameImportItem']
@@ -430,7 +436,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('books/files-ajax', [Admin\BookFilesystemController::class, 'filesAjax'])->name('books.filesAjax');
 
     // AJAX: Extract embedded cover from audio files
-    Route::post('books/extract-embedded-cover', [Admin\BookController::class, 'extractEmbeddedCover'])
+    Route::post('books/extract-embedded-cover', [BookCoverAdminController::class, 'extractEmbeddedCover'])
         ->name('books.extract-embedded-cover');
 
     // AJAX: Get audio file metadata
@@ -442,18 +448,18 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('books.browseDirectories');
 
     // AJAX: Rename series across all books
-    Route::post('books/rename-series', [Admin\BookController::class, 'renameSeries'])->name('books.renameSeries');
+    Route::post('books/rename-series', [BookSeriesController::class, 'renameSeries'])->name('books.renameSeries');
 
     // AJAX: Check for directory path conflicts
-    Route::post('books/check-directory-conflict', [Admin\BookController::class, 'checkDirectoryConflict'])
+    Route::post('books/check-directory-conflict', [BookPathController::class, 'checkDirectoryConflict'])
         ->name('books.checkDirectoryConflict');
 
     // AJAX: Build directory path from form fields
-    Route::post('books/build-path-from-fields', [Admin\BookController::class, 'buildPathFromFields'])
+    Route::post('books/build-path-from-fields', [BookPathController::class, 'buildPathFromFields'])
         ->name('books.buildPathFromFields');
 
     // AJAX: Execute immediate directory move
-    Route::post('books/{id}/execute-immediate-move', [Admin\BookController::class, 'executeImmediateMove'])
+    Route::post('books/{id}/execute-immediate-move', [BookPathController::class, 'executeImmediateMove'])
         ->name('books.executeImmediateMove');
 
     // AJAX: Planned actions preview for edit form
@@ -471,27 +477,27 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
-    Route::get('books/{id}/raw-json', [Admin\BookController::class, 'getRawJson'])->name('books.rawJson');
-    Route::post('books/{id}/raw-json', [Admin\BookController::class, 'saveRawJson'])->name('books.saveRawJson');
+    Route::get('books/{id}/raw-json', [BookJsonController::class, 'getRawJson'])->name('books.rawJson');
+    Route::post('books/{id}/raw-json', [BookJsonController::class, 'saveRawJson'])->name('books.saveRawJson');
 
     // Autocomplete routes for Book form
     Route::get('/books/autocomplete/authors', [
-        Admin\BookController::class,
+        BookAutocompleteController::class,
         'autocompleteAuthors',
     ])->name('books.autocomplete.authors');
 
     Route::get('/books/autocomplete/series', [
-        Admin\BookController::class,
+        BookAutocompleteController::class,
         'autocompleteSeries',
     ])->name('books.autocomplete.series');
 
     Route::get('/books/autocomplete/narrators', [
-        Admin\BookController::class,
+        BookAutocompleteController::class,
         'autocompleteNarrators',
     ])->name('books.autocomplete.narrators');
 
     Route::get('/books/autocomplete/genres', [
-        Admin\BookController::class,
+        BookAutocompleteController::class,
         'autocompleteGenres',
     ])->name('books.autocomplete.genres');
 

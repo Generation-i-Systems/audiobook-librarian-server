@@ -7,7 +7,11 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AuthorController;
 use App\Http\Controllers\Api\BadgeController;
 use App\Http\Controllers\Api\BookApiController;
+use App\Http\Controllers\Api\BookAuthorController;
+use App\Http\Controllers\Api\BookCoverController;
+use App\Http\Controllers\Api\BookDownloadController;
 use App\Http\Controllers\Api\BookImportApiController;
+use App\Http\Controllers\Api\BookSeriesGenreController;
 use App\Http\Controllers\Api\BookmarkApiController;
 use App\Http\Controllers\Api\BookmarkSyncController;
 use App\Http\Controllers\Api\BookMatchController;
@@ -49,7 +53,7 @@ Route::prefix('v1')->group(function () {
         return response()->file($path, ['Content-Type' => 'application/json']);
     })->name('api.v1.openapi');
 
-    Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
+    Route::get('/books/{book}/cover', [BookCoverController::class, 'cover']);
 
     // Public Skin Routes (no authentication required)
     Route::get('/skins', [SkinController::class, 'index'])->name('api.v1.skins.index');
@@ -122,59 +126,59 @@ Route::prefix('v1')->group(function () {
         Route::post('/books/batch', [BookApiController::class, 'batch']);
         Route::get('/books/enhanced', [BookApiController::class, 'booksEnhanced']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
-        Route::get('/books/{book}/download', [BookApiController::class, 'download']);
-        Route::get('/books/{book}/download/{file}', [BookApiController::class, 'downloadFile'])
+        Route::get('/books/{book}/download', [BookDownloadController::class, 'download']);
+        Route::get('/books/{book}/download/{file}', [BookDownloadController::class, 'downloadFile'])
             ->name('api.books.downloadFile');
-        Route::get('/books/{book}/download-url', [BookApiController::class, 'downloadUrl']);
+        Route::get('/books/{book}/download-url', [BookDownloadController::class, 'downloadUrl']);
         Route::get('/books/browse', [BookApiController::class, 'browse']);
         Route::get('/books/search', [BookApiController::class, 'search']);
-        Route::post('/books/queue/download', [BookApiController::class, 'queueDownload']);
-        Route::get('/books/queue/download/{zipId}', [BookApiController::class, 'downloadQueuedZip']);
-        Route::post('/books/queue/download/{zipId}/mark-downloaded', [BookApiController::class, 'markZipDownloaded']);
+        Route::post('/books/queue/download', [BookDownloadController::class, 'queueDownload']);
+        Route::get('/books/queue/download/{zipId}', [BookDownloadController::class, 'downloadQueuedZip']);
+        Route::post('/books/queue/download/{zipId}/mark-downloaded', [BookDownloadController::class, 'markZipDownloaded']);
 
         // Series Books Route
-        Route::get('/series/{seriesId}/books', [BookApiController::class, 'booksBySeries']);
+        Route::get('/series/{seriesId}/books', [BookSeriesGenreController::class, 'booksBySeries']);
 
         // Series Routes - with author filtering and pagination
-        Route::get('/series', [BookApiController::class, 'series']);
+        Route::get('/series', [BookSeriesGenreController::class, 'series']);
         // Series Autocomplete
-        Route::get('/series/autocomplete', [BookApiController::class, 'autocompleteSeries']);
+        Route::get('/series/autocomplete', [BookSeriesGenreController::class, 'autocompleteSeries']);
 
         // Series search and management (moved up to avoid conflict with {seriesId})
         Route::get('/series/search', [BookImportApiController::class, 'searchSeries']);
         Route::post('/series', [BookImportApiController::class, 'createSeries']);
 
-        Route::get('/series/{seriesId}', [BookApiController::class, 'seriesDetails']);
+        Route::get('/series/{seriesId}', [BookSeriesGenreController::class, 'seriesDetails']);
         // Toggle Series Favorite
         Route::post('/series/{series}/favorite', [SeriesController::class, 'toggleFavorite']);
 
         // Authors Route - with genre filtering and pagination
-        Route::get('/authors', [BookApiController::class, 'authors']);
+        Route::get('/authors', [BookAuthorController::class, 'authors']);
         // Author Autocomplete
-        Route::get('/authors/autocomplete', [BookApiController::class, 'autocompleteAuthors']);
+        Route::get('/authors/autocomplete', [BookAuthorController::class, 'autocompleteAuthors']);
 
         // Author search and management (moved up to avoid conflict with {authorId})
         Route::get('/authors/search', [BookImportApiController::class, 'searchAuthors']);
         Route::post('/authors', [BookImportApiController::class, 'createAuthor']);
 
-        Route::get('/authors/{authorId}', [BookApiController::class, 'authorDetails']);
+        Route::get('/authors/{authorId}', [BookAuthorController::class, 'authorDetails']);
         // Toggle Author Favorite
         Route::post('/authors/{author}/favorite', [AuthorController::class, 'toggleFavorite']);
         // Narrator Autocomplete
-        Route::get('/narrators/autocomplete', [BookApiController::class, 'autocompleteNarrators']);
+        Route::get('/narrators/autocomplete', [BookSeriesGenreController::class, 'autocompleteNarrators']);
 
         // Author Books Route
-        Route::get('/authors/{authorId}/books', [BookApiController::class, 'booksByAuthor']);
+        Route::get('/authors/{authorId}/books', [BookAuthorController::class, 'booksByAuthor']);
         // Author Books by Genre Route
-        Route::get('/authors/{authorId}/genres/{genreId}/books', [BookApiController::class, 'booksByAuthorAndGenre']);
+        Route::get('/authors/{authorId}/genres/{genreId}/books', [BookAuthorController::class, 'booksByAuthorAndGenre']);
 
         // Author Series Route
-        Route::get('/authors/{authorId}/series', [BookApiController::class, 'seriesByAuthor']);
+        Route::get('/authors/{authorId}/series', [BookAuthorController::class, 'seriesByAuthor']);
 
         // Genre Routes
-        Route::get('/genres', [BookApiController::class, 'listGenres']);
-        Route::get('/genres/{genre}/authors', [BookApiController::class, 'authorsByGenre']);
-        Route::get('/genres/{genreId}/authors', [BookApiController::class, 'authorsByGenreSimple']);
+        Route::get('/genres', [BookSeriesGenreController::class, 'listGenres']);
+        Route::get('/genres/{genre}/authors', [BookSeriesGenreController::class, 'authorsByGenre']);
+        Route::get('/genres/{genreId}/authors', [BookSeriesGenreController::class, 'authorsByGenreSimple']);
 
         // Book Request Route
         Route::post('/book-requests', [BookRequestApiController::class, 'store']);
@@ -326,6 +330,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/google', [AuthController::class, 'googleLogin']);
     Route::post('/auth/facebook', [AuthController::class, 'facebookLogin']);
     Route::post('/auth/apple', [AuthController::class, 'appleLogin']);
+    Route::post('/auth/discord', [AuthController::class, 'discordLogin']);
 
     // Backwards compatible auth-prefixed routes (mobile clients expect /auth/* paths)
     Route::prefix('auth')->group(function () {
@@ -338,5 +343,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/google', [AuthController::class, 'googleLogin']);
         Route::post('/facebook', [AuthController::class, 'facebookLogin']);
         Route::post('/apple', [AuthController::class, 'appleLogin']);
+        Route::post('/discord', [AuthController::class, 'discordLogin']);
     });
 });

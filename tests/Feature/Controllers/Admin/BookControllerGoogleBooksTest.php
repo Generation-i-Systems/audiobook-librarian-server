@@ -2,8 +2,7 @@
 
 namespace Tests\Feature\Controllers\Admin;
 
-use App\Contracts\DocumentStoreServiceInterface;
-use App\Http\Controllers\Admin\BookController;
+use App\Http\Controllers\Admin\BookMetadataSearchController;
 use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\JsonResponse;
@@ -133,10 +132,8 @@ class BookControllerGoogleBooksTest extends TestCase
         Log::shouldReceive('debug')->zeroOrMoreTimes();
 
         // Mock the dependencies
-        $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockGoogleBooksApi = Mockery::mock(GoogleBooksApiService::class);
         $mockAudibleService = Mockery::mock(\App\Services\AudibleService::class);
-        $mockExternalCoverService = Mockery::mock(\App\Services\ExternalCoverService::class);
 
         // Define the expected results from the service
         $expectedResults = [
@@ -150,11 +147,9 @@ class BookControllerGoogleBooksTest extends TestCase
             ->andReturn($expectedResults);
 
         // Instantiate the controller with mocked dependencies
-        $controller = new BookController(
-            $mockDocumentStore,
+        $controller = new BookMetadataSearchController(
             $mockGoogleBooksApi,
-            $mockAudibleService,
-            $mockExternalCoverService
+            $mockAudibleService
         );
 
         // Create a request with query parameters

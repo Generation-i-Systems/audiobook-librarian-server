@@ -31,8 +31,6 @@ class BookControllerUpdateNarratorSeriesTest extends TestCase
 
         $this->controller = new BookController(
             $this->documentStoreService,
-            $this->createMock(\App\Services\GoogleBooksApiService::class),
-            $this->createMock(\App\Services\AudibleService::class),
             $this->createMock(\App\Services\ExternalCoverService::class)
         );
 

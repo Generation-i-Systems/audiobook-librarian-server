@@ -5,6 +5,7 @@ namespace Tests\Unit\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Admin\BookController;
+use App\Http\Controllers\Admin\BookMetadataSearchController;
 use App\Http\Controllers\Admin\ImportFileController;
 use App\Services\AudibleService;
 use App\Services\BookImportService;
@@ -118,25 +119,10 @@ class BookControllerTest extends TestCase
         $this->importFileController = Mockery::mock(ImportFileController::class);
         $this->importFileController->shouldReceive('processImportedFile')->andReturn(true);
 
-        // Create a custom controller class that extends BookController and overrides the setGoogleBooksApiService method
-        $controllerClass = new class ($this->documentStore, $this->googleBooksApiService, $this->audibleService, $this->externalCoverService) extends BookController {
-            public function setGoogleBooksApiService($service)
-            {
-                $this->googleBooksApiService = $service;
-                return $this;
-            }
-
-            public function jsonResponse($message, $success = true, $data = [])
-            {
-                return response()->json([
-                    'success' => $success,
-                    'message' => $message,
-                    'id' => $data['id'] ?? null
-                ]);
-            }
-        };
-
-        $this->controller = $controllerClass;
+        $this->controller = new BookController(
+            $this->documentStore,
+            $this->externalCoverService
+        );
 
         // Set up storage
         Storage::fake('books');
@@ -154,24 +140,22 @@ class BookControllerTest extends TestCase
         ]);
 
         // Set up the mock to return specific data for this test
-        $this->googleBooksApiService = Mockery::mock(GoogleBooksApiService::class);
-        $this->googleBooksApiService->shouldReceive('searchBooks')
+        $googleBooksApiService = Mockery::mock(GoogleBooksApiService::class);
+        $googleBooksApiService->shouldReceive('searchBooks')
             ->with(Mockery::type('string'), Mockery::type('array'))
             ->once()
             ->andReturn([
                 ['title' => 'Test Book', 'author' => 'Test Author'],
             ]);
 
-        // Recreate the controller with the updated mock
-        $this->controller = new BookController(
-            $this->documentStore,
-            $this->googleBooksApiService,
-            $this->audibleService,
-            $this->externalCoverService
+        // Use BookMetadataSearchController for search functionality
+        $searchController = new BookMetadataSearchController(
+            $googleBooksApiService,
+            $this->audibleService
         );
 
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $searchController->searchBooks($request);
 
         // Assert that the response is a JSON response
         $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
@@ -195,8 +179,14 @@ class BookControllerTest extends TestCase
             'limit' => 10,
         ]);
 
+        // Use BookMetadataSearchController for search functionality
+        $searchController = new BookMetadataSearchController(
+            $this->googleBooksApiService,
+            $this->audibleService
+        );
+
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $searchController->searchBooks($request);
 
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());
@@ -240,8 +230,14 @@ class BookControllerTest extends TestCase
             'limit' => 10,
         ]);
 
+        // Use BookMetadataSearchController for search functionality
+        $searchController = new BookMetadataSearchController(
+            $this->googleBooksApiService,
+            $this->audibleService
+        );
+
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $searchController->searchBooks($request);
 
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());
@@ -276,8 +272,14 @@ class BookControllerTest extends TestCase
             'limit' => 10,
         ]);
 
+        // Use BookMetadataSearchController for search functionality
+        $searchController = new BookMetadataSearchController(
+            $this->googleBooksApiService,
+            $this->audibleService
+        );
+
         // Call the searchBooks method
-        $response = $this->controller->searchBooks($request);
+        $response = $searchController->searchBooks($request);
 
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());

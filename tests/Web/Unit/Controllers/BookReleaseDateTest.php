@@ -5,9 +5,7 @@ namespace Tests\Web\Unit\Controllers;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Admin\BookController;
-use App\Services\AudibleService;
 use App\Services\ExternalCoverService;
-use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Mockery;
@@ -18,8 +16,6 @@ class BookReleaseDateTest extends TestCase
     protected BookController $controller;
 
     protected $documentStore;
-    protected $googleBooksApiService;
-    protected $audibleService;
     protected $externalCoverService;
 
     protected function tearDown(): void
@@ -34,14 +30,10 @@ class BookReleaseDateTest extends TestCase
 
         // Mocks
         $this->documentStore = Mockery::mock(DocumentStoreServiceInterface::class);
-        $this->googleBooksApiService = Mockery::mock(GoogleBooksApiService::class);
-        $this->audibleService = Mockery::mock(AudibleService::class);
         $this->externalCoverService = Mockery::mock(ExternalCoverService::class);
 
         $this->controller = new BookController(
             $this->documentStore,
-            $this->googleBooksApiService,
-            $this->audibleService,
             $this->externalCoverService
         );
     }

@@ -3,9 +3,7 @@
 namespace Tests\Unit\Controllers\Admin;
 
 use App\Http\Controllers\Admin\BookController;
-use App\Services\AudibleService;
 use App\Services\ExternalCoverService;
-use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
@@ -26,15 +24,11 @@ class BookControllerCoverImageTest extends TestCase
 
         // Create mock services
         $this->documentStore = new MockDocumentStoreService();
-        $googleBooksApiService = $this->createMock(GoogleBooksApiService::class);
-        $audibleService = $this->createMock(AudibleService::class);
         $externalCoverService = $this->createMock(ExternalCoverService::class);
 
         // Create controller with mocked services
         $this->controller = new BookController(
             $this->documentStore,
-            $googleBooksApiService,
-            $audibleService,
             $externalCoverService
         );
 

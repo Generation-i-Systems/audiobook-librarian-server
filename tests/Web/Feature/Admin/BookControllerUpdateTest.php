@@ -45,8 +45,6 @@ class BookControllerUpdateTest extends TestCase
         // Create a controller instance with the mock service
         $this->controller = new BookController(
             $this->documentStoreService,
-            $this->createMock(\App\Services\GoogleBooksApiService::class),
-            $this->createMock(\App\Services\AudibleService::class),
             $this->externalCoverService
         );
 

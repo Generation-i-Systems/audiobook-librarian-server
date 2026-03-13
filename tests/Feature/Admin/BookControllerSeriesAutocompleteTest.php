@@ -3,7 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Http\Controllers\Admin\BookController;
+use App\Http\Controllers\Admin\BookAutocompleteController;
 use Illuminate\Http\Request;
 use Mockery;
 use Tests\TestCase;
@@ -27,21 +27,11 @@ class BookControllerSeriesAutocompleteTest extends TestCase
                 ['seriesName' => 'Another Test Series'],
             ]);
 
-        // Create services needed for controller
-        $googleBooksService = $this->app->make('App\Services\GoogleBooksApiService');
-        $audibleService = $this->app->make('App\Services\AudibleService');
-        $externalCoverService = $this->app->make('App\Services\ExternalCoverService');
-
         // Create a controller instance with the mock
         // Use type-hinting to ensure the mock is treated as the correct interface
         /** @var DocumentStoreServiceInterface $documentStore */
         $documentStore = $mockDocumentStore;
-        $controller = new BookController(
-            $documentStore,
-            $googleBooksService,
-            $audibleService,
-            $externalCoverService
-        );
+        $controller = new BookAutocompleteController($documentStore);
 
         // Create a request with the query parameter
         $request = new Request(['query' => 'test']);
