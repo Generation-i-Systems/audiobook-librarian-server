@@ -7,36 +7,33 @@ use Illuminate\Support\Facades\Storage;
 
 trait BookTransformTrait
 {
-    private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
+    private function getBookWithCover($book, bool $withCover = false, bool $inlineCovers = false, bool $enhanced = false): array
     {
-        // Ensure $book is an array
         if (!is_array($book)) {
             Log::error('getBookWithCover received non-array book data', [
-                'book_type' => gettype($book),
+                'book_type'  => gettype($book),
                 'book_value' => $book,
-                'backtrace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5),
+                'backtrace'  => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5),
             ]);
             return ['error' => 'Invalid book data'];
         }
 
-        // Transform book data to match OpenAPI specification
         $transformedBook = [
-            'id' => $book['id'] ?? null,
-            'title' => $book['title'] ?? '',
-            'author' => $this->normalizeArray($book['author'] ?? $book['author_name'] ?? []),
-            'narrator' => $this->normalizeArray($book['narrator'] ?? $book['narrator_name'] ?? []),
-            'series' => $this->formatSeriesData($book),
-            'genre' => $this->normalizeGenre($book['genre'] ?? []),
-            'year' => isset($book['published_year']) ? (int) $book['published_year'] : (isset($book['year']) ? (int) $book['year'] : null),
-            'duration' => $book['duration'] ?? null,
+            'id'          => $book['id'] ?? null,
+            'title'       => $book['title'] ?? '',
+            'author'      => $this->normalizeArray($book['author'] ?? $book['author_name'] ?? []),
+            'narrator'    => $this->normalizeArray($book['narrator'] ?? $book['narrator_name'] ?? []),
+            'series'      => $this->formatSeriesData($book),
+            'genre'       => $this->normalizeGenre($book['genre'] ?? []),
+            'year'        => isset($book['published_year']) ? (int) $book['published_year'] : (isset($book['year']) ? (int) $book['year'] : null),
+            'duration'    => $book['duration'] ?? null,
             'description' => $book['description'] ?? null,
-            'file_count' => isset($book['audio_file_count']) ? (int) $book['audio_file_count'] : (isset($book['file_count']) ? (int) $book['file_count'] : null),
-            'total_size' => isset($book['total_size']) ? (int) $book['total_size'] : null,
-            'created_at' => $book['created_at'] ?? $book['date_added'] ?? null,
-            'updated_at' => $book['updated_at'] ?? null,
+            'file_count'  => isset($book['audio_file_count']) ? (int) $book['audio_file_count'] : (isset($book['file_count']) ? (int) $book['file_count'] : null),
+            'total_size'  => isset($book['total_size']) ? (int) $book['total_size'] : null,
+            'created_at'  => $book['created_at'] ?? $book['date_added'] ?? null,
+            'updated_at'  => $book['updated_at'] ?? null,
         ];
 
-        // Include user-specific data if present
         if (isset($book['progress'])) {
             $transformedBook['progress'] = $book['progress'];
         }
@@ -47,9 +44,16 @@ trait BookTransformTrait
             $transformedBook['recommendation'] = $book['recommendation'];
         }
 
-        // Handle cover image - always set cover_url if coverImage exists
+        // Enhanced mode: add structured relationship objects with IDs so clients
+        // can reliably navigate to the correct author/series/genre/narrator screen.
+        if ($enhanced) {
+            $transformedBook['authors']   = $this->extractRelationshipObjects($book, 'authors_data', 'authors');
+            $transformedBook['genres']    = $this->extractRelationshipObjects($book, 'genres_data', 'genres');
+            $transformedBook['narrators'] = $this->extractRelationshipObjects($book, 'narrators_data', 'narrators');
+            $transformedBook['series']    = $this->extractSeriesObjects($book);
+        }
+
         if (!empty($book['coverImage'])) {
-            // Resolve the cover image path (handles both filename-only and full path formats)
             $coverPath = $this->resolveCoverImagePath($book['coverImage'], $book['directoryPath'] ?? null);
 
             if ($inlineCovers && $coverPath && Storage::disk('books')->exists($coverPath)) {
@@ -60,8 +64,6 @@ trait BookTransformTrait
                     'data' => base64_encode(Storage::disk('books')->get($coverPath)),
                 ];
             }
-            // Always provide cover_url for consistency with OpenAPI spec
-            // Use the current request's hostname and protocol for the cover URL
             $request = request();
             $transformedBook['cover_url'] = $request->getSchemeAndHttpHost() . '/api/v1/books/' . ($book['id'] ?? '') . '/cover';
         } else {
@@ -69,6 +71,72 @@ trait BookTransformTrait
         }
 
         return $transformedBook;
+    }
+
+    /**
+     * Extract structured relationship objects (id + name) from pre-eagerly-loaded data.
+     * Falls back to authors/genres/narrators key if the _data variant is absent.
+     *
+     * @return array<int, array{id: mixed, name: string}>
+     */
+    private function extractRelationshipObjects(array $book, string $dataKey, string $fallbackKey): array
+    {
+        $raw = $book[$dataKey] ?? $book[$fallbackKey] ?? [];
+
+        if (!is_array($raw) || empty($raw)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($raw as $item) {
+            if (is_array($item) && isset($item['id'])) {
+                $result[] = ['id' => $item['id'], 'name' => $item['name'] ?? ''];
+            } elseif (is_string($item)) {
+                // Flat string, no ID available — keep as object for consistent shape
+                $result[] = ['id' => null, 'name' => $item];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Extract series as structured objects with id, name, series_number, is_collection.
+     *
+     * @return array<int, array{id: mixed, name: string, series_number: string|null, is_collection: bool}>
+     */
+    private function extractSeriesObjects(array $book): array
+    {
+        $raw = $book['series_data'] ?? $book['series'] ?? [];
+
+        if (!is_array($raw) || empty($raw)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($raw as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $name = $item['name'] ?? $item['seriesName'] ?? null;
+            if (empty($name)) {
+                continue;
+            }
+            $seriesNumber = $item['pivot']['series_number']
+                ?? $item['series_number']
+                ?? $item['number']
+                ?? null;
+
+            $result[] = [
+                'id'            => $item['id'] ?? null,
+                'name'          => $name,
+                'series_number' => $seriesNumber !== null ? (string) $seriesNumber : null,
+                'is_collection' => (bool) ($item['is_collection'] ?? false),
+                'pivot'         => ['series_number' => $seriesNumber !== null ? (string) $seriesNumber : null],
+            ];
+        }
+
+        return $result;
     }
 
     /**

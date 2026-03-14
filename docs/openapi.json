@@ -6133,6 +6133,16 @@
                         }
                     },
                     {
+                        "name": "enhanced",
+                        "in": "query",
+                        "description": "Enable enhanced mode with structured relationship data and richer pagination info",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "description": "Number of books per page",
@@ -6191,12 +6201,32 @@
                     {
                         "name": "sort",
                         "in": "query",
-                        "description": "Sort field (title, created_at, author)",
+                        "description": "Sort field or combined sort token (e.g. title_asc, created_at_desc, last_listened_desc). When using a combined token, the 'order' parameter is ignored.",
                         "required": false,
                         "schema": {
                             "type": "string",
+                            "enum": [
+                                "title",
+                                "created_at",
+                                "author",
+                                "progress",
+                                "last_listened",
+                                "queue_order",
+                                "title_asc",
+                                "title_desc",
+                                "created_at_asc",
+                                "created_at_desc",
+                                "author_asc",
+                                "author_desc",
+                                "progress_asc",
+                                "progress_desc",
+                                "last_listened_asc",
+                                "last_listened_desc",
+                                "queue_order_asc",
+                                "queue_order_desc"
+                            ],
                             "default": "title",
-                            "example": "title"
+                            "example": "title_asc"
                         }
                     },
                     {
@@ -6237,6 +6267,66 @@
                         "name": "series",
                         "in": "query",
                         "description": "Filter by series name",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "The Stormlight Archive"
+                        }
+                    },
+                    {
+                        "name": "genre_id",
+                        "in": "query",
+                        "description": "Filter by genre ID (requires enhanced=true)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "genre_name",
+                        "in": "query",
+                        "description": "Filter by genre name (alias for genre, requires enhanced=true)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Fantasy"
+                        }
+                    },
+                    {
+                        "name": "author_id",
+                        "in": "query",
+                        "description": "Filter by author ID (requires enhanced=true)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    },
+                    {
+                        "name": "author_name",
+                        "in": "query",
+                        "description": "Filter by author name (alias for author, requires enhanced=true)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Brandon Sanderson"
+                        }
+                    },
+                    {
+                        "name": "series_id",
+                        "in": "query",
+                        "description": "Filter by series ID (requires enhanced=true)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 456
+                        }
+                    },
+                    {
+                        "name": "series_name",
+                        "in": "query",
+                        "description": "Filter by series name (alias for series, requires enhanced=true)",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -6318,7 +6408,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Books retrieved successfully",
+                        "description": "Returns a paginated list of audiobooks. When 'enhanced=true' is passed, returns structured relationship data and a richer pagination object.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6327,11 +6417,23 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/components/schemas/Book"
+                                                "oneOf": [
+                                                    {
+                                                        "$ref": "#/components/schemas/Book"
+                                                    },
+                                                    {
+                                                        "$ref": "#/components/schemas/BookEnhanced"
+                                                    }
+                                                ]
                                             }
                                         },
                                         "meta": {
-                                            "$ref": "#/components/schemas/PaginationMeta"
+                                            "$ref": "#/components/schemas/PaginationMeta",
+                                            "description": "Pagination metadata for standard requests (not present if enhanced=true)"
+                                        },
+                                        "pagination": {
+                                            "$ref": "#/components/schemas/Pagination",
+                                            "description": "Pagination metadata for enhanced requests (returned only if enhanced=true)"
                                         }
                                     }
                                 },
@@ -8024,303 +8126,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/books/enhanced": {
-            "get": {
-                "tags": [
-                    "Books"
-                ],
-                "summary": "Get books with enhanced filtering",
-                "description": "Returns a paginated list of books with comprehensive filtering by genre, author, series, search, and sorting capabilities",
-                "operationId": "getBooksEnhanced",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "genre_id",
-                        "in": "query",
-                        "description": "Filter books by genre ID",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "genre_name",
-                        "in": "query",
-                        "description": "Filter books by genre name",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "example": "Fantasy"
-                        }
-                    },
-                    {
-                        "name": "author_id",
-                        "in": "query",
-                        "description": "Filter books by author ID",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 123
-                        }
-                    },
-                    {
-                        "name": "author_name",
-                        "in": "query",
-                        "description": "Filter books by author name",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "example": "Brandon Sanderson"
-                        }
-                    },
-                    {
-                        "name": "series_id",
-                        "in": "query",
-                        "description": "Filter books by series ID",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 456
-                        }
-                    },
-                    {
-                        "name": "series_name",
-                        "in": "query",
-                        "description": "Filter books by series name",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "example": "The Stormlight Archive"
-                        }
-                    },
-                    {
-                        "name": "search",
-                        "in": "query",
-                        "description": "Full-text search across title, description, authors, narrators, and series name",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "example": "Way of Kings"
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number for pagination",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 1,
-                            "minimum": 1,
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Number of books per page (max 100)",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 15,
-                            "minimum": 1,
-                            "maximum": 100,
-                            "example": 50
-                        }
-                    },
-                    {
-                        "name": "sort",
-                        "in": "query",
-                        "description": "Sort order for books",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "title_asc",
-                                "title_desc",
-                                "created_at_asc",
-                                "created_at_desc",
-                                "author_asc",
-                                "author_desc",
-                                "progress_asc",
-                                "progress_desc",
-                                "last_listened_asc",
-                                "last_listened_desc",
-                                "queue_order_asc",
-                                "queue_order_desc"
-                            ],
-                            "default": "title_asc",
-                            "example": "title_asc"
-                        }
-                    },
-                    {
-                        "name": "status",
-                        "in": "query",
-                        "description": "Filter by book status",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "queue",
-                                "in_progress",
-                                "completed",
-                                "wishlist"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "is_recommended",
-                        "in": "query",
-                        "description": "Filter by recommendation status",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean"
-                        }
-                    },
-                    {
-                        "name": "is_completed",
-                        "in": "query",
-                        "description": "Filter by completion status",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean"
-                        }
-                    },
-                    {
-                        "name": "device_id",
-                        "in": "query",
-                        "description": "Device identifier used to scope per-device listening progress and status",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "example": "my-iphone"
-                        }
-                    },
-                    {
-                        "name": "with_cover",
-                        "in": "query",
-                        "description": "Whether to include a cover_url in each book object (default true)",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean",
-                            "default": true
-                        }
-                    },
-                    {
-                        "name": "inlineCovers",
-                        "in": "query",
-                        "description": "When true, cover image is returned as a base64 data URI in cover_url instead of a URL (default false)",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean",
-                            "default": false
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Books retrieved successfully with enhanced filtering",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "books": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/BookEnhanced"
-                                            }
-                                        },
-                                        "pagination": {
-                                            "$ref": "#/components/schemas/Pagination"
-                                        }
-                                    }
-                                },
-                                "examples": {
-                                    "successful_response": {
-                                        "summary": "Successful enhanced books list response",
-                                        "value": {
-                                            "books": [
-                                                {
-                                                    "id": 1,
-                                                    "title": "The Way of Kings",
-                                                    "description": "The first book in The Stormlight Archive series...",
-                                                    "year": 2010,
-                                                    "duration": "45:30:00",
-                                                    "cover_url": "https://books.thelin.org/api/v1/books/1/cover",
-                                                    "file_count": 35,
-                                                    "total_size": 1587194112,
-                                                    "created_at": "2024-01-01T12:00:00Z",
-                                                    "updated_at": "2024-01-01T12:00:00Z",
-                                                    "authors": [
-                                                        {
-                                                            "id": 123,
-                                                            "name": "Brandon Sanderson"
-                                                        }
-                                                    ],
-                                                    "genres": [
-                                                        {
-                                                            "id": 1,
-                                                            "name": "Fantasy"
-                                                        }
-                                                    ],
-                                                    "narrators": [
-                                                        {
-                                                            "id": 78,
-                                                            "name": "Michael Kramer"
-                                                        }
-                                                    ],
-                                                    "series": [
-                                                        {
-                                                            "id": 456,
-                                                            "name": "The Stormlight Archive",
-                                                            "pivot": {
-                                                                "series_number": "1"
-                                                            }
-                                                        }
-                                                    ]
-                                                }
-                                            ],
-                                            "pagination": {
-                                                "current_page": 1,
-                                                "per_page": 50,
-                                                "total": 1200,
-                                                "total_pages": 24,
-                                                "has_next": true,
-                                                "has_prev": false
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized - Invalid or missing token",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                },
-                                "examples": {
-                                    "unauthorized": {
-                                        "summary": "Invalid or missing token",
-                                        "value": {
-                                            "error": "Unauthorized"
-                                        }
-                                    }
                                 }
                             }
                         }

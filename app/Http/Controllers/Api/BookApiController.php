@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -22,13 +25,13 @@ class BookApiController extends Controller
     /**
      * Batch fetch book metadata
      */
-    public function batch(Request $request)
+    public function batch(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'bookIds' => 'nullable|array',
-            'bookIds.*' => 'integer',
-            'queries' => 'nullable|array',
-            'queries.*.title' => 'required_with:queries|string',
+            'bookIds'          => 'nullable|array',
+            'bookIds.*'        => 'integer',
+            'queries'          => 'nullable|array',
+            'queries.*.title'  => 'required_with:queries|string',
             'queries.*.author' => 'nullable|string',
         ]);
 
@@ -38,7 +41,6 @@ class BookApiController extends Controller
         $results = [];
         $processedIds = [];
 
-        // 1. Fetch by IDs
         if (!empty($bookIds)) {
             $books = \App\Models\Book::whereIn('id', $bookIds)->get();
             foreach ($books as $book) {
@@ -47,7 +49,6 @@ class BookApiController extends Controller
                 $processedIds[] = $book->id;
             }
 
-            // Find missing IDs in ClientBooks
             $missingIds = array_diff($bookIds, $processedIds);
             if (!empty($missingIds)) {
                 $clientBooks = \App\Models\ClientBook::whereIn('id', $missingIds)->get();
@@ -57,12 +58,10 @@ class BookApiController extends Controller
             }
         }
 
-        // 2. Process Queries
         foreach ($queries as $query) {
-            $title = $query['title'];
+            $title  = $query['title'];
             $author = $query['author'] ?? null;
 
-            // Try main books
             $q = \App\Models\Book::where('title', 'LIKE', $title);
             if ($author) {
                 $q->whereHas('authors', function ($sq) use ($author) {
@@ -72,7 +71,6 @@ class BookApiController extends Controller
             $book = $q->first();
 
             if ($book) {
-                // Avoid duplicates if we already found it by ID
                 if (!in_array($book->id, $processedIds)) {
                     // @phpstan-ignore-next-line
                     $results[] = $this->transformBookForBatch($book);
@@ -81,7 +79,6 @@ class BookApiController extends Controller
                 continue;
             }
 
-            // Try Client Books
             $q = \App\Models\ClientBook::where('title', $title);
             if ($author) {
                 $q->where('author', $author);
@@ -96,51 +93,80 @@ class BookApiController extends Controller
         return response()->json($results);
     }
 
-    private function transformBookForBatch($book)
+    private function transformBookForBatch($book): array
     {
         return $this->getBookWithCover($book->toArray(), true, false);
     }
 
-    private function transformClientBookForBatch($clientBook)
+    private function transformClientBookForBatch($clientBook): array
     {
         return [
-            'id' => $clientBook->id,
-            'title' => $clientBook->title,
-            'author' => $clientBook->author,
-            'coverImage' => $clientBook->cover_url, // Map to expected field
+            'id'           => $clientBook->id,
+            'title'        => $clientBook->title,
+            'author'       => $clientBook->author,
+            'coverImage'   => $clientBook->cover_url,
             'is_client_book' => true,
-            'source' => 'client',
+            'source'       => 'client',
         ];
     }
 
-    public function index(Request $request)
+    /**
+     * List books.
+     *
+     * Pass ?enhanced=true to enable:
+     * - ID-based filters: genre_id, author_id, series_id
+     * - Name-specific aliases: genre_name, author_name, series_name
+     * - Combined sort tokens: title_asc, created_at_desc, last_listened_desc, etc.
+     * - Structured relationship objects (authors/genres/narrators/series with IDs)
+     * - Pagination block with has_next / has_prev / total_pages
+     */
+    public function index(Request $request): JsonResponse
     {
-        $perPage = $request->input('per_page', 15);
-        $page = (int) $request->input('page', 1);
-        $withCover = $request->boolean('with_cover', true);
+        $enhanced     = $request->boolean('enhanced', false);
+        $page         = max(1, (int) $request->input('page', 1));
+        $perPage      = $enhanced
+            ? min(100, max(1, (int) $request->input('per_page', 15)))
+            : (int) $request->input('per_page', 15);
+        $withCover    = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
+        $includeNeedsReview = $request->boolean(
+            'includeNeedsReview',
+            $request->boolean('include_needs_review', false)
+        );
 
         $filters = [
-            'search' => $request->input('search'),
-            'genre' => $request->input('genre'),
-            'author' => $request->input('author'),
-            'series' => $request->input('series'),
-            'title' => $request->input('title'),
+            'search'           => $request->input('search'),
+            'genre'            => $request->input('genre'),
+            'author'           => $request->input('author'),
+            'series'           => $request->input('series'),
+            'title'            => $request->input('title'),
             'publication_date' => $request->input('publication_date'),
-            'date_added' => $request->input('date_added'),
-            'status' => $request->input('status'),
-            'is_recommended' => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
-            'is_completed' => $request->has('is_completed') ? $request->boolean('is_completed') : null,
-            'device_id' => $request->input('device_id'),
+            'date_added'       => $request->input('date_added'),
+            'status'           => $request->input('status'),
+            'is_recommended'   => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
+            'is_completed'     => $request->has('is_completed') ? $request->boolean('is_completed') : null,
+            'device_id'        => $request->input('device_id'),
         ];
 
-        $sort = $request->input('sort', 'title');
-        $order = $request->input('order', 'asc');
+        if ($enhanced) {
+            $filters['genre_id']  = $request->input('genre_id');
+            $filters['author_id'] = $request->input('author_id');
+            $filters['series_id'] = $request->input('series_id');
+            if ($request->has('genre_name')) {
+                $filters['genre'] = $request->input('genre_name');
+            }
+            if ($request->has('author_name')) {
+                $filters['author'] = $request->input('author_name');
+            }
+            if ($request->has('series_name')) {
+                $filters['series'] = $request->input('series_name');
+            }
+        }
 
-        // Respect includeNeedsReview override
         $filters['include_needs_review'] = $includeNeedsReview;
         $userId = Auth::id();
+
+        [$sort, $order] = $this->resolveSortParams($request);
 
         $booksData = $this->documentStoreService->listBooks(
             $page,
@@ -153,281 +179,203 @@ class BookApiController extends Controller
             $userId
         );
 
-        // Transform books to match OpenAPI spec
         $transformedBooks = [];
         if (isset($booksData['data']) && is_array($booksData['data'])) {
             $booksArray = array_filter($booksData['data'], 'is_array');
-            // If not including needs_review, filter them out here as a safety net
             if (!$includeNeedsReview) {
-                $booksArray = array_filter($booksArray, function ($book) {
-                    return empty($book['needs_review']);
-                });
+                $booksArray = array_filter($booksArray, fn ($book) => empty($book['needs_review']));
             }
 
-            $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
-                return $this->getBookWithCover($book, $withCover, $inlineCovers);
-            }, $booksArray);
-        }
-
-        if ($booksData['total'] > 0) {
-            $from = (($page - 1) * $perPage) + 1;
-        } else {
-            $from = null;
+            $transformedBooks = array_map(
+                fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers, $enhanced),
+                $booksArray
+            );
         }
 
         // @phpstan-ignore-next-line
-        $total = (int) $booksData['total'] ?? 0;
-        $to = ($total > 0) ? min($page * $perPage, $total) : null;
-        $lastPage = $booksData['lastPage'] ?? max(1, ceil($total / $perPage));
+        $total    = (int) ($booksData['total'] ?? 0);
+        $lastPage = $booksData['lastPage'] ?? max(1, (int) ceil($total / $perPage));
+
+        if ($enhanced) {
+            return response()->json([
+                'data'       => array_values($transformedBooks),
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page'     => $perPage,
+                    'total'        => $total,
+                    'total_pages'  => $lastPage,
+                    'has_next'     => $page < $lastPage,
+                    'has_prev'     => $page > 1,
+                ],
+            ]);
+        }
+
+        $from = $total > 0 ? (($page - 1) * $perPage) + 1 : null;
+        $to   = $total > 0 ? min($page * $perPage, $total) : null;
 
         return response()->json([
-            'data' => $transformedBooks,
+            'data' => array_values($transformedBooks),
             'meta' => [
                 'current_page' => $booksData['currentPage'] ?? $page,
-                'from' => $from,
-                'last_page' => $lastPage,
-                'per_page' => $perPage,
-                'to' => $to,
-                'total' => $total,
-            ],
-        ]);
-    }
-
-
-    public function show($id, Request $request)
-    {
-        $userId = Auth::id();
-        $book = $this->documentStoreService->getBook($id, $userId);
-
-        if (!$book) {
-            return response()->json([
-                'error' => 'Book not found',
-                'message' => 'The specified book could not be found',
-            ], 404);
-        }
-
-        // Hide needs_review books unless explicitly requested
-        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
-        $isNeedsReview = !empty($book['needs_review']) || !empty($book['needsReview']);
-        if ($isNeedsReview && !$includeNeedsReview) {
-            return response()->json([
-                'error' => 'Book not available',
-                'message' => 'This book is pending review',
-            ], 404);
-        }
-
-        $withCover = $request->boolean('with_cover', true);
-        $inlineCovers = $request->boolean('inlineCovers', false);
-
-        // Transform book to match OpenAPI spec format
-        return response()->json($this->getBookWithCover($book, $withCover, $inlineCovers));
-    }
-
-    public function browse(Request $request)
-    {
-        $type = $request->input('type'); // 'genre', 'author', 'series'
-        $perPage = $request->input('per_page', 100);
-        $search = $request->input('search');
-        $since = $request->input('since') ? (int) $request->input('since') : null;
-
-        $items = match ($type) {
-            'genre' => $this->documentStoreService->listGenres($since),
-            'author' => $this->documentStoreService->listAuthors($since),
-            'series' => $this->documentStoreService->listSeries($since),
-            default => null,
-        };
-
-        if ($items === null) {
-            return response()->json([
-                'error' => 'Invalid browse type',
-                'message' => 'The browse type must be one of: genre, author, series',
-            ], 400);
-        }
-
-        if ($search) {
-            $items = array_filter($items, function ($item) use ($search) {
-                return stripos($item['name'], $search) !== false;
-            });
-        }
-        $items = array_values($items);
-        $total = count($items);
-        $page = (int) $request->input('page', 1);
-        $paginatedItems = array_slice($items, ($page - 1) * $perPage, $perPage);
-
-        return response()->json([
-            'data' => $paginatedItems,
-            'meta' => [
-                'current_page' => $page,
-                'from' => ($total > 0) ? (($page - 1) * $perPage) + 1 : null,
-                'last_page' => max(1, ceil($total / $perPage)),
-                'per_page' => $perPage,
-                'to' => ($total > 0) ? min($page * $perPage, $total) : null,
-                'total' => $total,
-                'since' => $since, // Echo back the since parameter
-                'timestamp' => time(), // Current server timestamp for client to use next time
-            ],
-        ]);
-    }
-
-
-    public function search(Request $request)
-    {
-        $perPage = $request->input('per_page', 20);
-        $page = (int) $request->input('page', 1);
-        $withCover = $request->boolean('with_cover', true);
-        $inlineCovers = $request->boolean('inlineCovers', false);
-        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
-
-        $filters = [
-            'search' => $request->input('search'),
-            'title' => $request->input('title'),
-            'author' => $request->input('author'),
-            'series' => $request->input('series'),
-            'publication_date' => $request->input('publication_date'),
-            'date_added' => $request->input('date_added'),
-            'status' => $request->input('status'),
-            'is_recommended' => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
-            'is_completed' => $request->has('is_completed') ? $request->boolean('is_completed') : null,
-            'device_id' => $request->input('device_id'),
-        ];
-
-        $filters['include_needs_review'] = $includeNeedsReview;
-        $userId = Auth::id();
-
-        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters, true, 'title', 'asc', false, $userId);
-        $books = $booksData['data'];
-        $total = $booksData['total'];
-
-        // Transform books to match OpenAPI spec
-        $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
-            return $this->getBookWithCover($book, $withCover, $inlineCovers);
-        }, $books);
-
-        return response()->json([
-            'data' => $transformedBooks,
-            'meta' => [
-                'current_page' => $page,
-                'from' => ($total > 0) ? (($page - 1) * $perPage) + 1 : null,
-                'last_page' => max(1, ceil($total / $perPage)),
-                'per_page' => $perPage,
-                'to' => ($total > 0) ? min($page * $perPage, $total) : null,
-                'total' => $total,
+                'from'         => $from,
+                'last_page'    => $lastPage,
+                'per_page'     => $perPage,
+                'to'           => $to,
+                'total'        => $total,
             ],
         ]);
     }
 
     /**
-     * Enhanced books endpoint with proper SQL-based filtering
+     * Resolve sort column and direction from request.
+     * Accepts combined tokens like "title_asc" OR classic ?sort=title&order=asc.
      *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
+     * @return array{0: string, 1: string}
      */
-    public function booksEnhanced(Request $request)
+    private function resolveSortParams(Request $request): array
     {
-        $page = max(1, (int) $request->input('page', 1));
-        $perPage = min(100, max(1, (int) $request->input('per_page', 15)));
-        $withCover = $request->boolean('with_cover', true);
-        $inlineCovers = $request->boolean('inlineCovers', false);
-
-        // Filtering parameters
-        $filters = [
-            'genre_id' => $request->input('genre_id'),
-            'genre' => $request->input('genre_name'),
-            'author_id' => $request->input('author_id'),
-            'author' => $request->input('author_name'),
-            'series_id' => $request->input('series_id'),
-            'series' => $request->input('series_name'),
-            'search' => $request->input('search'),
-            'status' => $request->input('status'),
-            'is_recommended' => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
-            'is_completed' => $request->has('is_completed') ? $request->boolean('is_completed') : null,
-            'device_id' => $request->input('device_id'),
-        ];
-
-        // Map enhanced sort names to internal sort names
         $sortMap = [
-            'title_asc' => ['title', 'asc'],
-            'title_desc' => ['title', 'desc'],
-            'created_at_asc' => ['created_at', 'asc'],
-            'created_at_desc' => ['created_at', 'desc'],
-            'author_asc' => ['author', 'asc'],
-            'author_desc' => ['author', 'desc'],
-            'progress_asc' => ['progress', 'asc'],
-            'progress_desc' => ['progress', 'desc'],
-            'last_listened_asc' => ['last_listened', 'asc'],
+            'title_asc'          => ['title', 'asc'],
+            'title_desc'         => ['title', 'desc'],
+            'created_at_asc'     => ['created_at', 'asc'],
+            'created_at_desc'    => ['created_at', 'desc'],
+            'author_asc'         => ['author', 'asc'],
+            'author_desc'        => ['author', 'desc'],
+            'progress_asc'       => ['progress', 'asc'],
+            'progress_desc'      => ['progress', 'desc'],
+            'last_listened_asc'  => ['last_listened', 'asc'],
             'last_listened_desc' => ['last_listened', 'desc'],
-            'queue_order_asc' => ['queue_order', 'asc'],
-            'queue_order_desc' => ['queue_order', 'desc'],
+            'queue_order_asc'    => ['queue_order', 'asc'],
+            'queue_order_desc'   => ['queue_order', 'desc'],
         ];
 
-        $sortParam = $request->input('sort', 'title_asc');
-        $sortConfig = $sortMap[$sortParam] ?? ['title', 'asc'];
+        $sortParam = (string) $request->input('sort', 'title');
 
-        $sort = $sortConfig[0];
-        $order = $sortConfig[1];
+        if (isset($sortMap[$sortParam])) {
+            return $sortMap[$sortParam];
+        }
+
+        $order = strtolower((string) $request->input('order', 'asc'));
+
+        return [$sortParam, in_array($order, ['asc', 'desc']) ? $order : 'asc'];
+    }
+
+    public function show(string $id, Request $request): JsonResponse
+    {
         $userId = Auth::id();
+        $book   = $this->documentStoreService->getBook($id, $userId);
 
-        $booksData = $this->documentStoreService->listBooks(
-            $page,
-            $perPage,
-            $filters,
-            true,
-            $sort,
-            $order,
-            false,
-            $userId
+        if (!$book) {
+            return response()->json([
+                'error'   => 'Book not found',
+                'message' => 'The specified book could not be found',
+            ], 404);
+        }
+
+        $includeNeedsReview = $request->boolean(
+            'includeNeedsReview',
+            $request->boolean('include_needs_review', false)
         );
+        if ((!empty($book['needs_review']) || !empty($book['needsReview'])) && !$includeNeedsReview) {
+            return response()->json([
+                'error'   => 'Book not available',
+                'message' => 'This book is pending review',
+            ], 404);
+        }
 
-        $total = $booksData['total'];
-        $books = $booksData['data'];
+        return response()->json(
+            $this->getBookWithCover($book, $request->boolean('with_cover', true), $request->boolean('inlineCovers', false))
+        );
+    }
 
-        // Transform books to match API spec
-        $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
-            $result = $this->getBookWithCover($book, $withCover, $inlineCovers);
+    public function browse(Request $request): JsonResponse
+    {
+        $type    = $request->input('type');
+        $perPage = (int) $request->input('per_page', 100);
+        $search  = $request->input('search');
+        $since   = $request->input('since') ? (int) $request->input('since') : null;
 
-            // Add full relationship objects for the enhanced endpoint
-            // listBooks returns arrays with specific keys for these relationships
-            if (isset($book['authors_data'])) {
-                $result['authors'] = $book['authors_data'];
-            } elseif (isset($book['authors'])) {
-                $result['authors'] = $book['authors'];
-            }
+        $items = match ($type) {
+            'genre'  => $this->documentStoreService->listGenres($since),
+            'author' => $this->documentStoreService->listAuthors($since),
+            'series' => $this->documentStoreService->listSeries($since),
+            default  => null,
+        };
 
-            if (isset($book['genres_data'])) {
-                $result['genres'] = $book['genres_data'];
-            } elseif (isset($book['genres'])) {
-                $result['genres'] = $book['genres'];
-            }
+        if ($items === null) {
+            return response()->json([
+                'error'   => 'Invalid browse type',
+                'message' => 'The browse type must be one of: genre, author, series',
+            ], 400);
+        }
 
-            if (isset($book['series_data'])) {
-                $result['series'] = $book['series_data'];
-            } elseif (isset($book['series'])) {
-                $result['series'] = $book['series'];
-            }
+        if ($search) {
+            $items = array_filter($items, fn ($item) => stripos($item['name'], $search) !== false);
+        }
 
-            if (isset($book['narrators_data'])) {
-                $result['narrators'] = $book['narrators_data'];
-            } elseif (isset($book['narrators'])) {
-                $result['narrators'] = $book['narrators'];
-            }
-
-            return $result;
-        }, $books);
-
-        // Calculate pagination info
-        $totalPages = ceil($total / $perPage);
-        $hasNext = $page < $totalPages;
-        $hasPrev = $page > 1;
+        $items = array_values($items);
+        $total = count($items);
+        $page  = (int) $request->input('page', 1);
 
         return response()->json([
-            'books' => $transformedBooks,
-            'pagination' => [
+            'data' => array_slice($items, ($page - 1) * $perPage, $perPage),
+            'meta' => [
                 'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'total_pages' => $totalPages,
-                'has_next' => $hasNext,
-                'has_prev' => $hasPrev,
+                'from'         => $total > 0 ? (($page - 1) * $perPage) + 1 : null,
+                'last_page'    => max(1, (int) ceil($total / $perPage)),
+                'per_page'     => $perPage,
+                'to'           => $total > 0 ? min($page * $perPage, $total) : null,
+                'total'        => $total,
+                'since'        => $since,
+                'timestamp'    => time(),
+            ],
+        ]);
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $perPage      = (int) $request->input('per_page', 20);
+        $page         = (int) $request->input('page', 1);
+        $withCover    = $request->boolean('with_cover', true);
+        $inlineCovers = $request->boolean('inlineCovers', false);
+        $includeNeedsReview = $request->boolean(
+            'includeNeedsReview',
+            $request->boolean('include_needs_review', false)
+        );
+
+        $filters = [
+            'search'           => $request->input('search'),
+            'title'            => $request->input('title'),
+            'author'           => $request->input('author'),
+            'series'           => $request->input('series'),
+            'publication_date' => $request->input('publication_date'),
+            'date_added'       => $request->input('date_added'),
+            'status'           => $request->input('status'),
+            'is_recommended'   => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
+            'is_completed'     => $request->has('is_completed') ? $request->boolean('is_completed') : null,
+            'device_id'        => $request->input('device_id'),
+            'include_needs_review' => $includeNeedsReview,
+        ];
+
+        $userId    = Auth::id();
+        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters, true, 'title', 'asc', false, $userId);
+        $books     = $booksData['data'];
+        $total     = $booksData['total'];
+
+        $transformedBooks = array_map(
+            fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers),
+            $books
+        );
+
+        return response()->json([
+            'data' => $transformedBooks,
+            'meta' => [
+                'current_page' => $page,
+                'from'         => $total > 0 ? (($page - 1) * $perPage) + 1 : null,
+                'last_page'    => max(1, (int) ceil($total / $perPage)),
+                'per_page'     => $perPage,
+                'to'           => $total > 0 ? min($page * $perPage, $total) : null,
+                'total'        => $total,
             ],
         ]);
     }

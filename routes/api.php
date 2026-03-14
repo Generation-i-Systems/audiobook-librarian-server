@@ -124,7 +124,6 @@ Route::prefix('v1')->group(function () {
         // Book Routes
         Route::get('/books', [BookApiController::class, 'index']);
         Route::post('/books/batch', [BookApiController::class, 'batch']);
-        Route::get('/books/enhanced', [BookApiController::class, 'booksEnhanced']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/download', [BookDownloadController::class, 'download']);
         Route::get('/books/{book}/download/{file}', [BookDownloadController::class, 'downloadFile'])

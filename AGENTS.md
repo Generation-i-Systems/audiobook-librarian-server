@@ -75,7 +75,7 @@ npm run test:coverage
 - **MUST** Keep README updated
 - **MUST** Keep Blueprint updated
 - **MUST** Keep documentation updated
-- **MUST** document all API changes in `docs/openapi.json` and provide human-readable documentation explaining the feature, usage logic, and purpose.
+- **MUST** document all API changes in `docs/openapi.json` as it is the source of truth for the API, and provide human-readable documentation explaining the feature, usage logic, and purpose.
 - **MUST** Keep changelog updated
 - **MUST** Store prompts in prompts.md
 
@@ -132,7 +132,7 @@ npm run test:coverage
 - Minimize Blade template code - prefer controllers/services/JS
 - Use Laravel 11+ patterns (no `app/Console/Kernel.php`, use `bootstrap/app.php`)
 - Prefer dependency injection over facades where possible
-- **MUST update openapi.json after any API change**
+- **MUST update openapi.json after any API change** as it is the source of truth for the API
 - **MUST NOT access database from controllers** - must use DocumentStoreServiceInterface
 - User authentication handled by DocumentstoreUser NOT models/User
 - Use Laravel Pint with config from `.pint.json` in project root if present
