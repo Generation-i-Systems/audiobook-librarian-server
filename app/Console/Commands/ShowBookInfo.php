@@ -1412,7 +1412,7 @@ class ShowBookInfo extends Command
      */
     protected function openUrlInBrowser(string $url): void
     {
-        $this->info("Opening page in browser: {$url}");
+        $this->info("Opening edit page: {$url}");
 
         // Skip browser opening when running tests
         if (app()->environment('testing')) {
