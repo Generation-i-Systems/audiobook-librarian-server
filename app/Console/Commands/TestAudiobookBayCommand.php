@@ -104,6 +104,7 @@ class TestAudiobookBayCommand extends Command
 
             if ($debug) {
                 $this->line("\nRaw HTML response:");
+                /** @phpstan-ignore-next-line */
                 $this->line(is_array($response) ? 'Array response' : (string) $response);
             }
 

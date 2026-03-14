@@ -159,7 +159,7 @@ class ToolExecutor
                     'narrators' => $book->narrators->pluck('name')->toArray(),
                     'series' => $book->series->map(fn ($s) => [
                         'name' => $s->name,
-                        'number' => $s->pivot->series_number,
+                        'number' => $s->pivot ? $s->pivot->getAttribute('series_number') : null,
                     ])->toArray(),
                     'directory_path' => $book->directory_path,
                     'duration' => $book->duration,
@@ -2895,7 +2895,7 @@ class ToolExecutor
         $seriesSlug = Str::slug($primarySeriesName);
 
         $seriesPivot = $book->series->first()?->pivot;
-        $seriesNumber = $seriesPivot?->series_number ?? null;
+        $seriesNumber = $seriesPivot ? $seriesPivot->getAttribute('series_number') : null;
         $titleSlug = Str::slug($book->title);
 
         if ($seriesNumber !== null) {

@@ -1,25 +1,2 @@
-create a command script to remove duplicate books by directoryPath of the duplicates keep the one with the most recent edits or the one with the most fields set
-the same script can look for books with directoryPaths that parse significaly differently than the parsed path (genre author series title) those books should be marked as needsReview
-any book without a cover should be marked as needs review unless that cover can be fixed by downloading a cover from any *coverImageUrl field or an image is found in the book directory
-any book with a series name that matches an author name should be marked as needsReview
-any book with a series name but not a series number should be marked as needsReview
-with all of these reasons for needs review add a new field called needsReviewReasons that is an array of strings
-
-
-build a tool to list and review books marked as needsReview
-
-
-From the admin book list clicking on the row for a book (not the buttons) should go to the show page for that book
-
-on all show page add a button that goes back to the list of books with previous filters applied
-
-
-fix profile page
-fix the user management page
-fix the messages page
-fix the import book from file page
-	- add "/media/downloads", "/media/downloads/audiobooks", "/media/audiobooks/unsorted/*", or "/media/audiobooks/OpenAudible/books" to the list of directories to search for books (with the widlcard resolved once at creation)
-	- make browsing the directories work once the root directory is selected
-
-
-
+implement a friend group that is accessed from the profile screen. allow people to join a group by showing a QR code and the other person scans the code or by email address, when sharing by email address the other user would need to confirm the friend request. This confirmation request should be shown in push notifications and shown in app on launch with a snackbar and on the profile screen
+The push notification permission request should be moved to a screen in the FTUE and the reason for the request be given as supporting downloading (if browse is enabled) and friend requests.

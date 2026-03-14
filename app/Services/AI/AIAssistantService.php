@@ -888,7 +888,7 @@ PROMPT;
         $seriesSlug = Str::slug($primarySeriesName);
 
         $seriesPivot = $book->series->first()?->pivot;
-        $seriesNumber = $seriesPivot?->series_number ?? null;
+        $seriesNumber = $seriesPivot ? $seriesPivot->getAttribute('series_number') : null;
         $titleSlug = Str::slug($book->title);
 
         if ($seriesNumber !== null) {

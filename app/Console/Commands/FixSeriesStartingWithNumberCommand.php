@@ -90,7 +90,8 @@ class FixSeriesStartingWithNumberCommand extends Command
             arsort($seriesNameCounts); // Sort by frequency, most frequent first
 
             // If we found potential series names
-            if (! empty($seriesNameCounts)) {
+            /** @phpstan-ignore-next-line */
+            if (count($seriesNameCounts) > 0) {
                 $mostFrequentSeriesName = array_key_first($seriesNameCounts);
                 $frequency = $seriesNameCounts[$mostFrequentSeriesName];
                 $confidence = $frequency / $books->count();

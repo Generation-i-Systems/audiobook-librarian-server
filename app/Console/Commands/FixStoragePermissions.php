@@ -16,7 +16,7 @@ class FixStoragePermissions extends Command
     public function handle(): int
     {
         $dryRun = $this->option('dry-run');
-        $verbose = $this->option('verbose') || $this->verbosity >= 1;
+        $verbose = $this->option('verbose') || $this->getOutput()->getVerbosity() >= 128; // VERBOSITY_VERBOSE
 
         Log::debug('FixStoragePermissions command started.', [
             'user' => get_current_user(),
