@@ -11853,6 +11853,90 @@
                 }
             }
         },
+        "/auth/discord": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Discord Sign-In",
+                "operationId": "discordLogin",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "accessToken"
+                                ],
+                                "properties": {
+                                    "accessToken": {
+                                        "type": "string",
+                                        "description": "Discord OAuth2 authorization code"
+                                    },
+                                    "codeVerifier": {
+                                        "type": "string",
+                                        "description": "PKCE code verifier (optional)"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid Discord code or failed to fetch user profile",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Account pending approval",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Discord authentication failed or not configured",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/auth/logout": {
             "post": {
                 "tags": [
