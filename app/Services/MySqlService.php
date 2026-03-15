@@ -116,26 +116,43 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         // Then, specifically handle the relationships with the correct keys and structures
         if (!empty($bookArray['authors'])) {
             $names = collect($bookArray['authors'])->pluck('name')->all();
-            $camelCasedBook['author']  = $names;
-            $camelCasedBook['authors'] = $names;
+            $camelCasedBook['author']       = $names;
+            $camelCasedBook['authors']      = $names;
+            $camelCasedBook['authors_data'] = collect($bookArray['authors'])
+                ->map(fn ($a) => ['id' => $a['id'], 'name' => $a['name']])
+                ->all();
         }
 
         if (!empty($bookArray['genres'])) {
             $names = collect($bookArray['genres'])->pluck('name')->all();
-            $camelCasedBook['genre']  = $names;
-            $camelCasedBook['genres'] = $names;
+            $camelCasedBook['genre']       = $names;
+            $camelCasedBook['genres']      = $names;
+            $camelCasedBook['genres_data'] = collect($bookArray['genres'])
+                ->map(fn ($g) => ['id' => $g['id'], 'name' => $g['name']])
+                ->all();
         }
 
         if (!empty($bookArray['narrators'])) {
-            $camelCasedBook['narrator'] = collect($bookArray['narrators'])->pluck('name')->all();
+            $camelCasedBook['narrator']       = collect($bookArray['narrators'])->pluck('name')->all();
+            $camelCasedBook['narrators_data'] = collect($bookArray['narrators'])
+                ->map(fn ($n) => ['id' => $n['id'], 'name' => $n['name']])
+                ->all();
         }
 
         if (!empty($bookArray['series'])) {
-            $camelCasedBook['series'] = collect($bookArray['series'])->map(function ($s) {
+            $camelCasedBook['series']      = collect($bookArray['series'])->map(function ($s) {
                 return [
                     'seriesName' => $s['name'],
                     'number' => $s['pivot']['series_number'] ?? null,
                     'isCollection' => $s['is_collection'] ?? false,
+                ];
+            })->all();
+            $camelCasedBook['series_data'] = collect($bookArray['series'])->map(function ($s) {
+                return [
+                    'id'            => $s['id'],
+                    'name'          => $s['name'],
+                    'series_number' => $s['pivot']['series_number'] ?? null,
+                    'is_collection' => $s['is_collection'] ?? false,
                 ];
             })->all();
         }

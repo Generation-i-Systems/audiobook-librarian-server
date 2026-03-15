@@ -284,7 +284,7 @@ class BookApiController extends Controller
         }
 
         return response()->json(
-            $this->getBookWithCover($book, $request->boolean('with_cover', true), $request->boolean('inlineCovers', false))
+            $this->getBookWithCover($book, $request->boolean('with_cover', true), $request->boolean('inlineCovers', false), $request->boolean('enhanced', false))
         );
     }
 
