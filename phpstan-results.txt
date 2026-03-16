@@ -1,0 +1,1752 @@
+Note: Using configuration file /home/devel/src/audiobook-librarian-server/phpstan.neon.
+   0/649 [░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0%[1G[2K 649/649 [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 100%
+
+ ------ ----------------------------------------------------------------------- 
+  Line   app/Console/Commands/FixSeriesStartingWithNumberCommand.php            
+ ------ ----------------------------------------------------------------------- 
+  :93    Variable $seriesNameCounts in empty() always exists and is not falsy.  
+         🪪  empty.variable                                                     
+ ------ ----------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   app/Console/Commands/FixStoragePermissions.php                          
+ ------ ------------------------------------------------------------------------ 
+  :19    Comparison operation ">=" between 8|16|32|64|128|256 and 1 is always    
+         true.                                                                   
+         🪪  greaterOrEqual.alwaysTrue                                           
+         💡  Because the type is coming from a PHPDoc, you can turn off this     
+         check by setting treatPhpDocTypesAsCertain: false in your phpstan.neon  
+         .                                                                       
+  :19    Result of || is always true.                                            
+         🪪  booleanOr.alwaysTrue                                                
+         💡  Because the type is coming from a PHPDoc, you can turn off this     
+         check by setting treatPhpDocTypesAsCertain: false in your phpstan.neon  
+         .                                                                       
+  :74    If condition is always true.                                            
+         🪪  if.alwaysTrue                                                       
+         💡  Because the type is coming from a PHPDoc, you can turn off this     
+         check by setting treatPhpDocTypesAsCertain: false in your phpstan.neon  
+         .                                                                       
+  :78    If condition is always true.                                            
+         🪪  if.alwaysTrue                                                       
+         💡  Because the type is coming from a PHPDoc, you can turn off this     
+         check by setting treatPhpDocTypesAsCertain: false in your phpstan.neon  
+         .                                                                       
+ ------ ------------------------------------------------------------------------ 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   app/Console/Commands/TestAudiobookBayCommand.php                        
+ ------ ------------------------------------------------------------------------ 
+  :107   Call to function is_array() with non-falsy-string will always evaluate  
+         to false.                                                               
+         🪪  function.impossibleType                                             
+         💡  Because the type is coming from a PHPDoc, you can turn off this     
+         check by setting treatPhpDocTypesAsCertain: false in your phpstan.neon  
+         .                                                                       
+ ------ ------------------------------------------------------------------------ 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/AIAssistantController.php   
+ ------ ------------------------------------------------------- 
+  :34    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :34    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :108   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :108   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------ 
+  Line   app/Http/Controllers/Admin/AIQueryController.php            
+ ------ ------------------------------------------------------------ 
+  :113   Access to an undefined property                             
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.       
+         🪪  property.notFound                                       
+  :113   Access to an undefined property                             
+         Illuminate\Contracts\Auth\Authenticatable::$name.           
+         🪪  property.notFound                                       
+  :113   Comparison operation ">" between 100 and 0 is always true.  
+         🪪  greater.alwaysTrue                                      
+ ------ ------------------------------------------------------------ 
+
+ ------ --------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/AccountRequestController.php  
+ ------ --------------------------------------------------------- 
+  :21    Access to an undefined property                          
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.    
+         🪪  property.notFound                                    
+  :21    Access to an undefined property                          
+         Illuminate\Contracts\Auth\Authenticatable::$name.        
+         🪪  property.notFound                                    
+ ------ --------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/AdminController.php         
+ ------ ------------------------------------------------------- 
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/AdminerController.php       
+ ------ ------------------------------------------------------- 
+  :13    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :13    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ---------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/AuthorController.php                       
+ ------ ---------------------------------------------------------------------- 
+  :48    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :48    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :48    Undefined variable: $contextQueryId                                   
+         🪪  variable.undefined                                                
+  :48    Undefined variable: $contextQueryId                                   
+         🪪  variable.undefined                                                
+  :48    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :48    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :48    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :48    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :92    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :92    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :134   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :134   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :237   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :237   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :237   Variable $direction on left side of ?? always exists and is not       
+         nullable.                                                             
+         🪪  nullCoalesce.variable                                             
+  :237   Variable $direction on left side of ?? always exists and is not       
+         nullable.                                                             
+         🪪  nullCoalesce.variable                                             
+  :237   Variable $sort on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                             
+  :237   Variable $sort on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                             
+ ------ ---------------------------------------------------------------------- 
+
+ ------ ---------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/BadgeController.php                        
+ ------ ---------------------------------------------------------------------- 
+  :41    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :41    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :41    Call to function is_array() with array will always evaluate to true.  
+         🪪  function.alreadyNarrowedType                                      
+ ------ ---------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   app/Http/Controllers/Admin/BookController.php                           
+ ------ ------------------------------------------------------------------------ 
+  :180   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :180   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.                       
+         🪪  property.notFound                                                   
+  :180   Undefined variable: $contextQueryId                                     
+         🪪  variable.undefined                                                  
+  :180   Undefined variable: $contextQueryId                                     
+         🪪  variable.undefined                                                  
+  :180   Variable $contextQueryId in isset() is never defined.                   
+         🪪  isset.variable                                                      
+  :180   Variable $contextQueryId in isset() is never defined.                   
+         🪪  isset.variable                                                      
+  :180   Variable $contextQueryId in isset() is never defined.                   
+         🪪  isset.variable                                                      
+  :180   Variable $contextQueryId in isset() is never defined.                   
+         🪪  isset.variable                                                      
+  :251   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :251   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :251   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.                       
+         🪪  property.notFound                                                   
+  :332   Left side of && is always true.                                         
+         🪪  booleanAnd.leftAlwaysTrue                                           
+  :332   Offset 'display_name' on array{type:                                    
+         'audible'|'candidate'|'current-NOT'|'google', value: string, src:       
+         string, label: 'Audible'|'Candidate'|'Current Cover'|'Current Cover     
+         …'|'Google Books', display_name: string}|array{type: 'embedded',        
+         value: 'embedded_from_import', src: non-falsy-string, label: 'Embedded  
+         Cover …', display_name: 'Embedded Cover'} on left side of ?? always     
+         exists and is not nullable.                                             
+         🪪  nullCoalesce.offset                                                 
+  :332   Result of && is always false.                                           
+         🪪  booleanAnd.alwaysFalse                                              
+  :332   Result of && is always false.                                           
+         🪪  booleanAnd.alwaysFalse                                              
+  :332   Result of && is always false.                                           
+         🪪  booleanAnd.alwaysFalse                                              
+  :332   Result of && is always false.                                           
+         🪪  booleanAnd.alwaysFalse                                              
+  :332   Result of && is always false.                                           
+         🪪  booleanAnd.alwaysFalse                                              
+  :332   Result of && is always false.                                           
+         🪪  booleanAnd.alwaysFalse                                              
+  :332   Result of || is always false.                                           
+         🪪  booleanOr.alwaysFalse                                               
+  :332   Result of || is always false.                                           
+         🪪  booleanOr.alwaysFalse                                               
+  :332   Result of || is always false.                                           
+         🪪  booleanOr.alwaysFalse                                               
+  :332   Strict comparison using === between                                     
+         'audible'|'candidate'|'current-NOT'|'embedded'|'google' and 'current'   
+         will always evaluate to false.                                          
+         🪪  identical.alwaysFalse                                               
+  :332   Strict comparison using === between                                     
+         'audible'|'candidate'|'current-NOT'|'embedded'|'google' and 'current'   
+         will always evaluate to false.                                          
+         🪪  identical.alwaysFalse                                               
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $__messageOriginal                                  
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $audibleCover                                       
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $audibleCover                                       
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $audibleCover                                       
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $audibleCover                                       
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $audibleCover                                       
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $biggestCover                                       
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $biggestCover                                       
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $initial                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $initial                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $initial                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $initial                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $initial                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $initial                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $initial                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $layout                                             
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Undefined variable: $message                                            
+         🪪  variable.undefined                                                  
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $__messageOriginal in isset() is never defined.                
+         🪪  isset.variable                                                      
+  :332   Variable $audibleCover in empty() is never defined.                     
+         🪪  empty.variable                                                      
+  :332   Variable $biggestCover in empty() is never defined.                     
+         🪪  empty.variable                                                      
+  :332   Variable $biggestCover in empty() is never defined.                     
+         🪪  empty.variable                                                      
+  :332   Variable $biggestCover in isset() is never defined.                     
+         🪪  isset.variable                                                      
+  :332   Variable $biggestCover in isset() is never defined.                     
+         🪪  isset.variable                                                      
+  :332   Variable $coverCandidates on left side of ?? always exists and is not   
+         nullable.                                                               
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in empty() is never defined.                          
+         🪪  empty.variable                                                      
+  :332   Variable $initial in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $initial on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $isModal on left side of ?? always exists and is not           
+         nullable.                                                               
+         🪪  nullCoalesce.variable                                               
+  :332   Variable $layout in isset() is never defined.                           
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+  :332   Variable $message in isset() is never defined.                          
+         🪪  isset.variable                                                      
+ ------ ------------------------------------------------------------------------ 
+
+ ------ --------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/BookFormController.php                    
+ ------ --------------------------------------------------------------------- 
+  :323   Expression on left side of ?? is always null.                        
+         🪪  nullCoalesce.expr                                                
+  :323   Expression on left side of ?? is always null.                        
+         🪪  nullCoalesce.expr                                                
+  :323   Left side of && is always true.                                      
+         🪪  booleanAnd.leftAlwaysTrue                                        
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :323   Strict comparison using === between                                  
+         'audible'|'candidate'|'embedded'|'google' and 'current' will always  
+         evaluate to false.                                                   
+         🪪  identical.alwaysFalse                                            
+  :323   Strict comparison using === between                                  
+         'audible'|'candidate'|'embedded'|'google' and 'current' will always  
+         evaluate to false.                                                   
+         🪪  identical.alwaysFalse                                            
+  :323   Ternary operator condition is always true.                           
+         🪪  ternary.alwaysTrue                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :323   Variable $audibleCover in empty() is never defined.                  
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :323   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :323   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :323   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :323   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :323   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :323   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :323   Variable $isModal in empty() always exists and is not falsy.         
+         🪪  empty.variable                                                   
+  :323   Variable $isModal in empty() always exists and is not falsy.         
+         🪪  empty.variable                                                   
+  :323   Variable $isModal in empty() always exists and is not falsy.         
+         🪪  empty.variable                                                   
+  :323   Variable $isModal on left side of ?? always exists and is not        
+         nullable.                                                            
+         🪪  nullCoalesce.variable                                            
+  :323   Variable $layout in isset() always exists and is not nullable.       
+         🪪  isset.variable                                                   
+  :323   Variable $layout in isset() always exists and is not nullable.       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :323   Variable $returnUrl on left side of ?? is never defined.             
+         🪪  nullCoalesce.variable                                            
+  :347   Expression on left side of ?? is always null.                        
+         🪪  nullCoalesce.expr                                                
+  :347   Expression on left side of ?? is always null.                        
+         🪪  nullCoalesce.expr                                                
+  :347   Left side of && is always true.                                      
+         🪪  booleanAnd.leftAlwaysTrue                                        
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Result of && is always false.                                        
+         🪪  booleanAnd.alwaysFalse                                           
+  :347   Strict comparison using === between                                  
+         'audible'|'candidate'|'embedded'|'google' and 'current' will always  
+         evaluate to false.                                                   
+         🪪  identical.alwaysFalse                                            
+  :347   Strict comparison using === between                                  
+         'audible'|'candidate'|'embedded'|'google' and 'current' will always  
+         evaluate to false.                                                   
+         🪪  identical.alwaysFalse                                            
+  :347   Ternary operator condition is always true.                           
+         🪪  ternary.alwaysTrue                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $__messageOriginal                               
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $audibleCover                                    
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $book                                            
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $layout                                          
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Undefined variable: $message                                         
+         🪪  variable.undefined                                               
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $__messageOriginal in isset() is never defined.             
+         🪪  isset.variable                                                   
+  :347   Variable $audibleCover in empty() is never defined.                  
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in empty() is never defined.                          
+         🪪  empty.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book in isset() is never defined.                          
+         🪪  isset.variable                                                   
+  :347   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :347   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :347   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :347   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :347   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :347   Variable $book on left side of ?? is never defined.                  
+         🪪  nullCoalesce.variable                                            
+  :347   Variable $isModal might not be defined.                              
+         🪪  variable.undefined                                               
+  :347   Variable $layout in isset() is never defined.                        
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $message in isset() is never defined.                       
+         🪪  isset.variable                                                   
+  :347   Variable $returnUrl on left side of ?? is never defined.             
+         🪪  nullCoalesce.variable                                            
+ ------ --------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/BookImportController.php    
+ ------ ------------------------------------------------------- 
+  :26    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :26    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ -------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/BookPositionController.php               
+ ------ -------------------------------------------------------------------- 
+  :36    Access to an undefined property                                     
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.               
+         🪪  property.notFound                                               
+  :36    Access to an undefined property                                     
+         Illuminate\Contracts\Auth\Authenticatable::$name.                   
+         🪪  property.notFound                                               
+  :36    Access to an undefined property                                     
+         Illuminate\Database\Eloquent\Model::$metadata.                      
+         🪪  property.notFound                                               
+  :36    Access to an undefined property                                     
+         Illuminate\Database\Eloquent\Model::$title.                         
+         🪪  property.notFound                                               
+  :36    Parameter #1 $num of function number_format expects float, string   
+         given.                                                              
+         🪪  argument.type                                                   
+  :36    Using nullsafe property access "?->metadata" on left side of ?? is  
+         unnecessary. Use -> instead.                                        
+         🪪  nullsafe.neverNull                                              
+ ------ -------------------------------------------------------------------- 
+
+ ------ -------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/DirectoryValidationController.php        
+ ------ -------------------------------------------------------------------- 
+  :56    View [admin/directory-validation.blade.php] contains syntx errors.  
+         🪪  bladestan.parsing                                               
+ ------ -------------------------------------------------------------------- 
+
+ ------ -------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/EventTimelineController.php  
+ ------ -------------------------------------------------------- 
+  :55    Access to an undefined property                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.   
+         🪪  property.notFound                                   
+  :55    Access to an undefined property                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.       
+         🪪  property.notFound                                   
+  :55    Access to an undefined property                         
+         Illuminate\Database\Eloquent\Model::$title.             
+         🪪  property.notFound                                   
+ ------ -------------------------------------------------------- 
+
+ ------ ---------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/GenreController.php                        
+ ------ ---------------------------------------------------------------------- 
+  :67    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :67    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :67    Undefined variable: $contextQueryId                                   
+         🪪  variable.undefined                                                
+  :67    Undefined variable: $contextQueryId                                   
+         🪪  variable.undefined                                                
+  :67    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :67    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :67    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :67    Variable $contextQueryId in isset() is never defined.                 
+         🪪  isset.variable                                                    
+  :67    Variable $direction on left side of ?? always exists and is not       
+         nullable.                                                             
+         🪪  nullCoalesce.variable                                             
+  :67    Variable $direction on left side of ?? always exists and is not       
+         nullable.                                                             
+         🪪  nullCoalesce.variable                                             
+  :67    Variable $sort on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                             
+  :67    Variable $sort on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                             
+  :67    Variable $sort on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                             
+  :81    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :81    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :133   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :133   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :235   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :235   Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :235   Variable $direction on left side of ?? always exists and is not       
+         nullable.                                                             
+         🪪  nullCoalesce.variable                                             
+  :235   Variable $direction on left side of ?? always exists and is not       
+         nullable.                                                             
+         🪪  nullCoalesce.variable                                             
+  :235   Variable $sort on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                             
+  :235   Variable $sort on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                             
+ ------ ---------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   app/Http/Controllers/Admin/JobController.php                            
+ ------ ------------------------------------------------------------------------ 
+  :49    Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :49    Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.                       
+         🪪  property.notFound                                                   
+  :49    Call to function method_exists() with                                   
+         Illuminate\Pagination\LengthAwarePaginator<int|string, mixed> and 'has  
+         Pages' will always evaluate to true.                                    
+         🪪  function.alreadyNarrowedType                                        
+  :49    Variable $jobs in isset() always exists and is not nullable.            
+         🪪  isset.variable                                                      
+  :49    Variable $jobs in isset() always exists and is not nullable.            
+         🪪  isset.variable                                                      
+  :78    Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :78    Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.                       
+         🪪  property.notFound                                                   
+ ------ ------------------------------------------------------------------------ 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   app/Http/Controllers/Admin/LibraryRepairController.php                  
+ ------ ------------------------------------------------------------------------ 
+  :70    Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :70    Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.                       
+         🪪  property.notFound                                                   
+  :70    Call to function is_countable() with                                    
+         Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>>   
+         will always evaluate to true.                                           
+         🪪  function.alreadyNarrowedType                                        
+  :70    Call to function is_object() with                                       
+         Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>>   
+         will always evaluate to true.                                           
+         🪪  function.alreadyNarrowedType                                        
+  :70    Call to function is_object() with                                       
+         Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>>   
+         will always evaluate to true.                                           
+         🪪  function.alreadyNarrowedType                                        
+  :70    Call to function method_exists() with                                   
+         Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>>   
+         and 'total' will always evaluate to true.                               
+         🪪  function.alreadyNarrowedType                                        
+  :70    Call to function method_exists() with                                   
+         Illuminate\Pagination\LengthAwarePaginator<int, array<string, mixed>>   
+         and 'withQueryString' will always evaluate to true.                     
+         🪪  function.alreadyNarrowedType                                        
+  :70    Variable $issues on left side of ?? always exists and is not nullable.  
+         🪪  nullCoalesce.variable                                               
+  :248   View [admin/library-repair/compare.blade.php] contains syntx errors.    
+         🪪  bladestan.parsing                                                   
+ ------ ------------------------------------------------------------------------ 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/ManageSeriesController.php  
+ ------ ------------------------------------------------------- 
+  :103   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :103   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/MessageController.php       
+ ------ ------------------------------------------------------- 
+  :32    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :32    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/MessagesController.php      
+ ------ ------------------------------------------------------- 
+  :27    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :27    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :27    Variable $users might not be defined.                  
+         🪪  variable.undefined                                 
+  :27    Variable $users might not be defined.                  
+         🪪  variable.undefined                                 
+  :40    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :40    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :40    Cannot access property $body on array.                 
+         🪪  property.nonObject                                 
+  :40    Cannot access property $created_at on array.           
+         🪪  property.nonObject                                 
+  :40    Cannot access property $fromUser on array.             
+         🪪  property.nonObject                                 
+  :40    Cannot access property $fromUser on array.             
+         🪪  property.nonObject                                 
+  :40    Cannot access property $fromUser on array.             
+         🪪  property.nonObject                                 
+  :40    Cannot access property $id on array.                   
+         🪪  property.nonObject                                 
+  :40    Cannot access property $is_read on array.              
+         🪪  property.nonObject                                 
+  :40    Cannot access property $subject on array.              
+         🪪  property.nonObject                                 
+  :63    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :63    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/NeedsReviewController.php   
+ ------ ------------------------------------------------------- 
+  :47    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :47    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/QueueController.php         
+ ------ ------------------------------------------------------- 
+  :29    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :29    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/SeriesController.php        
+ ------ ------------------------------------------------------- 
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/SkinController.php                      
+ ------ ------------------------------------------------------------------- 
+  :32    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :32    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+  :49    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :49    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+  :49    Parameter #2 $default of function old expects                      
+         array|Illuminate\Database\Eloquent\Model|string|null, true given.  
+         🪪  argument.type                                                  
+  :91    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :91    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+  :107   Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :107   Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+ ------ ------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/SocialController.php        
+ ------ ------------------------------------------------------- 
+  :40    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :40    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/ThemeController.php                     
+ ------ ------------------------------------------------------------------- 
+  :31    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :31    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+  :48    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :48    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+  :48    Parameter #2 $default of function old expects                      
+         array|Illuminate\Database\Eloquent\Model|string|null, true given.  
+         🪪  argument.type                                                  
+  :89    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :89    Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+  :105   Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.              
+         🪪  property.notFound                                              
+  :105   Access to an undefined property                                    
+         Illuminate\Contracts\Auth\Authenticatable::$name.                  
+         🪪  property.notFound                                              
+ ------ ------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/TrashController.php         
+ ------ ------------------------------------------------------- 
+  :32    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :32    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ---------------------------------------------------------------------- 
+  Line   app/Http/Controllers/Admin/UserController.php                         
+ ------ ---------------------------------------------------------------------- 
+  :29    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :29    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :35    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :35    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :73    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :73    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :73    Undefined variable: $userId                                           
+         🪪  variable.undefined                                                
+  :73    Undefined variable: $userId                                           
+         🪪  variable.undefined                                                
+  :73    Variable $activityData in isset() always exists and is not nullable.  
+         🪪  isset.variable                                                    
+  :73    Variable $userId in isset() is never defined.                         
+         🪪  isset.variable                                                    
+  :85    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :85    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :98    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :98    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+ ------ ---------------------------------------------------------------------- 
+
+ ------ --------------------------------------------------------------- 
+  Line   app/Http/Controllers/BookController.php                        
+ ------ --------------------------------------------------------------- 
+  :99    Access to an undefined property                                
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.          
+         🪪  property.notFound                                          
+  :99    Access to an undefined property                                
+         Illuminate\Contracts\Auth\Authenticatable::$name.              
+         🪪  property.notFound                                          
+  :99    Variable $books in isset() always exists and is not nullable.  
+         🪪  isset.variable                                             
+  :99    Variable $books in isset() always exists and is not nullable.  
+         🪪  isset.variable                                             
+  :99    Variable $books in isset() always exists and is not nullable.  
+         🪪  isset.variable                                             
+  :333   Access to an undefined property                                
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.          
+         🪪  property.notFound                                          
+  :333   Access to an undefined property                                
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.          
+         🪪  property.notFound                                          
+  :333   Access to an undefined property                                
+         Illuminate\Contracts\Auth\Authenticatable::$name.              
+         🪪  property.notFound                                          
+ ------ --------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/BookQueueController.php           
+ ------ ------------------------------------------------------- 
+  :26    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :26    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/EmergencyBookController.php       
+ ------ ------------------------------------------------------- 
+  :76    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :76    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :91    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :91    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/FavoriteAuthorWebController.php   
+ ------ ------------------------------------------------------- 
+  :23    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :23    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/HomeController.php                
+ ------ ------------------------------------------------------- 
+  :24    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :24    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/PlayerController.php              
+ ------ ------------------------------------------------------- 
+  :44    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :44    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ---------------------------------------------------------------------- 
+  Line   app/Http/Controllers/ProfileController.php                            
+ ------ ---------------------------------------------------------------------- 
+  :36    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$email.                    
+         🪪  property.notFound                                                 
+  :36    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                 
+         🪪  property.notFound                                                 
+  :36    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :36    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$name.                     
+         🪪  property.notFound                                                 
+  :36    Access to an undefined property                                       
+         Illuminate\Contracts\Auth\Authenticatable::$role.                     
+         🪪  property.notFound                                                 
+  :36    Undefined variable: $userId                                           
+         🪪  variable.undefined                                                
+  :36    Undefined variable: $userId                                           
+         🪪  variable.undefined                                                
+  :36    Variable $activityData in isset() always exists and is not nullable.  
+         🪪  isset.variable                                                    
+  :36    Variable $userId in isset() is never defined.                         
+         🪪  isset.variable                                                    
+ ------ ---------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/SkinWebController.php             
+ ------ ------------------------------------------------------- 
+  :28    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :28    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :51    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :51    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :65    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :65    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :65    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :123   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :123   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :240   View [gallery.skins.my-skins] not found.               
+         🪪  bladestan.missing                                  
+  :290   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :290   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/ThemeWebController.php            
+ ------ ------------------------------------------------------- 
+  :27    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :27    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :50    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :50    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :64    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :64    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :64    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :120   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :120   Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :242   View [gallery.themes.my-themes] not found.             
+         🪪  bladestan.missing                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------------------- 
+  Line   app/Http/Controllers/UserLibraryController.php         
+ ------ ------------------------------------------------------- 
+  :21    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$created_at.       
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$order.            
+         🪪  property.notFound                                  
+  :21    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$target_date.      
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :36    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$created_at.       
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$finished_at.      
+         🪪  property.notFound                                  
+  :53    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$read_count.       
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.  
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Contracts\Auth\Authenticatable::$name.      
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$book.             
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$started_at.       
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$status.           
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$target_date.      
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$target_date.      
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$target_date.      
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$target_date.      
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$target_date.      
+         🪪  property.notFound                                  
+  :70    Access to an undefined property                        
+         Illuminate\Database\Eloquent\Model::$target_date.      
+         🪪  property.notFound                                  
+ ------ ------------------------------------------------------- 
+
+ ------ ------------------------------------------- 
+  Line   app/Mail/NewFavoriteBooksNotification.php  
+ ------ ------------------------------------------- 
+  :34    Variable $books might not be defined.      
+         🪪  variable.undefined                     
+  :34    Variable $books might not be defined.      
+         🪪  variable.undefined                     
+  :34    Variable $books might not be defined.      
+         🪪  variable.undefined                     
+  :34    Variable $userName might not be defined.   
+         🪪  variable.undefined                     
+ ------ ------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   app/Services/AI/AIAssistantService.php                                  
+ ------ ------------------------------------------------------------------------ 
+  :891   Access to an undefined property                                         
+         Illuminate\Database\Eloquent\Relations\Pivot::$series_number.           
+         🪪  property.notFound                                                   
+         💡  Learn more: https://phpstan.org/blog/solving-phpstan-access-to-unde  
+         fined-property                                                          
+ ------ ------------------------------------------------------------------------ 
+
+ ------- ----------------------------------------------------------------------- 
+  Line    app/Services/AI/ToolExecutor.php                                       
+ ------- ----------------------------------------------------------------------- 
+  :162    Ignored error pattern #^Access to an undefined property                
+          Illuminate\\Database\\Eloquent\\Relations\\Pivot\:\:\$series_number\.  
+          $# (property.notFound) in path                                         
+          /home/devel/src/audiobook-librarian-server/app/Services/AI/ToolExecut  
+          or.php is expected to occur 5 times, but occurred 6 times.             
+  :2898   Access to an undefined property                                        
+          Illuminate\Database\Eloquent\Relations\Pivot::$series_number.          
+          🪪  property.notFound                                                  
+          💡  Learn more: https://phpstan.org/blog/solving-phpstan-access-to-und  
+          efined-property                                                        
+ ------- ----------------------------------------------------------------------- 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   tests/Unit/Controllers/Admin/BookReleaseDateTest.php                    
+ ------ ------------------------------------------------------------------------ 
+  :115   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :115   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.                       
+         🪪  property.notFound                                                   
+  :115   Function formatSeries not found.                                        
+         🪪  function.notFound                                                   
+  :115   Function formatValue not found.                                         
+         🪪  function.notFound                                                   
+  :115   Function formatValue not found.                                         
+         🪪  function.notFound                                                   
+  :115   Offset 'date' on list<string>|string on left side of ?? does not exist  
+         .                                                                       
+         🪪  nullCoalesce.offset                                                 
+  :115   Offset 'path' on list<string> on left side of ?? does not exist.        
+         🪪  nullCoalesce.offset                                                 
+ ------ ------------------------------------------------------------------------ 
+
+ ------ ------------------------------------------------------------------------ 
+  Line   tests/Web/Unit/Controllers/BookReleaseDateTest.php                      
+ ------ ------------------------------------------------------------------------ 
+  :115   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$is_admin.                   
+         🪪  property.notFound                                                   
+  :115   Access to an undefined property                                         
+         Illuminate\Contracts\Auth\Authenticatable::$name.                       
+         🪪  property.notFound                                                   
+  :115   Function formatSeries not found.                                        
+         🪪  function.notFound                                                   
+  :115   Function formatValue not found.                                         
+         🪪  function.notFound                                                   
+  :115   Function formatValue not found.                                         
+         🪪  function.notFound                                                   
+  :115   Offset 'date' on list<string>|string on left side of ?? does not exist  
+         .                                                                       
+         🪪  nullCoalesce.offset                                                 
+  :115   Offset 'path' on list<string> on left side of ?? does not exist.        
+         🪪  nullCoalesce.offset                                                 
+ ------ ------------------------------------------------------------------------ 
+
+ [ERROR] Found 635 errors                                                        
+

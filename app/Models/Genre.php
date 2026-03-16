@@ -11,6 +11,7 @@ use App\Traits\Auditable;
 /**
  * @property int $id
  * @property string $name
+ * @property bool|null $is_fiction
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
@@ -38,7 +39,9 @@ class Genre extends Model
     use Auditable;
     use SoftDeletes;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'is_fiction'];
+
+    protected $casts = ['is_fiction' => 'boolean'];
 
     public function books(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {

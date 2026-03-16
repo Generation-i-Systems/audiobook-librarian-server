@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $user_id
+ * @property int|null $playlist_id
  * @property int|null $book_id
  * @property string|null $title
  * @property string|null $author
@@ -52,6 +53,7 @@ class UserBookStatus extends Model
 
     protected $fillable = [
         'user_id',
+        'playlist_id',
         'book_id',
         'title',
         'author',
@@ -65,6 +67,7 @@ class UserBookStatus extends Model
     ];
 
     protected $casts = [
+        'playlist_id' => 'integer',
         'order' => 'integer',
         'status_detail' => 'array',
         'read_count' => 'integer',
@@ -81,5 +84,10 @@ class UserBookStatus extends Model
     public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class);
+    }
+
+    public function playlist(): BelongsTo
+    {
+        return $this->belongsTo(Playlist::class);
     }
 }

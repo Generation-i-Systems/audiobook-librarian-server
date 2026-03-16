@@ -29,6 +29,8 @@ use App\Http\Controllers\Api\ReadingStatsApiController;
 use App\Http\Controllers\Api\RecommendationController;
 use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\SkinController;
+use App\Http\Controllers\Api\ListeningGoalController;
+use App\Http\Controllers\Api\PlaylistController;
 use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
@@ -83,6 +85,26 @@ Route::prefix('v1')->group(function () {
             Route::post('/queue/reorder', [UserStatusController::class, 'reorder']);
         });
 
+        // Playlist Routes
+        Route::prefix('playlists')->group(function () {
+            Route::get('/', [PlaylistController::class, 'index']);
+            Route::post('/', [PlaylistController::class, 'store']);
+            Route::get('/{playlist}', [PlaylistController::class, 'show']);
+            Route::put('/{playlist}', [PlaylistController::class, 'update']);
+            Route::delete('/{playlist}', [PlaylistController::class, 'destroy']);
+            Route::post('/{playlist}/books', [PlaylistController::class, 'addBook']);
+            Route::delete('/{playlist}/books/{bookId}', [PlaylistController::class, 'removeBook']);
+            Route::post('/{playlist}/reorder', [PlaylistController::class, 'reorder']);
+        });
+
+        // Listening Goals Routes
+        Route::prefix('goals/listening')->group(function () {
+            Route::get('/', [ListeningGoalController::class, 'index']);
+            Route::post('/', [ListeningGoalController::class, 'store']);
+            Route::put('/{goal}', [ListeningGoalController::class, 'update']);
+            Route::delete('/{goal}', [ListeningGoalController::class, 'destroy']);
+        });
+
         // Sync Routes
         Route::prefix('sync')->middleware('idempotency')->group(function () {
             Route::post('/progress', [\App\Http\Controllers\Api\SyncController::class, 'progress']);
@@ -127,6 +149,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/download', [BookDownloadController::class, 'download']);
         Route::get('/books/{book}/download/{file}', [BookDownloadController::class, 'downloadFile'])
+            ->where('file', '.*')
             ->name('api.books.downloadFile');
         Route::get('/books/{book}/download-url', [BookDownloadController::class, 'downloadUrl']);
         Route::get('/books/browse', [BookApiController::class, 'browse']);
@@ -247,6 +270,7 @@ Route::prefix('v1')->group(function () {
         // OpenAPI spec statistics routes
         Route::get('/statistics/overview', [StatisticsController::class, 'getOverview']);
         Route::get('/statistics/daily', [StatisticsController::class, 'getDailyStatsOpenApi']);
+        Route::get('/statistics/timeline', [StatisticsController::class, 'getTimelineStats']);
         Route::get('/statistics/reading-history', [StatisticsController::class, 'getReadingHistoryStats']);
         Route::post('/statistics/report', [StatisticsController::class, 'reportSession']);
 
