@@ -67,7 +67,7 @@ class BookDownloadController extends Controller
             ], 404);
         }
 
-        $files = Storage::disk('books')->files($directoryPath);
+        $files = Storage::disk('books')->allFiles($directoryPath);
         if (empty($files)) {
             return response()->json([
                 'error' => 'No files found',
@@ -77,40 +77,26 @@ class BookDownloadController extends Controller
 
         // Filter and categorize files
         $audioFiles = [];
-        $coverFile = null;
+        $coverFiles = [];
         $otherFiles = [];
 
         foreach ($files as $file) {
             $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            $fileName = basename($file);
+            $relativeFile = str_replace($directoryPath . '/', '', $file);
+
+            $entry = [
+                'filename' => $relativeFile,
+                'path' => $file,
+                'size' => Storage::disk('books')->size($file),
+                'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => $relativeFile]),
+            ];
 
             if (in_array($extension, ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac', 'm4b'])) {
-                $audioFiles[] = [
-                    'filename' => $fileName,
-                    'path' => $file,
-                    'size' => Storage::disk('books')->size($file),
-                    'type' => 'audio',
-                    'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
-                ];
-            } elseif (
-                in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
-                (strpos(strtolower($fileName), 'cover') !== false || strpos(strtolower($fileName), 'folder') !== false)
-            ) {
-                $coverFile = [
-                    'filename' => $fileName,
-                    'path' => $file,
-                    'size' => Storage::disk('books')->size($file),
-                    'type' => 'cover',
-                    'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
-                ];
+                $audioFiles[] = array_merge($entry, ['type' => 'audio']);
+            } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                $coverFiles[] = array_merge($entry, ['type' => 'cover']);
             } else {
-                $otherFiles[] = [
-                    'filename' => $fileName,
-                    'path' => $file,
-                    'size' => Storage::disk('books')->size($file),
-                    'type' => 'other',
-                    'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
-                ];
+                $otherFiles[] = array_merge($entry, ['type' => 'other']);
             }
         }
 
@@ -119,19 +105,24 @@ class BookDownloadController extends Controller
             return strnatcmp($a['filename'], $b['filename']);
         });
 
-        // Calculate total size
-        $totalSize = array_sum(array_column($audioFiles, 'size'));
-        if ($coverFile) {
-            $totalSize += $coverFile['size'];
-        }
-        $totalSize += array_sum(array_column($otherFiles, 'size'));
+        // Sort cover files: db cover first, then alphanumerically
+        $dbCoverFile = $book['coverFile'] ?? null;
+        usort($coverFiles, function ($a, $b) use ($dbCoverFile) {
+            $aIsDb = $dbCoverFile && $a['filename'] === basename($dbCoverFile);
+            $bIsDb = $dbCoverFile && $b['filename'] === basename($dbCoverFile);
+            if ($aIsDb !== $bIsDb) {
+                return $aIsDb ? -1 : 1;
+            }
+            return strnatcmp($a['filename'], $b['filename']);
+        });
 
-        // Build ordered file list (cover first, then audio files alphabetically, then other files)
-        $orderedFiles = [];
-        if ($coverFile) {
-            $orderedFiles[] = $coverFile;
-        }
-        $orderedFiles = array_merge($orderedFiles, $audioFiles, $otherFiles);
+        // Calculate total size
+        $totalSize = array_sum(array_column($audioFiles, 'size'))
+            + array_sum(array_column($coverFiles, 'size'))
+            + array_sum(array_column($otherFiles, 'size'));
+
+        // Build ordered file list (covers first, then audio files alphabetically, then other files)
+        $orderedFiles = array_merge($coverFiles, $audioFiles, $otherFiles);
 
         $manifest = [
             'book_id' => (int) $id,
@@ -166,22 +157,9 @@ class BookDownloadController extends Controller
             // Add metadata.json
             $zip->addFromString('metadata.json', json_encode($orderedFiles, JSON_PRETTY_PRINT));
 
-            // Add cover image
-            if ($coverFile) {
-                $zip->addFile(Storage::disk('books')->path($coverFile['path']), 'cover.' . pathinfo($coverFile['path'], PATHINFO_EXTENSION));
-            }
-
-            // Add audio files
-            foreach ($audioFiles as $file) {
-                $zip->addFile(Storage::disk('books')->path($file['path']), $file['filename']);
-            }
-
-            // Add other files
-            foreach ($otherFiles as $file) {
-                if ($coverFile && $file['path'] === $coverFile['path']) {
-                    continue;
-                } // Skip if already added as cover
-                $zip->addFile(Storage::disk('books')->path($file['path']), $file['filename']);
+            // Add all files in manifest order
+            foreach ($orderedFiles as $file) {
+                $zip->addFile(Storage::disk('books')->path($file['path']), $file['path']);
             }
 
             $zip->close();
@@ -234,19 +212,11 @@ class BookDownloadController extends Controller
             ], 404);
         }
 
-        // Decode the filename and find the file
+        // Resolve the file path relative to the book directory
         $fileName = urldecode($fileName);
-        $filePath = null;
-        $files = Storage::disk('books')->files($directoryPath);
+        $filePath = $directoryPath . '/' . $fileName;
 
-        foreach ($files as $file) {
-            if (basename($file) === $fileName) {
-                $filePath = $file;
-                break;
-            }
-        }
-
-        if (!$filePath || !Storage::disk('books')->exists($filePath)) {
+        if (!Storage::disk('books')->exists($filePath)) {
             return response()->json([
                 'error' => 'File not found',
                 'message' => 'The requested file could not be found',

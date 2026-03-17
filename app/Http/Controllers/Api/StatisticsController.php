@@ -177,6 +177,70 @@ class StatisticsController extends Controller
     }
 
     /**
+     * Get timeline listening statistics, grouped by day or month
+     */
+    public function getTimelineStats(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from'     => 'nullable|date_format:Y-m-d',
+            'to'       => 'nullable|date_format:Y-m-d',
+            'group_by' => 'nullable|string|in:day,month',
+        ]);
+
+        $userId   = Auth::id();
+        $deviceId = (string) ($request->header('X-Device-ID', 'unknown'));
+        $from     = isset($validated['from']) ? Carbon::parse($validated['from']) : now()->subDays(29);
+        $to       = isset($validated['to']) ? Carbon::parse($validated['to']) : now();
+        $groupBy  = $validated['group_by'] ?? 'day';
+
+        $baseQuery = $this->listeningStatsQuery($userId, $deviceId)
+            ->whereBetween('listening_date', [$from->toDateString(), $to->toDateString()]);
+
+        $summary = (clone $baseQuery)
+            ->selectRaw('SUM(seconds_listened) * 1000 as total_ms, COUNT(*) as total_sessions')
+            ->first();
+
+        if ($groupBy === 'month') {
+            if (DB::getDriverName() === 'sqlite') {
+                $rows = (clone $baseQuery)
+                    ->selectRaw("strftime('%Y-%m', listening_date) as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
+                    ->groupByRaw("strftime('%Y-%m', listening_date)")
+                    ->orderByRaw("strftime('%Y-%m', listening_date)")
+                    ->toBase()->get();
+            } else {
+                $rows = (clone $baseQuery)
+                    ->selectRaw("DATE_FORMAT(listening_date, '%Y-%m') as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
+                    ->groupByRaw("DATE_FORMAT(listening_date, '%Y-%m')")
+                    ->orderByRaw("DATE_FORMAT(listening_date, '%Y-%m')")
+                    ->toBase()->get();
+            }
+        } else {
+            $rows = (clone $baseQuery)
+                ->selectRaw('listening_date as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count')
+                ->groupBy('listening_date')
+                ->orderBy('listening_date')
+                ->toBase()->get();
+        }
+
+        $bars = $rows->map(fn ($r) => [
+            'period'            => $r->period,
+            'listening_time_ms' => (int) ($r->listening_time_ms ?? 0),
+            'sessions_count'    => (int) ($r->sessions_count ?? 0),
+        ]);
+
+        return response()->json([
+            'bars'    => $bars,
+            'summary' => [
+                'total_listening_time_ms' => (int) ($summary->total_ms ?? 0),
+                'total_sessions'          => (int) ($summary->total_sessions ?? 0),
+                'from'                    => $from->toDateString(),
+                'to'                      => $to->toDateString(),
+                'group_by'                => $groupBy,
+            ],
+        ]);
+    }
+
+    /**
      * Report listening session (OpenAPI spec)
      */
     public function reportSession(Request $request): JsonResponse
@@ -185,8 +249,8 @@ class StatisticsController extends Controller
             'book_id'              => 'nullable|integer|exists:books,id',
             'title'                => 'required_without:book_id|string|max:255',
             'author'               => 'required_without:book_id|string|max:255',
-            'session_start'        => 'required|date_format:Y-m-d\TH:i:s\Z',
-            'session_end'          => 'required|date_format:Y-m-d\TH:i:s\Z|after:session_start',
+            'session_start'        => 'required|date',
+            'session_end'          => 'required|date|after:session_start',
             'start_position_ms'    => 'required|integer|min:0',
             'end_position_ms'      => 'required|integer|min:0',
             'playback_speed'       => 'nullable|numeric|min:0.1|max:5.0',
