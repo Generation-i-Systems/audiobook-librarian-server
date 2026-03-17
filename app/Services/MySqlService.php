@@ -14,7 +14,6 @@ use App\Models\BookProgress;
 use App\Models\ExternalRead;
 use App\Models\Genre;
 use App\Models\Job;
-use App\Models\LibraryRepairIssue;
 use App\Models\ListeningStatistic;
 use App\Models\Message;
 use App\Models\Narrator;
@@ -23,55 +22,39 @@ use App\Models\Series;
 use App\Models\User;
 use App\Models\UserBookStatus;
 use App\Traits\HandlesLibraryJson;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ListeningEvent;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServiceInterface
 {
     use HandlesLibraryJson;
 
-    private ?bool $libraryRepairIssuesTableExists = null;
+    private ?BookDataTransformer $bookDataTransformer = null;
+    private ?BookMutationService $bookMutationService = null;
+    private ?LibraryRepairIssueStore $libraryRepairIssueStore = null;
 
     private function getTrashService(): BookTrashService
     {
         return app(BookTrashService::class);
     }
 
-    private function buildCoverImageOutput(?string $coverImage, ?string $directoryPath): ?string
+    private function getBookDataTransformer(): BookDataTransformer
     {
-        if ($coverImage === null) {
-            return null;
-        }
+        return $this->bookDataTransformer ??= app(BookDataTransformer::class);
+    }
 
-        $coverImage = trim($coverImage);
+    private function getBookMutationService(): BookMutationService
+    {
+        return $this->bookMutationService ??= app(BookMutationService::class);
+    }
 
-        if ($coverImage === '') {
-            return null;
-        }
-
-        if (str_starts_with($coverImage, 'http://') || str_starts_with($coverImage, 'https://')) {
-            return $coverImage;
-        }
-
-        $baseName = basename($coverImage);
-
-        if ($baseName === '') {
-            return null;
-        }
-
-        $directoryPath = is_string($directoryPath) ? trim($directoryPath, '/') : '';
-
-        if ($directoryPath === '') {
-            return $baseName;
-        }
-
-        return $directoryPath . '/' . $baseName;
+    private function getLibraryRepairIssueStore(): LibraryRepairIssueStore
+    {
+        return $this->libraryRepairIssueStore ??= app(LibraryRepairIssueStore::class);
     }
 
     public function getBook(string $id, ?int $userId = null): ?array
@@ -88,80 +71,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             return null;
         }
 
-        $bookArray = $book->toArray();
-        $camelCasedBook = [];
-
-        // First, copy all non-relational properties, converting keys to camelCase
-        foreach ($bookArray as $key => $value) {
-            if (!is_array($value)) {
-                if ($key === 'cover_image') {
-                    $camelCasedBook['coverImage'] = $this->buildCoverImageOutput($value, $book->directory_path);
-                } else {
-                    $camelCasedBook[Str::camel($key)] = $value;
-                }
-            }
-        }
-
-        // Handle user data if present
-        if ($userId) {
-            $camelCasedBook = array_merge($camelCasedBook, $this->transformUserData($book));
-        }
-
-        // Handle array-type fields that are not relationships
-        // (Book model's toArray already converts to camelCase via CamelCaseAttributeAccess trait)
-        if (isset($bookArray['needsReviewReasons'])) {
-            $camelCasedBook['needsReviewReasons'] = $bookArray['needsReviewReasons'];
-        }
-
-        // Then, specifically handle the relationships with the correct keys and structures
-        if (!empty($bookArray['authors'])) {
-            $names = collect($bookArray['authors'])->pluck('name')->all();
-            $camelCasedBook['author']       = $names;
-            $camelCasedBook['authors']      = $names;
-            $camelCasedBook['authors_data'] = collect($bookArray['authors'])
-                ->map(fn ($a) => ['id' => $a['id'], 'name' => $a['name']])
-                ->all();
-        }
-
-        if (!empty($bookArray['genres'])) {
-            $names = collect($bookArray['genres'])->pluck('name')->all();
-            $camelCasedBook['genre']       = $names;
-            $camelCasedBook['genres']      = $names;
-            $camelCasedBook['genres_data'] = collect($bookArray['genres'])
-                ->map(fn ($g) => ['id' => $g['id'], 'name' => $g['name']])
-                ->all();
-        }
-
-        if (!empty($bookArray['narrators'])) {
-            $camelCasedBook['narrator']       = collect($bookArray['narrators'])->pluck('name')->all();
-            $camelCasedBook['narrators_data'] = collect($bookArray['narrators'])
-                ->map(fn ($n) => ['id' => $n['id'], 'name' => $n['name']])
-                ->all();
-        }
-
-        if (!empty($bookArray['series'])) {
-            $camelCasedBook['series']      = collect($bookArray['series'])->map(function ($s) {
-                return [
-                    'seriesName' => $s['name'],
-                    'number' => $s['pivot']['series_number'] ?? null,
-                    'isCollection' => $s['is_collection'] ?? false,
-                ];
-            })->all();
-            $camelCasedBook['series_data'] = collect($bookArray['series'])->map(function ($s) {
-                return [
-                    'id'            => $s['id'],
-                    'name'          => $s['name'],
-                    'series_number' => $s['pivot']['series_number'] ?? null,
-                    'is_collection' => $s['is_collection'] ?? false,
-                ];
-            })->all();
-        }
-
-        if (!empty($bookArray['chapters'])) {
-            $camelCasedBook['chapters'] = $bookArray['chapters'];
-        }
-
-        return $camelCasedBook;
+        return $this->getBookDataTransformer()->toDocumentStoreBook($book, $userId);
     }
 
     public function findBookByDirectoryPath(string $directoryPath): ?array
@@ -334,217 +244,22 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array
     {
-        if (!$this->ensureLibraryRepairIssuesTable()) {
-            return [];
-        }
-
-        try {
-            $query = LibraryRepairIssue::query()
-                ->with([
-                    'book.authors' => function ($q): void {
-                        $q->select('authors.id', 'authors.name');
-                    },
-                ]);
-
-            $this->applyLibraryRepairIssueFilters($query, $filters);
-
-            return $query
-                ->orderByDesc('created_at')
-                ->forPage(max(1, $page), max(1, $limit))
-                ->get()
-                ->map(fn (LibraryRepairIssue $issue) => $this->transformLibraryRepairIssue($issue))
-                ->toArray();
-        } catch (\Throwable $e) {
-            Log::error('listLibraryRepairIssues failed: ' . $e->getMessage());
-
-            return [];
-        }
+        return $this->getLibraryRepairIssueStore()->listIssues($filters, $limit, $page);
     }
 
     public function countLibraryRepairIssues(array $filters = []): int
     {
-        if (!$this->ensureLibraryRepairIssuesTable()) {
-            return 0;
-        }
-
-        try {
-            $query = LibraryRepairIssue::query();
-            $this->applyLibraryRepairIssueFilters($query, $filters);
-
-            return $query->count();
-        } catch (\Throwable $e) {
-            Log::error('countLibraryRepairIssues failed: ' . $e->getMessage());
-
-            return 0;
-        }
+        return $this->getLibraryRepairIssueStore()->countIssues($filters);
     }
 
     public function getLibraryRepairIssue(int $issueId): ?array
     {
-        if (!$this->ensureLibraryRepairIssuesTable()) {
-            return null;
-        }
-
-        try {
-            $issue = LibraryRepairIssue::with([
-                'book.authors' => function ($q): void {
-                    $q->select('authors.id', 'authors.name');
-                },
-            ])->find($issueId);
-
-            if (!$issue) {
-                return null;
-            }
-
-            return $this->transformLibraryRepairIssue($issue);
-        } catch (\Throwable $e) {
-            Log::error('getLibraryRepairIssue failed: ' . $e->getMessage());
-
-            return null;
-        }
-    }
-
-    /**
-     * @param Builder|\Illuminate\Database\Eloquent\Relations\Relation $query
-     */
-    private function applyLibraryRepairIssueFilters($query, array $filters): void
-    {
-        if (!empty($filters['issue_type'])) {
-            $query->where('issue_type', $filters['issue_type']);
-        }
-
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search): void {
-                $q->where('directory_path', 'like', '%' . $search . '%')
-                    ->orWhereHas('book', function ($bookQuery) use ($search): void {
-                        $bookQuery->where('title', 'like', '%' . $search . '%');
-                    });
-            });
-        }
-
-        if (!empty($filters['book_id'])) {
-            $query->where('book_id', $filters['book_id']);
-        }
-
-        $showResolved = $this->normalizeBooleanFilter($filters['show_resolved'] ?? null);
-
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        } elseif (!$showResolved) {
-            $query->where('status', 'pending');
-        }
-
-        if (array_key_exists('auto_resolved', $filters)) {
-            $query->where('auto_resolved', $this->normalizeBooleanFilter($filters['auto_resolved']));
-        }
-    }
-
-    private function normalizeBooleanFilter(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if ($value === null) {
-            return false;
-        }
-
-        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
-    }
-
-    private function ensureLibraryRepairIssuesTable(): bool
-    {
-        if ($this->libraryRepairIssuesTableExists === false) {
-            return false;
-        }
-
-        if ($this->libraryRepairIssuesTableExists === null) {
-            $this->libraryRepairIssuesTableExists = Schema::hasTable('library_repair_issues');
-
-            if (!$this->libraryRepairIssuesTableExists) {
-                Log::notice('library_repair_issues table is missing; skipping library repair queries.');
-
-                return false;
-            }
-        }
-
-        return true;
+        return $this->getLibraryRepairIssueStore()->getIssue($issueId);
     }
 
     public function resolveLibraryRepairIssue(int $issueId, ?string $resolutionNotes = null): bool
     {
-        if (!$this->ensureLibraryRepairIssuesTable()) {
-            return false;
-        }
-
-        try {
-            /** @var LibraryRepairIssue|null $issue */
-            $issue = LibraryRepairIssue::with('book')->find($issueId);
-
-            if (!$issue) {
-                return false;
-            }
-
-            $issue->status = 'resolved';
-            $issue->resolution_notes = $resolutionNotes;
-            $issue->resolved_at = now();
-            $issue->auto_resolved = false;
-            $issue->save();
-
-            $this->clearLibraryRepairReason($issue->book);
-
-            return true;
-        } catch (\Throwable $e) {
-            Log::error('resolveLibraryRepairIssue failed: ' . $e->getMessage(), [
-                'issueId' => $issueId,
-            ]);
-
-            return false;
-        }
-    }
-
-    private function transformLibraryRepairIssue(LibraryRepairIssue $issue): array
-    {
-        return [
-            'id' => $issue->id,
-            'issueType' => $issue->issue_type,
-            'status' => $issue->status,
-            'directoryPath' => $issue->directory_path,
-            'metadata' => $issue->metadata ?? [],
-            'autoResolved' => (bool) $issue->auto_resolved,
-            'resolvedAt' => $issue->resolved_at ? $issue->resolved_at->toIso8601String() : null,
-            'resolutionNotes' => $issue->resolution_notes,
-            'createdAt' => $issue->created_at ? $issue->created_at->toIso8601String() : null,
-            'updatedAt' => $issue->updated_at ? $issue->updated_at->toIso8601String() : null,
-            'book' => $issue->book ? [
-                'id' => $issue->book->id,
-                'title' => $issue->book->title,
-                'directoryPath' => $issue->book->directory_path,
-                'authors' => $issue->book->authors->pluck('name')->all(),
-                'needsReview' => (bool) $issue->book->needs_review,
-                'needsReviewReasons' => (array) ($issue->book->needs_review_reasons ?? []),
-            ] : null,
-        ];
-    }
-
-    private function clearLibraryRepairReason(?Book $book): void
-    {
-        if (!$book) {
-            return;
-        }
-
-        $reasons = collect($book->needs_review_reasons ?? [])
-            ->reject(fn ($reason) => $reason === 'library_repair')
-            ->values()
-            ->all();
-
-        $book->needs_review_reasons = $reasons;
-
-        if (empty($reasons)) {
-            $book->needs_review = false;
-        }
-        $book->save();
+        return $this->getLibraryRepairIssueStore()->resolveIssue($issueId, $resolutionNotes);
     }
 
     /**
@@ -865,75 +580,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             ->take($perPage)
             ->get();
 
-        // Transform data
-        $transformedData = $books->map(function (Book $book) use ($userId) {
-            $request = request();
-            $coverUrl = null;
-            if ($book->cover_image) {
-                $coverUrl = $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover';
-            }
-            $durationFormatted = $book->duration ? gmdate('H:i:s', $book->duration) : null;
-
-            $seriesData = $book->series->map(function (Series $series): array {
-                $seriesNumber = null;
-
-                // Try to get series_number from pivot
-                if ($series->pivot) {
-                    $seriesNumber = $series->pivot->series_number ?? null;
-                }
-
-                return [
-                    'name' => $series->name,
-                    'series_number' => $seriesNumber,
-                    'is_collection' => $series->is_collection ?? false,
-                ];
-            })->toArray();
-
-            $baseData = [
-                'id' => $book->id,
-                'title' => $book->title,
-                'author' => $book->authors->pluck('name')->toArray(),
-                'narrator' => $book->narrators->pluck('name')->toArray(),
-                'series' => $seriesData,
-                'genre' => $book->genres->pluck('name')->toArray(),
-                'year' => $book->release_date ? (int) $book->release_date->format('Y') : null,
-                'duration' => $durationFormatted,
-                'description' => $book->description,
-                'coverImage' => $this->buildCoverImageOutput($book->cover_image, $book->directory_path),
-                'directoryPath' => $book->directory_path,
-                'cover_url' => $coverUrl,
-                'needs_review' => (bool) $book->needs_review,
-                'file_count' => $book->audio_file_count,
-                'total_size' => $book->getAttribute('total_size'),
-                'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
-                'updated_at' => $book->updated_at ? $book->updated_at->toIso8601String() : null,
-                // Include full relationship data for enhanced API
-                'authors_data' => $book->authors->toArray(),
-                'genres_data' => $book->genres->toArray(),
-                'series_data' => $book->series->map(function (Series $series): array {
-                    $seriesNumber = null;
-                    if ($series->pivot && isset($series->pivot->series_number)) {
-                        $seriesNumber = (string) $series->pivot->series_number;
-                    }
-
-                    return [
-                        'id' => $series->id,
-                        'name' => $series->name,
-                        'is_collection' => $series->is_collection,
-                        'pivot' => [
-                            'series_number' => $seriesNumber,
-                        ],
-                    ];
-                })->toArray(),
-                'narrators_data' => $book->narrators->toArray(),
-            ];
-
-            if ($userId) {
-                $baseData = array_merge($baseData, $this->transformUserData($book));
-            }
-
-            return $baseData;
-        })->toArray();
+        $transformedData = $books
+            ->map(fn (Book $book) => $this->getBookDataTransformer()->toBookListItem($book, $userId))
+            ->toArray();
 
         return [
             'data' => $transformedData,
@@ -947,56 +596,6 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         ];
     }
 
-    private function transformUserData(Book $book): array
-    {
-        $userData = [
-            'progress' => null,
-            'status' => null,
-            'recommendation' => null,
-        ];
-
-        if ($book->relationLoaded('progress') && $book->progress->isNotEmpty()) {
-            $latestProgress = $book->progress->first();
-            $userData['progress'] = [
-                'position' => $latestProgress->current_position_seconds,
-                'duration' => $latestProgress->total_duration_seconds,
-                'percentage' => (float) $latestProgress->progress_percentage,
-                'chapter' => $latestProgress->current_chapter,
-                'chapterName' => $latestProgress->current_chapter_name,
-                'lastListenedAt' => $latestProgress->last_listened_at?->toIso8601String(),
-                'isCompleted' => (bool) $latestProgress->completed,
-            ];
-        }
-
-        if ($book->relationLoaded('statuses') && $book->statuses->isNotEmpty()) {
-            $status = $book->statuses->first();
-            $userData['status'] = [
-                'status' => $status->status,
-                'order' => $status->order,
-                'detail' => $status->status_detail,
-                'readCount' => $status->read_count,
-            ];
-        }
-
-        if ($book->relationLoaded('recommendations') && $book->recommendations->isNotEmpty()) {
-            $rec = $book->recommendations->first();
-            $sender = null;
-
-            if ($rec->sender) {
-                $sender = ['id' => $rec->sender->id, 'name' => $rec->sender->name];
-            }
-
-            $userData['recommendation'] = [
-                'id' => $rec->id,
-                'sender' => $sender,
-                'message' => $rec->message,
-                'sentAt' => $rec->created_at?->toIso8601String(),
-            ];
-        }
-
-        return $userData;
-    }
-
     public function getAllBooks(?int $limit = null, int $offset = 0): array
     {
         $query = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters']);
@@ -1005,26 +604,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $query->limit($limit)->offset($offset);
         }
 
-        return $query->get()->map(function (Book $book) {
-            $bookArray = $book->toArray();
-            $bookArray['_id'] = (string) $book->id;
-
-            if (!isset($bookArray['directoryPath']) && isset($bookArray['directory_path'])) {
-                $bookArray['directoryPath'] = $bookArray['directory_path'];
-            }
-
-            // Transform series to canonical format
-            if (!empty($bookArray['series'])) {
-                $series = [];
-
-                foreach ($bookArray['series'] as $s) {
-                    $series[$s['name']] = $s['pivot']['series_number'] ?? null;
-                }
-                $bookArray['series'] = $series;
-            }
-
-            return $bookArray;
-        })->toArray();
+        return $query->get()->map(
+            fn (Book $book) => $this->getBookDataTransformer()->toExportedBook($book)
+        )->toArray();
     }
 
     public function dumpAllBooks()
@@ -1070,28 +652,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->get()
-                ->map(function (Book $book) {
-                    $releaseDate = null;
-
-                    if ($book->release_date) {
-                        $releaseDate = $book->release_date->toDateString();
-                    }
-
-                    return [
-                        'id' => (string) $book->id,
-                        'title' => (string) $book->title,
-                        'directoryPath' => $book->directory_path,
-                        'coverImage' => $this->buildCoverImageOutput($book->cover_image, $book->directory_path),
-                        'createdAt' => $book->created_at ? $book->created_at->toIso8601String() : null,
-                        'description' => (string) ($book->description ?? ''),
-                        'duration' => (int) ($book->duration ?? 0),
-                        'releaseDate' => $releaseDate,
-                        'audioFileCount' => (int) ($book->audio_file_count ?? 0),
-                        'totalSize' => (int) ($book->total_size ?? 0),
-                        'authors' => $book->authors->pluck('name')->values()->all(),
-                        'narrators' => $book->narrators->pluck('name')->values()->all(),
-                    ];
-                })
+                ->map(fn (Book $book) => $this->getBookDataTransformer()->toRecentBook($book))
                 ->toArray();
         } catch (\Exception $e) {
             Log::error('Error fetching recent books: ' . $e->getMessage());
@@ -1839,224 +1400,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     // --- Placeholder Implementations ---
 
-    private function normalizeCoverImageValue(?string $coverImage): ?string
-    {
-        if ($coverImage === null) {
-            return null;
-        }
-
-        $coverImage = trim($coverImage);
-
-        if ($coverImage === '') {
-            return null;
-        }
-
-        if (str_starts_with($coverImage, 'file://')) {
-            $parsedPath = parse_url($coverImage, PHP_URL_PATH);
-
-            if (is_string($parsedPath) && $parsedPath !== '') {
-                $coverImage = $parsedPath;
-            }
-        }
-
-        $parsedUrl = parse_url($coverImage);
-
-        if (
-            is_array($parsedUrl)
-            && isset($parsedUrl['scheme'])
-            && in_array($parsedUrl['scheme'], ['http', 'https'], true)
-        ) {
-            return $coverImage;
-        }
-
-        $coverImage = str_replace('\\', '/', $coverImage);
-
-        $baseName = basename($coverImage);
-
-        if ($baseName === '') {
-            return null;
-        }
-
-        return $baseName;
-    }
-
-    private function normalizeRelatedIds(array $items): array
-    {
-        $ids = [];
-
-        foreach ($items as $item) {
-            if (is_array($item) && isset($item['id'])) {
-                $ids[] = $item['id'];
-                continue;
-            }
-
-            if (is_string($item) || is_int($item)) {
-                $value = trim((string) $item);
-
-                if ($value !== '') {
-                    $ids[] = $value;
-                }
-            }
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    private function isLikelyIdList(array $items): bool
-    {
-        if (empty($items)) {
-            return false;
-        }
-
-        $ids = $this->normalizeRelatedIds($items);
-
-        if (empty($ids)) {
-            return false;
-        }
-
-        foreach ($ids as $id) {
-            if (!is_string($id) || $id === '' || !is_numeric($id)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     public function createBook(array $data)
     {
         try {
-            $bookId = $data['id'] ?? null;
-            $directoryPath = $data['directory_path'] ?? $data['directoryPath'] ?? null;
-            $releaseDate = $data['release_date'] ?? $data['releaseDate'] ?? null;
-            $needsReview = $data['needs_review'] ?? $data['needsReview'] ?? false;
-            $needsReviewReasons = $data['needs_review_reasons'] ?? $data['needsReviewReasons'] ?? null;
-            $audioFileCount = $data['audio_file_count'] ?? $data['audioFileCount'] ?? null;
-
-            $normalizedCover = $this->normalizeCoverImageValue($data['cover_image'] ?? $data['coverImage'] ?? null);
-
-            $attributes = [
-                'title' => $data['title'],
-                'description' => $data['description'] ?? null,
-                'release_date' => $releaseDate,
-                'cover_image' => $normalizedCover,
-                'language' => $data['language'] ?? 'en',
-                'source' => $data['source'] ?? 'unknown',
-                'series_id' => $data['series_id'] ?? null,
-                'mongo_id' => $data['mongo_id'] ?? null,
-                'directory_path' => $directoryPath,
-                'duration' => $data['duration'] ?? null,
-                'publisher' => $data['publisher'] ?? null,
-                'needs_review' => $needsReview,
-                'needs_review_reasons' => $needsReviewReasons,
-                'audio_file_count' => $audioFileCount,
-                'mongo_record' => $data['mongo_record'] ?? null,
-                'file_tags' => $data['file_tags'] ?? null,
-                'audible_info' => $data['audible_info'] ?? null,
-                'google_books_info' => $data['google_books_info'] ?? null,
-                'hardcover_info' => $data['hardcover_info'] ?? null,
-                'audiobook_bay_info' => $data['audiobook_bay_info'] ?? null,
-            ];
-
-            if ($bookId !== null && is_numeric($bookId)) {
-                $existingBook = Book::withTrashed()->find((int) $bookId);
-
-                if ($existingBook) {
-                    if ($existingBook->trashed()) {
-                        $existingBook->restore();
-                    }
-
-                    $existingBook->update($attributes);
-                    $book = $existingBook;
-                } else {
-                    $book = new Book();
-                    $book->id = (int) $bookId;
-                    $book->fill($attributes);
-                    $book->save();
-                }
-            } else {
-                $book = Book::create($attributes);
-            }
-
-            // Handle authors (support both IDs and names)
-            $authorData = $data['authors'] ?? $data['author'] ?? null;
-
-            if (is_array($authorData)) {
-                if ($this->isLikelyIdList($authorData)) {
-                    $book->authors()->sync($this->normalizeRelatedIds($authorData));
-                } else {
-                    $authorIds = [];
-
-                    foreach ($authorData as $authorName) {
-                        if (is_string($authorName) || is_int($authorName)) {
-                            $name = trim((string) $authorName);
-
-                            if ($name === '') {
-                                continue;
-                            }
-                            $author = Author::firstOrCreate(['name' => $name]);
-                            $authorIds[] = $author->id;
-                        }
-                    }
-                    $book->authors()->sync($authorIds);
-                }
-            }
-
-            // Handle narrators (support both IDs and names)
-            $narratorData = $data['narrators'] ?? $data['narrator'] ?? null;
-
-            if (is_array($narratorData)) {
-                if ($this->isLikelyIdList($narratorData)) {
-                    $book->narrators()->sync($this->normalizeRelatedIds($narratorData));
-                } else {
-                    $narratorIds = [];
-
-                    foreach ($narratorData as $narratorName) {
-                        if (is_string($narratorName) || is_int($narratorName)) {
-                            $name = trim((string) $narratorName);
-
-                            if ($name === '') {
-                                continue;
-                            }
-                            $narrator = Narrator::firstOrCreate(['name' => $name]);
-                            $narratorIds[] = $narrator->id;
-                        }
-                    }
-                    $book->narrators()->sync($narratorIds);
-                }
-            }
-
-            // Handle genres (support both IDs and names)
-            $genreData = $data['genres'] ?? $data['genre'] ?? null;
-
-            if (is_array($genreData)) {
-                if ($this->isLikelyIdList($genreData)) {
-                    $book->genres()->sync($this->normalizeRelatedIds($genreData));
-                } else {
-                    $genreIds = [];
-
-                    foreach ($genreData as $genreName) {
-                        if (is_string($genreName) || is_int($genreName)) {
-                            $name = trim((string) $genreName);
-
-                            if ($name === '') {
-                                continue;
-                            }
-                            $genre = Genre::firstOrCreate(['name' => $name]);
-                            $genreIds[] = $genre->id;
-                        }
-                    }
-                    $book->genres()->sync($genreIds);
-                }
-            }
-
-            if (!empty($data['chapters'])) {
-                foreach ($data['chapters'] as $chapterData) {
-                    $book->chapters()->create($chapterData);
-                }
-            }
-
-            return $book;
+            return $this->getBookMutationService()->createBook($data);
         } catch (\Exception $e) {
             Log::error(
                 'MySqlService createBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
@@ -2069,179 +1416,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     public function updateBook(string $id, array $data)
     {
         try {
-            $book = Book::findOrFail($id);
-
-            $normalizedCover = $this->normalizeCoverImageValue($data['cover_image'] ?? $data['coverImage'] ?? null);
-
-            // Handle publishedYear -> release_date mapping
-            if (isset($data['publishedYear']) && !empty($data['publishedYear']) && is_numeric($data['publishedYear'])) {
-                $data['release_date'] = $data['publishedYear'] . '-01-01';
-            }
-
-            $book->update([
-                'title' => $data['title'] ?? $book->title,
-                'description' => $data['description'] ?? $book->description,
-                'language' => $data['language'] ?? $book->language,
-                'source' => $data['source'] ?? $book->source,
-                'series_id' => $data['series_id'] ?? $book->series_id,
-                'mongo_id' => $data['mongo_id'] ?? $book->mongo_id,
-                'release_date' => $data['release_date'] ?? $book->release_date,
-                'cover_image' => $normalizedCover ?? $book->cover_image,
-                'directory_path' => $data['directory_path'] ?? $data['directoryPath'] ?? $book->directory_path,
-                'duration' => $data['duration'] ?? $book->duration,
-                'publisher' => $data['publisher'] ?? $book->publisher,
-                'needs_review' => $data['needs_review'] ?? $data['needsReview'] ?? $book->needs_review,
-                'needs_review_reasons' => $this->resolveNeedsReviewReasons($data, $book),
-                'audio_file_count' => $data['audio_file_count'] ?? $book->audio_file_count,
-                'mongo_record' => $data['mongo_record'] ?? $book->mongo_record,
-                'file_tags' => $data['file_tags'] ?? $book->file_tags,
-                'audible_info' => $data['audible_info'] ?? $book->audible_info,
-                'google_books_info' => $data['google_books_info'] ?? $book->google_books_info,
-                'hardcover_info' => $data['hardcover_info'] ?? $book->hardcover_info,
-                'audiobook_bay_info' => $data['audiobook_bay_info'] ?? $book->audiobook_bay_info,
-            ]);
-
-            // Handle authors (support both 'authors' and 'author' keys)
-            $authorData = $data['authors'] ?? $data['author'] ?? null;
-
-            if (is_array($authorData)) {
-                if ($this->isLikelyIdList($authorData)) {
-                    $book->authors()->sync($this->normalizeRelatedIds($authorData));
-                } else {
-                    $authorIds = [];
-
-                    foreach ($authorData as $authorName) {
-                        if (is_string($authorName) || is_int($authorName)) {
-                            $name = trim((string) $authorName);
-
-                            if ($name === '') {
-                                continue;
-                            }
-
-                            if (is_numeric($name)) {
-                                $existingAuthor = Author::find($name);
-
-                                if ($existingAuthor) {
-                                    $authorIds[] = $existingAuthor->id;
-                                    continue;
-                                }
-                            }
-
-                            $author = Author::firstOrCreate(['name' => $name]);
-                            $authorIds[] = $author->id;
-                        }
-                    }
-                    $book->authors()->sync($authorIds);
-                }
-            }
-
-            // Handle narrators (support both 'narrators' and 'narrator' keys)
-            $narratorData = $data['narrators'] ?? $data['narrator'] ?? null;
-
-            if (is_array($narratorData)) {
-                if ($this->isLikelyIdList($narratorData)) {
-                    $book->narrators()->sync($this->normalizeRelatedIds($narratorData));
-                } else {
-                    $narratorIds = [];
-
-                    foreach ($narratorData as $narratorName) {
-                        if (is_string($narratorName) || is_int($narratorName)) {
-                            $name = trim((string) $narratorName);
-
-                            if ($name === '') {
-                                continue;
-                            }
-
-                            if (is_numeric($name)) {
-                                $existingNarrator = Narrator::find($name);
-
-                                if ($existingNarrator) {
-                                    $narratorIds[] = $existingNarrator->id;
-                                    continue;
-                                }
-                            }
-
-                            $narrator = Narrator::firstOrCreate(['name' => $name]);
-                            $narratorIds[] = $narrator->id;
-                        }
-                    }
-                    $book->narrators()->sync($narratorIds);
-                }
-            }
-
-            // Handle genres (support both 'genres' and 'genre' keys)
-            $genreData = $data['genres'] ?? $data['genre'] ?? null;
-
-            if (is_array($genreData)) {
-                if ($this->isLikelyIdList($genreData)) {
-                    $book->genres()->sync($this->normalizeRelatedIds($genreData));
-                } else {
-                    $genreIds = [];
-
-                    foreach ($genreData as $genreName) {
-                        if (is_string($genreName) || is_int($genreName)) {
-                            $name = trim((string) $genreName);
-
-                            if ($name === '') {
-                                continue;
-                            }
-
-                            if (is_numeric($name)) {
-                                $existingGenre = Genre::find($name);
-
-                                if ($existingGenre) {
-                                    $genreIds[] = $existingGenre->id;
-                                    continue;
-                                }
-                            }
-
-                            $genre = Genre::firstOrCreate(['name' => $name]);
-                            $genreIds[] = $genre->id;
-                        }
-                    }
-                    $book->genres()->sync($genreIds);
-                }
-            }
-
-            // Handle series (prioritize new 'series' array structure over legacy 'series_name')
-            if (isset($data['series']) && is_array($data['series'])) {
-                // Handle new series array structure from BookController
-                $seriesSyncData = [];
-
-                foreach ($data['series'] as $seriesEntry) {
-                    $seriesName = $seriesEntry['seriesName'] ?? $seriesEntry['name'] ?? null;
-
-                    if ($seriesName) {
-                        $series = Series::firstOrCreate(['name' => $seriesName]);
-                        $seriesSyncData[$series->id] = [
-                            'series_number' => $seriesEntry['number'] ?? null,
-                        ];
-                    }
-                }
-                $book->series()->sync($seriesSyncData);
-            } elseif (array_key_exists('series_name', $data)) {
-                if ($data['series_name']) {
-                    $series = Series::firstOrCreate(['name' => $data['series_name']]);
-                    $book->series()->sync([
-                        $series->id => [
-                            'series_number' => null,
-                        ],
-                    ]);
-                } else {
-                    $book->series()->detach();
-                }
-            }
-
-            if (isset($data['chapters'])) {
-                $book->chapters()->delete();
-
-                foreach ($data['chapters'] as $chapterData) {
-                    $book->chapters()->create($chapterData);
-                }
-            }
-
-            $book->refresh();
-            $book->load(['authors', 'narrators', 'genres', 'series', 'publisher']);
+            $book = $this->getBookMutationService()->updateBook($id, $data);
 
             $bookArray = $book->toArray();
 
@@ -4214,18 +3389,5 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
 
         return $linkedCount;
-    }
-
-    private function resolveNeedsReviewReasons(array $data, Book $book)
-    {
-        if (array_key_exists('needs_review_reasons', $data)) {
-            return $data['needs_review_reasons'];
-        }
-
-        if (array_key_exists('needsReviewReasons', $data)) {
-            return $data['needsReviewReasons'];
-        }
-
-        return $book->needs_review_reasons;
     }
 }
