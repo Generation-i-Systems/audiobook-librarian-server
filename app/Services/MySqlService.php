@@ -24,7 +24,6 @@ use App\Models\UserBookStatus;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use App\Models\ListeningEvent;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -36,6 +35,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private ?BookDataTransformer $bookDataTransformer = null;
     private ?BookMutationService $bookMutationService = null;
     private ?LibraryRepairIssueStore $libraryRepairIssueStore = null;
+    private ?UserLibraryStateService $userLibraryStateService = null;
+    private ?UserAccountService $userAccountService = null;
+    private ?UserReadingStatsService $userReadingStatsService = null;
 
     private function getTrashService(): BookTrashService
     {
@@ -55,6 +57,21 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private function getLibraryRepairIssueStore(): LibraryRepairIssueStore
     {
         return $this->libraryRepairIssueStore ??= app(LibraryRepairIssueStore::class);
+    }
+
+    private function getUserLibraryStateService(): UserLibraryStateService
+    {
+        return $this->userLibraryStateService ??= app(UserLibraryStateService::class);
+    }
+
+    private function getUserAccountService(): UserAccountService
+    {
+        return $this->userAccountService ??= app(UserAccountService::class);
+    }
+
+    private function getUserReadingStatsService(): UserReadingStatsService
+    {
+        return $this->userReadingStatsService ??= app(UserReadingStatsService::class);
     }
 
     public function getBook(string $id, ?int $userId = null): ?array
@@ -1459,134 +1476,32 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getUserById($identifier)
     {
-        // Start with base columns that definitely exist
-        $columns = [
-            'id',
-            'name',
-            'username',
-            'email',
-            'role',
-            'email_verified_at',
-            'created_at',
-            'updated_at',
-        ];
-
-        // Add photo_url if the column exists
-        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'photo_url')) {
-            $columns[] = 'photo_url';
-        }
-
-        // Add google_id if the column exists
-        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'google_id')) {
-            $columns[] = 'google_id';
-        }
-
-        $user = User::select($columns)->find($identifier);
-
-        if (!$user) {
-            return null;
-        }
-
-        // Convert to array and ensure consistent attribute naming
-        $result = [
-            'id' => $user->id,
-            'name' => $user->name,
-            'username' => $user->username,
-            'email' => $user->email,
-            'role' => $user->role,
-            'email_verified_at' => $user->email_verified_at,
-            'created_at' => $user->created_at,
-            'updated_at' => $user->updated_at,
-        ];
-
-        // Handle camelCase attribute naming from CamelCaseAttributeAccess trait
-        $photoUrl = $user->photo_url ?? $user->photoUrl ?? null;
-
-        if ($photoUrl) {
-            $result['photo_url'] = $photoUrl;
-        }
-
-        $googleId = $user->google_id ?? $user->googleId ?? null;
-
-        if ($googleId) {
-            $result['google_id'] = $googleId;
-        }
-
-        return $result;
+        return $this->getUserAccountService()->getUserById($identifier);
     }
 
     public function getUserByCredentials($credentials)
     {
-        if (empty($credentials['password'])) {
-            return null;
-        }
-
-        // Support both email and username login
-        $user = null;
-        if (!empty($credentials['email'])) {
-            $user = User::where('email', $credentials['email'])->first();
-        } elseif (!empty($credentials['username'])) {
-            $user = User::where('username', $credentials['username'])->first();
-        }
-
-        if (!$user) {
-            return null;
-        }
-
-        if (Hash::check($credentials['password'], $user->getAuthPassword())) {
-            return $user->toArray();
-        }
-
-        return null;
+        return $this->getUserAccountService()->getUserByCredentials($credentials);
     }
 
     public function getUserByRememberToken($identifier, $token)
     {
-        $user = User::where('id', $identifier)->where('remember_token', $token)->first();
-
-        return $user ? $user->toArray() : null;
+        return $this->getUserAccountService()->getUserByRememberToken($identifier, $token);
     }
 
     public function createUser(array $data)
     {
-        // Generate username from email if not provided (for Google auth, etc.)
-        $username = $data['username'] ?? explode('@', $data['email'])[0];
-
-        // Ensure username is unique
-        $originalUsername = $username;
-        $counter = 1;
-
-        while (User::where('username', $username)->exists()) {
-            $username = $originalUsername . $counter;
-            $counter++;
-        }
-
-        $user = User::create([
-            'name' => $data['name'],
-            'username' => $username,
-            'email' => $data['email'],
-            'password' => $data['password'], // Hashed automatically by model cast
-            'role' => $data['role'] ?? 'library-user',
-            'email_verified_at' => $data['email_verified_at'] ?? null,
-            'google_id' => $data['google_id'] ?? null,
-            'facebook_id' => $data['facebook_id'] ?? null,
-            'apple_id' => $data['apple_id'] ?? null,
-        ]);
-
-        return (string) $user->id;
+        return $this->getUserAccountService()->createUser($data);
     }
 
     public function updateUser(string $id, array $data)
     {
-        $user = User::findOrFail($id);
-        $user->update($data);
-
-        return $user;
+        return $this->getUserAccountService()->updateUser($id, $data);
     }
 
     public function deleteUser(string $id)
     {
-        return User::where('id', $id)->delete();
+        return $this->getUserAccountService()->deleteUser($id);
     }
 
     /**
@@ -1598,48 +1513,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getUserByEmail(string $email): ?array
     {
-        $user = User::where('email', $email)->first();
-
-        if (!$user) {
-            return null;
-        }
-
-        // Ensure hidden attributes like password are included for auth flow
-        return $user->makeVisible(['password'])->toArray();
+        return $this->getUserAccountService()->getUserByEmail($email);
     }
 
     public function getUserByAppleId(string $appleId): ?array
     {
-        $appleId = trim($appleId);
-
-        if ($appleId === '') {
-            return null;
-        }
-
-        $user = User::where('apple_id', $appleId)->first();
-
-        if (!$user) {
-            return null;
-        }
-
-        return $user->makeVisible(['password'])->toArray();
+        return $this->getUserAccountService()->getUserByAppleId($appleId);
     }
 
     public function getUserByDiscordId(string $discordId): ?array
     {
-        $discordId = trim($discordId);
-
-        if ($discordId === '') {
-            return null;
-        }
-
-        $user = User::where('discord_id', $discordId)->first();
-
-        if (!$user) {
-            return null;
-        }
-
-        return $user->makeVisible(['password'])->toArray();
+        return $this->getUserAccountService()->getUserByDiscordId($discordId);
     }
 
     /**
@@ -1651,7 +1535,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function userExistsByEmail(string $email): bool
     {
-        return User::where('email', $email)->exists();
+        return $this->getUserAccountService()->userExistsByEmail($email);
     }
 
     /**
@@ -1663,26 +1547,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function userExistsByUsername(string $username): bool
     {
-        return User::where('username', $username)->exists();
+        return $this->getUserAccountService()->userExistsByUsername($username);
     }
 
     public function validateUserCredentials($user, array $credentials): bool
     {
-        if (!isset($credentials['password'])) {
-            return false;
-        }
-
-        // If $user is an array (from getUserByCredentials), convert it to a model
-        if (is_array($user)) {
-            $user = User::find($user['id'] ?? null);
-
-            if (!$user) {
-                return false;
-            }
-        }
-
-        // Check if the provided password matches the hashed password in the database
-        return Hash::check($credentials['password'], $user->password);
+        return $this->getUserAccountService()->validateUserCredentials($user, $credentials);
     }
 
     /**
@@ -1694,13 +1564,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getUserByUsername(string $username): ?array
     {
-        $user = User::where('username', $username)->first();
-
-        if (!$user) {
-            return null;
-        }
-
-        return $user->makeVisible(['password'])->toArray();
+        return $this->getUserAccountService()->getUserByUsername($username);
     }
 
     /**
@@ -1710,24 +1574,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getAdminUsers(): array
     {
-        return User::whereIn('role', ['admin', 'super-admin'])->get()->toArray();
+        return $this->getUserAccountService()->getAdminUsers();
     }
 
     public function isAdmin(string $userId): bool
     {
-        $user = User::find($userId);
-
-        return $user && in_array($user->role, ['admin', 'super-admin'], true);
+        return $this->getUserAccountService()->isAdmin($userId);
     }
 
     public function updateRememberToken(string $identifier, string $token): void
     {
-        $user = User::find($identifier);
-
-        if ($user) {
-            $user->setRememberToken($token);
-            $user->save();
-        }
+        $this->getUserAccountService()->updateRememberToken($identifier, $token);
     }
 
     public function getJob(string $jobId): ?array
@@ -2182,19 +2039,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getBookQueue(string $userId): array
     {
-        try {
-            $user = User::find($userId);
-
-            if (!$user) {
-                return [];
-            }
-
-            return $user->queuedBooks()->with(['authors', 'narrators', 'genres', 'series'])->get()->toArray();
-        } catch (\Exception $e) {
-            Log::error('MySqlService getBookQueue failed: ' . $e->getMessage());
-
-            return [];
-        }
+        return $this->getUserLibraryStateService()->getBookQueue($userId);
     }
 
     /**
@@ -2207,41 +2052,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function addBookToQueue(string $userId, string $bookId): bool
     {
-        try {
-            $user = User::find($userId);
-
-            if (!$user) {
-                return false;
-            }
-
-            $book = Book::find($bookId);
-
-            if (!$book) {
-                return false;
-            }
-
-            // Check if book is already in queue
-            if ($user->queuedBooks()->where('book_id', $bookId)->exists()) {
-                return true; // Book already in queue, nothing to do
-            }
-
-            // Get the current highest position
-            $maxPosition = $user->queuedBooks()->max('order') ?? -1;
-
-            // Add book to queue with the next position and current timestamp
-            UserBookStatus::create([
-                'user_id' => (int) $userId,
-                'book_id' => (int) $bookId,
-                'order' => (int) $maxPosition + 1,
-                'status' => 'queue',
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService addBookToQueue failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getUserLibraryStateService()->addBookToQueue($userId, $bookId);
     }
 
     /**
@@ -2254,30 +2065,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function removeBookFromQueue(string $userId, string $bookId): bool
     {
-        try {
-            $user = User::find($userId);
-
-            if (!$user) {
-                return false;
-            }
-
-            $book = Book::find($bookId);
-
-            if (!$book) {
-                return false;
-            }
-
-            UserBookStatus::where('user_id', (int) $userId)
-                ->where('book_id', (int) $bookId)
-                ->where('status', 'queue')
-                ->delete();
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService removeBookFromQueue failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getUserLibraryStateService()->removeBookFromQueue($userId, $bookId);
     }
 
     /**
@@ -2290,49 +2078,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function updateBookQueue(string $userId, array $bookIds): bool
     {
-        try {
-            $user = User::find($userId);
-
-            if (!$user) {
-                return false;
-            }
-
-            $existing = UserBookStatus::where('user_id', (int) $userId)
-                ->where('status', 'queue')
-                ->pluck('book_id')
-                ->map(fn ($id) => (string) $id)
-                ->toArray();
-
-            $target = array_values(array_map(fn ($id) => (string) $id, $bookIds));
-
-            $toDelete = array_diff($existing, $target);
-
-            if ($toDelete !== []) {
-                UserBookStatus::where('user_id', (int) $userId)
-                    ->where('status', 'queue')
-                    ->whereIn('book_id', array_map('intval', $toDelete))
-                    ->delete();
-            }
-
-            foreach ($target as $index => $bookId) {
-                UserBookStatus::updateOrCreate(
-                    [
-                        'user_id' => (int) $userId,
-                        'book_id' => (int) $bookId,
-                    ],
-                    [
-                        'status' => 'queue',
-                        'order' => (int) $index,
-                    ]
-                );
-            }
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService updateBookQueue failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getUserLibraryStateService()->updateBookQueue($userId, $bookIds);
     }
 
     public function resetReadingProgress(string $userId, string $bookId): bool
@@ -2361,97 +2107,58 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getBookmarks(string $userId, string $bookId): array
     {
-        return Bookmark::where('user_id', $userId)->where('book_id', $bookId)->get()->toArray();
+        return $this->getUserLibraryStateService()->getBookmarks($userId, $bookId);
     }
 
     public function getBookmark(string $bookmarkId, string $userId, string $bookId): ?array
     {
-        $bookmark = Bookmark::where('id', $bookmarkId)->where('user_id', $userId)->where('book_id', $bookId)->first();
-
-        return $bookmark ? $bookmark->toArray() : null;
+        return $this->getUserLibraryStateService()->getBookmark($bookmarkId, $userId, $bookId);
     }
 
     public function createBookmark(array $data): string
     {
-        $bookmark = Bookmark::create($data);
-
-        return (string) $bookmark->id;
+        return $this->getUserLibraryStateService()->createBookmark($data);
     }
 
     public function updateBookmark(string $bookmarkId, array $data): bool
     {
-        $bookmark = Bookmark::findOrFail($bookmarkId);
-
-        return $bookmark->update($data);
+        return $this->getUserLibraryStateService()->updateBookmark($bookmarkId, $data);
     }
 
     public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool
     {
-        $bookmark = Bookmark::where('id', $bookmarkId)
-            ->where('user_id', $userId)
-            ->where('book_id', $bookId)
-            ->firstOrFail();
-
-        return $bookmark->delete();
+        return $this->getUserLibraryStateService()->deleteBookmark($bookmarkId, $userId, $bookId);
     }
 
     public function deleteBookmarkById(string $bookmarkId, string $userId): bool
     {
-        $bookmark = Bookmark::where('id', $bookmarkId)
-            ->where('user_id', $userId)
-            ->first();
-
-        if (!$bookmark) {
-            return false;
-        }
-
-        $bookmark->forceDelete();
-
-        return true;
+        return $this->getUserLibraryStateService()->deleteBookmarkById($bookmarkId, $userId);
     }
 
     // EXTERNAL READS / PREVIOUSLY READ
     public function getExternalReads(string $userId, string $bookId): array
     {
-        return ExternalRead::where('user_id', $userId)
-            ->where('book_id', $bookId)
-            ->orderBy('started_at')
-            ->get()
-            ->toArray();
+        return $this->getUserLibraryStateService()->getExternalReads($userId, $bookId);
     }
 
     public function getExternalRead(string $externalReadId, string $userId, string $bookId): ?array
     {
-        $entry = ExternalRead::where('id', $externalReadId)
-            ->where('user_id', $userId)
-            ->where('book_id', $bookId)
-            ->first();
-
-        return $entry ? $entry->toArray() : null;
+        return $this->getUserLibraryStateService()->getExternalRead($externalReadId, $userId, $bookId);
     }
 
     public function createExternalRead(array $data): string
     {
-        $entry = ExternalRead::create($data);
-
-        return (string) $entry->id;
+        return $this->getUserLibraryStateService()->createExternalRead($data);
     }
 
     public function updateExternalRead(string $externalReadId, array $data): bool
     {
-        $entry = ExternalRead::findOrFail($externalReadId);
-
-        return $entry->update($data);
+        return $this->getUserLibraryStateService()->updateExternalRead($externalReadId, $data);
     }
 
     public function deleteExternalRead(string $externalReadId, string $userId, string $bookId): bool
     {
-        $entry = ExternalRead::where('id', $externalReadId)
-            ->where('user_id', $userId)
-            ->where('book_id', $bookId)
-            ->firstOrFail();
-
-        return $entry->delete();
+        return $this->getUserLibraryStateService()->deleteExternalRead($externalReadId, $userId, $bookId);
     }
 
     public function getDocument(string $collection, string $docId): ?array
@@ -2715,17 +2422,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getPendingAccountRequests(): array
     {
-        try {
-            return DB::table('account_requests')
-                ->where('status', 'pending')
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->toArray();
-        } catch (\Exception $e) {
-            Log::error('MySqlService getPendingAccountRequests failed: ' . $e->getMessage());
-
-            return [];
-        }
+        return $this->getUserAccountService()->getPendingAccountRequests();
     }
 
     /**
@@ -2737,15 +2434,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getAccountRequest(string $id): ?array
     {
-        try {
-            $request = DB::table('account_requests')->where('id', $id)->first();
-
-            return $request ? (array) $request : null;
-        } catch (\Exception $e) {
-            Log::error('MySqlService getAccountRequest failed: ' . $e->getMessage());
-
-            return null;
-        }
+        return $this->getUserAccountService()->getAccountRequest($id);
     }
 
     /**
@@ -2757,44 +2446,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function approveAccountRequest(string $id): bool
     {
-        try {
-            DB::beginTransaction();
-
-            // Get the account request
-            $request = DB::table('account_requests')->where('id', $id)->first();
-
-            if (!$request) {
-                DB::rollBack();
-
-                return false;
-            }
-
-            // Update the status to approved
-            DB::table('account_requests')
-                ->where('id', $id)
-                ->update(['status' => 'approved', 'updated_at' => now()]);
-
-            // Create a new user from the account request data
-            $userData = [
-                'name' => $request->name ?? '',
-                'email' => $request->email ?? '',
-                'username' => $request->username ?? '',
-                'password' => Hash::make($request->password ?? Str::random(10)),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-
-            User::create($userData);
-
-            DB::commit();
-
-            return true;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('MySqlService approveAccountRequest failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getUserAccountService()->approveAccountRequest($id);
     }
 
     /**
@@ -2806,20 +2458,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function rejectAccountRequest(string $id): bool
     {
-        try {
-            $updated = DB::table('account_requests')
-                ->where('id', $id)
-                ->update([
-                    'status' => 'rejected',
-                    'updated_at' => now(),
-                ]);
-
-            return $updated > 0;
-        } catch (\Exception $e) {
-            Log::error('MySqlService rejectAccountRequest failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getUserAccountService()->rejectAccountRequest($id);
     }
 
     public function createFollow(string $userId, string $followableType, string $followableId): bool
@@ -3095,28 +2734,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function recordReadingSession(string $userId, string $bookId, array $data): array
     {
-        try {
-            $session = ReadingSession::create([
-                'user_id' => $userId,
-                'book_id' => $bookId,
-                'started_at' => $data['started_at'] ?? now(),
-                'ended_at' => $data['ended_at'] ?? now(),
-                'duration_seconds' => $data['duration_seconds'] ?? 0,
-                'pages' => $data['pages'] ?? null,
-                'position_start' => $data['position_start'] ?? null,
-                'position_end' => $data['position_end'] ?? null,
-                'device' => $data['device'] ?? null,
-            ]);
-
-            return $session->toArray();
-        } catch (\Exception $e) {
-            Log::error('MySqlService recordReadingSession failed: ' . $e->getMessage(), [
-                'userId' => $userId,
-                'bookId' => $bookId,
-            ]);
-
-            throw $e;
-        }
+        return $this->getUserReadingStatsService()->recordReadingSession($userId, $bookId, $data);
     }
 
     /**
@@ -3124,45 +2742,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getDailyStats(string $userId, ?string $from = null, ?string $to = null): array
     {
-        try {
-            $query = ReadingSession::where('user_id', $userId);
-
-            if ($from) {
-                $query->whereDate('started_at', '>=', $from);
-            }
-
-            if ($to) {
-                $query->whereDate('started_at', '<=', $to);
-            }
-
-            return $query->selectRaw('
-                    DATE(started_at) as date,
-                    SUM(duration_seconds) as duration_seconds,
-                    COUNT(*) as sessions,
-                    COUNT(DISTINCT book_id) as books
-                ')
-                ->whereNotNull('started_at')
-                ->groupBy('date')
-                ->orderBy('date')
-                ->get()
-                ->map(function (ReadingSession $row): array {
-                    return [
-                        'date' => (string) $row->getAttribute('date'),
-                        'duration_seconds' => (int) $row->getAttribute('duration_seconds'),
-                        'sessions' => (int) $row->getAttribute('sessions'),
-                        'books' => (int) $row->getAttribute('books'),
-                    ];
-                })
-                ->toArray();
-        } catch (\Exception $e) {
-            Log::error('MySqlService getDailyStats failed: ' . $e->getMessage(), [
-                'userId' => $userId,
-                'from' => $from,
-                'to' => $to,
-            ]);
-
-            return [];
-        }
+        return $this->getUserReadingStatsService()->getDailyStats($userId, $from, $to);
     }
 
     /**
@@ -3170,45 +2750,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getBookStats(string $userId, string $bookId): array
     {
-        try {
-            $stats = ReadingSession::where('user_id', $userId)
-                ->where('book_id', $bookId)
-                ->selectRaw('
-                    SUM(duration_seconds) as total_duration_seconds,
-                    COUNT(*) as sessions,
-                    MIN(started_at) as first_started_at,
-                    MAX(ended_at) as last_ended_at
-                ')
-                ->first();
-
-            if (!$stats) {
-                return [
-                    'total_duration_seconds' => 0,
-                    'sessions' => 0,
-                    'first_started_at' => null,
-                    'last_ended_at' => null,
-                ];
-            }
-
-            return [
-                'total_duration_seconds' => (int) ($stats->getAttribute('total_duration_seconds') ?? 0),
-                'sessions' => (int) ($stats->getAttribute('sessions') ?? 0),
-                'first_started_at' => $this->formatIso8601DateTime($stats->getAttribute('first_started_at')),
-                'last_ended_at' => $this->formatIso8601DateTime($stats->getAttribute('last_ended_at')),
-            ];
-        } catch (\Exception $e) {
-            Log::error('MySqlService getBookStats failed: ' . $e->getMessage(), [
-                'userId' => $userId,
-                'bookId' => $bookId,
-            ]);
-
-            return [
-                'total_duration_seconds' => 0,
-                'sessions' => 0,
-                'first_started_at' => null,
-                'last_ended_at' => null,
-            ];
-        }
+        return $this->getUserReadingStatsService()->getBookStats($userId, $bookId);
     }
 
     /**
@@ -3216,38 +2758,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getUserStats(string $userId): array
     {
-        try {
-            $stats = ReadingSession::where('user_id', $userId)
-                ->selectRaw('
-                    SUM(duration_seconds) as total_duration_seconds,
-                    COUNT(*) as sessions,
-                    COUNT(DISTINCT DATE(started_at)) as active_days
-                ')
-                ->whereNotNull('started_at')
-                ->first();
-
-            $streaks = $this->getStreaks($userId);
-
-            return [
-                'total_duration_seconds' => (int) ($stats?->getAttribute('total_duration_seconds') ?? 0),
-                'sessions' => (int) ($stats?->getAttribute('sessions') ?? 0),
-                'active_days' => (int) ($stats?->getAttribute('active_days') ?? 0),
-                'streak_current' => $streaks['current'] ?? 0,
-                'streak_longest' => $streaks['longest'] ?? 0,
-            ];
-        } catch (\Exception $e) {
-            Log::error('MySqlService getUserStats failed: ' . $e->getMessage(), [
-                'userId' => $userId,
-            ]);
-
-            return [
-                'total_duration_seconds' => 0,
-                'sessions' => 0,
-                'active_days' => 0,
-                'streak_current' => 0,
-                'streak_longest' => 0,
-            ];
-        }
+        return $this->getUserReadingStatsService()->getUserStats($userId);
     }
 
     /**
@@ -3255,70 +2766,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getStreaks(string $userId): array
     {
-        try {
-            $dates = ReadingSession::where('user_id', $userId)
-                ->selectRaw('DISTINCT DATE(started_at) as reading_date')
-                ->whereNotNull('started_at')
-                ->orderBy('reading_date', 'desc')
-                ->pluck('reading_date')
-                ->map(fn ($date) => is_string($date) ? $date : (string) $date)
-                ->values()
-                ->toArray();
-
-            if (empty($dates)) {
-                return [
-                    'current' => 0,
-                    'longest' => 0,
-                    'last_active_date' => null,
-                ];
-            }
-
-            $lastActiveDate = $dates[0];
-            $today = now()->format('Y-m-d');
-            $yesterday = now()->subDay()->format('Y-m-d');
-
-            $currentStreak = 0;
-            $longestStreak = 0;
-            $tempStreak = 0;
-
-            foreach ($dates as $i => $date) {
-                if ($i === 0) {
-                    $tempStreak = 1;
-                } else {
-                    $prevDate = $dates[$i - 1];
-                    $currentDate = strtotime($date);
-                    $prevDateTime = strtotime($prevDate);
-
-                    if ($currentDate === $prevDateTime - 86400) {
-                        $tempStreak++;
-                    } else {
-                        $tempStreak = 1;
-                    }
-                }
-
-                $longestStreak = max($longestStreak, $tempStreak);
-            }
-
-            if ($lastActiveDate === $today || $lastActiveDate === $yesterday) {
-                $currentStreak = $tempStreak;
-            }
-
-            return [
-                'current' => $currentStreak,
-                'longest' => $longestStreak,
-                'last_active_date' => $dates[0] ?? null,
-            ];
-        } catch (\Exception $e) {
-            Log::error('MySqlService getStreaks failed: ' . $e->getMessage(), [
-                'userId' => $userId,
-            ]);
-
-            return [
-                'current' => 0,
-                'longest' => 0,
-                'last_active_date' => null,
-            ];
-        }
+        return $this->getUserReadingStatsService()->getStreaks($userId);
     }
 
     public function createReview(array $data): string
