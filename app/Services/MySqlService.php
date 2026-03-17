@@ -38,6 +38,8 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private ?UserLibraryStateService $userLibraryStateService = null;
     private ?UserAccountService $userAccountService = null;
     private ?UserReadingStatsService $userReadingStatsService = null;
+    private ?WorkflowMessagingService $workflowMessagingService = null;
+    private ?UserActivityService $userActivityService = null;
 
     private function getTrashService(): BookTrashService
     {
@@ -72,6 +74,16 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private function getUserReadingStatsService(): UserReadingStatsService
     {
         return $this->userReadingStatsService ??= app(UserReadingStatsService::class);
+    }
+
+    private function getWorkflowMessagingService(): WorkflowMessagingService
+    {
+        return $this->workflowMessagingService ??= app(WorkflowMessagingService::class);
+    }
+
+    private function getUserActivityService(): UserActivityService
+    {
+        return $this->userActivityService ??= app(UserActivityService::class);
     }
 
     public function getBook(string $id, ?int $userId = null): ?array
@@ -1589,26 +1601,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getJob(string $jobId): ?array
     {
-        $job = Job::find($jobId);
-
-        return $job ? $job->toArray() : null;
+        return $this->getWorkflowMessagingService()->getJob($jobId);
     }
 
     public function getJobs(): array
     {
-        return Job::query()
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function (Job $job): array {
-                return [
-                    'id' => (string) $job->id,
-                    'type' => (string) $job->type,
-                    'status' => (string) $job->status,
-                    'data' => $job->payload,
-                    'startedAt' => $job->created_at ? $job->created_at->toIso8601String() : null,
-                ];
-            })
-            ->toArray();
+        return $this->getWorkflowMessagingService()->getJobs();
     }
 
     public function listJobs(
@@ -1661,7 +1659,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getJobCount(): int
     {
-        return Job::count();
+        return $this->getWorkflowMessagingService()->getJobCount();
     }
 
     public function clearJobs(): bool
@@ -1768,26 +1766,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
     {
-        $query = Message::query();
-
-        if ($userId) {
-            $query->where('recipient_id', $userId);
-        }
-
-        if (!$includeAcknowledged) {
-            $query->whereNull('acknowledged_at');
-        }
-
-        return $query->with('sender')
-            ->limit($limit)
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->toArray();
+        return $this->getWorkflowMessagingService()->getMessages($userId, $includeAcknowledged, $limit);
     }
 
     public function getUsersForMessaging(): array
     {
-        return User::all()->toArray();
+        return $this->getWorkflowMessagingService()->getUsersForMessaging();
     }
 
     /**
@@ -1846,145 +1830,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getUserActivityData(string $userId): array
     {
-        try {
-            /** @var User|null $user */
-            $user = User::with([
-                'badges.badge',
-                'progress.book',
-                'reviews.book',
-                'recommendationsReceived.book',
-                'recommendationsReceived.sender',
-                'bookStatuses.book'
-            ])->find($userId);
-
-            if (!$user) {
-                return [];
-            }
-
-            // Get all badges to show unearned ones, sorted by progression
-            $allBadges = \App\Models\Badge::active()->get()->sort(function ($a, $b) {
-                if ($a->sort_order !== $b->sort_order) {
-                    return $a->sort_order <=> $b->sort_order;
-                }
-
-                // Tier weight for reliable progression (Bronze -> Silver -> Gold)
-                $tiers = ['bronze' => 1, 'silver' => 2, 'gold' => 3, 'platinum' => 4, 'diamond' => 5];
-                $weightA = $tiers[$a->tier] ?? 99;
-                $weightB = $tiers[$b->tier] ?? 99;
-
-                if ($weightA !== $weightB) {
-                    return $weightA <=> $weightB;
-                }
-
-                return strcmp($a->name, $b->name);
-            });
-            $earnedBadgeIds = $user->badges->pluck('badge_id')->toArray();
-
-            $badgesByCategory = $allBadges->groupBy('category')->map(function ($badges) use ($earnedBadgeIds, $user) {
-                // Filter to show all earned badges + the first unearned one (next level)
-                $filteredBadges = collect([]);
-                $foundNextUnearned = false;
-
-                foreach ($badges as $badge) {
-                    $isEarned = in_array($badge->id, $earnedBadgeIds);
-
-                    if ($isEarned) {
-                        $filteredBadges->push($badge);
-                    } elseif (!$foundNextUnearned) {
-                        $filteredBadges->push($badge);
-                        $foundNextUnearned = true;
-                    }
-                }
-
-                return $filteredBadges->map(function (\App\Models\Badge $badge) use ($earnedBadgeIds, $user): array {
-                    $isEarned = in_array($badge->id, $earnedBadgeIds);
-                    $userBadge = $isEarned ? $user->badges->firstWhere('badge_id', $badge->id) : null;
-
-                    $iconPath = "images/badges/{$badge->key}.svg";
-                    $hasIconFile = file_exists(public_path($iconPath));
-
-                    return [
-                        'id' => $badge->id,
-                        'name' => $badge->name,
-                        'icon' => $hasIconFile ? "/{$iconPath}" : null, // Use SVG if exists
-                        'emoji' => $badge->icon, // Original emoji
-                        'description' => $badge->description,
-                        'tier' => $badge->tier,
-                        'is_earned' => $isEarned,
-                        'earned_at' => $userBadge?->earned_at,
-                    ];
-                })->all();
-            });
-
-            // Derive progress from ListeningEvents (New System)
-            $listeningEvents = \App\Models\ListeningEvent::where('user_id', $userId)
-                ->with('book')
-                ->orderBy('timestamp_ms', 'desc')
-                ->get()
-                ->groupBy('book_id');
-
-            $derivedProgress = $listeningEvents->map(function ($events) {
-                /** @var ListeningEvent $latest */
-                $latest = $events->first();
-                /** @var Book|null $book */
-                $book = $latest->book;
-
-                // Calculate percentage
-                $percentage = 0;
-                $metadata = $latest->metadata ?? [];
-                if (isset($metadata['progress_percentage'])) {
-                    $percentage = $metadata['progress_percentage'];
-                } elseif ($book instanceof Book && $book->duration) {
-                    $percentage = ($latest->position_ms / ($book->duration * 1000)) * 100;
-                }
-
-                $isCompleted = $latest->event_type === 'BOOK_FINISH' || $latest->event_type === 'BOOK_MARK_COMPLETE' || $percentage >= 95;
-
-                return [
-                    'book_id' => $latest->book_id,
-                    'book_title' => $book ? $book->title : 'Unknown Book',
-                    'percentage' => (float) $percentage,
-                    'last_listened_at' => \Carbon\Carbon::createFromTimestampMs($latest->timestamp_ms),
-                    'completed' => $isCompleted,
-                ];
-            })->values();
-
-            // Derive statuses from listening activity
-            $derivedStatuses = $derivedProgress->map(function ($item) {
-                return [
-                    'book_id' => $item['book_id'],
-                    'book_title' => $item['book_title'],
-                    'status' => $item['completed'] ? 'Finished' : 'In Progress',
-                    'updated_at' => $item['last_listened_at'],
-                ];
-            });
-
-            return [
-                'badges_by_category' => $badgesByCategory->toArray(),
-                'progress' => $derivedProgress->toArray(),
-                'reviews' => $user->reviews->map(fn ($r) => [
-                    'book_id' => $r->book_id,
-                    'book_title' => $r->book->title,
-                    'comment' => $r->comment,
-                    'age_rating' => $r->age_rating,
-                    'content_rating' => $r->content_rating,
-                    'created_at' => $r->created_at,
-                ])->toArray(),
-                'recommendations' => $user->recommendationsReceived->map(fn ($rec) => [
-                    'book_id' => $rec->book_id,
-                    'book_title' => $rec->book->title,
-                    'sender_name' => $rec->sender?->name,
-                    'message' => $rec->message,
-                    'created_at' => $rec->created_at,
-                    'acknowledged_at' => $rec->acknowledged_at,
-                ])->toArray(),
-                'statuses' => $derivedStatuses->toArray(),
-                'tips' => $this->getBadgeTips($userId),
-            ];
-        } catch (\Exception $e) {
-            Log::error('MySqlService getUserActivityData failed: ' . $e->getMessage());
-            return [];
-        }
+        return $this->getUserActivityService()->getUserActivityData($userId);
     }
 
     /**
@@ -1995,39 +1841,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getBadgeTips(string $userId): array
     {
-        $allBadges = \App\Models\Badge::active()->ordered()->get();
-        $earnedBadgeIds = \App\Models\UserBadge::where('user_id', $userId)->pluck('badge_id')->toArray();
-
-        $tips = [];
-        $categories = $allBadges->groupBy('category');
-
-        foreach ($categories as $category => $badges) {
-            // Filter out earned badges
-            $unearnedBadges = $badges->filter(function ($badge) use ($earnedBadgeIds) {
-                return !in_array($badge->id, $earnedBadgeIds);
-            });
-
-            if ($unearnedBadges->isEmpty()) {
-                continue;
-            }
-
-            // Get the first unearned badge in the sequence
-            $nextBadge = $unearnedBadges->first();
-
-            $iconPath = "images/badges/{$nextBadge->key}.svg";
-            $hasIconFile = file_exists(public_path($iconPath));
-
-            $tips[] = [
-                'category' => $category,
-                'badge_name' => $nextBadge->name,
-                'description' => $nextBadge->description,
-                'tip' => "Aim for the '{$nextBadge->name}' badge: {$nextBadge->description}",
-                'icon' => $hasIconFile ? "/{$iconPath}" : null,
-                'emoji' => $nextBadge->icon,
-            ];
-        }
-
-        return $tips;
+        return $this->getUserActivityService()->getBadgeTips($userId);
     }
 
     /**
@@ -2463,19 +2277,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function createFollow(string $userId, string $followableType, string $followableId): bool
     {
-        try {
-            return DB::table('follows')->insert([
-                'user_id' => $userId,
-                'followable_type' => $followableType,
-                'followable_id' => $followableId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        } catch (\Exception $e) {
-            Log::error('MySqlService createFollow failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getWorkflowMessagingService()->createFollow($userId, $followableType, $followableId);
     }
 
     public function createGenre(array $data)
@@ -2485,43 +2287,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function createMessage(array $messageData): ?string
     {
-        try {
-            $message = Message::create([
-                'sender_id' => $messageData['sender_id'],
-                'recipient_id' => $messageData['recipient_id'],
-                'content' => $messageData['content'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            return (string) $message->id;
-        } catch (\Exception $e) {
-            Log::error('MySqlService createMessage failed: ' . $e->getMessage());
-
-            return null;
-        }
+        return $this->getWorkflowMessagingService()->createMessage($messageData);
     }
 
     public function acknowledgeMessage(string $messageId): bool
     {
-        $id = (int) $messageId;
-
-        if ($id <= 0) {
-            return false;
-        }
-
-        try {
-            $updated = Message::query()
-                ->whereKey($id)
-                ->whereNull('acknowledged_at')
-                ->update(['acknowledged_at' => now()]);
-
-            return $updated > 0;
-        } catch (\Exception $e) {
-            Log::error('MySqlService acknowledgeMessage failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getWorkflowMessagingService()->acknowledgeMessage($messageId);
     }
 
     public function createNarrator(array $data)
@@ -2565,53 +2336,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function createJob(array $data)
     {
-        try {
-            $job = Job::create([
-                'user_id' => $data['user_id'],
-                'content' => $data['content'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService createJob failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getWorkflowMessagingService()->createJob($data);
     }
 
     public function deleteFollow(string $userId, string $followableType, string $followableId): bool
     {
-        try {
-            return DB::table('follows')
-                ->where('user_id', $userId)
-                ->where('followable_type', $followableType)
-                ->where('followable_id', $followableId)
-                ->delete() > 0;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteFollow failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getWorkflowMessagingService()->deleteFollow($userId, $followableType, $followableId);
     }
 
     public function deleteJob(string $jobId): bool
     {
-        try {
-            $job = Job::where('id', $jobId)->first();
-
-            if (!$job) {
-                return false;
-            }
-            $job->delete();
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteJob failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getWorkflowMessagingService()->deleteJob($jobId);
     }
 
     public function deleteMessage(string $messageId): bool
