@@ -9,7 +9,6 @@ use App\Contracts\DocumentStatsServiceInterface;
 use App\Models\Author;
 use App\Models\Badge;
 use App\Models\Book;
-use App\Models\Bookmark;
 use App\Models\BookProgress;
 use App\Models\ExternalRead;
 use App\Models\Genre;
@@ -40,6 +39,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private ?UserReadingStatsService $userReadingStatsService = null;
     private ?WorkflowMessagingService $workflowMessagingService = null;
     private ?UserActivityService $userActivityService = null;
+    private ?GenericDocumentService $genericDocumentService = null;
 
     private function getTrashService(): BookTrashService
     {
@@ -84,6 +84,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private function getUserActivityService(): UserActivityService
     {
         return $this->userActivityService ??= app(UserActivityService::class);
+    }
+
+    private function getGenericDocumentService(): GenericDocumentService
+    {
+        return $this->genericDocumentService ??= app(GenericDocumentService::class);
     }
 
     public function getBook(string $id, ?int $userId = null): ?array
@@ -1617,35 +1622,19 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         string $direction = 'DESC',
         ?string $startAfterId = null
     ): array {
-        $query = Job::query();
-
-        if ($type) {
-            $query->where('type', $type);
-        }
-
-        if ($status) {
-            $query->where('status', $status);
-        }
-
-        if ($startAfterId) {
-            $startJob = Job::find($startAfterId);
-
-            if ($startJob) {
-                $query->where('created_at', '<', $startJob->created_at);
-            }
-        }
-
-        return $query->orderBy($orderBy, $direction)
-            ->limit($limit)
-            ->get()
-            ->toArray();
+        return $this->getWorkflowMessagingService()->listJobs(
+            $type,
+            $status,
+            $limit,
+            $orderBy,
+            $direction,
+            $startAfterId
+        );
     }
 
     public function updateJob(string $jobId, array $data): bool
     {
-        $job = Job::findOrFail($jobId);
-
-        return $job->update($data);
+        return $this->getWorkflowMessagingService()->updateJob($jobId, $data);
     }
 
     public function updateJobStatus(string $jobId, string $type, string $status, array $metadata = []): bool
@@ -1664,9 +1653,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function clearJobs(): bool
     {
-        Job::truncate();
-
-        return true;
+        return $this->getWorkflowMessagingService()->clearJobs();
     }
 
     public function jobExistsByDirectoryPath(string $directoryPath): bool
@@ -1977,69 +1964,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getDocument(string $collection, string $docId): ?array
     {
-        $modelMap = [
-            'users' => User::class,
-            'messages' => Message::class,
-            'genres' => Genre::class,
-            'authors' => Author::class,
-            'series' => Series::class,
-            'books' => Book::class,
-            'jobs' => Job::class,
-            'bookmarks' => Bookmark::class,
-            'external_reads' => ExternalRead::class,
-            'narrators' => Narrator::class,
-        ];
-
-        if (!isset($modelMap[$collection])) {
-            return null;
-        }
-
-        $modelClass = $modelMap[$collection];
-
-        try {
-            $instance = $modelClass::find($docId);
-
-            return $instance ? $instance->toArray() : null;
-        } catch (\Exception $e) {
-            Log::error(
-                "Failed to get document from {$collection} (ID: {$docId}): " . $e->getMessage()
-            );
-
-            return null;
-        }
+        return $this->getGenericDocumentService()->getDocument($collection, $docId);
     }
 
     public function updateDocument(string $collection, string $id, array $data): bool
     {
-        $modelMap = [
-            'users' => User::class,
-            'messages' => Message::class,
-            'genres' => Genre::class,
-            'authors' => Author::class,
-            'series' => Series::class,
-            'books' => Book::class,
-            'jobs' => Job::class,
-            'bookmarks' => Bookmark::class,
-            'external_reads' => ExternalRead::class,
-        ];
-
-        if (!isset($modelMap[$collection])) {
-            return false;
-        }
-
-        $modelClass = $modelMap[$collection];
-
-        try {
-            $instance = $modelClass::findOrFail($id);
-
-            return $instance->update($data);
-        } catch (\Exception $e) {
-            Log::error(
-                "Failed to update document in {$collection} (ID: {$id}): " . $e->getMessage()
-            );
-
-            return false;
-        }
+        return $this->getGenericDocumentService()->updateDocument($collection, $id, $data);
     }
 
     public function followExists(string $userId, string $followableType, string $followableId): bool

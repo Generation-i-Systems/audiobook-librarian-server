@@ -12,6 +12,13 @@ use Illuminate\Support\Facades\Log;
 
 class WorkflowMessagingService
 {
+    private ?JobWorkflowService $jobWorkflowService = null;
+
+    private function getJobWorkflowService(): JobWorkflowService
+    {
+        return $this->jobWorkflowService ??= app(JobWorkflowService::class);
+    }
+
     public function getJob(string $jobId): ?array
     {
         $job = Job::find($jobId);
@@ -173,5 +180,26 @@ class WorkflowMessagingService
 
             return false;
         }
+    }
+
+    public function listJobs(
+        ?string $type = null,
+        ?string $status = null,
+        int $limit = 50,
+        string $orderBy = 'updated_at',
+        string $direction = 'DESC',
+        ?string $startAfterId = null
+    ): array {
+        return $this->getJobWorkflowService()->listJobs($type, $status, $limit, $orderBy, $direction, $startAfterId);
+    }
+
+    public function updateJob(string $jobId, array $data): bool
+    {
+        return $this->getJobWorkflowService()->updateJob($jobId, $data);
+    }
+
+    public function clearJobs(): bool
+    {
+        return $this->getJobWorkflowService()->clearJobs();
     }
 }
