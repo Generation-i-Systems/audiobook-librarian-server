@@ -10,6 +10,8 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use ZipArchive;
 
 class SkinController extends Controller
 {
@@ -60,7 +62,7 @@ class SkinController extends Controller
         }
     }
 
-    public function download(int $id): Response
+    public function download(int $id): Response|BinaryFileResponse
     {
         try {
             $skin = $this->skinService->getSkin($id);
@@ -69,18 +71,98 @@ class SkinController extends Controller
                 return response('Skin not found', 404);
             }
 
-            $filePath = Storage::disk('local')->path($skin['file_path']);
+            $skinFilePath = $skin['file_path'] ?? $skin['filePath'] ?? null;
+
+            if (! is_string($skinFilePath) || $skinFilePath === '') {
+                return response('File not found', 404);
+            }
+
+            $filePath = Storage::disk('local')->path($skinFilePath);
+
+            if (! file_exists($filePath)) {
+                $legacyFilePath = storage_path('app/' . ltrim($skinFilePath, '/'));
+                if (file_exists($legacyFilePath)) {
+                    $filePath = $legacyFilePath;
+                }
+            }
+
+            if (! file_exists($filePath)) {
+                $filePath = $this->skinService->buildZip($id);
+            }
 
             if (! file_exists($filePath)) {
                 return response('File not found', 404);
             }
 
-            \App\Models\Skin::find($id)->incrementDownloadCount();
+            $filePath = $this->repairLegacySkinZipIfNeeded($filePath, $id);
 
-            return response()->download($filePath, $skin['name'] . '.zip');
+            if ($skinModel = \App\Models\Skin::find($id)) {
+                $skinModel->incrementDownloadCount();
+            }
+
+            return response()->download($filePath, ($skin['name'] ?? 'skin') . '.zip');
         } catch (\Exception $e) {
             return response($e->getMessage(), 500);
         }
+    }
+
+    private function repairLegacySkinZipIfNeeded(string $filePath, int $skinId): string
+    {
+        $zip = new ZipArchive();
+        if ($zip->open($filePath) !== true) {
+            return $filePath;
+        }
+
+        $entries = [];
+        $requiresRepair = false;
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $originalName = $zip->getNameIndex($i);
+            $repairedName = $this->repairLegacyZipEntryName($originalName);
+            $entries[] = [$originalName, $repairedName, $zip->getFromIndex($i), str_ends_with($originalName, '/')];
+            if ($originalName !== $repairedName) {
+                $requiresRepair = true;
+            }
+        }
+        $zip->close();
+
+        if (! $requiresRepair) {
+            return $filePath;
+        }
+
+        $repairedPath = storage_path("app/skins/{$skinId}/skin_repaired_" . time() . '.zip');
+        if (! is_dir(dirname($repairedPath))) {
+            mkdir(dirname($repairedPath), 0755, true);
+        }
+
+        $repairedZip = new ZipArchive();
+        if ($repairedZip->open($repairedPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return $filePath;
+        }
+
+        foreach ($entries as [$originalName, $repairedName, $content, $isDirectory]) {
+            if ($isDirectory) {
+                $repairedZip->addEmptyDir(rtrim($repairedName, '/'));
+                continue;
+            }
+
+            $repairedZip->addFromString($repairedName, $content ?: '');
+        }
+
+        $repairedZip->close();
+
+        return $repairedPath;
+    }
+
+    private function repairLegacyZipEntryName(string $entryName): string
+    {
+        return match (true) {
+            $entryName === 'nifest.json' => 'manifest.json',
+            $entryName === 'ADME.md' => 'README.md',
+            str_starts_with($entryName, 'sets/') => 'as' . $entryName,
+            str_starts_with($entryName, 'eview') => 'pr' . $entryName,
+            default => $entryName,
+        };
     }
 
     public function store(Request $request): JsonResponse
