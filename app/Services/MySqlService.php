@@ -10,16 +10,10 @@ use App\Models\Author;
 use App\Models\Badge;
 use App\Models\Book;
 use App\Models\BookProgress;
-use App\Models\ExternalRead;
 use App\Models\Genre;
-use App\Models\Job;
-use App\Models\ListeningStatistic;
-use App\Models\Message;
 use App\Models\Narrator;
-use App\Models\ReadingSession;
 use App\Models\Series;
 use App\Models\User;
-use App\Models\UserBookStatus;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +36,8 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private ?GenericDocumentService $genericDocumentService = null;
     private ?TaxonomyService $taxonomyService = null;
     private ?AdminMaintenanceService $adminMaintenanceService = null;
+    private ?TokenMaintenanceService $tokenMaintenanceService = null;
+    private ?LegacyCompatibilityService $legacyCompatibilityService = null;
 
     private function getTrashService(): BookTrashService
     {
@@ -101,6 +97,16 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private function getAdminMaintenanceService(): AdminMaintenanceService
     {
         return $this->adminMaintenanceService ??= app(AdminMaintenanceService::class);
+    }
+
+    private function getTokenMaintenanceService(): TokenMaintenanceService
+    {
+        return $this->tokenMaintenanceService ??= app(TokenMaintenanceService::class);
+    }
+
+    private function getLegacyCompatibilityService(): LegacyCompatibilityService
+    {
+        return $this->legacyCompatibilityService ??= app(LegacyCompatibilityService::class);
     }
 
     public function getBook(string $id, ?int $userId = null): ?array
@@ -1651,11 +1657,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function updateJobStatus(string $jobId, string $type, string $status, array $metadata = []): bool
     {
-        $job = Job::firstOrNew(['id' => $jobId]);
-        $job->type = $type;
-        $job->status = $status;
-        $job->metadata = array_merge($job->metadata ?? [], $metadata);
-        return $job->save();
+        return $this->getLegacyCompatibilityService()->updateJobStatus($jobId, $type, $status, $metadata);
     }
 
     public function getJobCount(): int
@@ -1670,7 +1672,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function jobExistsByDirectoryPath(string $directoryPath): bool
     {
-        return Job::where('directory_path', $directoryPath)->exists();
+        return $this->getLegacyCompatibilityService()->jobExistsByDirectoryPath($directoryPath);
     }
 
     public function bookExistsByDirectoryPath(string $directoryPath): bool
@@ -1922,26 +1924,22 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function followExists(string $userId, string $followableType, string $followableId): bool
     {
-        return false;
+        return $this->getLegacyCompatibilityService()->followExists($userId, $followableType, $followableId);
     }
 
     public function getQueueCollection($name)
     {
-        return null;
+        return $this->getLegacyCompatibilityService()->getQueueCollection($name);
     }
 
     public function getClient()
     {
-        return null; // MySQL does not have a direct "client" object like NoSQL databases
+        return $this->getLegacyCompatibilityService()->getClient();
     }
 
     public function cleanupOldJobs(int $daysOld): int
     {
-        $deletedCount = Job::where('created_at', '<=', now()->subDays($daysOld))
-            ->whereIn('status', ['completed', 'failed', 'cancelled'])
-            ->delete();
-
-        return $deletedCount;
+        return $this->getTokenMaintenanceService()->cleanupOldJobs($daysOld);
     }
 
     public function findOrCreateMany(string $type, array $items): array
@@ -2022,28 +2020,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function createApiToken(array $tokenData): ?string
     {
-        try {
-            $id = DB::table('api_tokens')->insertGetId($tokenData);
-
-            return (string) $id;
-        } catch (\Exception $e) {
-            Log::error('MySqlService createApiToken failed: ' . $e->getMessage());
-
-            return null;
-        }
+        return $this->getTokenMaintenanceService()->createApiToken($tokenData);
     }
 
     public function getApiTokenByValue(string $tokenValue): ?array
     {
-        try {
-            $row = DB::table('api_tokens')->where('token', $tokenValue)->first();
-
-            return $row ? (array) $row : null;
-        } catch (\Exception $e) {
-            Log::error('MySqlService getApiTokenByValue failed: ' . $e->getMessage());
-
-            return null;
-        }
+        return $this->getTokenMaintenanceService()->getApiTokenByValue($tokenValue);
     }
 
     /**
@@ -2055,17 +2037,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function deleteApiTokenByValue(string $tokenValue): bool
     {
-        try {
-            $deleted = DB::table('api_tokens')
-                ->where('token', $tokenValue)
-                ->delete();
-
-            return $deleted > 0;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteApiTokenByValue failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getTokenMaintenanceService()->deleteApiTokenByValue($tokenValue);
     }
 
     /**
@@ -2269,65 +2241,6 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function linkNonLibraryBooks(): int
     {
-        $linkedCount = 0;
-        $models = [
-            ExternalRead::class,
-            ListeningStatistic::class,
-            ReadingSession::class,
-            UserBookStatus::class,
-        ];
-
-        foreach ($models as $modelClass) {
-            $records = $modelClass::whereNull('book_id')
-                ->whereNotNull('title')
-                ->whereNotNull('author')
-                ->get();
-
-            foreach ($records as $record) {
-                $book = Book::where('title', $record->title)
-                    ->whereHas('authors', function ($query) use ($record) {
-                        $query->where('name', 'like', '%' . $record->author . '%');
-                    })
-                    ->first();
-
-                if ($book) {
-                    $record->book_id = $book->id;
-                    $record->save();
-                    $linkedCount++;
-
-                    // Create a message for the user if user_id is available
-                    $recipientId = null;
-                    if (isset($record->user_id)) {
-                        $recipientId = (int) $record->user_id;
-                    } elseif (isset($record->deviceId)) {
-                        // In some models user_id might be stored in device_id field temporarily or vice versa
-                        $recipientId = (int) $record->deviceId;
-                    }
-
-                    if ($recipientId) {
-                        $content = "Your statistical data for '";
-                        $content .= $record->title;
-                        $content .= "' has been linked to '";
-                        $content .= $book->title;
-                        $content .= "' in the library.";
-
-                        Message::create([
-                            'sender_id' => null, // System message
-                            'recipient_id' => $recipientId,
-                            'type' => 'book_linked',
-                            'content' => $content,
-                            'payload' => [
-                                'book_id' => $book->id,
-                                'title' => $book->title,
-                                'original_title' => $record->title,
-                                'original_author' => $record->author,
-                            ],
-                        ]);
-                    }
-                }
-            }
-        }
-
-        return $linkedCount;
+        return $this->getLegacyCompatibilityService()->linkNonLibraryBooks();
     }
 }
