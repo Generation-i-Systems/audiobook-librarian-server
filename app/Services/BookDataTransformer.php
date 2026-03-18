@@ -87,7 +87,7 @@ class BookDataTransformer
     {
         $coverUrl = null;
         if ($book->cover_image) {
-            $coverUrl = request()->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover';
+            $coverUrl = $this->normalizeCoverUrl(request()->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover');
         }
 
         $baseData = [
@@ -196,7 +196,7 @@ class BookDataTransformer
         }
 
         if (str_starts_with($coverImage, 'http://') || str_starts_with($coverImage, 'https://')) {
-            return $coverImage;
+            return $this->normalizeCoverUrl($coverImage);
         }
 
         $baseName = basename($coverImage);
@@ -212,6 +212,15 @@ class BookDataTransformer
         }
 
         return $directoryPath . '/' . $baseName;
+    }
+
+    private function normalizeCoverUrl(string $url): string
+    {
+        if (str_starts_with($url, 'http://')) {
+            return 'https://' . substr($url, 7);
+        }
+
+        return $url;
     }
 
     private function transformUserData(Book $book): array

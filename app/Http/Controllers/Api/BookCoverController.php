@@ -30,16 +30,6 @@ class BookCoverController extends Controller
             ], 404);
         }
 
-        // Hide needs_review books unless explicitly requested
-        $includeNeedsReview = request()->boolean('includeNeedsReview', request()->boolean('include_needs_review', false));
-        $isNeedsReview = !empty($book['needs_review']) || !empty($book['needsReview']);
-        if ($isNeedsReview && !$includeNeedsReview) {
-            return response()->json([
-                'error' => 'Cover not found',
-                'message' => 'Cover image not available for a book pending review',
-            ], 404);
-        }
-
         if (empty($book['coverImage'])) {
             return response()->json([
                 'error' => 'Cover not found',

@@ -515,17 +515,17 @@ class BookController extends Controller
     protected function processCoverImage(?string $coverImage, ?string $directoryPath = null): string
     {
         if (empty($coverImage)) {
-            return asset('images/placeholder.png');
+            return $this->normalizeCoverImageUrl(asset('images/placeholder.png'));
         }
 
         // If it's already a full URL, return as-is (avoid double processing)
         if (Str::startsWith($coverImage, ['http://', 'https://'])) {
-            return $coverImage;
+            return $this->normalizeCoverImageUrl($coverImage);
         }
 
         // If it's an absolute path (like /images/placeholder.png), convert to asset URL
         if (Str::startsWith($coverImage, '/')) {
-            return url($coverImage);
+            return $this->normalizeCoverImageUrl(url($coverImage));
         }
 
         // Handle relative paths: always prefer directoryPath + basename when available.
@@ -546,6 +546,15 @@ class BookController extends Controller
 
         $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($finalCoverPath));
 
-        return url('/cover/' . $encodedPath);
+        return $this->normalizeCoverImageUrl(url('/cover/' . $encodedPath));
+    }
+
+    protected function normalizeCoverImageUrl(string $url): string
+    {
+        if (Str::startsWith($url, 'http://')) {
+            return 'https://' . substr($url, 7);
+        }
+
+        return $url;
     }
 }

@@ -76,15 +76,15 @@ trait ProcessesBookData
     protected function processCoverImage(?string $coverImage, ?string $directoryPath = null): string
     {
         if (empty($coverImage)) {
-            return asset('images/placeholder.png');
+            return $this->normalizeCoverImageUrl(asset('images/placeholder.png'));
         }
 
         if (Str::startsWith($coverImage, ['http://', 'https://'])) {
-            return $coverImage;
+            return $this->normalizeCoverImageUrl($coverImage);
         }
 
         if (Str::startsWith($coverImage, '/')) {
-            return url($coverImage);
+            return $this->normalizeCoverImageUrl(url($coverImage));
         }
 
         $coverFilename = basename($coverImage);
@@ -101,6 +101,15 @@ trait ProcessesBookData
         }
 
         $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($finalCoverPath));
-        return url('/cover/' . $encodedPath);
+        return $this->normalizeCoverImageUrl(url('/cover/' . $encodedPath));
+    }
+
+    protected function normalizeCoverImageUrl(string $url): string
+    {
+        if (Str::startsWith($url, 'http://')) {
+            return 'https://' . substr($url, 7);
+        }
+
+        return $url;
     }
 }

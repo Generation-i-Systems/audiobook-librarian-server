@@ -90,6 +90,24 @@ class BookDataTransformerTest extends TestCase
     }
 
     #[Test]
+    public function toBookListItemUpgradesCoverLinksToHttps(): void
+    {
+        $this->app->instance('request', Request::create('http://library.test/api/v1/books', 'GET'));
+
+        $book = Book::factory()->create([
+            'cover_image' => 'http://cdn.example.test/ddd.jpg',
+            'directory_path' => 'design/ddd',
+        ]);
+
+        $book->load(['authors', 'narrators', 'genres', 'series']);
+
+        $result = (new BookDataTransformer())->toBookListItem($book);
+
+        $this->assertSame('https://cdn.example.test/ddd.jpg', $result['coverImage']);
+        $this->assertSame('https://library.test/api/v1/books/' . $book->id . '/cover', $result['cover_url']);
+    }
+
+    #[Test]
     public function toRecentBookReturnsCompactRecentBookShape(): void
     {
         $book = Book::factory()->create([

@@ -65,7 +65,7 @@ trait BookTransformTrait
                 ];
             }
             $request = request();
-            $transformedBook['cover_url'] = $request->getSchemeAndHttpHost() . '/api/v1/books/' . ($book['id'] ?? '') . '/cover';
+            $transformedBook['cover_url'] = $this->normalizeCoverUrl($request->getSchemeAndHttpHost() . '/api/v1/books/' . ($book['id'] ?? '') . '/cover');
         } else {
             $transformedBook['cover_url'] = null;
         }
@@ -98,6 +98,15 @@ trait BookTransformTrait
         }
 
         return $result;
+    }
+
+    private function normalizeCoverUrl(string $url): string
+    {
+        if (strpos($url, 'http://') === 0) {
+            return 'https://' . substr($url, 7);
+        }
+
+        return $url;
     }
 
     /**

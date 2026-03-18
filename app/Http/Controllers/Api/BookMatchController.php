@@ -303,8 +303,37 @@ class BookMatchController extends Controller
             'description'    => $book->description,
             'duration'       => $book->duration,
             'audioFileCount' => $book->audio_file_count,
-            'coverImage'     => $book->cover_image,
+            'coverImage'     => $this->buildCoverImageOutput($book),
             'year'           => $book->year,
         ];
+    }
+
+    private function buildCoverImageOutput(Book $book): ?string
+    {
+        $coverImage = $book->cover_image;
+
+        if ($coverImage === null) {
+            return null;
+        }
+
+        $coverImage = trim($coverImage);
+        if ($coverImage === '') {
+            return null;
+        }
+
+        if (str_starts_with($coverImage, 'http://') || str_starts_with($coverImage, 'https://')) {
+            return $this->normalizeCoverUrl($coverImage);
+        }
+
+        return $this->normalizeCoverUrl(request()->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover');
+    }
+
+    private function normalizeCoverUrl(string $url): string
+    {
+        if (str_starts_with($url, 'http://')) {
+            return 'https://' . substr($url, 7);
+        }
+
+        return $url;
     }
 }

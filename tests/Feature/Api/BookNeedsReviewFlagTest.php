@@ -92,4 +92,22 @@ class BookNeedsReviewFlagTest extends ApiTestCase
             ->assertOk()
             ->assertJsonFragment(['book_id' => (int) $book->id]);
     }
+
+    #[Test]
+    public function cover_is_available_for_needs_review_without_flag(): void
+    {
+        Storage::fake('books');
+        $this->withoutMiddleware();
+
+        $book = Book::factory()->create([
+            'needs_review' => true,
+            'cover_image' => 'cover.jpg',
+            'directory_path' => 'books/needs-review',
+        ]);
+
+        Storage::disk('books')->put('books/needs-review/cover.jpg', 'fake-image-content');
+
+        $this->get('/api/v1/books/' . $book->id . '/cover')
+            ->assertOk();
+    }
 }
