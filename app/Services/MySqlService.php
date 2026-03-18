@@ -41,6 +41,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private ?UserActivityService $userActivityService = null;
     private ?GenericDocumentService $genericDocumentService = null;
     private ?TaxonomyService $taxonomyService = null;
+    private ?AdminMaintenanceService $adminMaintenanceService = null;
 
     private function getTrashService(): BookTrashService
     {
@@ -95,6 +96,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private function getTaxonomyService(): TaxonomyService
     {
         return $this->taxonomyService ??= app(TaxonomyService::class);
+    }
+
+    private function getAdminMaintenanceService(): AdminMaintenanceService
+    {
+        return $this->adminMaintenanceService ??= app(AdminMaintenanceService::class);
     }
 
     public function getBook(string $id, ?int $userId = null): ?array
@@ -1742,39 +1748,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getAllUsers(): array
     {
-        try {
-            // Get all users with necessary fields
-            $users = User::all([
-                'id',
-                'name',
-                'username',
-                'email',
-                'photo_url',
-                'role',
-                'email_verified_at',
-                'created_at',
-                'updated_at',
-            ]);
-
-            // Convert to array and ensure consistent attribute naming
-            return $users->map(fn ($user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'username' => $user->username,
-                'email' => $user->email,
-                'photo_url' => $user->photo_url, // This will use the accessor
-                'role' => $user->role,
-                'email_verified_at' => $user->email_verified_at,
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
-                // Add google_id if it exists
-                'google_id' => $user->google_id ?? null,
-            ])->toArray();
-        } catch (\Exception $e) {
-            Log::error('MySqlService getAllUsers failed: ' . $e->getMessage());
-
-            return [];
-        }
+        return $this->getAdminMaintenanceService()->getAllUsers();
     }
 
     /**
@@ -2219,20 +2193,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function deleteMessage(string $messageId): bool
     {
-        try {
-            $message = Message::where('id', $messageId)->first();
-
-            if (!$message) {
-                return false;
-            }
-            $message->delete();
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteMessage failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getAdminMaintenanceService()->deleteMessage($messageId);
     }
 
     public function deleteNarrator(string $narratorId): bool
@@ -2257,31 +2218,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function deleteBook(string $bookId, bool $deleteFiles = true): bool
     {
-        try {
-            $book = Book::where('id', $bookId)->first();
-
-            if (!$book) {
-                Log::warning('Book not found for deletion', ['book_id' => $bookId]);
-                return false;
-            }
-
-            $book->delete();
-
-            Log::info('Book deleted from database', [
-                'book_id' => $bookId,
-                'delete_files' => $deleteFiles,
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('Failed to delete book from database', [
-                'book_id' => $bookId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return false;
-        }
+        return $this->getAdminMaintenanceService()->deleteBook($bookId, $deleteFiles);
     }
 
     /**
