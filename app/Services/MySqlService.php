@@ -40,6 +40,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private ?WorkflowMessagingService $workflowMessagingService = null;
     private ?UserActivityService $userActivityService = null;
     private ?GenericDocumentService $genericDocumentService = null;
+    private ?TaxonomyService $taxonomyService = null;
 
     private function getTrashService(): BookTrashService
     {
@@ -89,6 +90,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private function getGenericDocumentService(): GenericDocumentService
     {
         return $this->genericDocumentService ??= app(GenericDocumentService::class);
+    }
+
+    private function getTaxonomyService(): TaxonomyService
+    {
+        return $this->taxonomyService ??= app(TaxonomyService::class);
     }
 
     public function getBook(string $id, ?int $userId = null): ?array
@@ -1414,17 +1420,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function autocompleteAuthors(string $query, int $limit = 10): array
     {
-        return Author::where('name', 'like', "%$query%")->limit($limit)->get()->toArray();
+        return $this->getTaxonomyService()->autocompleteAuthors($query, $limit);
     }
 
     public function autocompleteNarrators(string $query, int $limit = 10): array
     {
-        return Narrator::where('name', 'like', "%$query%")->limit($limit)->get()->toArray();
+        return $this->getTaxonomyService()->autocompleteNarrators($query, $limit);
     }
 
     public function autocompleteSeries(string $query, int $limit = 10): array
     {
-        return Series::where('name', 'like', "%$query%")->limit($limit)->get()->toArray();
+        return $this->getTaxonomyService()->autocompleteSeries($query, $limit);
     }
 
     public function listNarrators(): array
@@ -1676,79 +1682,47 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function updateGenre(string $id, array $data): bool
     {
-        try {
-            $genre = Genre::find($id);
-
-            if (!$genre) {
-                return false;
-            }
-
-            return $genre->update($data);
-        } catch (\Exception $e) {
-            Log::error('MySqlService updateGenre failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getTaxonomyService()->updateGenre($id, $data);
     }
 
     public function getSeriesByName(string $name): ?array
     {
-        $series = Series::where('name', $name)->first();
-
-        return $series ? $series->toArray() : null;
+        return $this->getTaxonomyService()->getSeriesByName($name);
     }
 
     public function findOrCreateSeriesByName(string $name)
     {
-        $series = $this->getSeriesByName($name);
-
-        if ($series) {
-            return $series;
-        }
-
-        $id = $this->createSeries($name);
-
-        return ['id' => $id, 'name' => $name];
+        return $this->getTaxonomyService()->findOrCreateSeriesByName($name);
     }
 
     public function getSeries(string $id)
     {
-        return Series::find($id);
+        return $this->getTaxonomyService()->getSeries($id);
     }
 
     public function searchSeriesByName(string $term): array
     {
-        return $this->autocompleteSeries($term);
+        return $this->getTaxonomyService()->searchSeriesByName($term);
     }
 
     public function createAuthor(array $data)
     {
-        return Author::create($data);
+        return $this->getTaxonomyService()->createAuthor($data);
     }
 
     public function searchAuthorsByName(string $term): array
     {
-        return $this->autocompleteAuthors($term);
+        return $this->getTaxonomyService()->searchAuthorsByName($term);
     }
 
     public function searchNarratorsByName(string $term): array
     {
-        return $this->autocompleteNarrators($term);
+        return $this->getTaxonomyService()->searchNarratorsByName($term);
     }
 
     public function searchGenresByName(string $term): array
     {
-        if (empty($term)) {
-            return [];
-        }
-
-        $genres = Genre::where('name', 'LIKE', '%' . $term . '%')
-            ->orderBy('name')
-            ->limit(20)
-            ->pluck('name')
-            ->toArray();
-
-        return $genres;
+        return $this->getTaxonomyService()->searchGenresByName($term);
     }
 
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
@@ -2144,19 +2118,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function updateAuthor(string $id, array $data): bool
     {
-        try {
-            $author = Author::find($id);
-
-            if (!$author) {
-                return false;
-            }
-
-            return $author->update($data);
-        } catch (\Exception $e) {
-            Log::error('MySqlService updateAuthor failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getTaxonomyService()->updateAuthor($id, $data);
     }
 
     /**
@@ -2212,7 +2174,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function createGenre(array $data)
     {
-        return Genre::create($data);
+        return $this->getTaxonomyService()->createGenre($data);
     }
 
     public function createMessage(array $messageData): ?string
@@ -2227,41 +2189,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function createNarrator(array $data)
     {
-        return Narrator::create($data);
+        return $this->getTaxonomyService()->createNarrator($data);
     }
 
     public function createSeries(string $name, bool $isCollection = false)
     {
-        try {
-            $series = Series::create([
-                'name' => $name,
-                'is_collection' => $isCollection,
-            ]);
-
-            return $series->id;
-        } catch (\Exception $e) {
-            Log::error('MySqlService createSeries failed: ' . $e->getMessage());
-
-            return null;
-        }
+        return $this->getTaxonomyService()->createSeries($name, $isCollection);
     }
 
     public function updateSeries(int $id, array $data)
     {
-        try {
-            $series = Series::find($id);
-
-            if (!$series) {
-                return false;
-            }
-            $series->update($data);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService updateSeries failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getTaxonomyService()->updateSeries($id, $data);
     }
 
     public function createJob(array $data)
@@ -2299,70 +2237,22 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function deleteNarrator(string $narratorId): bool
     {
-        try {
-            $narrator = Narrator::where('id', $narratorId)->first();
-
-            if (!$narrator) {
-                return false;
-            }
-            $narrator->delete();
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteNarrator failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getTaxonomyService()->deleteNarrator($narratorId);
     }
 
     public function deleteSeries(string $seriesId): bool
     {
-        try {
-            $series = Series::where('id', $seriesId)->first();
-
-            if (!$series) {
-                return false;
-            }
-            $series->delete();
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteSeries failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getTaxonomyService()->deleteSeries($seriesId);
     }
 
     public function deleteGenre(string $genreId): bool
     {
-        try {
-            $genre = Genre::where('id', $genreId)->first();
-
-            if (!$genre) {
-                return false;
-            }
-            $genre->delete();
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteGenre failed: ' . $e->getMessage());
-
-            return false;
-        }
+        return $this->getTaxonomyService()->deleteGenre($genreId);
     }
 
     public function deleteAuthor(string $authorId): void
     {
-        try {
-            $author = Author::where('id', $authorId)->first();
-
-            if (!$author) {
-                return;
-            }
-            $author->delete();
-        } catch (\Exception $e) {
-            Log::error('MySqlService deleteAuthor failed: ' . $e->getMessage());
-        }
+        $this->getTaxonomyService()->deleteAuthor($authorId);
     }
 
     public function deleteBook(string $bookId, bool $deleteFiles = true): bool
