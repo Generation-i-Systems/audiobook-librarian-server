@@ -710,6 +710,50 @@ class SkinRenderer {
             div.style.backgroundRepeat = 'no-repeat';
         }
 
+        div.style.borderRadius = el.backgroundCornerRadius ? `${el.backgroundCornerRadius}px` : '';
+        div.style.webkitMaskImage = '';
+        div.style.maskImage = '';
+        div.style.webkitMaskComposite = '';
+        div.style.maskComposite = '';
+
+        const fadeAmount = Math.max(0, Math.min(1, parseFloat(el.backgroundFadeAmount ?? 0.25) || 0));
+        if (el.backgroundFade && fadeAmount > 0) {
+            const fadePercent = Math.max(5, Math.min(95, Math.round(fadeAmount * 100)));
+            let maskImage = '';
+            let maskComposite = '';
+
+            switch (el.backgroundFade) {
+                case 'left':
+                    maskImage = `linear-gradient(to right, transparent 0%, black ${fadePercent}%, black 100%)`;
+                    break;
+                case 'right':
+                    maskImage = `linear-gradient(to right, black 0%, black ${100 - fadePercent}%, transparent 100%)`;
+                    break;
+                case 'top':
+                    maskImage = `linear-gradient(to bottom, transparent 0%, black ${fadePercent}%, black 100%)`;
+                    break;
+                case 'bottom':
+                    maskImage = `linear-gradient(to bottom, black 0%, black ${100 - fadePercent}%, transparent 100%)`;
+                    break;
+                case 'edges':
+                    maskImage = [
+                        `linear-gradient(to right, transparent 0%, black ${fadePercent}%, black ${100 - fadePercent}%, transparent 100%)`,
+                        `linear-gradient(to bottom, transparent 0%, black ${fadePercent}%, black ${100 - fadePercent}%, transparent 100%)`
+                    ].join(', ');
+                    maskComposite = 'intersect';
+                    break;
+            }
+
+            if (maskImage) {
+                div.style.webkitMaskImage = maskImage;
+                div.style.maskImage = maskImage;
+                if (maskComposite) {
+                    div.style.webkitMaskComposite = maskComposite;
+                    div.style.maskComposite = maskComposite;
+                }
+            }
+        }
+
         switch (el.type) {
             case 'text':
                 if (el.dataBinding) {
@@ -1155,6 +1199,16 @@ class PropertyEditor {
         // Background (All elements)
         this.addBackgroundInput('Background', el.backgroundColor || '', el.backgroundImage || '', (bgColor, bgImage) => {
             this.state.updateElement(el.id, { backgroundColor: bgColor, backgroundImage: bgImage });
+        });
+
+        this.addNumberInput('Background Radius', el.backgroundCornerRadius ?? '', (val) => {
+            this.state.updateElement(el.id, { backgroundCornerRadius: val === '' ? undefined : val });
+        });
+        this.addSelect('Background Fade', el.backgroundFade || '', ['', 'left', 'right', 'top', 'bottom', 'edges'], (val) => {
+            this.state.updateElement(el.id, { backgroundFade: val || undefined });
+        });
+        this.addNumberInput('Fade Amount', el.backgroundFadeAmount ?? '', (val) => {
+            this.state.updateElement(el.id, { backgroundFadeAmount: val === '' ? undefined : val });
         });
 
         if (el.type === 'text') {
