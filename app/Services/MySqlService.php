@@ -457,7 +457,6 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $searchTerm = $filters['search'];
             $query->where(function ($q) use ($searchTerm): void {
                 $q->where('title', 'like', '%' . $searchTerm . '%')
-                    ->orWhere('description', 'like', '%' . $searchTerm . '%')
                     ->orWhereHas('authors', function ($authorQuery) use ($searchTerm): void {
                         $authorQuery->where('name', 'like', '%' . $searchTerm . '%');
                     })

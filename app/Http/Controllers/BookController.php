@@ -54,6 +54,23 @@ class BookController extends Controller
             $filters['series'] = $request->series;
         }
 
+        $tokens = $this->parseSearchTokens($request->input('search', ''));
+        if ($tokens['author_id']) {
+            $filters['author_id'] = $tokens['author_id'];
+            unset($filters['author']);
+        }
+        if ($tokens['genre_id']) {
+            $filters['genre_id'] = $tokens['genre_id'];
+            unset($filters['genre']);
+        }
+        if ($tokens['series_id']) {
+            $filters['series_id'] = $tokens['series_id'];
+            unset($filters['series']);
+        }
+        if ($tokens['search'] !== '') {
+            $filters['search'] = $tokens['search'];
+        }
+
         // Get paginated and filtered books with minimal relations
         $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true);
         $books = $result['data'];
@@ -191,27 +208,41 @@ class BookController extends Controller
 
         // Get filters from request
         $filters = [];
-        if ($request->has('search') && !empty($request->input('search'))) {
-            $filters['search'] = $request->input('search');
-        }
 
         // Support both xxx and xxx_id for author, genre, and series
         if ($request->has('author') && !empty($request->input('author'))) {
             $filters['author'] = $request->input('author');
         } elseif ($request->has('author_id') && !empty($request->input('author_id'))) {
-            $filters['author'] = $request->input('author_id');
+            $filters['author_id'] = $request->input('author_id');
         }
 
         if ($request->has('genre') && !empty($request->input('genre'))) {
             $filters['genre'] = $request->input('genre');
         } elseif ($request->has('genre_id') && !empty($request->input('genre_id'))) {
-            $filters['genre'] = $request->input('genre_id');
+            $filters['genre_id'] = $request->input('genre_id');
         }
 
         if ($request->has('series') && !empty($request->input('series'))) {
             $filters['series'] = $request->input('series');
         } elseif ($request->has('series_id') && !empty($request->input('series_id'))) {
-            $filters['series'] = $request->input('series_id');
+            $filters['series_id'] = $request->input('series_id');
+        }
+
+        $tokens = $this->parseSearchTokens($request->input('search', ''));
+        if ($tokens['author_id']) {
+            $filters['author_id'] = $tokens['author_id'];
+            unset($filters['author']);
+        }
+        if ($tokens['genre_id']) {
+            $filters['genre_id'] = $tokens['genre_id'];
+            unset($filters['genre']);
+        }
+        if ($tokens['series_id']) {
+            $filters['series_id'] = $tokens['series_id'];
+            unset($filters['series']);
+        }
+        if ($tokens['search'] !== '') {
+            $filters['search'] = $tokens['search'];
         }
 
         // Get sorting parameters

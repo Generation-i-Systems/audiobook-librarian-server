@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
+use App\Services\AudioFileAnalyzer;
 use App\Services\BookDirectoryMoveService;
 use App\Services\ExternalCoverService;
 use App\Traits\BookImportTrait;
@@ -39,12 +40,16 @@ class BookController extends Controller
 
     protected ExternalCoverService $externalCoverService;
 
+    protected AudioFileAnalyzer $audioFileAnalyzer;
+
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
-        ExternalCoverService $externalCoverService
+        ExternalCoverService $externalCoverService,
+        AudioFileAnalyzer $audioFileAnalyzer
     ) {
         $this->documentStoreService = $documentStoreService;
         $this->externalCoverService = $externalCoverService;
+        $this->audioFileAnalyzer = $audioFileAnalyzer;
     }
 
     public function index(Request $request)
@@ -57,9 +62,6 @@ class BookController extends Controller
 
             // Get filters from request
             $filters = [];
-            if ($request->filled('search')) {
-                $filters['search'] = $request->input('search');
-            }
             if ($request->filled('author')) {
                 $filters['author'] = $request->input('author');
             }
@@ -69,8 +71,26 @@ class BookController extends Controller
             if ($request->filled('genre')) {
                 $filters['genre'] = $request->input('genre');
             } elseif ($request->filled('genre_id')) {
-                $filters['genre'] = $request->input('genre_id');
+                $filters['genre_id'] = $request->input('genre_id');
             }
+
+            $tokens = $this->parseSearchTokens($request->input('search', ''));
+            if ($tokens['author_id']) {
+                $filters['author_id'] = $tokens['author_id'];
+                unset($filters['author']);
+            }
+            if ($tokens['genre_id']) {
+                $filters['genre_id'] = $tokens['genre_id'];
+                unset($filters['genre']);
+            }
+            if ($tokens['series_id']) {
+                $filters['series_id'] = $tokens['series_id'];
+                unset($filters['series']);
+            }
+            if ($tokens['search'] !== '') {
+                $filters['search'] = $tokens['search'];
+            }
+
             // Admin panel should see books that need review
             $filters['include_needs_review'] = true;
 
@@ -1163,6 +1183,20 @@ class BookController extends Controller
             'keys' => array_keys($validated),
         ]);
         $documentStore->updateBook($id, $validated);
+
+        // Recalculate duration from audio files on disk
+        $directoryPath = $validated['directoryPath'] ?? ($book['directoryPath'] ?? null);
+        if ($directoryPath) {
+            $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            $absolutePath = $bookRoot . '/' . ltrim($directoryPath, '/');
+            if (is_dir($absolutePath)) {
+                $durationInfo = $this->audioFileAnalyzer->getDirectoryAudioDuration($absolutePath);
+                if ($durationInfo['total_seconds'] > 0) {
+                    $documentStore->updateBook($id, ['duration' => (int) $durationInfo['total_seconds']]);
+                    Log::info("Recalculated duration for book {$id}: {$durationInfo['formatted']}");
+                }
+            }
+        }
 
         // Redirect to returnUrl if present, else fallback to last list or main index
         $returnUrl = $request->input('returnUrl') ?? session('last_admin_list_url') ?? route('admin.books.index');
