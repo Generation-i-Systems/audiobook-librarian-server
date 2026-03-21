@@ -393,6 +393,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                         @if($seriesText)
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">{{ $seriesText }}</p>
                                         @endif
+                                        @if(!empty($book['duration']) && $book['duration'] !== '00:00:00')
+                                            <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;"><i class="fas fa-clock"></i> {{ $book['duration'] }}</p>
+                                        @endif
                                     </div>
                                 </div>
                             </a>
@@ -434,6 +437,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                         @if($seriesText)
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">{{ $seriesText }}</p>
                                         @endif
+                                        @if(!empty($book['duration']) && $book['duration'] !== '00:00:00')
+                                            <p class="card-text small text-muted mb-0" style="font-size: 0.7rem;"><i class="fas fa-clock"></i> {{ $book['duration'] }}</p>
+                                        @endif
                                     </div>
                                 </div>
                             </a>
@@ -451,6 +457,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                             <th>Title</th>
                             <th>Author</th>
                             <th>Genre</th>
+                            <th style="width: 90px;">Length</th>
                             <th style="width: 100px;">Actions</th>
                         </tr>
                     </thead>
@@ -486,6 +493,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                     </td>
                                     <td>{{ $authors }}</td>
                                     <td>{{ $genres }}</td>
+                                    <td class="text-muted small">{{ (!empty($book['duration']) && $book['duration'] !== '00:00:00') ? $book['duration'] : '' }}</td>
                                     <td>
                                         <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i></a>
                                     </td>
@@ -1094,6 +1102,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 if (book.series && book.series.length > 0) {
                     seriesText = book.series.map(s => `${s.seriesName}${s.number ? ' (Book ' + s.number + ')' : ''}`).join(', ');
                 }
+                const duration = book.duration && book.duration !== '00:00:00' ? book.duration : '';
                 return `
                                                         <a href="/books/${book.id}" class="text-decoration-none">
                                                             <div class="card h-100 book-card-hover">
@@ -1103,6 +1112,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                                                     <h6 class="card-title small mb-0">${title}</h6>
                                                                     <p class="card-text small text-muted">${author}</p>
                                                                     ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
+                                                                    ${duration ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;"><i class="fas fa-clock"></i> ${duration}</p>` : ''}
                                                                 </div>
                                                             </div>
                                                         </a>
@@ -1118,6 +1128,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 if (book.series && book.series.length > 0) {
                     seriesText = book.series.map(s => `${s.seriesName}${s.number ? ' (Book ' + s.number + ')' : ''}`).join(', ');
                 }
+                const duration = book.duration && book.duration !== '00:00:00' ? book.duration : '';
                 return `
                                                         <a href="/books/${book.id}" class="text-decoration-none">
                                                             <div class="card h-100 book-card-hover">
@@ -1127,6 +1138,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                                                     <p class="card-title small mb-0 text-truncate">${title}</p>
                                                                     <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
                                                                     ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
+                                                                    ${duration ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;"><i class="fas fa-clock"></i> ${duration}</p>` : ''}
                                                                 </div>
                                                             </div>
                                                         </a>
@@ -1143,6 +1155,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 if (book.series && book.series.length > 0) {
                     seriesText = book.series.map(s => `${s.seriesName}${s.number ? ' (Book ' + s.number + ')' : ''}`).join(', ');
                 }
+                const duration = book.duration && book.duration !== '00:00:00' ? book.duration : '';
                 return `
                                                         <td>
                                                             <img src="${cover}" alt="${title}" style="height: 48px; width: auto; object-fit: contain;">
@@ -1153,6 +1166,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                                         </td>
                                                         <td>${author}</td>
                                                         <td>${genre}</td>
+                                                        <td class="text-muted small">${duration}</td>
                                                         <td>
                                                             <a href="/books/${book.id}/download" class="btn btn-sm btn-secondary">
                                                                 <i class="fas fa-download"></i>

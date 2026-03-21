@@ -85,6 +85,7 @@
                     <th style="width: 60px; text-align: center;">#</th>
                     <th style="cursor: pointer;"><a href="{{ $getSortUrl('genre') }}"
                             style="text-decoration: none; color: inherit;">Genre{{ $getSortIndicator('genre') }}</a></th>
+                    <th style="width: 90px;">Length</th>
                     @if($showYear)
                         <th style="cursor: pointer;"><a href="{{ $getSortUrl('year') }}"
                                 style="text-decoration: none; color: inherit;">Year{{ $getSortIndicator('year') }}</a></th>
@@ -170,18 +171,20 @@
                         </td>
                         <td>
                             @if(!empty($book['author']))
-                                @if(is_array($book['author']))
-                                    @foreach($book['author'] as $author)
-                                        @php
-                                            $authorName = is_array($author) && isset($author['name']) ? $author['name'] : (is_string($author) ? $author : 'Unknown');
-                                        @endphp
-                                        <a href="{{ route('admin.books.index', ['author' => $authorName]) }}"
-                                            class="text-decoration-none">{{ $authorName }}</a>@if(!$loop->last)<br>@endif
-                                    @endforeach
-                                @else
-                                    <a href="{{ route('admin.books.index', ['author' => $book['author']]) }}"
-                                        class="text-decoration-none">{{ $book['author'] }}</a>
-                                @endif
+                                @php
+                                    $authorsData = collect($book['authors_data'] ?? []);
+                                    $authorsList = is_array($book['author']) ? $book['author'] : [$book['author']];
+                                @endphp
+                                @foreach($authorsList as $author)
+                                    @php
+                                        $authorName = is_array($author) && isset($author['name']) ? $author['name'] : (is_string($author) ? $author : 'Unknown');
+                                        $authorRecord = $authorsData->firstWhere('name', $authorName);
+                                        $authorLink = $authorRecord
+                                            ? route('admin.books.index', ['search' => 'authorId:' . $authorRecord['id']])
+                                            : route('admin.books.index', ['author' => $authorName]);
+                                    @endphp
+                                    <a href="{{ $authorLink }}" class="text-decoration-none">{{ $authorName }}</a>@if(!$loop->last)<br>@endif
+                                @endforeach
                             @else
                                 Unknown
                             @endif
@@ -190,6 +193,7 @@
                             @if(!empty($book['series']))
                                 @php
                                     $series = $book['series'] ?? [];
+                                    $seriesDataById = collect($book['series_data'] ?? [])->keyBy('name');
                                 @endphp
                                 @if(is_array($series))
                                     @foreach($series as $key => $item)
@@ -202,10 +206,13 @@
                                             } elseif (is_string($item)) {
                                                 $seriesName = $item;
                                             }
+                                            $seriesRecord = $seriesName ? ($seriesDataById[$seriesName] ?? null) : null;
+                                            $seriesLink = ($seriesRecord && isset($seriesRecord['id']))
+                                                ? route('admin.books.index', ['search' => 'seriesId:' . $seriesRecord['id']])
+                                                : route('admin.books.index', ['series' => $seriesName]);
                                         @endphp
                                         @if($seriesName)
-                                            <a href="{{ route('admin.books.index', ['series' => $seriesName]) }}"
-                                                class="text-decoration-none">{{ $seriesName }}</a>
+                                            <a href="{{ $seriesLink }}" class="text-decoration-none">{{ $seriesName }}</a>
                                         @endif
                                         @if(!$loop->last)<br>@endif
                                     @endforeach
@@ -240,25 +247,31 @@
                         </td>
                         <td>
                             @if(!empty($book['genre']))
-                                @if(is_array($book['genre']))
-                                    @if(isset($book['genre']['name']))
-                                        <a href="{{ route('admin.books.index', ['genre' => $book['genre']['name']]) }}"
-                                            class="text-decoration-none">{{ $book['genre']['name'] }}</a>
-                                    @else
-                                        @foreach($book['genre'] as $genre)
-                                            @php
-                                                $genreName = is_array($genre) ? ($genre['name'] ?? '') : $genre;
-                                            @endphp
-                                            <a href="{{ route('admin.books.index', ['genre' => $genreName]) }}"
-                                                class="text-decoration-none">{{ $genreName }}</a>@if(!$loop->last), @endif
-                                        @endforeach
-                                    @endif
-                                @else
-                                    <a href="{{ route('admin.books.index', ['genre' => $book['genre']]) }}"
-                                        class="text-decoration-none">{{ $book['genre'] }}</a>
-                                @endif
+                                @php
+                                    $genresData = collect($book['genres_data'] ?? [])->keyBy('name');
+                                    $genresList = is_array($book['genre'])
+                                        ? (isset($book['genre']['name']) ? [$book['genre']['name']] : $book['genre'])
+                                        : [$book['genre']];
+                                @endphp
+                                @foreach($genresList as $genre)
+                                    @php
+                                        $genreName = is_array($genre) ? ($genre['name'] ?? '') : $genre;
+                                        $genreRecord = $genreName ? ($genresData[$genreName] ?? null) : null;
+                                        $genreLink = ($genreRecord && isset($genreRecord['id']))
+                                            ? route('admin.books.index', ['search' => 'genreId:' . $genreRecord['id']])
+                                            : route('admin.books.index', ['genre' => $genreName]);
+                                    @endphp
+                                    <a href="{{ $genreLink }}" class="text-decoration-none">{{ $genreName }}</a>@if(!$loop->last), @endif
+                                @endforeach
                             @else
                                 Unknown
+                            @endif
+                        </td>
+                        <td class="text-muted small">
+                            @if(!empty($book['duration']) && $book['duration'] !== '00:00:00')
+                                {{ $book['duration'] }}
+                            @else
+                                -
                             @endif
                         </td>
                         @if($showYear)
