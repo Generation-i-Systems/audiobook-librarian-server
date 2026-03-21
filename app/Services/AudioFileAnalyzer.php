@@ -84,11 +84,12 @@ class AudioFileAnalyzer
      */
     public function formatDuration(float $seconds): string
     {
-        $hours = floor($seconds / 3600);
-        $minutes = floor(($seconds % 3600) / 60);
-        $seconds = floor($seconds % 60);
+        $total = (int) $seconds;
+        $hours = intdiv($total, 3600);
+        $minutes = intdiv($total % 3600, 60);
+        $secs = $total % 60;
 
-        return sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $secs);
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\BookMetadataSearchController;
 use App\Http\Controllers\Admin\ImportFileController;
 use App\Services\AudibleService;
 use App\Services\BookImportService;
+use App\Services\AudioFileAnalyzer;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
@@ -127,7 +128,8 @@ class BookControllerTest extends TestCase
 
         $this->controller = new BookController(
             $this->documentStore,
-            $this->externalCoverService
+            $this->externalCoverService,
+            new AudioFileAnalyzer()
         );
 
         $this->importController = new BookImportController(

@@ -5,6 +5,7 @@ namespace Tests\Web\Unit\Controllers;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Admin\BookController;
+use App\Services\AudioFileAnalyzer;
 use App\Services\ExternalCoverService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -34,7 +35,8 @@ class BookReleaseDateTest extends TestCase
 
         $this->controller = new BookController(
             $this->documentStore,
-            $this->externalCoverService
+            $this->externalCoverService,
+            new AudioFileAnalyzer()
         );
     }
 

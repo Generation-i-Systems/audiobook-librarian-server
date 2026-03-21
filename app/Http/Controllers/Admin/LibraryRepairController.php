@@ -215,7 +215,7 @@ class LibraryRepairController extends Controller
                     'narrators' => $book->narrators->pluck('name')->join(', '),
                     'series' => $book->series->pluck('name')->join(', '),
                     'genres' => $book->genres->pluck('name')->join(', '),
-                    'duration' => $book->duration ? gmdate('H:i:s', $book->duration) : '',
+                    'duration' => $book->duration ? sprintf('%02d:%02d:%02d', intdiv($book->duration, 3600), intdiv($book->duration % 3600, 60), $book->duration % 60) : '',
                     'created_at', 'updated_at' => $book->$field?->format('Y-m-d H:i'),
                     'release_date' => $book->release_date?->format('Y-m-d') ?? '',
                     default => (string) ($book->$field ?? ''),

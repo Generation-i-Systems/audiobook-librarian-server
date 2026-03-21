@@ -106,7 +106,7 @@ class BookDataTransformer
             })->toArray(),
             'genre' => $book->genres->pluck('name')->toArray(),
             'year' => $book->release_date ? (int) $book->release_date->format('Y') : null,
-            'duration' => $book->duration ? gmdate('H:i:s', $book->duration) : null,
+            'duration' => $book->duration ? $this->formatDuration($book->duration) : null,
             'description' => $book->description,
             'coverImage' => $this->buildCoverImageOutput($book->cover_image, $book->directory_path),
             'directoryPath' => $book->directory_path,
@@ -271,5 +271,14 @@ class BookDataTransformer
         }
 
         return $userData;
+    }
+
+    private function formatDuration(int $seconds): string
+    {
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        $secs = $seconds % 60;
+
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $secs);
     }
 }

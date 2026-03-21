@@ -4,6 +4,7 @@ namespace Tests\Web\Feature\Admin;
 
 use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Admin\BookController;
+use App\Services\AudioFileAnalyzer;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -45,7 +46,8 @@ class BookControllerUpdateTest extends TestCase
         // Create a controller instance with the mock service
         $this->controller = new BookController(
             $this->documentStoreService,
-            $this->externalCoverService
+            $this->externalCoverService,
+            new AudioFileAnalyzer()
         );
 
         // Create a test user with admin role

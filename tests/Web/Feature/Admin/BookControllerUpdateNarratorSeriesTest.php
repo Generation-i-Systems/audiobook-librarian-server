@@ -4,6 +4,7 @@ namespace Tests\Web\Feature\Admin;
 
 use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Admin\BookController;
+use App\Services\AudioFileAnalyzer;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,7 +32,8 @@ class BookControllerUpdateNarratorSeriesTest extends TestCase
 
         $this->controller = new BookController(
             $this->documentStoreService,
-            $this->createMock(\App\Services\ExternalCoverService::class)
+            $this->createMock(\App\Services\ExternalCoverService::class),
+            new AudioFileAnalyzer()
         );
 
         $this->user = new DocumentstoreUser([

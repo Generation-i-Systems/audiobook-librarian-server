@@ -3,6 +3,7 @@
 namespace Tests\Web\Unit\Controllers;
 
 use App\Http\Controllers\Admin\BookController;
+use App\Services\AudioFileAnalyzer;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
@@ -29,7 +30,8 @@ class BookControllerDebugTest extends TestCase
 
         $this->controller = new BookController(
             $this->documentStore,
-            $mockExternalCoverService
+            $mockExternalCoverService,
+            new AudioFileAnalyzer()
         );
 
         // Set up storage
@@ -89,7 +91,8 @@ class BookControllerDebugTest extends TestCase
         // Re-create the controller with the standard mock service
         $this->controller = new BookController(
             $this->documentStore,
-            $this->createMock(\App\Services\ExternalCoverService::class)
+            $this->createMock(\App\Services\ExternalCoverService::class),
+            new AudioFileAnalyzer()
         );
 
         // Call the store method

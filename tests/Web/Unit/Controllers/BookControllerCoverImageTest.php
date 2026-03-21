@@ -3,6 +3,7 @@
 namespace Tests\Web\Unit\Controllers;
 
 use App\Http\Controllers\Admin\BookController;
+use App\Services\AudioFileAnalyzer;
 use App\Services\ExternalCoverService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -28,7 +29,8 @@ class BookControllerCoverImageTest extends TestCase
 
         $this->controller = new BookController(
             $this->documentStore,
-            $externalCoverService
+            $externalCoverService,
+            new AudioFileAnalyzer()
         );
 
         // Ensure the controller uses our mock document store

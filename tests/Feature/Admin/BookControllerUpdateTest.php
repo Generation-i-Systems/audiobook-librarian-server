@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Admin\BookController;
+use App\Services\AudioFileAnalyzer;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -45,7 +46,8 @@ class BookControllerUpdateTest extends TestCase
         // Create a controller instance with the mock service
         $this->controller = new BookController(
             $this->documentStoreService,
-            $this->externalCoverService
+            $this->externalCoverService,
+            new AudioFileAnalyzer()
         );
 
         // Create a test user with admin role
@@ -312,6 +314,84 @@ class BookControllerUpdateTest extends TestCase
         // When using Storage::fake(), we need to check if the file was stored
         // The controller uses 'jpg' extension for image/jpeg content type
         $this->assertTrue(Storage::disk('books')->exists('test/path/cover_audible_B01234ABCD.jpg'));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function updateBookDownloadsAndSavesGenericCoverImageUrl(): void
+    {
+        Log::spy();
+        Storage::fake('books');
+
+        $bookId = 'test-book-4';
+        $bookData = [
+            'id' => $bookId,
+            'title' => 'Old Generic Book',
+            'author' => ['Old Author'],
+            'genre' => ['Old Genre'],
+            'directoryPath' => 'test/path',
+        ];
+
+        $this->documentStoreService->expects($this->once())
+            ->method('getBook')
+            ->with($bookId)
+            ->willReturn($bookData);
+
+        $this->documentStoreService->method('updateBook')
+            ->with(
+                $this->equalTo($bookId),
+                $this->callback(function ($data) {
+                    return $data['title'] === 'Updated Generic Book'
+                        && ($data['coverImage'] ?? null) === 'cover_googlebooks_test-id.jpg';
+                })
+            )
+            ->willReturn(true);
+
+        $this->externalCoverService->expects($this->once())
+            ->method('downloadCoverImage')
+            ->with(
+                $this->equalTo('https://example.com/cover.jpg'),
+                $this->equalTo('test/path'),
+                $this->equalTo('googlebooks'),
+                $this->equalTo('test-id')
+            )
+            ->willReturnCallback(function () {
+                Storage::disk('books')->put('test/path/cover_googlebooks_test-id.jpg', 'fake image content');
+
+                return [
+                    'success' => true,
+                    'path' => 'test/path/cover_googlebooks_test-id.jpg',
+                ];
+            });
+
+        $this->documentStoreService->method('findOrCreateMany')
+            ->willReturnCallback(function ($type) {
+                if ($type === 'authors') {
+                    return ['author-1'];
+                }
+
+                if ($type === 'genres') {
+                    return ['genre-1'];
+                }
+
+                return [];
+            });
+
+        $request = new Request([
+            'title' => 'Updated Generic Book',
+            'author' => ['Updated Author'],
+            'genre' => ['Updated Genre'],
+            'description' => 'Updated desc',
+            'directoryPath' => 'test/path',
+            'coverImageUrl' => 'https://example.com/cover.jpg',
+            'coverImageSource' => 'googlebooks',
+            'googleBooksId' => 'test-id',
+        ]);
+        $this->app->instance('request', $request);
+
+        $response = $this->controller->update($request, $bookId);
+
+        $this->assertEquals(302, $response->getStatusCode());
+        $this->assertTrue(Storage::disk('books')->exists('test/path/cover_googlebooks_test-id.jpg'));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
