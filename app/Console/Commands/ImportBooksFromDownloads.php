@@ -1273,7 +1273,17 @@ class ImportBooksFromDownloads extends Command
                 fn () => $this->getValidGenres(),
                 fn ($message, $data = null) => $this->logUiMessage($message, $data),
                 fn ($metadata) => $this->buildUiMetadata($metadata),
-                $sequential
+                $sequential,
+                fn ($metadata, $ab, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
+                    $metadata,
+                    $ab,
+                    $enrichmentService,
+                    fn ($headers, $rows) => $this->table($headers, $rows)
+                ),
+                fn () => $this->getEnrichmentService(),
+                fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
+                    'include_narrator' => (bool) $this->option('include-narrator'),
+                ]))
             ),
             fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
@@ -1389,7 +1399,17 @@ class ImportBooksFromDownloads extends Command
                 fn () => $this->getValidGenres(),
                 fn ($message, $data = null) => $this->logUiMessage($message, $data),
                 fn ($metadata) => $this->buildUiMetadata($metadata),
-                $sequential
+                $sequential,
+                fn ($metadata, $ab, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
+                    $metadata,
+                    $ab,
+                    $enrichmentService,
+                    fn ($headers, $rows) => $this->table($headers, $rows)
+                ),
+                fn () => $this->getEnrichmentService(),
+                fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
+                    'include_narrator' => (bool) $this->option('include-narrator'),
+                ]))
             ),
             fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
@@ -1442,7 +1462,17 @@ class ImportBooksFromDownloads extends Command
             fn () => $this->getValidGenres(),
             fn ($message, $data = null) => $this->logUiMessage($message, $data),
             fn ($metadata) => $this->buildUiMetadata($metadata),
-            $sequential
+            $sequential,
+            fn ($metadata, $ab, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
+                $metadata,
+                $ab,
+                $enrichmentService,
+                fn ($headers, $rows) => $this->table($headers, $rows)
+            ),
+            fn () => $this->getEnrichmentService(),
+            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
+                'include_narrator' => (bool) $this->option('include-narrator'),
+            ]))
         );
     }
 

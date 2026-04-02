@@ -4541,7 +4541,10 @@ class BookImportService
         callable $getValidGenresCallback,
         callable $uiServiceLogCallback,
         callable $buildUiMetadataCallback,
-        bool $forceSequential = false
+        bool $forceSequential = false,
+        ?callable $manualEnrichmentCallback = null,
+        ?callable $getEnrichmentServiceCallback = null,
+        ?callable $generateDirectoryPathCallback = null
     ): array {
         if ($forceSequential) {
             $currentTitle = $metadata['title'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']) ?? '';
@@ -4644,6 +4647,7 @@ class BookImportService
                 ]);
             }
 
+            $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
             $options = [
                 '1' => 'Title: ' . $currentTitle,
                 '2' => 'Author(s): ' . $displayAuthor,
@@ -4653,8 +4657,14 @@ class BookImportService
                 '6' => 'Year: ' . $currentYear,
                 '7' => 'Genre: ' . $displayGenre,
                 '8' => 'Directory Path: ' . $currentDirectory,
-                '9' => "\e[1;32mDone\e[0m",
+                'a' => 'Edit all fields (sequential)',
+                'c' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
+                'n' => 'Add narrator to directory name',
             ];
+            if ($manualEnrichmentCallback !== null && $getEnrichmentServiceCallback !== null) {
+                $options['r'] = 'Request enrichment (Audible/Google Books)';
+            }
+            $options['9'] = "\e[1;32mDone\e[0m";
 
             $choice = $selectWithImmediateInterruptCallback('Select field to edit', $options, '9');
 
@@ -4715,6 +4725,54 @@ class BookImportService
                 case '8':
                     $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
                     break;
+                case 'a':
+                    $metadata = $this->editMetadataFields(
+                        $metadata,
+                        $audiobook,
+                        $askInlineCallback,
+                        $selectWithImmediateInterruptCallback,
+                        $getFirstNonEmptyMetadataValueCallback,
+                        $extractSeriesNumberFromTitleCallback,
+                        $getValidGenresCallback,
+                        $uiServiceLogCallback,
+                        $buildUiMetadataCallback,
+                        true,
+                        $manualEnrichmentCallback,
+                        $getEnrichmentServiceCallback,
+                        $generateDirectoryPathCallback
+                    );
+                    continue 2;
+                case 'c':
+                    $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
+                    $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
+                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    continue 2;
+                case 'r':
+                    if ($manualEnrichmentCallback !== null && $getEnrichmentServiceCallback !== null) {
+                        $metadata = $manualEnrichmentCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
+                        $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    }
+                    continue 2;
+                case 'n':
+                    $narrators = $metadata['narrator'] ?? null;
+                    $narratorString = '';
+                    if ($narrators !== null) {
+                        $narratorString = is_array($narrators) ? implode(', ', $narrators) : (string) $narrators;
+                    }
+                    if ($narratorString === '') {
+                        $narratorString = $askInlineCallback('Narrator name', '');
+                    }
+                    if (trim($narratorString) !== '') {
+                        $resolvedDir = $metadata['custom_directory_path'] ?? '';
+                        if ($resolvedDir === '' && $generateDirectoryPathCallback !== null) {
+                            $resolvedDir = $generateDirectoryPathCallback($metadata, ['include_title' => true]);
+                        }
+                        $base = rtrim($resolvedDir, '/');
+                        $base = preg_replace('/\s*\([^)]+\)$/', '', $base);
+                        $metadata['custom_directory_path'] = $base . " ({$narratorString})";
+                        $uiServiceLogCallback("📁 Directory updated: {$metadata['custom_directory_path']}");
+                    }
+                    continue 2;
             }
 
             if (!$titleManuallyEdited) {
@@ -4759,23 +4817,18 @@ class BookImportService
 
         $options = [
             '1' => $acceptLabel,
-            '2' => 'Edit all fields',
-            '3' => 'Edit individual fields',
-            '4' => $isFinalConfirmation ? 'Skip' : 'Skip this book',
-            '5' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
-            '6' => 'Request enrichment (Audible/Google Books)',
+            '2' => 'Edit',
+            '3' => $isFinalConfirmation ? 'Skip' : 'Skip this book',
         ];
-
-        $options['7'] = 'Add narrator to directory name';
 
         // Only show "Reprocess as Multi-Book Archive" if NOT already a multi-book part AND has more than 1 file
         if (!$isMultiBookPart && $fileCount > 1) {
-            $options['8'] = 'Reprocess as Multi-Book Archive (Split)';
+            $options['4'] = 'Reprocess as Multi-Book Archive (Split)';
         }
 
         // Only show "Merge into Parent Book" if this IS a multi-book part
         if ($isMultiBookPart) {
-            $options['9'] = 'Merge into Parent Book';
+            $options['5'] = 'Merge into Parent Book';
         }
 
         // Show "Fix previous import" when there is a previous import in this session
@@ -8645,7 +8698,7 @@ class BookImportService
             // confidence 100 means user manually edited/confirmed, so trust it fully
             $userConfirmed = $confidence >= 100;
             if (!$isGenreValid) {
-                $defaultChoice = '3';
+                $defaultChoice = '2';
             } elseif ($userConfirmed && $hasAuthor) {
                 $defaultChoice = '1';
             } elseif ($confidence >= 75 && $hasAuthor && $hasEnrichmentData) {
@@ -8668,35 +8721,16 @@ class BookImportService
             $choice = strtolower(trim($choice));
             if (in_array($choice, ['1', 'a', 'accept'], true)) {
                 if (!$isGenreValid) {
-                    $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 3)');
+                    $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 2 → Genre)');
                     continue;
                 }
                 return true;
             }
-            if (in_array($choice, ['4', 's', 'skip'], true)) {
+            if (in_array($choice, ['3', 's', 'skip'], true)) {
                 return false;
             }
 
-            if ($choice === '2' || $choice === 'a' || $choice === 'all') {
-                $metadata = $editMetadataFieldsCallback($metadata, true);
-                if ($inputInterrupted) {
-                    return false;
-                }
-
-                $currentGenre = $metadata['genre'] ?? $currentGenre;
-                if (is_array($currentGenre)) {
-                    $currentGenre = $currentGenre[0] ?? 'Other';
-                }
-                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                if ($isGenreValid) {
-                    $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
-                }
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                continue;
-            }
-
-            if ($choice === '3' || $choice === 'e' || $choice === 'edit') {
+            if ($choice === '2' || $choice === 'e' || $choice === 'edit') {
                 $metadata = $editMetadataFieldsCallback($metadata, false);
                 if ($inputInterrupted) {
                     return false;
@@ -8711,61 +8745,17 @@ class BookImportService
                 if ($isGenreValid) {
                     $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
                 }
+                $currentCoverUrl = (string) ($metadata['cover_url'] ?? $currentCoverUrl);
                 $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                 continue;
             }
 
-            if ($choice === '5') {
-                $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
-                if ($inputInterrupted) {
-                    $metadata['cover_url'] = $currentCoverUrl;
-                } else {
-                    $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
-                }
-                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                continue;
-            }
-
-            if ($choice === '6') {
-                $metadata = $manualEnrichmentWithComparisonCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
-                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                $currentGenre = $metadata['genre'] ?? 'Other';
-                if (is_array($currentGenre)) {
-                    $currentGenre = $currentGenre[0] ?? 'Other';
-                }
-                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
-                continue;
-            }
-
-            if ($choice === '7') {
-                $narrators = $metadata['narrator'] ?? null;
-                $narratorString = '';
-                if ($narrators !== null) {
-                    $narratorString = is_array($narrators) ? implode(', ', $narrators) : (string) $narrators;
-                }
-                if ($narratorString === '') {
-                    $narratorString = $askInlineCallback('Narrator name', '');
-                }
-                if (trim($narratorString) !== '') {
-                    $base = rtrim($metadata['custom_directory_path'] ?? $generateDirectoryPathCallback($metadata, ['include_title' => true]), '/');
-                    // Remove any existing narrator suffix before appending
-                    $base = preg_replace('/\s*\([^)]+\)$/', '', $base);
-                    $metadata['custom_directory_path'] = $base . " ({$narratorString})";
-                    $currentDirectoryPath = $metadata['custom_directory_path'];
-                    $uiServiceLogCallback("📁 Directory updated: {$currentDirectoryPath}");
-                }
-                continue;
-            }
-
-            if ($choice === '8') {
+            if ($choice === '4') {
                 $metadata['_action'] = 'reprocess_multi';
                 return true;
             }
 
-            if ($choice === '9') {
+            if ($choice === '5') {
                 $metadata['_action'] = 'merge_parent';
                 return true;
             }

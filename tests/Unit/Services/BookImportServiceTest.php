@@ -79,8 +79,8 @@ class BookImportServiceTest extends TestCase
         ];
 
         $logs = [];
-        // Select '3' (Edit), then '1' (Accept)
-        $selectResponses = ['3', '1'];
+        // Select '2' (Edit), then '1' (Accept)
+        $selectResponses = ['2', '1'];
         $inputInterrupted = false;
 
         $result = $this->service->reviewAndApprove(
