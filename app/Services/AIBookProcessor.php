@@ -436,7 +436,17 @@ class AIBookProcessor
     ): string {
         $prompt = "Extract audiobook metadata from this data and return JSON only:\n\n";
 
-        $prompt .= "Directory: {$directoryPath}\n";
+        // Strip leading filesystem noise (e.g. /media/lyra_data1/audiobooks/unsorted) so the AI
+        // only sees the meaningful part of the path (e.g. "The Messenger/01 The Messenger").
+        // Keep up to the last 2 path segments to preserve series/title context.
+        $displayPath = $directoryPath;
+        if (str_starts_with($directoryPath, '/')) {
+            $parts = array_filter(explode('/', $directoryPath), fn ($p) => $p !== '');
+            if (count($parts) > 2) {
+                $displayPath = implode('/', array_slice(array_values($parts), -2));
+            }
+        }
+        $prompt .= "Directory: {$displayPath}\n";
 
         // Prioritize NFO data if available
         if (!empty($nfoData)) {
@@ -780,7 +790,8 @@ class AIBookProcessor
         if (isset($metadata['series']) && is_array($metadata['series'])) {
             $normalized['series'] = $metadata['series']['name'] ?? null;
             if (isset($metadata['series']['number'])) {
-                $normalized['series_number'] = (int) $metadata['series']['number'];
+                $raw = $metadata['series']['number'];
+                $normalized['series_number'] = is_numeric($raw) && str_contains((string) $raw, '.') ? (float) $raw : (int) $raw;
             }
             $normalized['is_collection'] = $metadata['series']['is_collection'] ?? false;
         }
@@ -940,7 +951,7 @@ class AIBookProcessor
                                 if ($key === 'title' && is_array($values) && count($values) > 1) {
                                     $tags[$key] = end($values);
                                 } else {
-                                    $tags[$key] = $values[0];
+                                    $tags[$key] = is_array($values) ? reset($values) : $values;
                                 }
                             }
                         }
@@ -951,8 +962,9 @@ class AIBookProcessor
                 foreach ($fileInfo['tags'] as $tagFormat => $tagData) {
                     if (!in_array($tagFormat, $preferredFormats)) {
                         foreach ($tagData as $key => $values) {
-                            if (!isset($tags[$key]) && !empty($values[0])) {
-                                $tags[$key] = $values[0];
+                            $first = is_array($values) ? reset($values) : $values;
+                            if (!isset($tags[$key]) && !empty($first)) {
+                                $tags[$key] = $first;
                             }
                         }
                     }
