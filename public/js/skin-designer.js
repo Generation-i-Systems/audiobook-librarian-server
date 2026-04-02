@@ -180,12 +180,10 @@ class SkinState {
         const asset = this.assets.find(a => a.relative_path === path || a.path === path || a.name === path);
         if (asset) return asset.url;
 
-        // Use the skin asset proxy route
-        // Format: /skin-asset/{skinId}/{path}
-        const skinId = this.skin.id;
         const assetPath = path.startsWith('/') ? path.substring(1) : path;
+        const base = this.skin._assetBaseUrl || `/skin-asset/${this.skin.id}`;
 
-        return `/skin-asset/${skinId}/${assetPath}`;
+        return `${base}/${assetPath}`;
     }
 
     getBackgroundImage() {
@@ -533,13 +531,15 @@ class SkinRenderer {
     calculatePosition(flexValue, containerSize, elementSize) {
         if (typeof flexValue === 'number') return flexValue;
         if (flexValue === 'auto' || flexValue === 'center') {
-            return Math.floor((containerSize - elementSize) / 2); // Center
+            return Math.floor((containerSize - elementSize) / 2);
         }
+        if (flexValue === 'top') return 0;
+        if (flexValue === 'bottom') return Math.max(0, containerSize - elementSize);
         if (flexValue === 'line') return 0; // Will be calculated by line layout
-        if (flexValue === 'max') return containerSize;
+        if (flexValue === 'max') return containerSize - elementSize;
         if (typeof flexValue === 'string' && flexValue.startsWith('max-')) {
             const minus = parseInt(flexValue.substring(4));
-            return containerSize - minus;
+            return containerSize - minus - elementSize;
         }
         return 0; // Default to 0 if unknown
     }
@@ -766,24 +766,38 @@ class SkinRenderer {
                 div.style.textAlign = el.textAlign || 'left';
                 div.style.fontWeight = el.fontWeight || 'normal';
                 break;
-            case 'button':
-                if (el.image) {
+            case 'button': {
+                const btnImage = el.image || el.customImage;
+                if (btnImage) {
                     const img = document.createElement('img');
-                    img.src = this.state.resolveAssetUrl(el.image);
+                    img.src = this.state.resolveAssetUrl(btnImage);
                     img.style.width = '100%';
                     img.style.height = '100%';
                     img.style.objectFit = 'contain';
                     div.appendChild(img);
                 } else {
-                     if (!el.backgroundColor) div.style.backgroundColor = el.themeable?.tint ? this.resolveThemeColor(el.themeable.tint, '#495057') : '#495057';
-                     div.style.borderRadius = '999px';
-                     div.style.color = 'white';
-                     div.style.display = 'flex';
-                     div.style.alignItems = 'center';
-                     div.style.justifyContent = 'center';
-                     div.innerText = this.getActionIcon(el.action);
+                    const tint = el.themeable?.tint ? this.resolveThemeColor(el.themeable.tint, '#495057') : '#495057';
+                    if (!el.backgroundColor) div.style.backgroundColor = tint;
+                    div.style.borderRadius = '999px';
+                    div.style.color = 'white';
+                    div.style.display = 'flex';
+                    div.style.alignItems = 'center';
+                    div.style.justifyContent = 'center';
+                    const icon = this.getActionIcon(el.action);
+                    if (icon) {
+                        div.innerText = icon;
+                    } else if (!el.backgroundColor) {
+                        // No known icon and no background — show a small dot
+                        const dot = document.createElement('div');
+                        dot.style.width = '30%';
+                        dot.style.height = '30%';
+                        dot.style.borderRadius = '50%';
+                        dot.style.backgroundColor = tint;
+                        div.appendChild(dot);
+                    }
                 }
                 break;
+            }
             case 'image':
             case 'cover-image':
                 if (el.image) {
@@ -829,16 +843,45 @@ class SkinRenderer {
                      div.innerText = el.type;
                 }
                 break;
-            case 'progress-bar':
-                if (!el.backgroundColor) div.style.backgroundColor = '#495057';
-                div.style.borderRadius = '4px';
-                const progress = document.createElement('div');
-                progress.style.height = '100%';
-                progress.style.width = '50%'; // Sample value
-                progress.style.borderRadius = '4px';
-                progress.style.backgroundColor = this.resolveThemeColor(el.themeable?.activeColor, '#0d6efd');
-                div.appendChild(progress);
+            case 'progress-bar': {
+                const activeColor = this.resolveThemeColor(el.themeable?.activeColor, '#0d6efd');
+                const inactiveColor = this.resolveThemeColor(el.themeable?.inactiveColor, '#495057');
+                const progressStyle = el.progressBarStyle || 'linear';
+                const sampleProgress = 0.5;
+                if (progressStyle === 'waveform') {
+                    div.style.display = 'flex';
+                    div.style.alignItems = 'center';
+                    div.style.gap = '2px';
+                    div.style.overflow = 'hidden';
+                    const barWidth = 3;
+                    const gap = 2;
+                    const totalWidth = div.offsetWidth || 100;
+                    const count = Math.floor(totalWidth / (barWidth + gap)) || 20;
+                    const seed = 42;
+                    let rng = seed;
+                    const rand = () => { rng = (rng * 1664525 + 1013904223) & 0xffffffff; return (rng >>> 0) / 0xffffffff; };
+                    for (let i = 0; i < count; i++) {
+                        const bar = document.createElement('div');
+                        const heightPct = 30 + rand() * 70;
+                        bar.style.width = `${barWidth}px`;
+                        bar.style.flexShrink = '0';
+                        bar.style.height = `${heightPct}%`;
+                        bar.style.borderRadius = '1px';
+                        bar.style.backgroundColor = (i / count) < sampleProgress ? activeColor : inactiveColor;
+                        div.appendChild(bar);
+                    }
+                } else {
+                    if (!el.backgroundColor) div.style.backgroundColor = inactiveColor;
+                    div.style.borderRadius = '4px';
+                    const progress = document.createElement('div');
+                    progress.style.height = '100%';
+                    progress.style.width = `${sampleProgress * 100}%`;
+                    progress.style.borderRadius = '4px';
+                    progress.style.backgroundColor = activeColor;
+                    div.appendChild(progress);
+                }
                 break;
+            }
             case 'container':
                 if (!el.backgroundColor) {
                     div.style.border = '1px dashed #6c757d';
@@ -924,11 +967,19 @@ class SkinRenderer {
     }
 
     getActionIcon(action) {
-        if (!action) return '?';
-        if (action.includes('play-pause')) return '▶';
-        if (action.includes('skip-forward')) return '⏩';
-        if (action.includes('skip-backward')) return '⏪';
-        return '?';
+        if (!action) return null;
+        if (action.includes('play-pause') || action.includes('toggle-play')) return '▶';
+        if (action.startsWith('skip-forward-') || action.startsWith('skip-forward:')) return '⏩';
+        if (action.startsWith('skip-backward-') || action.startsWith('skip-backward:')) return '⏪';
+        if (action === 'next-chapter') return '⏭';
+        if (action === 'prev-chapter') return '⏮';
+        if (action === 'create-bookmark') return '🔖';
+        if (action === 'show-bookmarks' || action === 'open-bookmarks') return 'B';
+        if (action === 'enter-drive-mode' || action === 'drive-mode') return '🚗';
+        if (action === 'exit-drive-mode') return '✕';
+        if (action === 'sleep-timer' || action === 'show-sleep-timer') return '⏰';
+        if (action === 'playback-speed' || action === 'show-speed-selector') return '⚡';
+        return null;
     }
 }
 
@@ -1083,7 +1134,7 @@ const VALIDATORS = {
     id: (val) => /^[a-zA-Z0-9_-]+$/.test(val) ? null : "ID must be alphanumeric, underscores or hyphens",
     dimension: (val) => {
         if (typeof val === 'number') return null;
-        if (val === 'max' || val === 'auto' || val === 'none' || val === 'start' || val === 'line' || val === 'center') return null;
+        if (val === 'max' || val === 'auto' || val === 'none' || val === 'start' || val === 'line' || val === 'center' || val === 'top' || val === 'bottom') return null;
         if (/^max-\d+$/.test(val)) return null;
         if (/^\d+%$/.test(val)) return null;
         const n = parseFloat(val);
@@ -1125,8 +1176,8 @@ const VALIDATORS = {
 const TOOLTIPS = {
     id: "Unique identifier for this element.",
     anchor: "Point on the canvas where this element is positioned from.",
-    x: "Horizontal position. Supports 'auto' (center), 'max' (full width), 'max-20' (20px margin).",
-    y: "Vertical position. Supports 'auto' (center), 'max' (full height), 'max-20' (20px margin).",
+    x: "Horizontal position. Supports 'auto'/'center' (center), 'top' (0), 'bottom' (right edge), 'max' (right edge - element width), 'max-20' (20px from right).",
+    y: "Vertical position. Supports 'auto'/'center' (center), 'top' (0), 'bottom' (bottom edge - element height), 'max' (bottom edge - element height), 'max-20' (20px from bottom).",
     width: "Width in pixels, 'max' (fill), or '50%' (percentage).",
     height: "Height in pixels, 'max' (fill), or '50%' (percentage).",
     action: "Action on tap. Defaults: skip-forward-30, next-chapter, etc.",
@@ -1234,8 +1285,10 @@ class PropertyEditor {
         }
 
         if (el.type === 'progress-bar') {
+             this.addSelect('Style', el.progressBarStyle || 'linear', ['linear', 'slider', 'marker', 'waveform', 'wavy'], (val) => this.state.updateElement(el.id, { progressBarStyle: val === 'linear' ? undefined : val }));
              this.addThemeColorInput('Active Color', el.themeable?.activeColor || '#2196F3', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, activeColor: val } }));
              this.addThemeColorInput('Inactive Color', el.themeable?.inactiveColor || '#424242', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, inactiveColor: val } }));
+             this.addThemeColorInput('Thumb Color', el.themeable?.thumbColor || '', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, thumbColor: val || undefined } }));
         }
 
         if (el.type === 'rectangle') {
@@ -1598,7 +1651,7 @@ class PropertyEditor {
                     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
                     uploadBtn.innerText = 'Uploading...';
                     uploadBtn.disabled = true;
-                    fetch(`/gallery/skins/${this.state.skin.id}/assets`, {
+                    fetch(this.state.skin._assetUploadUrl, {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': csrfToken },
                         body: formData
@@ -1849,7 +1902,7 @@ class PropertyEditor {
                     uploadBtn.innerText = 'Uploading...';
                     uploadBtn.disabled = true;
 
-                    fetch(`/gallery/skins/${this.state.skin.id}/assets`, {
+                    fetch(this.state.skin._assetUploadUrl, {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': csrfToken },
                         body: formData
@@ -2073,6 +2126,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const appEl = document.getElementById('designer-app');
     const skinData = JSON.parse(appEl.dataset.skin);
     const assetsData = JSON.parse(appEl.dataset.assets);
+    const manifestSaveUrl = appEl.dataset.manifestUrl || `/gallery/skins/${skinData.id}/manifest`;
+    skinData._assetUploadUrl = appEl.dataset.assetUrl || `/gallery/skins/${skinData.id}/assets`;
+    skinData._assetBaseUrl = appEl.dataset.assetBaseUrl || `/skin-asset/${skinData.id}`;
 
     const state = new SkinState(skinData, assetsData);
     const sampleData = new SampleData(state);
@@ -2249,7 +2305,7 @@ document.addEventListener('DOMContentLoaded', () => {
          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
          const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
-         fetch(`/gallery/skins/${skinData.id}/manifest`, {
+         fetch(manifestSaveUrl, {
              method: 'POST',
              headers: {
                  'Content-Type': 'application/json',

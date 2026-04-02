@@ -73,4 +73,47 @@ export function initRawJsonEdit() {
     }
 }
 
+export function initModalEnterGuards() {
+    $(document)
+        .off("keydown.modalEnterGuards", ".modal input, .modal select")
+        .on(
+            "keydown.modalEnterGuards",
+            ".modal input, .modal select",
+            function (e) {
+                if (e.key !== "Enter") {
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const modal = e.target.closest(".modal");
+                if (!modal) {
+                    return;
+                }
+
+                if (modal.id === "renameSeriesModal") {
+                    $("#confirm-rename-series-btn").trigger("click");
+                    return;
+                }
+
+                if (modal.id === "autofillModal") {
+                    $("#search-all-btn").trigger("click");
+                    return;
+                }
+
+                if (modal.id === "coverImageModal") {
+                    const coverUrlInput =
+                        document.getElementById("coverImageUrlText");
+                    if (coverUrlInput && e.target === coverUrlInput) {
+                        coverUrlInput.dispatchEvent(
+                            new Event("change", { bubbles: true }),
+                        );
+                    }
+                }
+            },
+        );
+}
+
 $(initRawJsonEdit);
+$(initModalEnterGuards);

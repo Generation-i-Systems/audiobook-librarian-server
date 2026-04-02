@@ -244,7 +244,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
               <div class="modal-body autofill-modal-scrollable">
-                <form id="autofill-search-form" class="mb-3">
+                <div id="autofill-search-form" class="mb-3">
                   <div class="row g-2 mb-2">
                     <div class="col-md-3">
                       <label for="autofill-title" class="form-label">Title</label>
@@ -290,7 +290,7 @@
                       <div id="autofill-modal-feedback" class="alert alert-danger d-none" style="display:none;"></div>
                     </div>
                   </div>
-                </form>
+                </div>
                 <div class="table-responsive" id="autofill-results-wrapper" style="display:none;">
                   <table class="table table-bordered table-hover align-middle mb-0" id="autofill-results-table">
                     <thead class="table-light">

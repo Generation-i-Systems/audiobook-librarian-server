@@ -144,6 +144,7 @@ describe("Book Form", () => {
         const container = isModal ? $(".modal-body form") : $("#book-form");
         initBookForm(container);
         bookForm.initRawJsonEdit();
+        bookForm.initModalEnterGuards();
         return { container };
     };
 
@@ -251,6 +252,58 @@ describe("Book Form", () => {
             expect($("#raw-json-error").text()).toContain(
                 "Failed to save JSON",
             );
+        });
+    });
+
+    describe("Modal Enter Guards", () => {
+        test("should prevent Enter in modal inputs from submitting the main form", () => {
+            setupTest();
+            document.body.insertAdjacentHTML(
+                "beforeend",
+                `
+                    <div id="coverImageModal" class="modal">
+                        <input type="text" id="coverImageUrlText" value="https://example.com/cover.jpg">
+                    </div>
+                `,
+            );
+
+            const input = document.getElementById("coverImageUrlText");
+            const event = new KeyboardEvent("keydown", {
+                key: "Enter",
+                bubbles: true,
+                cancelable: true,
+            });
+
+            input.dispatchEvent(event);
+
+            expect(event.defaultPrevented).toBe(true);
+        });
+
+        test("should trigger autofill search when Enter is pressed in autofill modal", () => {
+            setupTest();
+            document.body.insertAdjacentHTML(
+                "beforeend",
+                `
+                    <div id="autofillModal" class="modal">
+                        <input type="text" id="autofill-title">
+                    </div>
+                    <button type="button" id="search-all-btn">Search all</button>
+                `,
+            );
+
+            const searchButton = document.getElementById("search-all-btn");
+            const clickSpy = jest.spyOn(searchButton, "click");
+            const input = document.getElementById("autofill-title");
+
+            input.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "Enter",
+                    bubbles: true,
+                    cancelable: true,
+                }),
+            );
+
+            expect(clickSpy).toHaveBeenCalled();
         });
     });
 });
