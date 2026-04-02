@@ -478,9 +478,10 @@ class BookController extends Controller
                 }
                 // If it's an object with 'name' and 'pivot' (from MySQL relationship)
                 if (isset($seriesItem['name']) && isset($seriesItem['pivot']['series_number'])) {
+                    $sn = $seriesItem['pivot']['series_number'];
                     return [
                         'seriesName' => $seriesItem['name'],
-                        'number' => (int) $seriesItem['pivot']['series_number'],
+                        'number' => is_numeric($sn) && str_contains((string) $sn, '.') ? (float) $sn : (int) $sn,
                     ];
                 }
                 // If it's a simple string, assume it's the series name and number is 1

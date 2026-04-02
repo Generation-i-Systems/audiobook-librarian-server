@@ -966,9 +966,10 @@ trait BookImportTrait
             $book['edition'] = $matches[1];
         }
 
-        // Extract series number (e.g., 'Book 1', '#2', 'Vol. 3')
-        if (preg_match('/(?:book|vol\.?|#)\s*(\d+)/i', $filename, $matches)) {
-            $book['series_number'] = (int) $matches[1];
+        // Extract series number (e.g., 'Book 1', '#2', 'Vol. 3', 'Book 3.5')
+        if (preg_match('/(?:book|vol\.?|#)\s*([\d.]+)/i', $filename, $matches)) {
+            $raw = $matches[1];
+            $book['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
         }
     }
 

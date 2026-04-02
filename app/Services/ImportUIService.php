@@ -887,7 +887,7 @@ class ImportUIService implements ImportUIInterface
             is_float($seriesNumber) ||
             (is_string($seriesNumber) && is_numeric($seriesNumber));
         if ($hasNumericSeries) {
-            $seriesNumber = (int) $seriesNumber;
+            $seriesNumber = str_contains((string) $seriesNumber, '.') ? (float) $seriesNumber : (int) $seriesNumber;
             if ($seriesNumber > 0) {
                 $seriesSuffix = ' #' . $seriesNumber;
             }

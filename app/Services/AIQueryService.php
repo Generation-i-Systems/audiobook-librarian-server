@@ -1285,7 +1285,8 @@ PROMPT;
                 case 'add_series':
                     if (isset($parsedData['series_name']) && isset($parsedData['series_number'])) {
                         $seriesName = trim($parsedData['series_name']);
-                        $seriesNumber = (int) $parsedData['series_number'];
+                        $raw = $parsedData['series_number'];
+                        $seriesNumber = is_numeric($raw) && str_contains((string) $raw, '.') ? (float) $raw : (int) $raw;
 
                         // Find or create the series
                         $series = Series::firstOrCreate(

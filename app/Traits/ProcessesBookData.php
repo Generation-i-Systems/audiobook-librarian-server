@@ -48,9 +48,10 @@ trait ProcessesBookData
                     return $seriesItem;
                 }
                 if (isset($seriesItem['name']) && isset($seriesItem['pivot']['series_number'])) {
+                    $sn = $seriesItem['pivot']['series_number'];
                     return [
                         'seriesName' => $seriesItem['name'],
-                        'number' => (int) $seriesItem['pivot']['series_number'],
+                        'number' => is_numeric($sn) && str_contains((string) $sn, '.') ? (float) $sn : (int) $sn,
                     ];
                 }
                 if (is_string($seriesItem)) {
