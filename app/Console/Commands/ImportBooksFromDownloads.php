@@ -102,6 +102,8 @@ class ImportBooksFromDownloads extends Command
     protected array $processedBooks = [];
     protected array $failedBooks = [];
     protected array $skippedBooks = [];
+    // Tracks how far back the user has navigated with "fix previous import" (0 = most recent)
+    protected int $fixHistoryIndex = 0;
     protected int $totalFound = 0;
 
     protected function getFileOperation(): string
@@ -1260,7 +1262,7 @@ class ImportBooksFromDownloads extends Command
             fn ($message, $data = null) => $this->logUiMessage($message, $data),
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
             fn ($question, $default) => $this->askInline($question, $default ?? ''),
-            fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, $fileCount = 0) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, !empty($audiobook['is_multi_book_part']), $fileCount),
+            fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, $fileCount = 0, $previousImport = null) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, !empty($audiobook['is_multi_book_part']), $fileCount, $previousImport),
             fn ($metadata, $sequential = false) => $this->getImportService()->editMetadataFields(
                 $metadata,
                 $audiobook,
@@ -1285,7 +1287,9 @@ class ImportBooksFromDownloads extends Command
             fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
                 'include_narrator' => (bool) $this->option('include-narrator'),
             ])),
-            $this->inputInterrupted
+            $this->inputInterrupted,
+            fn ($previousImport) => $this->fixPreviousImport($previousImport),
+            $this->getLastProcessedBook()
         );
     }
 
@@ -1295,7 +1299,8 @@ class ImportBooksFromDownloads extends Command
         string $currentDirectoryPath,
         bool $isFinalConfirmation,
         bool $isMultiBookPart = false,
-        int $fileCount = 0
+        int $fileCount = 0,
+        ?array $previousImport = null
     ): array {
         return $this->getImportService()->buildReviewOptions(
             $currentCoverUrl,
@@ -1304,8 +1309,119 @@ class ImportBooksFromDownloads extends Command
             $isFinalConfirmation,
             fn () => $this->getValidGenres(),
             $isMultiBookPart,
-            $fileCount
+            $fileCount,
+            $previousImport
         );
+    }
+
+    /**
+     * Return the book to fix based on current history navigation index.
+     * Index 0 = most recent, 1 = one before that, etc.
+     */
+    protected function getLastProcessedBook(): ?array
+    {
+        $count = count($this->processedBooks);
+        if ($count === 0) {
+            return null;
+        }
+        // Clamp index to valid range
+        $this->fixHistoryIndex = min($this->fixHistoryIndex, $count - 1);
+        $targetIndex = $count - 1 - $this->fixHistoryIndex;
+        return $this->processedBooks[$targetIndex] ?? null;
+    }
+
+    /**
+     * Re-open an already-imported book for editing using the full review loop,
+     * so current field values are displayed and all edit options are available.
+     * Advances the history index so the next "fix previous" goes one book further back.
+     */
+    protected function fixPreviousImport(array $previousImport): void
+    {
+        $bookId = $previousImport['book_id'] ?? null;
+        if (!$bookId) {
+            $this->warn("Cannot fix previous import: no book ID available.");
+            return;
+        }
+
+        $book = \App\Models\Book::find($bookId);
+        if (!$book) {
+            $this->warn("Cannot fix previous import: book ID {$bookId} not found.");
+            return;
+        }
+
+        $this->info("📝 Editing previously imported book: {$book->title} (ID: {$bookId})");
+
+        $metadata = $this->getImportService()->buildMetadataFromBook($book);
+
+        // Display current metadata so the user sees what is already stored
+        $this->getImportService()->displayEnrichedMetadata(
+            $metadata,
+            fn ($headers, $rows) => $this->table($headers, $rows),
+            null,
+            null,
+            fn () => false
+        );
+
+        // Advance history index so next "fix previous" targets the book before this one
+        $this->fixHistoryIndex++;
+
+        // Run the full review loop — same as the initial import, but without file-move
+        // Accept/skip here means "save changes" / "discard and continue"
+        $fakeAudiobook = ['path' => $book->directory_path ?? '', 'files' => [], 'is_multi_book_part' => false];
+        $approved = $this->getImportService()->reviewAndApprove(
+            $metadata,
+            $fakeAudiobook,
+            fn ($metadata) => $this->buildUiMetadata($metadata),
+            fn ($message, $data = null) => $this->logUiMessage($message, $data),
+            fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
+            fn ($question, $default) => $this->askInline($question, $default ?? ''),
+            fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, $fileCount = 0, $prev = null) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, false, $fileCount, $prev),
+            fn ($metadata, $sequential = false) => $this->getImportService()->editMetadataFields(
+                $metadata,
+                $fakeAudiobook,
+                fn ($question, $default) => $this->askInline($question, $default ?? ''),
+                fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
+                fn ($metadata, $keys) => $this->getImportService()->getFirstNonEmptyMetadataValue($metadata, $keys),
+                fn (&$metadata) => $this->getImportService()->extractSeriesNumberFromTitle($metadata),
+                fn () => $this->getValidGenres(),
+                fn ($message, $data = null) => $this->logUiMessage($message, $data),
+                fn ($metadata) => $this->buildUiMetadata($metadata),
+                $sequential
+            ),
+            fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
+                $metadata,
+                $audiobook,
+                $enrichmentService,
+                fn ($headers, $rows) => $this->table($headers, $rows)
+            ),
+            fn () => $this->getEnrichmentService(),
+            fn () => $this->getValidGenres(),
+            fn ($metadata) => $this->getImportService()->hasEnrichmentData($metadata),
+            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
+                'include_narrator' => (bool) $this->option('include-narrator'),
+            ])),
+            $this->inputInterrupted,
+            fn ($prev) => $this->fixPreviousImport($prev),
+            $this->getLastProcessedBook()
+        );
+
+        if ($approved) {
+            $this->getImportService()->updateBookFromMetadata($book, $metadata, $fakeAudiobook);
+            $freshTitle = $book->fresh()->title ?? $book->title;
+            $this->info("✅ Updated: {$freshTitle}");
+
+            // Sync updated title back into the processedBooks log entry
+            $count = count($this->processedBooks);
+            $targetIndex = $count - $this->fixHistoryIndex;
+            if (isset($this->processedBooks[$targetIndex]) && ($this->processedBooks[$targetIndex]['book_id'] ?? null) === $bookId) {
+                $this->processedBooks[$targetIndex]['title'] = $freshTitle;
+            }
+        } else {
+            $this->info("↩ No changes saved for: {$book->title}");
+        }
+
+        // Reset history index when done so "fix previous" from next book starts at most recent
+        $this->fixHistoryIndex = 0;
     }
 
     /**
@@ -1365,7 +1481,8 @@ class ImportBooksFromDownloads extends Command
                 $options,
                 null,
                 null,
-                fn ($audiobook, $targetDir, $book) => $this->handleDirectoryConflict($audiobook, $targetDir)
+                fn ($audiobook, $targetDir, $book) => $this->handleDirectoryConflict($audiobook, $targetDir),
+                fn ($sourcePath, $targetPath, $type) => $this->handleFileConflict($sourcePath, $targetPath, $type)
             ),
             fn () => $this->getFileOperation(),
             fn ($message) => $this->info($message),
@@ -1554,6 +1671,40 @@ class ImportBooksFromDownloads extends Command
     protected function parsePlainTextNfo(string $content): array
     {
         return $this->getImportService()->parsePlainTextNfo($content);
+    }
+
+    /**
+     * Handle a file-level conflict where an individual file already exists at the destination.
+     * Returns 'keep', 'replace', or 'rename:<newname>'.
+     */
+    protected function handleFileConflict(string $sourcePath, string $targetPath, string $type): string
+    {
+        return $this->getImportService()->handleFileConflict(
+            $sourcePath,
+            $targetPath,
+            $type,
+            fn ($message) => $this->line($message),
+            fn ($question, $options, $default) => $this->uiService->select($question, $options, $default),
+            fn ($question, $default) => $this->uiService->ask($question, $default),
+            fn ($imagePath) => $this->displayLocalImage($imagePath)
+        );
+    }
+
+    /**
+     * Display a local image file using the terminal image protocol.
+     */
+    protected function displayLocalImage(string $imagePath): void
+    {
+        if (!file_exists($imagePath)) {
+            $this->line("    (file not found: {$imagePath})");
+            return;
+        }
+        $imageData = file_get_contents($imagePath);
+        if ($imageData) {
+            $this->displayKittyImage($imageData);
+        } else {
+            $this->line("    (could not read image: {$imagePath})");
+        }
     }
 
     /**

@@ -290,7 +290,51 @@ class BookImportService
         return $normalizedPath;
     }
 
-    protected function moveNonAudioFilesToDirectory(string $sourceDir, string $targetDir): void
+    /**
+     * Resolve a file conflict when a file already exists at the target path.
+     *
+     * Calls $handleFileConflictCallback($sourcePath, $targetPath, $type) where $type
+     * is 'audio' or 'non-audio'. The callback must return one of:
+     *   'keep'        — leave the existing file, skip the incoming one
+     *   'replace'     — overwrite the existing file with the incoming one
+     *   'rename:name' — move the incoming file to "$targetDir/name" instead
+     *
+     * When no callback is provided, defaults to 'keep' (safe fallback that never
+     * silently destroys data).
+     *
+     * Returns the resolved target path to write to, or null to skip.
+     */
+    protected function resolveFileConflict(
+        string $sourcePath,
+        string $targetPath,
+        string $type,
+        ?callable $handleFileConflictCallback
+    ): ?string {
+        if ($handleFileConflictCallback === null) {
+            Log::warning("File conflict — no callback provided, keeping existing file: {$targetPath}");
+            return null;
+        }
+
+        $resolution = $handleFileConflictCallback($sourcePath, $targetPath, $type);
+
+        if ($resolution === 'keep') {
+            return null;
+        }
+
+        if ($resolution === 'replace') {
+            return $targetPath;
+        }
+
+        if (is_string($resolution) && str_starts_with($resolution, 'rename:')) {
+            $newName = substr($resolution, strlen('rename:'));
+            return dirname($targetPath) . '/' . $newName;
+        }
+
+        Log::warning("Unknown file conflict resolution '{$resolution}', keeping existing file: {$targetPath}");
+        return null;
+    }
+
+    protected function moveNonAudioFilesToDirectory(string $sourceDir, string $targetDir, ?callable $handleFileConflictCallback = null): void
     {
         if (!File::isDirectory($sourceDir)) {
             return;
@@ -310,6 +354,15 @@ class BookImportService
             }
 
             $targetPath = rtrim($targetDir, '/') . '/' . $file->getFilename();
+
+            if (file_exists($targetPath)) {
+                $resolved = $this->resolveFileConflict($path, $targetPath, 'non-audio', $handleFileConflictCallback);
+                if ($resolved === null) {
+                    continue;
+                }
+                $targetPath = $resolved;
+            }
+
             File::move($path, $targetPath);
             $this->setFileOwnership($targetPath);
         }
@@ -336,7 +389,8 @@ class BookImportService
 
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::LEAVES_ONLY
+            \RecursiveIteratorIterator::LEAVES_ONLY,
+            \RecursiveIteratorIterator::CATCH_GET_CHILD
         );
 
         foreach ($iterator as $file) {
@@ -686,6 +740,45 @@ class BookImportService
     /**
      * Update existing book from metadata
      */
+
+    /**
+     * Build a metadata array from an existing Book model, suitable for use in
+     * editMetadataFields() and updateBookFromMetadata(). This is the inverse of
+     * createBookFromMetadata() and is used when re-editing an already-imported book.
+     */
+    public function buildMetadataFromBook(Book $book): array
+    {
+        $authors = $book->authors->pluck('name')->toArray();
+        $narrators = $book->narrators->pluck('name')->toArray();
+        $genres = $book->genres->pluck('name')->toArray();
+
+        $series = $book->series->first();
+        $seriesName = $series !== null ? ($series->name ?? '') : '';
+        $seriesNumber = null;
+        if ($series) {
+            $pivot = $series->pivot ?? null;
+            $seriesNumber = $pivot !== null ? ($pivot->series_number ?? null) : null;
+        }
+
+        return [
+            'title'          => $book->title ?? '',
+            'author'         => $authors,
+            'narrator'       => $narrators,
+            'genre'          => $genres[0] ?? '',
+            'series'         => $seriesName,
+            'series_number'  => $seriesNumber,
+            'year'           => $book->release_date?->year,
+            'description'    => $book->description ?? '',
+            'language'       => $book->language ?? '',
+            'isbn'           => $book->isbn ?? '',
+            'asin'           => $book->asin ?? '',
+            'publisher'      => $book->publisher ?? '',
+            'cover_url'      => '',
+            'confidence'     => 100,
+            'source_path'    => $book->directory_path ?? '',
+        ];
+    }
+
     public function updateBookFromMetadata(Book $book, array $metadata, array $audiobook, array $options = []): Book
     {
         try {
@@ -1195,7 +1288,8 @@ class BookImportService
         callable|array $warnCallback,
         ?callable $getBookStoragePathCallback = null,
         ?callable $getCopyFilesOptionCallback = null,
-        ?callable $handleDirectoryConflictCallback = null
+        ?callable $handleDirectoryConflictCallback = null,
+        ?callable $handleFileConflictCallback = null
     ): bool {
         $legacyOptions = null;
         if (is_array($warnCallback)) {
@@ -1216,7 +1310,7 @@ class BookImportService
             $options['target_directory'] = $legacyOptions['target_directory'];
         }
 
-        return $this->moveFilesToLibraryInternal($audiobook, $book, $options, $warnCallback, $handleDirectoryConflictCallback);
+        return $this->moveFilesToLibraryInternal($audiobook, $book, $options, $warnCallback, $handleDirectoryConflictCallback, $handleFileConflictCallback);
     }
 
     /**
@@ -1227,7 +1321,8 @@ class BookImportService
         Book $book,
         array $options,
         callable $warnCallback,
-        ?callable $handleDirectoryConflictCallback = null
+        ?callable $handleDirectoryConflictCallback = null,
+        ?callable $handleFileConflictCallback = null
     ): bool {
         try {
             $bookStoragePath = $options['storage_path'] ?? rtrim(
@@ -1329,7 +1424,7 @@ class BookImportService
                     ]);
 
                     // Move cover images / librarian.json (non-audio files) into the conflict-resolved directory
-                    $this->moveNonAudioFilesToDirectory($originalTargetDir, $targetDir);
+                    $this->moveNonAudioFilesToDirectory($originalTargetDir, $targetDir, $handleFileConflictCallback);
                 }
             }
 
@@ -1347,9 +1442,9 @@ class BookImportService
                 // Multi-book part: only move the specific files for this book
                 $filesToMove = $audiobook['multi_book_files_only'];
                 if ($operation === 'move') {
-                    $this->moveSpecificFiles($filesToMove, $targetDir);
+                    $this->moveSpecificFiles($filesToMove, $targetDir, $handleFileConflictCallback);
                 } else {
-                    $this->copySpecificFiles($filesToMove, $targetDir);
+                    $this->copySpecificFiles($filesToMove, $targetDir, $handleFileConflictCallback);
                 }
             } else {
                 // Regular book: move entire directory contents
@@ -1357,9 +1452,9 @@ class BookImportService
                 $this->flattenCdDirectories($sourcePath);
 
                 if ($operation === 'move') {
-                    $this->moveDirectoryContents($sourcePath, $targetDir);
+                    $this->moveDirectoryContents($sourcePath, $targetDir, $handleFileConflictCallback);
                 } else {
-                    $this->copyDirectoryContents($sourcePath, $targetDir);
+                    $this->copyDirectoryContents($sourcePath, $targetDir, $handleFileConflictCallback);
                 }
             }
 
@@ -1436,7 +1531,7 @@ class BookImportService
 
         return rtrim($basePath, '/') . '/' . ltrim($relativePath, '/');
     }
-    protected function copyDirectoryContents(string $source, string $target): void
+    protected function copyDirectoryContents(string $source, string $target, ?callable $handleFileConflictCallback = null): void
     {
         // Handle single file source
         if (File::isFile($source)) {
@@ -1446,6 +1541,15 @@ class BookImportService
             if (!File::isDirectory($target)) {
                 File::makeDirectory($target, 0775, true);
                 $this->setDirectoryOwnership($target);
+            }
+
+            if (file_exists($targetFile)) {
+                $type = in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), self::AUDIO_EXTENSIONS, true) ? 'audio' : 'non-audio';
+                $resolved = $this->resolveFileConflict($source, $targetFile, $type, $handleFileConflictCallback);
+                if ($resolved === null) {
+                    return;
+                }
+                $targetFile = $resolved;
             }
 
             if (!File::copy($source, $targetFile)) {
@@ -1483,6 +1587,15 @@ class BookImportService
                 $this->setDirectoryOwnership($target);
             }
 
+            if (file_exists($targetFile)) {
+                $type = in_array(strtolower($file->getExtension()), self::AUDIO_EXTENSIONS, true) ? 'audio' : 'non-audio';
+                $resolved = $this->resolveFileConflict($file->getPathname(), $targetFile, $type, $handleFileConflictCallback);
+                if ($resolved === null) {
+                    continue;
+                }
+                $targetFile = $resolved;
+            }
+
             File::copy($file->getPathname(), $targetFile);
 
             // Set file permissions after copying
@@ -1494,7 +1607,7 @@ class BookImportService
     /**
      * Move directory contents
      */
-    protected function moveDirectoryContents(string $source, string $target): void
+    protected function moveDirectoryContents(string $source, string $target, ?callable $handleFileConflictCallback = null): void
     {
         $sameFileSystem = $this->areOnSameFileSystem($source, $target);
 
@@ -1505,6 +1618,15 @@ class BookImportService
 
             if (!File::isDirectory($target)) {
                 File::makeDirectory($target, 0775, true);
+            }
+
+            if (file_exists($targetFile)) {
+                $type = in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), self::AUDIO_EXTENSIONS, true) ? 'audio' : 'non-audio';
+                $resolved = $this->resolveFileConflict($source, $targetFile, $type, $handleFileConflictCallback);
+                if ($resolved === null) {
+                    return;
+                }
+                $targetFile = $resolved;
             }
 
             if ($sameFileSystem) {
@@ -1547,6 +1669,15 @@ class BookImportService
                 File::makeDirectory($target, 0775, true);
             }
 
+            if (file_exists($targetFile)) {
+                $type = in_array(strtolower($file->getExtension()), self::AUDIO_EXTENSIONS, true) ? 'audio' : 'non-audio';
+                $resolved = $this->resolveFileConflict($file->getPathname(), $targetFile, $type, $handleFileConflictCallback);
+                if ($resolved === null) {
+                    continue;
+                }
+                $targetFile = $resolved;
+            }
+
             if ($sameFileSystem) {
                 if (!File::move($file->getPathname(), $targetFile)) {
                     throw new \Exception("Failed to move file: {$file->getPathname()} to {$targetFile}");
@@ -1576,7 +1707,7 @@ class BookImportService
     /**
      * Move specific files to target directory (for multi-book parts)
      */
-    protected function moveSpecificFiles(array $files, string $targetDir): void
+    protected function moveSpecificFiles(array $files, string $targetDir, ?callable $handleFileConflictCallback = null): void
     {
         if (!File::isDirectory($targetDir)) {
             File::makeDirectory($targetDir, 0775, true);
@@ -1594,6 +1725,15 @@ class BookImportService
 
             $filename = basename($filePath);
             $targetFile = "{$targetDir}/{$filename}";
+
+            if (file_exists($targetFile)) {
+                $type = in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), self::AUDIO_EXTENSIONS, true) ? 'audio' : 'non-audio';
+                $resolved = $this->resolveFileConflict($filePath, $targetFile, $type, $handleFileConflictCallback);
+                if ($resolved === null) {
+                    continue;
+                }
+                $targetFile = $resolved;
+            }
 
             $sameFileSystem = $this->areOnSameFileSystem($filePath, $targetDir);
 
@@ -1632,7 +1772,7 @@ class BookImportService
     /**
      * Copy specific files to target directory (for multi-book parts)
      */
-    protected function copySpecificFiles(array $files, string $targetDir): void
+    protected function copySpecificFiles(array $files, string $targetDir, ?callable $handleFileConflictCallback = null): void
     {
         if (!File::isDirectory($targetDir)) {
             File::makeDirectory($targetDir, 0775, true);
@@ -1647,6 +1787,15 @@ class BookImportService
 
             $filename = basename($filePath);
             $targetFile = "{$targetDir}/{$filename}";
+
+            if (file_exists($targetFile)) {
+                $type = in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), self::AUDIO_EXTENSIONS, true) ? 'audio' : 'non-audio';
+                $resolved = $this->resolveFileConflict($filePath, $targetFile, $type, $handleFileConflictCallback);
+                if ($resolved === null) {
+                    continue;
+                }
+                $targetFile = $resolved;
+            }
 
             if (!File::copy($filePath, $targetFile)) {
                 throw new \Exception("Failed to copy file: {$filePath} to {$targetFile}");
@@ -1854,6 +2003,45 @@ class BookImportService
     public function normalizeAuthorNameForDirectory(string $authorName): string
     {
         return $this->normalizeAuthorName($authorName);
+    }
+
+    /**
+     * Find a cover image in a source (import) directory using absolute path.
+     * Prefers standard names (cover.*, folder.*), then falls back to any image file.
+     */
+    protected function findCoverInSourceDirectory(string $absolutePath): ?string
+    {
+        if (!is_dir($absolutePath)) {
+            return null;
+        }
+
+        $files = scandir($absolutePath);
+        if ($files === false) {
+            return null;
+        }
+
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+        $preferred = ['cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp', 'folder.jpg', 'folder.jpeg', 'folder.png'];
+
+        foreach ($preferred as $name) {
+            foreach ($files as $file) {
+                if (strcasecmp($file, $name) === 0) {
+                    return $absolutePath . '/' . $file;
+                }
+            }
+        }
+
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (in_array($ext, $imageExtensions, true)) {
+                return $absolutePath . '/' . $file;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -2105,6 +2293,142 @@ class BookImportService
     /**
      * Handle directory conflict resolution with UI interaction
      */
+
+    /**
+     * Handle a file-level conflict where the destination file already exists.
+     *
+     * For images: displays both files side-by-side using the terminal image protocol.
+     * For text files: shows first 10 + last 10 lines of each file side-by-side.
+     * For audio files: shows file sizes and modification dates.
+     *
+     * Returns one of: 'keep', 'replace', 'rename:<newname>'
+     */
+    public function handleFileConflict(
+        string $sourcePath,
+        string $targetPath,
+        string $type,
+        callable $lineCallback,
+        callable $selectCallback,
+        callable $askCallback,
+        callable $displayImageCallback
+    ): string {
+        $filename = basename($targetPath);
+        $lineCallback('');
+        $lineCallback("⚠️  File conflict: <comment>{$filename}</comment> already exists in destination");
+
+        $sourceSize = file_exists($sourcePath) ? filesize($sourcePath) : 0;
+        $targetSize = file_exists($targetPath) ? filesize($targetPath) : 0;
+        $sourceMtime = file_exists($sourcePath) ? date('Y-m-d H:i:s', filemtime($sourcePath)) : 'unknown';
+        $targetMtime = file_exists($targetPath) ? date('Y-m-d H:i:s', filemtime($targetPath)) : 'unknown';
+
+        // If files are identical (same hash), default to keep to avoid pointless prompt
+        if (file_exists($sourcePath) && file_exists($targetPath) && md5_file($sourcePath) === md5_file($targetPath)) {
+            $lineCallback("  ✅ Files are identical — keeping existing file");
+            return 'keep';
+        }
+
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $isImage = in_array($extension, $imageExtensions, true);
+        $isText = in_array($extension, ['txt', 'json', 'nfo', 'xml', 'md', 'cue'], true);
+
+        $lineCallback("  Existing : {$targetPath}");
+        $lineCallback("    Size: " . $this->formatBytesInternal($targetSize) . "  Modified: {$targetMtime}");
+        $lineCallback("  Incoming : {$sourcePath}");
+        $lineCallback("    Size: " . $this->formatBytesInternal($sourceSize) . "  Modified: {$sourceMtime}");
+
+        if ($isImage) {
+            $lineCallback('');
+            $lineCallback('  📷 Existing cover:');
+            $displayImageCallback($targetPath);
+            $lineCallback('');
+            $lineCallback('  📷 Incoming cover:');
+            $displayImageCallback($sourcePath);
+            $lineCallback('');
+        } elseif ($isText) {
+            $lineCallback('');
+            $this->showTextFilePreview('  Existing', $targetPath, $lineCallback);
+            $this->showTextFilePreview('  Incoming', $sourcePath, $lineCallback);
+            $lineCallback('');
+        }
+
+        $options = [
+            'keep'    => "Keep existing {$filename}",
+            'replace' => "Replace with incoming {$filename}",
+            'rename'  => 'Rename incoming file (keep both)',
+        ];
+
+        $choice = $selectCallback("How should the conflict be resolved?", $options, 'keep');
+
+        if ($choice === 'rename' || $choice === 'Rename incoming file (keep both)') {
+            $suggested = pathinfo($filename, PATHINFO_FILENAME)
+                . '_new'
+                . ($extension !== '' ? '.' . $extension : '');
+            $newName = $askCallback("New filename for incoming file", $suggested);
+            $newName = trim((string) $newName);
+            if ($newName === '' || $newName === $filename) {
+                $newName = $suggested;
+            }
+            return 'rename:' . $newName;
+        }
+
+        if ($choice === 'replace' || $choice === "Replace with incoming {$filename}") {
+            return 'replace';
+        }
+
+        return 'keep';
+    }
+
+    /**
+     * Show first 10 + last 10 lines of a text file.
+     */
+    protected function showTextFilePreview(string $label, string $path, callable $lineCallback): void
+    {
+        if (!file_exists($path)) {
+            $lineCallback("  {$label}: (file not found)");
+            return;
+        }
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        if ($lines === false) {
+            $lineCallback("  {$label}: (could not read)");
+            return;
+        }
+
+        $total = count($lines);
+        $lineCallback("  {$label} ({$total} lines):");
+        $head = array_slice($lines, 0, 10);
+        foreach ($head as $line) {
+            $lineCallback('    ' . $line);
+        }
+        if ($total > 20) {
+            $lineCallback('    ...');
+            $tail = array_slice($lines, -10);
+            foreach ($tail as $line) {
+                $lineCallback('    ' . $line);
+            }
+        } elseif ($total > 10) {
+            $tail = array_slice($lines, 10);
+            foreach ($tail as $line) {
+                $lineCallback('    ' . $line);
+            }
+        }
+    }
+
+    protected function formatBytesInternal(int $bytes): string
+    {
+        if ($bytes >= 1073741824) {
+            return round($bytes / 1073741824, 2) . ' GB';
+        }
+        if ($bytes >= 1048576) {
+            return round($bytes / 1048576, 2) . ' MB';
+        }
+        if ($bytes >= 1024) {
+            return round($bytes / 1024, 2) . ' KB';
+        }
+        return $bytes . ' B';
+    }
+
     public function handleDirectoryConflict(
         array $audiobook,
         string $targetDir,
@@ -2855,6 +3179,10 @@ class BookImportService
             ['ISBN', $metadata['isbn'] ?? 'N/A'],
             ['Confidence', $metadata['confidence'] . '%'],
         ];
+
+        if (!empty($metadata['is_multi_part'])) {
+            $tableData[] = ['⚠ Multi-Part', 'Part number stripped from title — verify title is correct'];
+        }
 
         if (!empty($metadata['source_path'])) {
             $tableData[] = ['Source Path', $metadata['source_path']];
@@ -3750,7 +4078,7 @@ class BookImportService
             }
 
             $aiResult = $aiProcessor->processBookDirectory(
-                $audiobook['path'],
+                basename($audiobook['path']),
                 $fileNames,
                 $fileTags,
                 $nfoData
@@ -3760,11 +4088,27 @@ class BookImportService
                 $tagMetadata = $this->extractMetadataFromFileTags($fileTags);
                 $aiResult = $this->mergeMetadataFillMissing($aiResult, $tagMetadata);
 
+                // Tags are authoritative for author and year — override AI guesses when tags are present
+                if (!empty($tagMetadata['author'])) {
+                    $aiResult['author'] = $tagMetadata['author'];
+                }
+                if (!empty($tagMetadata['year'])) {
+                    $aiResult['year'] = $tagMetadata['year'];
+                }
+
                 if (!empty($fileTags) && empty($aiResult['cover_data'])) {
                     $firstTags = reset($fileTags);
                     if (!empty($firstTags['picture']['data'])) {
                         $aiResult['cover_data'] = $firstTags['picture']['data'];
                         $aiResult['cover_source'] = $firstTags['picture']['type'] ?? 'Embedded';
+                    }
+                }
+
+                // Scan the source directory for a cover image when no embedded/AI cover was found
+                if (empty($aiResult['cover_data']) && empty($aiResult['cover_url']) && empty($aiResult['cover_path'])) {
+                    $sourceCover = $this->findCoverInSourceDirectory($audiobook['path']);
+                    if ($sourceCover !== null) {
+                        $aiResult['cover_path'] = $sourceCover;
                     }
                 }
 
@@ -4401,7 +4745,8 @@ class BookImportService
         bool $isFinalConfirmation,
         callable $getValidGenresCallback,
         bool $isMultiBookPart = false,
-        int $fileCount = 0
+        int $fileCount = 0,
+        ?array $previousImport = null
     ): array {
         $validGenres = $getValidGenresCallback();
         $normalizedGenre = trim($currentGenre);
@@ -4431,6 +4776,12 @@ class BookImportService
         // Only show "Merge into Parent Book" if this IS a multi-book part
         if ($isMultiBookPart) {
             $options['9'] = 'Merge into Parent Book';
+        }
+
+        // Show "Fix previous import" when there is a previous import in this session
+        if ($previousImport !== null) {
+            $prevTitle = $previousImport['title'] ?? 'unknown';
+            $options['p'] = "Fix previous import: {$prevTitle}";
         }
 
         return $options;
@@ -4863,21 +5214,22 @@ class BookImportService
         $title = trim($metadata['title']);
 
         $patterns = [
-            '/^(.+?),\s*Book\s+(\d+)$/i',
-            '/^(.+?)\s+Book\s+(\d+)$/i',
-            '/^(.+?),\s*Volume\s+(\d+)$/i',
-            '/^(.+?)\s+Volume\s+(\d+)$/i',
-            '/^(.+?),\s*#(\d+)$/i',
-            '/^(.+?)\s+#(\d+)$/i',
-            '/^(.+?),\s*Part\s+(\d+)$/i',
-            '/^(.+?)\s+Part\s+(\d+)$/i',
-            '/^(.+?)\s+(\d+)$/',
+            '/^(.+?),\s*Book\s+([\d.]+)$/i',
+            '/^(.+?)\s+Book\s+([\d.]+)$/i',
+            '/^(.+?),\s*Volume\s+([\d.]+)$/i',
+            '/^(.+?)\s+Volume\s+([\d.]+)$/i',
+            '/^(.+?),\s*#([\d.]+)$/i',
+            '/^(.+?)\s+#([\d.]+)$/i',
+            '/^(.+?),\s*Part\s+([\d.]+)$/i',
+            '/^(.+?)\s+Part\s+([\d.]+)$/i',
+            '/^(.+?)\s+([\d.]+)$/',
         ];
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $title, $matches)) {
                 $cleanTitle = trim($matches[1]);
-                $bookNumber = (int) $matches[2];
+                $raw = $matches[2];
+                $bookNumber = str_contains($raw, '.') ? (float) $raw : (int) $raw;
 
                 $metadata['title'] = $cleanTitle;
                 $metadata['series_number'] = $bookNumber;
@@ -5092,47 +5444,61 @@ class BookImportService
         $name = trim($name);
 
         // Pattern 1: "Author - Series #N - Title" or "Author - Series, Book N - Title"
-        if (preg_match('/^(.+?)\s*-\s*(.+?)\s*[#,]\s*(\d+)\s*-\s*(.+)$/i', $name, $matches)) {
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s*[#,]\s*([\d.]+)\s*-\s*(.+)$/i', $name, $matches)) {
             $metadata['author'] = [trim($matches[1])];
             $metadata['series'] = trim($matches[2]);
-            $metadata['series_number'] = (int) $matches[3];
+            $raw = $matches[3];
+            $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
             $metadata['title'] = trim($matches[4]);
             return $metadata;
         }
 
         // Pattern 2: "Author - Series Book N - Title"
-        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+Book\s+(\d+)\s*-\s*(.+)$/i', $name, $matches)) {
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+Book\s+([\d.]+)\s*-\s*(.+)$/i', $name, $matches)) {
             $metadata['author'] = [trim($matches[1])];
             $metadata['series'] = trim($matches[2]);
-            $metadata['series_number'] = (int) $matches[3];
+            $raw = $matches[3];
+            $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
             $metadata['title'] = trim($matches[4]);
             return $metadata;
         }
 
-        // Pattern 3: "Series #N - Title by Author"
-        if (preg_match('/^(.+?)\s*#(\d+)\s*-\s*(.+?)\s+by\s+(.+)$/i', $name, $matches)) {
+        // Pattern 2b: "Series Book N - Title" (no author prefix)
+        if (preg_match('/^(.+?)\s+Book\s+([\d.]+)\s*-\s*(.+)$/i', $name, $matches)) {
+            $raw = $matches[2];
             $metadata['series'] = trim($matches[1]);
-            $metadata['series_number'] = (int) $matches[2];
+            $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
+            $metadata['title'] = trim($matches[3]);
+            return $metadata;
+        }
+
+        // Pattern 3: "Series #N - Title by Author"
+        if (preg_match('/^(.+?)\s*#([\d.]+)\s*-\s*(.+?)\s+by\s+(.+)$/i', $name, $matches)) {
+            $metadata['series'] = trim($matches[1]);
+            $raw = $matches[2];
+            $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
             $metadata['title'] = trim($matches[3]);
             $metadata['author'] = [trim($matches[4])];
             return $metadata;
         }
 
         // Pattern 4: "Author - Series, The Series Name, Book N" (with nested series info)
-        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?)\s+Series,?\s*Book\s*(\d+)$/i', $name, $matches)) {
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?)\s+Series,?\s*Book\s*([\d.]+)$/i', $name, $matches)) {
             $metadata['author'] = [trim($matches[1])];
             $metadata['title'] = trim($matches[2]);
             $metadata['series'] = trim($matches[3]) . ' Series';
-            $metadata['series_number'] = (int) $matches[4];
+            $raw = $matches[4];
+            $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
             return $metadata;
         }
 
         // Pattern 5: "Author - Title The Series, Book N"
-        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?),?\s*Book\s*(\d+)$/i', $name, $matches)) {
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?),?\s*Book\s*([\d.]+)$/i', $name, $matches)) {
             $metadata['author'] = [trim($matches[1])];
             $metadata['title'] = trim($matches[2]);
             $metadata['series'] = trim($matches[3]);
-            $metadata['series_number'] = (int) $matches[4];
+            $raw = $matches[4];
+            $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
             return $metadata;
         }
 
@@ -5484,8 +5850,37 @@ class BookImportService
 
         $metadata = [];
 
-        if (!empty($firstTags['album']) && is_string($firstTags['album'])) {
-            $metadata['title'] = $firstTags['album'];
+        $albumTag = !empty($firstTags['album']) && is_string($firstTags['album']) ? $firstTags['album'] : null;
+        $titleTag = !empty($firstTags['title']) && is_string($firstTags['title']) ? $firstTags['title'] : null;
+
+        // If the ID3 title tag contains a series pattern (e.g. "The Messenger, Book 01"),
+        // parse it and use the album tag to confirm the series name. The album tag is used
+        // as-is for the book title (it typically holds the series/product title).
+        if ($titleTag && $albumTag) {
+            $seriesPatterns = [
+                '/^(.+?),\s*Book\s+([\d.]+)$/i',
+                '/^(.+?)\s*#([\d.]+)$/i',
+                '/^(.+?)\s+Book\s+([\d.]+)$/i',
+            ];
+            $parsedSeries = null;
+            $parsedNumber = null;
+            foreach ($seriesPatterns as $pattern) {
+                if (preg_match($pattern, $titleTag, $m)) {
+                    $parsedSeries = trim($m[1]);
+                    $raw = $m[2];
+                    $parsedNumber = str_contains($raw, '.') ? (float) $raw : (int) $raw;
+                    break;
+                }
+            }
+            if ($parsedSeries !== null) {
+                $metadata['title'] = $albumTag;
+                $metadata['series'] = $parsedSeries;
+                $metadata['series_number'] = $parsedNumber;
+            } else {
+                $metadata['title'] = $albumTag;
+            }
+        } elseif ($albumTag) {
+            $metadata['title'] = $albumTag;
         }
 
         if (!empty($firstTags['artist'])) {
@@ -6035,11 +6430,50 @@ class BookImportService
     /**
      * Post-process AI result to fix common issues with numbered series books
      */
+    /**
+     * Strip part-number and production-marker suffixes from a directory/title string.
+     *
+     * Handles patterns like:
+     *   "01 The Warded Man (2 of 2) [Dramatized Adaptation] - Peter V. Brett"
+     *   "05.6 Butter Cookies and Demon Claws [Graphic Audio] - Peter V. Brett"
+     *   "05.6 Butter Cookies and Demon Claws (GraphicAudio) - Peter V. Brett"
+     *
+     * Returns ['title' => cleaned string, 'is_multi_part' => bool].
+     */
+    public function stripPartAndProductionMarkers(string $name): array
+    {
+        $isMultiPart = false;
+
+        // Strip " (N of M)" part-number markers — must come before author stripping
+        if (preg_match('/\s*\(\s*\d+\s+of\s+\d+\s*\)/i', $name)) {
+            $isMultiPart = true;
+            $name = preg_replace('/\s*\(\s*\d+\s+of\s+\d+\s*\)/i', '', $name);
+        }
+
+        // Strip production markers: [Dramatized Adaptation], [Graphic Audio], (GraphicAudio), etc.
+        $name = preg_replace('/\s*[\[\(]\s*Dramatized\s+Adaptation\s*[\]\)]/i', '', $name);
+        $name = preg_replace('/\s*[\[\(]\s*Graphic\s*Audio\s*[\]\)]/i', '', $name);
+
+        return ['title' => trim($name), 'is_multi_part' => $isMultiPart];
+    }
+
     public function postProcessAIResult(array $aiResult, array $audiobook): array
     {
         $directoryName = basename($audiobook['path']);
 
-        if (preg_match('/^(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
+        // Strip part-number markers (e.g. "(2 of 2)") and production markers from the
+        // directory name before it is used for title/series inference. We do this on the
+        // raw directory name so all downstream regex sees clean text.
+        $stripped = $this->stripPartAndProductionMarkers($directoryName);
+        $directoryName = $stripped['title'];
+        if ($stripped['is_multi_part']) {
+            $aiResult['is_multi_part'] = true;
+        }
+
+        if (
+            preg_match('/^(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches) ||
+            preg_match('/^(\d{1,2})\s+(.+)$/', $directoryName, $matches)
+        ) {
             $bookNumber = (int) $matches[1];
             $bookTitle = trim($matches[2]);
 
@@ -6067,6 +6501,15 @@ class BookImportService
         }
 
         if (!empty($aiResult['title'])) {
+            // Strip part-number / production markers that the AI may have echoed from the directory name
+            $strippedTitle = $this->stripPartAndProductionMarkers($aiResult['title']);
+            if ($strippedTitle['title'] !== $aiResult['title']) {
+                $aiResult['title'] = $strippedTitle['title'];
+                if ($strippedTitle['is_multi_part']) {
+                    $aiResult['is_multi_part'] = true;
+                }
+            }
+
             $originalTitle = $aiResult['title'];
             $seriesName = $aiResult['series'] ?? null;
             $cleanedTitle = $this->removeSeriesFromTitle($originalTitle, $seriesName);
@@ -8152,7 +8595,9 @@ class BookImportService
         callable $getValidGenresCallback,
         callable $hasEnrichmentDataCallback,
         callable $generateDirectoryPathCallback,
-        bool &$inputInterrupted
+        bool &$inputInterrupted,
+        ?callable $fixPreviousImportCallback = null,
+        ?array $previousImport = null
     ): bool {
         $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
 
@@ -8217,7 +8662,7 @@ class BookImportService
                 ]);
             }
 
-            $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false, count($audiobook['files'] ?? []));
+            $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false, count($audiobook['files'] ?? []), $previousImport);
             $choice = $selectWithImmediateInterruptCallback('Choose an option', $options, $defaultChoice);
 
             $choice = strtolower(trim($choice));
@@ -8323,6 +8768,12 @@ class BookImportService
             if ($choice === '9') {
                 $metadata['_action'] = 'merge_parent';
                 return true;
+            }
+
+            if ($choice === 'p' && $fixPreviousImportCallback !== null && $previousImport !== null) {
+                $fixPreviousImportCallback($previousImport);
+                // After fixing, remain in this review loop for the current book
+                continue;
             }
 
             break;
