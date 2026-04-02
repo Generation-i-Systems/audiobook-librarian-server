@@ -1367,6 +1367,9 @@ class ImportBooksFromDownloads extends Command
 
         // Run the full review loop — same as the initial import, but without file-move
         // Accept/skip here means "save changes" / "discard and continue"
+        // Use a local interrupted flag so any interrupt inside fix-previous does not
+        // bleed back into the main import loop via the shared $this->inputInterrupted ref.
+        $localInterrupted = false;
         $fakeAudiobook = ['path' => $book->directory_path ?? '', 'files' => [], 'is_multi_book_part' => false];
         $approved = $this->getImportService()->reviewAndApprove(
             $metadata,
@@ -1400,7 +1403,7 @@ class ImportBooksFromDownloads extends Command
             fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
                 'include_narrator' => (bool) $this->option('include-narrator'),
             ])),
-            $this->inputInterrupted,
+            $localInterrupted,
             fn ($prev) => $this->fixPreviousImport($prev),
             $this->getLastProcessedBook()
         );
