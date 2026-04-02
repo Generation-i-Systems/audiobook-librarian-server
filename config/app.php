@@ -77,6 +77,8 @@ return [
 
     'skin_paths' => env('SKIN_PATHS', ''),
 
+    'client_skins_path' => env('CLIENT_SKINS_PATH', ''),
+
     /*
     |--------------------------------------------------------------------------
     | Library Repair Sync Path

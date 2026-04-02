@@ -36,7 +36,10 @@
                     </a>
                 </div>
 
-                <div>
+                <div class="d-flex gap-2">
+                    <a href="{{ route('gallery.skins.builtin.index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-box"></i> Built-in Skins
+                    </a>
                     @auth
                         <a href="{{ route('gallery.skins.create') }}" class="btn btn-success">Upload Skin</a>
                         <a href="{{ route('gallery.skins.my-skins') }}" class="btn btn-secondary">My Skins</a>

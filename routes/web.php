@@ -20,6 +20,7 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\BuiltinSkinController;
 use App\Http\Controllers\SkinWebController;
 use App\Http\Controllers\ThemeWebController;
 use App\Http\Controllers\UserLibraryController;
@@ -700,6 +701,19 @@ Route::name('gallery.')->prefix('gallery')->group(function (): void {
         Route::get('/{id}/assets', [SkinWebController::class, 'listAssets'])->name('listAssets')->whereNumber('id');
         Route::post('/{id}/fork-designer', [SkinWebController::class, 'forkForDesigner'])->name('forkForDesigner')->whereNumber('id');
         Route::get('/{id}/export', [SkinWebController::class, 'exportZip'])->name('exportZip')->whereNumber('id');
+
+        // Built-in skins (from client repository)
+        Route::prefix('builtin')->name('builtin.')->group(function (): void {
+            Route::get('/', [BuiltinSkinController::class, 'index'])->name('index');
+            Route::get('/asset/{slug}/{path}', [BuiltinSkinController::class, 'serveAsset'])->name('asset')->where('path', '.*');
+            Route::get('/{slug}', [BuiltinSkinController::class, 'show'])->name('show');
+            Route::get('/{slug}/designer', [BuiltinSkinController::class, 'designer'])->name('designer');
+            Route::post('/{slug}/manifest', [BuiltinSkinController::class, 'updateManifest'])->name('updateManifest');
+            Route::post('/{slug}/assets', [BuiltinSkinController::class, 'uploadAsset'])->name('uploadAsset');
+            Route::get('/{slug}/assets', [BuiltinSkinController::class, 'listAssets'])->name('listAssets');
+            Route::post('/{slug}/fork', [BuiltinSkinController::class, 'fork'])->name('fork');
+            Route::get('/{slug}/download', [BuiltinSkinController::class, 'download'])->name('download');
+        });
     });
 
     // Theme Routes
