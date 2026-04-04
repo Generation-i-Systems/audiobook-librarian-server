@@ -40,7 +40,7 @@ rescan now just makes the page unable to load. because it takes so long the only
 
 I believe there are crons already setup. check permissions as part of scan so that renames and such are only offered if possible. and a warning shown if not. Also AI should not even show matches below 75% confidence
 
-build a special importer for "/media/lyra_data1/audiobooks/books/Science Fiction/VA/Top 100-ish Sci-Fi Books"  the number is for a "collection" which needs to be a special type of series. It is never a primary series but it should be stored as a series with a new flag added. edit form will also need a checkbox that can be set to show that the "series" is a collection. and it will need to be added to the api as well. For this directory parse the subdirs like '82 - The Lathe of Heaven - Ursula K Le Guin - 1971' as '[collectionNum] - [title] - [author or authors] - [year]' and the collection name is "Top 100-ish Sci-Fi Books" the books should be moved to their proper locaton based on the author and have a normal book title directory. Collections to not create subdirectories in the storage path like a regular series does. get cover image and other enrichment like a normal import. the script should have a dry run that would show the details for each book to be moved and imported. and should be able to be run with specific books for testing by specifying them on the commandline. add collections to the docs and all the places where series is used
+build a special importer for "/media/lyra_data1/audiobooks/books/Science Fiction/VA/Top 100-ish Sci-Fi Books" the number is for a "collection" which needs to be a special type of series. It is never a primary series but it should be stored as a series with a new flag added. edit form will also need a checkbox that can be set to show that the "series" is a collection. and it will need to be added to the api as well. For this directory parse the subdirs like '82 - The Lathe of Heaven - Ursula K Le Guin - 1971' as '[collectionNum] - [title] - [author or authors] - [year]' and the collection name is "Top 100-ish Sci-Fi Books" the books should be moved to their proper locaton based on the author and have a normal book title directory. Collections to not create subdirectories in the storage path like a regular series does. get cover image and other enrichment like a normal import. the script should have a dry run that would show the details for each book to be moved and imported. and should be able to be run with specific books for testing by specifying them on the commandline. add collections to the docs and all the places where series is used
 
 ---
 
@@ -80,6 +80,20 @@ when doing autofill when results come back select the first option by default. a
 
 ---
 
+## 2026-04-04
+
+the backend is granting badges that don't make sense like monthly goal crusher for people who have never set a goal. or 5 series explorer for users who haven't finished a single book. but not books like "First Library" for users with multiple books in their library. We also don't have a wishlist so "First Wishlist" is impossible. Evaluate all logic for granting badges and make sure that they are granted correctly and that all badges can be earned
+
+for listening speeds also make sure the user listened for a reasonable time at each speed to count
+
+I would also like to have stats showing minutes listened per day, per week, and per month. There may be goals set for an ammount listened within a play list
+
+"Reading Timeline" is always blank
+
+in theory I should be able to go back and look at an given day/week/month and get the time listened along with requesting the details of which books and time per book
+
+---
+
 ## 2026-02-13
 
 implement applie login and facebook login support and document in openapi.json
@@ -100,7 +114,7 @@ The clients are getting api responses from `https://books.thelin.org/api/v1/book
 
 ## 2025-12-11
 
-implement the metadata lookup for audiobookbay and hardcover. audiobookbay should not need auth credentials for any of the features currently implemented. validate the data with integration tests that hit the actual audiobookbay url. Do the same for hardcover. these tests should not be part of any existing test suite. They are only for developing the endpoint handlers or for verifying the handlers going forward so they  would need to be ran specifically and not even in global test suite runs. among other things this is an example url that should work https://books.thelin.org/admin/books/search?source=audiobookbay&title=The%20Last%20Guardian&author=Eoin%20Colfer&series=&api_id=
+implement the metadata lookup for audiobookbay and hardcover. audiobookbay should not need auth credentials for any of the features currently implemented. validate the data with integration tests that hit the actual audiobookbay url. Do the same for hardcover. these tests should not be part of any existing test suite. They are only for developing the endpoint handlers or for verifying the handlers going forward so they would need to be ran specifically and not even in global test suite runs. among other things this is an example url that should work https://books.thelin.org/admin/books/search?source=audiobookbay&title=The%20Last%20Guardian&author=Eoin%20Colfer&series=&api_id=
 
 ---
 
@@ -110,7 +124,7 @@ add a sanity check for imports to make sure there are audio files in the destina
 
 when importing a multi book directory default to using the same genre for all future books after selecting a genre in one book
 
-the directory should be set at the beginning of the import and just USED (do not create a _01 directory)
+the directory should be set at the beginning of the import and just USED (do not create a \_01 directory)
 
 ---
 
@@ -126,7 +140,7 @@ Android client crashes parsing `/api/v1/badges/unnotified` with: `Unexpected sym
 
 still not seeing recent activity not from this device
 
-all cover images should be relative to the directoryPath. So   "coverImage": "Romance/J.R. Ward/Black Dagger Brotherhood/02 Lover Eternal/cover_audible_1765842643.jpg", should just be cover_audible_1765842643.jpg. Look at import edit and display logics to make sure we are using the new format. But also support existing data that includes the directoryPath
+all cover images should be relative to the directoryPath. So "coverImage": "Romance/J.R. Ward/Black Dagger Brotherhood/02 Lover Eternal/cover_audible_1765842643.jpg", should just be cover_audible_1765842643.jpg. Look at import edit and display logics to make sure we are using the new format. But also support existing data that includes the directoryPath
 
 ---
 

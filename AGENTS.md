@@ -4,7 +4,9 @@ This repository is a Laravel 11+ audiobook management application with MySQL dat
 
 ## TOP PRIORITY SAFETY RULES
 
+- **MANDATORY WARNING**: The local database is live and contains real data. NEVER damage the database. Do not run any command or code path that could wipe, broadly reset, truncate, drop, or otherwise destructively alter live data.
 - **CRITICAL**: Assume the database is _production_ and contains live data. NEVER execute commands that clear or destructively delete data, such as `php artisan migrate:fresh`, `php artisan migrate:reset`, `DB::raw('DROP TABLE...')`, or `rm -rf` on any user-facing file system paths.
+- **LIMITED EXCEPTION**: Badge-related tables may be reset or reseeded when needed, but only if the work is strictly limited to badge tables and does not risk the rest of the database.
 - **MIGRATIONS**: All migrations MUST be non-destructive (`Schema::table` or `Schema::create`). If a migration involves a destructive operation (like dropping a column), it MUST be protected by a manual review flag or an explicit user confirmation, and preferably a safe, non-destructive alternative like soft deletes or renaming should be used.
 - **RESTORE**: If data loss occurs, immediately pause all work and instruct the user on restoration. Do not proceed until data integrity is confirmed by the user.
 
@@ -170,8 +172,10 @@ npm run test:coverage
 
 #### Database Conventions
 
+- **MANDATORY WARNING**: The local database is live. Never damage it. Protect all non-badge data from destructive changes at all times.
 - **CRITICAL**: Assume database is _production_ with live data - never execute destructive commands
 - **FORBIDDEN COMMANDS**: Never execute `php artisan migrate:fresh`, `php artisan migrate:reset`, `DB::raw('DROP TABLE...')`, `TRUNCATE`, or `rm -rf` on user-facing paths
+- **ONLY ALLOWED RESET SCOPE**: If a reset/reseed is truly needed, it may apply only to badge tables, never the full database or unrelated user data.
 - **MIGRATIONS**: All migrations MUST be non-destructive (`Schema::table` or `Schema::create`). Destructive operations require explicit user confirmation and prefer safe alternatives (soft deletes, renaming)
 - **MUST** Use Eloquent for database access
 - **MUST** Use snake_case for database fields

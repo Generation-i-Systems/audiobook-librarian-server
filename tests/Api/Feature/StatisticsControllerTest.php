@@ -176,7 +176,65 @@ class StatisticsControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('total_listening_time_ms', (600 + 900) * 1000)
-            ->assertJsonPath('books_started', 2);
+            ->assertJsonPath('books_started', 2)
+            ->assertJsonPath('listening_minutes.day', 25)
+            ->assertJsonPath('listening_minutes.week', 25)
+            ->assertJsonPath('listening_minutes.month', 25);
+    }
+
+    public function test_timeline_returns_detail_for_specific_day_with_books(): void
+    {
+        $book1 = Book::factory()->create(['title' => 'Timeline One']);
+        $book2 = Book::factory()->create(['title' => 'Timeline Two']);
+        $date = now()->subDays(2)->toDateString();
+
+        \App\Models\Device::create([
+            'device_id' => 'device-a',
+            'user_id' => $this->user->id,
+            'name' => 'Device A',
+            'sync_enabled' => true,
+        ]);
+
+        \App\Models\Device::create([
+            'device_id' => 'device-b',
+            'user_id' => $this->user->id,
+            'name' => 'Device B',
+            'sync_enabled' => true,
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book1->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 900,
+            'session_type' => 'listening',
+            'listening_date' => $date,
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book2->id,
+            'device_id' => 'device-b',
+            'seconds_listened' => 1500,
+            'session_type' => 'listening',
+            'listening_date' => $date,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'device-a',
+            'X-Acting-As-Test' => '1',
+        ])->getJson('/api/v1/statistics/timeline?from=' . $date . '&to=' . $date . '&detail_period_type=day&detail_period=' . $date);
+
+        $response->assertOk()
+            ->assertJsonPath('summary.total_listening_time_ms', 2400000)
+            ->assertJsonPath('detail.total_seconds', 2400)
+            ->assertJsonPath('detail.total_minutes', 40)
+            ->assertJsonPath('detail.books_count', 2)
+            ->assertJsonPath('detail.books.0.title', 'Timeline Two')
+            ->assertJsonPath('detail.books.0.total_seconds', 1500)
+            ->assertJsonPath('detail.books.1.title', 'Timeline One')
+            ->assertJsonPath('detail.books.1.total_seconds', 900);
     }
 
     public function test_get_weekly_stats_returns_aggregated_data()
@@ -413,6 +471,9 @@ class StatisticsControllerTest extends TestCase
             ->assertJson([
                 'success' => true,
             ])
+            ->assertJsonPath('data.listening_minutes.day', 30)
+            ->assertJsonPath('data.listening_minutes.week', 90)
+            ->assertJsonPath('data.listening_minutes.month', 90)
             ->assertJsonStructure([
                 'success',
                 'data' => [
@@ -433,6 +494,11 @@ class StatisticsControllerTest extends TestCase
                         'total_books',
                         'days_active',
                         'formatted_total_duration',
+                    ],
+                    'listening_minutes' => [
+                        'day',
+                        'week',
+                        'month',
                     ],
                 ],
             ]);

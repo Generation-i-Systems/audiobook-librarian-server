@@ -21,7 +21,21 @@ class StatisticsController extends Controller
         $query = ListeningStatistic::query();
 
         if ($userId !== null) {
-            $query->where('user_id', $userId);
+            $userDeviceIds = DB::table('devices')
+                ->where('user_id', $userId)
+                ->pluck('device_id')
+                ->push($deviceId)
+                ->filter()
+                ->unique()
+                ->values();
+
+            $query->where(function ($statsQuery) use ($userId, $userDeviceIds) {
+                $statsQuery->where('user_id', $userId);
+
+                if ($userDeviceIds->isNotEmpty()) {
+                    $statsQuery->orWhereIn('device_id', $userDeviceIds);
+                }
+            });
         } else {
             $query->where('device_id', $deviceId);
         }
@@ -85,6 +99,7 @@ class StatisticsController extends Controller
 
         // Get daily stats for the period
         $dailyStats = $this->getDailyStatsForPeriod($userId, $deviceId, $startDate);
+        $listeningMinutes = $this->getListeningMinutesBreakdown($userId, $deviceId);
 
         return response()->json([
             'daily_stats'                 => $dailyStats,
@@ -95,6 +110,7 @@ class StatisticsController extends Controller
             'favorite_genres'             => $favoriteGenres,
             'current_streak'              => $currentStreak,
             'longest_streak'              => $longestStreak,
+            'listening_minutes'           => $listeningMinutes,
         ]);
     }
 
@@ -182,9 +198,11 @@ class StatisticsController extends Controller
     public function getTimelineStats(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'from'     => 'nullable|date_format:Y-m-d',
-            'to'       => 'nullable|date_format:Y-m-d',
-            'group_by' => 'nullable|string|in:day,month',
+            'from'               => 'nullable|date_format:Y-m-d',
+            'to'                 => 'nullable|date_format:Y-m-d',
+            'group_by'           => 'nullable|string|in:day,month',
+            'detail_period_type' => 'nullable|string|in:day,week,month',
+            'detail_period'      => 'nullable|string|max:20',
         ]);
 
         $userId   = Auth::id();
@@ -193,29 +211,34 @@ class StatisticsController extends Controller
         $to       = isset($validated['to']) ? Carbon::parse($validated['to']) : now();
         $groupBy  = $validated['group_by'] ?? 'day';
 
-        $baseQuery = $this->listeningStatsQuery($userId, $deviceId)
-            ->whereBetween('listening_date', [$from->toDateString(), $to->toDateString()]);
-
-        $summary = (clone $baseQuery)
+        $summary = $this->listeningStatsQuery($userId, $deviceId)
+            ->whereDate('listening_date', '>=', $from->toDateString())
+            ->whereDate('listening_date', '<=', $to->toDateString())
             ->selectRaw('SUM(seconds_listened) * 1000 as total_ms, COUNT(*) as total_sessions')
             ->first();
 
         if ($groupBy === 'month') {
             if (DB::getDriverName() === 'sqlite') {
-                $rows = (clone $baseQuery)
+                $rows = $this->listeningStatsQuery($userId, $deviceId)
+                    ->whereDate('listening_date', '>=', $from->toDateString())
+                    ->whereDate('listening_date', '<=', $to->toDateString())
                     ->selectRaw("strftime('%Y-%m', listening_date) as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
                     ->groupByRaw("strftime('%Y-%m', listening_date)")
                     ->orderByRaw("strftime('%Y-%m', listening_date)")
                     ->toBase()->get();
             } else {
-                $rows = (clone $baseQuery)
+                $rows = $this->listeningStatsQuery($userId, $deviceId)
+                    ->whereDate('listening_date', '>=', $from->toDateString())
+                    ->whereDate('listening_date', '<=', $to->toDateString())
                     ->selectRaw("DATE_FORMAT(listening_date, '%Y-%m') as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
                     ->groupByRaw("DATE_FORMAT(listening_date, '%Y-%m')")
                     ->orderByRaw("DATE_FORMAT(listening_date, '%Y-%m')")
                     ->toBase()->get();
             }
         } else {
-            $rows = (clone $baseQuery)
+            $rows = $this->listeningStatsQuery($userId, $deviceId)
+                ->whereDate('listening_date', '>=', $from->toDateString())
+                ->whereDate('listening_date', '<=', $to->toDateString())
                 ->selectRaw('listening_date as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count')
                 ->groupBy('listening_date')
                 ->orderBy('listening_date')
@@ -228,6 +251,16 @@ class StatisticsController extends Controller
             'sessions_count'    => (int) ($r->sessions_count ?? 0),
         ]);
 
+        $detail = null;
+        if (isset($validated['detail_period_type'], $validated['detail_period'])) {
+            $detail = $this->getTimelinePeriodDetails(
+                $userId,
+                $deviceId,
+                $validated['detail_period_type'],
+                $validated['detail_period']
+            );
+        }
+
         return response()->json([
             'bars'    => $bars,
             'summary' => [
@@ -237,7 +270,102 @@ class StatisticsController extends Controller
                 'to'                      => $to->toDateString(),
                 'group_by'                => $groupBy,
             ],
+            'detail' => $detail,
         ]);
+    }
+
+    private function getTimelinePeriodDetails(
+        ?int $userId,
+        string $deviceId,
+        string $periodType,
+        string $period
+    ): array {
+        [$startDate, $endDate] = $this->resolveTimelineDetailRange($periodType, $period);
+
+        $detailQuery = $this->listeningStatsQuery($userId, $deviceId)
+            ->whereDate('listening_date', '>=', $startDate->toDateString())
+            ->whereDate('listening_date', '<=', $endDate->toDateString());
+
+        $summary = (clone $detailQuery)
+            ->selectRaw('SUM(seconds_listened) as total_seconds, COUNT(*) as session_count, COUNT(DISTINCT book_id) as books_count')
+            ->first();
+
+        $books = (clone $detailQuery)
+            ->leftJoin('books', 'books.id', '=', 'listening_statistics.book_id')
+            ->selectRaw('listening_statistics.book_id, books.title, SUM(listening_statistics.seconds_listened) as total_seconds, COUNT(*) as session_count')
+            ->groupBy('listening_statistics.book_id', 'books.title')
+            ->orderByDesc('total_seconds')
+            ->toBase()
+            ->get()
+            ->map(static function (object $book): array {
+                $seconds = (int) ($book->total_seconds ?? 0);
+
+                return [
+                    'book_id' => $book->book_id,
+                    'title' => $book->title,
+                    'total_seconds' => $seconds,
+                    'total_minutes' => (int) floor($seconds / 60),
+                    'session_count' => (int) ($book->session_count ?? 0),
+                ];
+            })
+            ->values();
+
+        $totalSeconds = (int) ($summary->total_seconds ?? 0);
+
+        return [
+            'period_type' => $periodType,
+            'period' => $period,
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $endDate->toDateString(),
+            'total_seconds' => $totalSeconds,
+            'total_minutes' => (int) floor($totalSeconds / 60),
+            'session_count' => (int) ($summary->session_count ?? 0),
+            'books_count' => (int) ($summary->books_count ?? 0),
+            'books' => $books,
+        ];
+    }
+
+    private function resolveTimelineDetailRange(string $periodType, string $period): array
+    {
+        return match ($periodType) {
+            'day' => $this->resolveDayRange($period),
+            'week' => $this->resolveWeekRange($period),
+            'month' => $this->resolveMonthRange($period),
+            default => throw new \InvalidArgumentException('Unsupported detail period type.'),
+        };
+    }
+
+    private function resolveDayRange(string $period): array
+    {
+        if (! Carbon::hasFormat($period, 'Y-m-d')) {
+            abort(422, 'Invalid day period format. Use YYYY-MM-DD.');
+        }
+
+        $date = Carbon::createFromFormat('Y-m-d', $period);
+
+        return [$date->copy()->startOfDay(), $date->copy()->endOfDay()];
+    }
+
+    private function resolveWeekRange(string $period): array
+    {
+        if (! preg_match('/^(\d{4})-W(\d{2})$/', $period, $matches)) {
+            abort(422, 'Invalid week period format. Use YYYY-Www.');
+        }
+
+        $date = Carbon::now()->setISODate((int) $matches[1], (int) $matches[2]);
+
+        return [$date->copy()->startOfWeek(), $date->copy()->endOfWeek()];
+    }
+
+    private function resolveMonthRange(string $period): array
+    {
+        if (! Carbon::hasFormat($period, 'Y-m')) {
+            abort(422, 'Invalid month period format. Use YYYY-MM.');
+        }
+
+        $date = Carbon::createFromFormat('Y-m', $period);
+
+        return [$date->copy()->startOfMonth(), $date->copy()->endOfMonth()];
     }
 
     /**
@@ -726,9 +854,19 @@ class StatisticsController extends Controller
             'session_count' => 0,
             'formatted_duration' => '0:00',
         ];
-        if ($deviceId) {
-            $todayStats = ListeningStatistic::getDailyStats($deviceId, $today);
-        }
+
+        $todayQuery = $this->listeningStatsQuery($userId, (string) ($deviceId ?? 'unknown'))
+            ->whereDate('listening_date', $today);
+
+        $todaySummary = $todayQuery->selectRaw('SUM(seconds_listened) as total_seconds, COUNT(DISTINCT book_id) as books_listened, COUNT(*) as session_count')
+            ->first();
+
+        $todayStats = [
+            'total_seconds' => (int) ($todaySummary->total_seconds ?? 0),
+            'books_listened' => (int) ($todaySummary->books_listened ?? 0),
+            'session_count' => (int) ($todaySummary->session_count ?? 0),
+            'formatted_duration' => $this->formatSeconds((int) ($todaySummary->total_seconds ?? 0)),
+        ];
 
         // High-level user stats (from user_book_status)
         $userStats = [
@@ -760,12 +898,7 @@ class StatisticsController extends Controller
         }
 
         // All-time listening stats
-        $query = ListeningStatistic::query();
-        if ($userId) {
-            $query->where('user_id', $userId);
-        } else {
-            $query->where('device_id', $deviceId);
-        }
+        $query = $this->listeningStatsQuery($userId, (string) ($deviceId ?? 'unknown'));
 
         $allTimeStats = $query->selectRaw('
                 SUM(seconds_listened) as total_seconds,
@@ -774,6 +907,8 @@ class StatisticsController extends Controller
                 COUNT(DISTINCT listening_date) as days_listened
             ')
             ->first();
+
+        $listeningMinutes = $this->getListeningMinutesBreakdown($userId, (string) ($deviceId ?? 'unknown'));
 
         return response()->json([
             'success' => true,
@@ -791,8 +926,32 @@ class StatisticsController extends Controller
                     'days_active'              => $allTimeStats->days_listened ?? 0,
                     'formatted_total_duration' => $this->formatSeconds($allTimeStats->total_seconds ?? 0),
                 ],
+                'listening_minutes' => $listeningMinutes,
             ],
         ]);
+    }
+
+    private function getListeningMinutesBreakdown(?int $userId, string $deviceId): array
+    {
+        $query = $this->listeningStatsQuery($userId, $deviceId);
+
+        $daySeconds = (clone $query)
+            ->whereDate('listening_date', now()->toDateString())
+            ->sum('seconds_listened');
+
+        $weekSeconds = (clone $query)
+            ->where('listening_date', '>=', now()->startOfWeek()->toDateString())
+            ->sum('seconds_listened');
+
+        $monthSeconds = (clone $query)
+            ->where('listening_date', '>=', now()->startOfMonth()->toDateString())
+            ->sum('seconds_listened');
+
+        return [
+            'day' => (int) floor($daySeconds / 60),
+            'week' => (int) floor($weekSeconds / 60),
+            'month' => (int) floor($monthSeconds / 60),
+        ];
     }
 
     /**

@@ -14,6 +14,17 @@
 
 ### Fixed
 
+- Badge evaluation now only grants badges for reachable conditions and real user activity
+    - Canonical badge definitions now align with actual tracked data (goals, playlists, library, recommendations, seasonal activity, and series exploration)
+    - Legacy impossible badge definitions are deactivated during canonical seeding, and action badges remain available
+    - Speed badges now require meaningful listening time at each playback speed instead of any brief speed change
+    - Library and goal badges now use `user_book_status`, playlists, listening goals, and cross-device listening data correctly
+- Reading timeline and dashboard stats now aggregate correctly across a user's devices and return usable listening-minute summaries
+
+    - Added day/week/month listening-minute totals to overview and dashboard responses
+    - Timeline queries now support detailed day/week/month drill-downs with per-book listening totals
+    - Playlist listening goals now count listening from all of the user's devices
+
 - **CRITICAL**: Fixed auto-processing bug where books were imported without user confirmation
 
     - reviewAndApprove method was auto-approving books when no enrichment data existed

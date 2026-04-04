@@ -1,13 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Badge;
 use App\Models\ClientEvent;
+use App\Models\ListeningGoal;
 use App\Models\ListeningStatistic;
 use App\Models\Message;
+use App\Models\Playlist;
+use App\Models\Review;
 use App\Models\UserBadge;
+use App\Models\UserRecommendation;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +27,7 @@ class BadgeService
      */
     public function evaluateBadgesForUser(\App\Models\User $user): array
     {
-        return $this->evaluateUserBadges($user->id);
+        return $this->evaluateUserBadges((string) $user->id);
     }
 
     /**
@@ -62,7 +70,7 @@ class BadgeService
     /**
      * Build a base query for ListeningStatistic matching a user by user_id, device_id, or deviceId.
      */
-    protected function userStatsQuery(string $userId, ?string $deviceId = null): \Illuminate\Database\Eloquent\Builder
+    protected function userStatsQuery(string $userId, ?string $deviceId = null): Builder
     {
         return ListeningStatistic::where(function ($q) use ($userId, $deviceId) {
             $q->where('device_id', $userId)
@@ -103,14 +111,18 @@ class BadgeService
             $authorsExplored   = $this->getAuthorsExplored($userId, $deviceId);
             $narratorsExplored = $this->getNarratorsExplored($userId, $deviceId);
 
-            // Get weekend listening sessions
+            // Get weekend listening sessions/time
             $weekendSessions = $this->getWeekendSessions($userId, $deviceId);
+            $weekendListeningTime = $this->getWeekendListeningTime($userId, $deviceId);
 
             // Get recent completion stats
             $booksCompletedThisMonth = $this->getBooksCompletedInTimeframe($userId, $deviceId, 30);
             $booksCompletedThisWeek  = $this->getBooksCompletedInTimeframe($userId, $deviceId, 7);
+            $booksCompletedOnWeekend = $this->getBooksCompletedOnWeekend($userId, $deviceId);
+            $quickFinishes = $this->getQuickFinishCount($userId, $deviceId);
 
-            // Get series completion count
+            // Get series exploration stats
+            $seriesStarted = $this->getStartedSeriesCount($userId, $deviceId);
             $seriesCompleted = $this->getSeriesCompleted($userId, $deviceId);
 
             // Get additional statistics for expanded badge categories
@@ -121,6 +133,16 @@ class BadgeService
             $chapterCompletion = $this->getChapterCompletion($userId, $deviceId);
             $deviceVariety     = $this->getDeviceVariety($userId, $deviceId);
             $repeatListening   = $this->getRepeatListening($userId, $deviceId);
+            $languageVariety   = $this->getLanguageVariety($userId, $deviceId);
+            $classicBooks      = $this->getClassicBooksExplored($userId, $deviceId);
+            $indieBooks        = $this->getIndieBooksExplored($userId, $deviceId);
+            $recommendationsSent = $this->getRecommendationsSent($userId);
+            $recommendationsRead = $this->getRecommendationsRead($userId);
+            $playlistCount       = $this->getPlaylistCount($userId);
+            $timeOfDayStats      = $this->getTimeOfDayStatistics($userId, $deviceId);
+            $seasonalStats       = $this->getSeasonalStatistics($userId, $deviceId, $allTimeStats->getAttribute('first_listening_date'));
+            $speedStats          = $this->getPlaybackSpeedStatistics($userId, $deviceId);
+            $goalStats           = $this->getGoalStatistics($userId);
 
             // Get action-based statistics from client events
             $actionCounts = $this->getActionCounts($userId, $deviceId);
@@ -138,8 +160,12 @@ class BadgeService
                 'authors_explored'           => $authorsExplored,
                 'narrator_variety'           => $narratorsExplored,
                 'weekend_listening'          => $weekendSessions,
+                'weekend_listening_time'     => $weekendListeningTime,
                 'books_completed_this_month' => $booksCompletedThisMonth,
                 'books_completed_this_week'  => $booksCompletedThisWeek,
+                'books_completed_on_weekend' => $booksCompletedOnWeekend,
+                'quick_finishes'             => $quickFinishes,
+                'series_started'             => $seriesStarted,
                 'series_completion'          => $seriesCompleted,
                 'bookmarks_created'          => $bookmarksCreated,
                 'books_reviewed'             => $booksReviewed,
@@ -148,9 +174,15 @@ class BadgeService
                 'chapter_completion'         => $chapterCompletion,
                 'device_variety'             => $deviceVariety,
                 'repeat_listening'           => $repeatListening,
+                'language_variety'           => $languageVariety,
+                'classic_books_explored'     => $classicBooks,
+                'indie_books_explored'       => $indieBooks,
+                'recommendations_sent'       => $recommendationsSent,
+                'discovery_rate'             => $recommendationsRead,
+                'playlist_count'             => $playlistCount,
                 'first_listening_date'       => $allTimeStats->getAttribute('first_listening_date'),
                 'last_listening_date'        => $allTimeStats->getAttribute('last_listening_date'),
-            ] + $actionCounts;
+            ] + $timeOfDayStats + $seasonalStats + $speedStats + $goalStats + $actionCounts;
         });
     }
 
@@ -267,6 +299,20 @@ class BadgeService
             ->count();
     }
 
+    protected function getWeekendListeningTime(string $userId, ?string $deviceId = null): int
+    {
+        $query = $this->userStatsQuery($userId, $deviceId);
+
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            return (int) ($query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN (0, 6)")
+                ->sum('seconds_listened'));
+        }
+
+        return (int) ($query->whereRaw('DAYOFWEEK(listening_date) IN (1, 7)')
+            ->sum('seconds_listened'));
+    }
+
     /**
      * Get books completed in timeframe
      */
@@ -288,13 +334,7 @@ class BadgeService
     protected function getSeriesCompleted(string $userId, ?string $deviceId = null): int
     {
         try {
-            // Find series where every book has a "completed" session for this user
-            $completedBookIds = ListeningStatistic::where(function ($q) use ($userId, $deviceId) {
-                $q->where('device_id', $userId);
-                if ($deviceId) {
-                    $q->orWhere('device_id', $deviceId);
-                }
-            })
+            $completedBookIds = $this->userStatsQuery($userId, $deviceId)
                 ->where('session_type', 'completed')
                 ->distinct('book_id')
                 ->pluck('book_id');
@@ -303,23 +343,16 @@ class BadgeService
                 return 0;
             }
 
-            // Get all series that have at least one completed book
-            $seriesWithCompleted = DB::table('books')
-                ->whereIn('id', $completedBookIds)
-                ->whereNotNull('series_id')
-                ->select('series_id')
-                ->distinct()
-                ->pluck('series_id');
+            $seriesWithCompleted = $this->getBookSeriesIds($completedBookIds);
 
             $completedSeries = 0;
             foreach ($seriesWithCompleted as $seriesId) {
-                $totalBooksInSeries = DB::table('books')->where('series_id', $seriesId)->count();
-                $completedInSeries  = DB::table('books')
-                    ->where('series_id', $seriesId)
-                    ->whereIn('id', $completedBookIds)
+                $seriesBookIds = $this->getSeriesBookIds((int) $seriesId);
+                $completedInSeries = $seriesBookIds
+                    ->intersect($completedBookIds->map(fn ($bookId) => (int) $bookId))
                     ->count();
 
-                if ($totalBooksInSeries > 0 && $completedInSeries >= $totalBooksInSeries) {
+                if ($seriesBookIds->isNotEmpty() && $completedInSeries >= $seriesBookIds->count()) {
                     $completedSeries++;
                 }
             }
@@ -329,6 +362,16 @@ class BadgeService
             Log::warning('Failed to calculate series completion', ['error' => $e->getMessage()]);
             return 0;
         }
+    }
+
+    protected function getStartedSeriesCount(string $userId, ?string $deviceId = null): int
+    {
+        return $this->getBookSeriesIds(
+            $this->userStatsQuery($userId, $deviceId)
+                ->whereNotNull('book_id')
+                ->distinct('book_id')
+                ->pluck('book_id')
+        )->count();
     }
 
     /**
@@ -344,9 +387,14 @@ class BadgeService
      */
     protected function getBooksReviewed(string $userId, ?string $deviceId = null): int
     {
-        // This would depend on your review system implementation
-        // For now, return 0 as placeholder
-        return 0;
+        if (! is_numeric($userId)) {
+            return 0;
+        }
+
+        return Review::query()
+            ->where('user_id', (int) $userId)
+            ->distinct('book_id')
+            ->count();
     }
 
     /**
@@ -354,7 +402,24 @@ class BadgeService
      */
     protected function getLibrarySize(string $userId, ?string $deviceId = null): int
     {
-        return DB::table('book_user')->where('user_id', $userId)->count();
+        if (! is_numeric($userId)) {
+            return 0;
+        }
+
+        $legacyLibraryBookIds = DB::table('book_user')
+            ->where('user_id', $userId)
+            ->pluck('book_id');
+
+        $statusBookIds = DB::table('user_book_status')
+            ->where('user_id', $userId)
+            ->whereNotNull('book_id')
+            ->pluck('book_id');
+
+        return $legacyLibraryBookIds
+            ->merge($statusBookIds)
+            ->filter()
+            ->unique()
+            ->count();
     }
 
     /**
@@ -385,6 +450,15 @@ class BadgeService
 
         // Rough estimate: assume average session covers 1-2 chapters
         return (int) ($query->count() * 1.5);
+    }
+
+    protected function getLanguageVariety(string $userId, ?string $deviceId = null): int
+    {
+        return $this->userStatsQuery($userId, $deviceId)
+            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
+            ->whereNotNull('books.language')
+            ->distinct('books.language')
+            ->count('books.language');
     }
 
     /**
@@ -418,6 +492,402 @@ class BadgeService
             ->havingRaw('COUNT(*) > 1')
             ->get()
             ->count();
+    }
+
+    protected function getBooksCompletedOnWeekend(string $userId, ?string $deviceId = null): int
+    {
+        $query = $this->userStatsQuery($userId, $deviceId)->where('session_type', 'completed');
+
+        $driver = DB::connection()->getDriverName();
+        if ($driver === 'sqlite') {
+            return $query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN (0, 6)")
+                ->distinct('book_id')
+                ->count();
+        }
+
+        return $query->whereRaw('DAYOFWEEK(listening_date) IN (1, 7)')
+            ->distinct('book_id')
+            ->count();
+    }
+
+    protected function getQuickFinishCount(string $userId, ?string $deviceId = null): int
+    {
+        $bookTimelines = $this->userStatsQuery($userId, $deviceId)
+            ->whereNotNull('book_id')
+            ->selectRaw('book_id, MIN(listening_date) as first_date, MIN(CASE WHEN session_type = "completed" THEN listening_date END) as completed_date')
+            ->groupBy('book_id')
+            ->get();
+
+        return $bookTimelines->filter(function ($timeline): bool {
+            $firstDate = $timeline->getAttribute('first_date');
+            $completedDate = $timeline->getAttribute('completed_date');
+
+            if ($firstDate === null || $completedDate === null) {
+                return false;
+            }
+
+            return Carbon::parse($firstDate)->diffInDays(Carbon::parse($completedDate)) <= 7;
+        })->count();
+    }
+
+    protected function getClassicBooksExplored(string $userId, ?string $deviceId = null): int
+    {
+        return $this->userStatsQuery($userId, $deviceId)
+            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
+            ->where(function ($query): void {
+                $query->where('books.year', '<=', 1970)
+                    ->orWhereYear('books.release_date', '<=', 1970);
+            })
+            ->distinct('listening_statistics.book_id')
+            ->count('listening_statistics.book_id');
+    }
+
+    protected function getIndieBooksExplored(string $userId, ?string $deviceId = null): int
+    {
+        return $this->userStatsQuery($userId, $deviceId)
+            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
+            ->where(function ($query): void {
+                $query->whereNull('books.publisher_id')
+                    ->orWhere('books.source', '!=', 'audible');
+            })
+            ->distinct('listening_statistics.book_id')
+            ->count('listening_statistics.book_id');
+    }
+
+    protected function getRecommendationsSent(string $userId): int
+    {
+        if (! is_numeric($userId)) {
+            return 0;
+        }
+
+        return UserRecommendation::query()
+            ->where('sender_id', (int) $userId)
+            ->count();
+    }
+
+    protected function getRecommendationsRead(string $userId): int
+    {
+        if (! is_numeric($userId)) {
+            return 0;
+        }
+
+        return UserRecommendation::query()
+            ->where('recipient_id', (int) $userId)
+            ->whereNotNull('acknowledged_at')
+            ->distinct('book_id')
+            ->count('book_id');
+    }
+
+    protected function getPlaylistCount(string $userId): int
+    {
+        if (! is_numeric($userId)) {
+            return 0;
+        }
+
+        return Playlist::query()->where('user_id', (int) $userId)->count();
+    }
+
+    protected function getTimeOfDayStatistics(string $userId, ?string $deviceId = null): array
+    {
+        $sessions = $this->userStatsQuery($userId, $deviceId)
+            ->whereNotNull('session_start')
+            ->get(['session_start']);
+
+        $morningSessions = 0;
+        $eveningSessions = 0;
+        $commuteSessions = 0;
+
+        foreach ($sessions as $session) {
+            $hour = Carbon::parse((string) $session->getAttribute('session_start'))->hour;
+
+            if ($hour >= 5 && $hour < 12) {
+                $morningSessions++;
+            }
+
+            if ($hour >= 18 || $hour < 1) {
+                $eveningSessions++;
+            }
+
+            if (($hour >= 6 && $hour < 10) || ($hour >= 16 && $hour < 20)) {
+                $commuteSessions++;
+            }
+        }
+
+        return [
+            'morning_sessions' => $morningSessions,
+            'evening_sessions' => $eveningSessions,
+            'commute_sessions' => $commuteSessions,
+        ];
+    }
+
+    protected function getSeasonalStatistics(string $userId, ?string $deviceId = null, mixed $firstListeningDate = null): array
+    {
+        $dates = $this->userStatsQuery($userId, $deviceId)
+            ->select('listening_date')
+            ->distinct()
+            ->pluck('listening_date')
+            ->map(fn ($date) => Carbon::parse((string) $date));
+
+        $stats = [
+            'new_year_sessions' => 0,
+            'spring_sessions' => 0,
+            'summer_sessions' => 0,
+            'autumn_sessions' => 0,
+            'winter_sessions' => 0,
+            'anniversary_sessions' => 0,
+        ];
+
+        $anniversaryMonthDay = $firstListeningDate !== null
+            ? Carbon::parse((string) $firstListeningDate)->format('m-d')
+            : null;
+        $firstListeningYear = $firstListeningDate !== null
+            ? Carbon::parse((string) $firstListeningDate)->year
+            : null;
+
+        foreach ($dates as $date) {
+            $month = $date->month;
+
+            if ($month === 1 && $date->day === 1) {
+                $stats['new_year_sessions']++;
+            }
+
+            if (in_array($month, [3, 4, 5], true)) {
+                $stats['spring_sessions']++;
+            }
+
+            if (in_array($month, [6, 7, 8], true)) {
+                $stats['summer_sessions']++;
+            }
+
+            if (in_array($month, [9, 10, 11], true)) {
+                $stats['autumn_sessions']++;
+            }
+
+            if (in_array($month, [12, 1, 2], true)) {
+                $stats['winter_sessions']++;
+            }
+
+            if ($anniversaryMonthDay !== null
+                && $firstListeningYear !== null
+                && $date->year > $firstListeningYear
+                && $date->format('m-d') === $anniversaryMonthDay) {
+                $stats['anniversary_sessions'] = 1;
+            }
+        }
+
+        return $stats;
+    }
+
+    protected function getPlaybackSpeedStatistics(string $userId, ?string $deviceId = null): array
+    {
+        $sessions = $this->userStatsQuery($userId, $deviceId)
+            ->get(['seconds_listened', 'metadata']);
+
+        $speedThresholds = [
+            'speed_time_110' => 1.10,
+            'speed_time_125' => 1.25,
+            'speed_time_150' => 1.50,
+            'speed_time_175' => 1.75,
+            'speed_time_200' => 2.00,
+        ];
+
+        $speedStats = array_fill_keys(array_keys($speedThresholds), 0);
+        $speedBucketThresholds = [1.10, 1.25, 1.50, 1.75, 2.00];
+        $speedBuckets = array_fill_keys(array_map(static fn (float $speed): string => number_format($speed, 2, '.', ''), $speedBucketThresholds), 0);
+
+        foreach ($sessions as $session) {
+            $speed = (float) data_get($session->getAttribute('metadata'), 'playback_speed', 1.0);
+            $secondsListened = (int) $session->getAttribute('seconds_listened');
+
+            foreach ($speedThresholds as $key => $threshold) {
+                if ($speed >= $threshold) {
+                    $speedStats[$key] += $secondsListened;
+                }
+            }
+
+            foreach ($speedBucketThresholds as $bucket) {
+                if (abs($speed - $bucket) < 0.051) {
+                    $speedBuckets[number_format($bucket, 2, '.', '')] += $secondsListened;
+                    break;
+                }
+            }
+        }
+
+        $speedStats['speed_variety'] = collect($speedBuckets)
+            ->filter(static fn (int $seconds): bool => $seconds >= 1800)
+            ->count();
+
+        return $speedStats;
+    }
+
+    protected function getGoalStatistics(string $userId): array
+    {
+        if (! is_numeric($userId)) {
+            return [
+                'weekly_goal_streak' => 0,
+                'monthly_goal_streak' => 0,
+                'yearly_goal_achieved' => 0,
+            ];
+        }
+
+        $goals = ListeningGoal::query()
+            ->where('user_id', (int) $userId)
+            ->where('is_active', true)
+            ->get();
+
+        $weeklyGoalStreak = 0;
+        $monthlyGoalStreak = 0;
+        $yearlyGoalAchieved = 0;
+
+        foreach ($goals as $goal) {
+            if ($goal->period_type === 'week') {
+                $weeklyGoalStreak = max($weeklyGoalStreak, $this->calculateGoalAchievementStreak($goal, 4));
+            }
+
+            if ($goal->period_type === 'month') {
+                $monthlyGoalStreak = max($monthlyGoalStreak, $this->calculateGoalAchievementStreak($goal, 3));
+            }
+
+            if ($goal->period_type === 'year') {
+                $yearlyGoalAchieved = max($yearlyGoalAchieved, $this->goalIsMetForOffset($goal, 0) ? 1 : 0);
+            }
+        }
+
+        return [
+            'weekly_goal_streak' => $weeklyGoalStreak,
+            'monthly_goal_streak' => $monthlyGoalStreak,
+            'yearly_goal_achieved' => $yearlyGoalAchieved,
+        ];
+    }
+
+    protected function calculateGoalAchievementStreak(ListeningGoal $goal, int $periods): int
+    {
+        $streak = 0;
+
+        for ($offset = 0; $offset < $periods; $offset++) {
+            if (! $this->goalIsMetForOffset($goal, $offset)) {
+                break;
+            }
+
+            $streak++;
+        }
+
+        return $streak;
+    }
+
+    protected function goalIsMetForOffset(ListeningGoal $goal, int $offset): bool
+    {
+        $period = $this->goalPeriodBounds($goal->period_type, $offset);
+        $minutes = $this->goalProgressMinutes($goal, $period['start'], $period['end']);
+
+        return $minutes >= $goal->target_minutes;
+    }
+
+    protected function goalPeriodBounds(string $periodType, int $offset): array
+    {
+        $now = Carbon::now();
+
+        return match ($periodType) {
+            'day' => [
+                'start' => $now->copy()->subDays($offset)->startOfDay(),
+                'end' => $now->copy()->subDays($offset)->endOfDay(),
+            ],
+            'week' => [
+                'start' => $now->copy()->subWeeks($offset)->startOfWeek(),
+                'end' => $now->copy()->subWeeks($offset)->endOfWeek(),
+            ],
+            'month' => [
+                'start' => $now->copy()->subMonths($offset)->startOfMonth(),
+                'end' => $now->copy()->subMonths($offset)->endOfMonth(),
+            ],
+            'year' => [
+                'start' => $now->copy()->subYears($offset)->startOfYear(),
+                'end' => $now->copy()->subYears($offset)->endOfYear(),
+            ],
+            default => [
+                'start' => $now->copy()->startOfDay(),
+                'end' => $now->copy()->endOfDay(),
+            ],
+        };
+    }
+
+    protected function goalProgressMinutes(ListeningGoal $goal, Carbon $start, Carbon $end): int
+    {
+        $userId = (string) $goal->user_id;
+        $query = $this->userStatsQuery($userId)
+            ->whereBetween('listening_date', [$start->toDateString(), $end->toDateString()]);
+
+        switch ($goal->metric) {
+            case 'genre_hours':
+                if ($goal->genre_id === null) {
+                    return 0;
+                }
+
+                $query->join('book_genre', 'book_genre.book_id', '=', 'listening_statistics.book_id')
+                    ->where('book_genre.genre_id', $goal->genre_id);
+                break;
+            case 'playlist_hours':
+                if ($goal->playlist_id === null) {
+                    return 0;
+                }
+
+                $query->join('user_book_status', function ($join) use ($goal): void {
+                    $join->on('user_book_status.book_id', '=', 'listening_statistics.book_id')
+                        ->where('user_book_status.user_id', '=', $goal->user_id)
+                        ->where('user_book_status.playlist_id', '=', $goal->playlist_id);
+                });
+                break;
+            case 'fiction_hours':
+                $query->join('book_genre', 'book_genre.book_id', '=', 'listening_statistics.book_id')
+                    ->join('genres', 'genres.id', '=', 'book_genre.genre_id')
+                    ->where('genres.is_fiction', true);
+                break;
+            case 'nonfiction_hours':
+                $query->join('book_genre', 'book_genre.book_id', '=', 'listening_statistics.book_id')
+                    ->join('genres', 'genres.id', '=', 'book_genre.genre_id')
+                    ->where('genres.is_fiction', false);
+                break;
+            default:
+                break;
+        }
+
+        return (int) floor(((int) $query->sum('seconds_listened')) / 60);
+    }
+
+    protected function getBookSeriesIds(Collection $bookIds): Collection
+    {
+        if ($bookIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('books')
+            ->whereIn('id', $bookIds)
+            ->whereNotNull('series_id')
+            ->pluck('series_id')
+            ->merge(
+                DB::table('book_series')
+                    ->whereIn('book_id', $bookIds)
+                    ->pluck('series_id')
+            )
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    protected function getSeriesBookIds(int $seriesId): Collection
+    {
+        return DB::table('books')
+            ->where('series_id', $seriesId)
+            ->pluck('id')
+            ->merge(
+                DB::table('book_series')
+                    ->where('series_id', $seriesId)
+                    ->pluck('book_id')
+            )
+            ->filter()
+            ->map(static fn ($bookId): int => (int) $bookId)
+            ->unique()
+            ->values();
     }
 
     /**

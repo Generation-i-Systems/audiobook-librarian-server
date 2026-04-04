@@ -74,6 +74,15 @@ class ListeningGoalController extends Controller
             'is_active'      => 'sometimes|boolean',
         ]);
 
+        if (!empty($validated['playlist_id'])) {
+            abort_if(
+                \App\Models\Playlist::where('id', $validated['playlist_id'])
+                    ->where('user_id', Auth::id())->doesntExist(),
+                403,
+                'Playlist not found'
+            );
+        }
+
         $goal->update($validated);
         $goal->load(['genre', 'playlist']);
 
@@ -99,8 +108,18 @@ class ListeningGoalController extends Controller
             default => now()->startOfMonth(),
         };
 
+        $deviceIds = DB::table('devices')
+            ->where('user_id', $userId)
+            ->pluck('device_id');
+
         $query = DB::table('listening_statistics')
-            ->where('listening_statistics.user_id', $userId)
+            ->where(function ($statsQuery) use ($userId, $deviceIds): void {
+                $statsQuery->where('listening_statistics.user_id', $userId);
+
+                if ($deviceIds->isNotEmpty()) {
+                    $statsQuery->orWhereIn('listening_statistics.device_id', $deviceIds);
+                }
+            })
             ->where('listening_statistics.listening_date', '>=', $periodStart->toDateString());
 
         switch ($goal->metric) {

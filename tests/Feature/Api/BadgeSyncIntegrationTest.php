@@ -6,9 +6,11 @@ use App\Models\Badge;
 use App\Models\Book;
 use App\Models\ClientEvent;
 use App\Models\Device;
+use App\Models\ListeningGoal;
 use App\Models\ListeningStatistic;
 use App\Models\Message;
 use App\Models\User;
+use App\Models\UserBookStatus;
 use App\Services\BadgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -363,5 +365,108 @@ class BadgeSyncIntegrationTest extends TestCase
         $earnedIds = array_map(fn ($ub) => $ub->badge_id, $newBadges);
         $this->assertContains($androidBadge->id, $earnedIds, 'Android badge should be awarded');
         $this->assertNotContains($iosBadge->id, $earnedIds, 'iOS badge should NOT be awarded');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function speed_variety_badge_requires_meaningful_time_at_each_speed(): void
+    {
+        Cache::flush();
+
+        $badge = $this->createTestBadge(['speed_variety' => 3], 'speed');
+
+        foreach ([1.1, 1.25, 1.5] as $speed) {
+            ListeningStatistic::create([
+                'book_id' => null,
+                'user_id' => $this->user->id,
+                'device_id' => $this->deviceId,
+                'listening_date' => now()->toDateString(),
+                'seconds_listened' => 600,
+                'session_type' => 'listening',
+                'metadata' => ['playback_speed' => $speed],
+            ]);
+        }
+
+        $badgeService = app(BadgeService::class);
+        $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
+
+        ListeningStatistic::query()->delete();
+        Cache::flush();
+
+        foreach ([1.1, 1.25, 1.5] as $speed) {
+            ListeningStatistic::create([
+                'book_id' => null,
+                'user_id' => $this->user->id,
+                'device_id' => $this->deviceId,
+                'listening_date' => now()->toDateString(),
+                'seconds_listened' => 1800,
+                'session_type' => 'listening',
+                'metadata' => ['playback_speed' => $speed],
+            ]);
+        }
+
+        $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertCount(1, $newBadges);
+        /** @var \App\Models\UserBadge $firstBadge */
+        $firstBadge = reset($newBadges);
+        $this->assertEquals($badge->id, $firstBadge->badge_id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function goal_streak_badges_require_actual_goals(): void
+    {
+        Cache::flush();
+
+        $badge = $this->createTestBadge(['monthly_goal_streak' => 1], 'dedication');
+
+        ListeningStatistic::create([
+            'book_id' => null,
+            'user_id' => $this->user->id,
+            'device_id' => $this->deviceId,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 7200,
+            'session_type' => 'listening',
+        ]);
+
+        $badgeService = app(BadgeService::class);
+        $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
+
+        ListeningGoal::create([
+            'user_id' => $this->user->id,
+            'period_type' => 'month',
+            'metric' => 'total_hours',
+            'target_minutes' => 60,
+            'is_active' => true,
+        ]);
+
+        Cache::flush();
+        $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertCount(1, $newBadges);
+        /** @var \App\Models\UserBadge $firstBadge */
+        $firstBadge = reset($newBadges);
+        $this->assertEquals($badge->id, $firstBadge->badge_id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function library_badges_count_books_from_user_status_records(): void
+    {
+        Cache::flush();
+
+        $book = Book::factory()->create();
+        $badge = $this->createTestBadge(['library_size' => 1], 'collection');
+
+        UserBookStatus::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'status' => 'queue',
+            'order' => 1,
+        ]);
+
+        $badgeService = app(BadgeService::class);
+        $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertNotEmpty($newBadges);
+        $this->assertEquals($badge->id, $newBadges[0]->badge_id);
     }
 }
