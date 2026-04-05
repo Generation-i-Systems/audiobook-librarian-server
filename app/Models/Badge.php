@@ -307,20 +307,63 @@ class Badge extends Model
      */
     public function getProgressPercentage(array $userStats): int
     {
-        $criteria      = $this->criteria;
+        $criteria = $this->criteria;
         $totalCriteria = count($criteria);
-        $metCriteria   = 0;
-
-        foreach ($criteria as $type => $requirement) {
-            if ($this->checkSingleCriterion($type, $requirement, $userStats)) {
-                $metCriteria++;
-            }
-        }
 
         if ($totalCriteria === 0) {
             return 100;
         }
 
-        return (int) (($metCriteria / $totalCriteria) * 100);
+        $progress = 0.0;
+
+        foreach ($criteria as $type => $requirement) {
+            $progress += $this->getSingleCriterionProgress($type, $requirement, $userStats);
+        }
+
+        return (int) floor(($progress / $totalCriteria) * 100);
+    }
+
+    protected function getSingleCriterionProgress(string $type, $requirement, array $userStats): float
+    {
+        $value = $userStats[$type] ?? 0;
+
+        if (is_numeric($requirement)) {
+            if ((float) $requirement <= 0.0) {
+                return 1.0;
+            }
+
+            return min(1.0, max(0.0, ((float) $value) / ((float) $requirement)));
+        }
+
+        if (is_array($requirement)) {
+            $min = isset($requirement['min']) && is_numeric($requirement['min'])
+                ? (float) $requirement['min']
+                : null;
+            $max = isset($requirement['max']) && is_numeric($requirement['max'])
+                ? (float) $requirement['max']
+                : null;
+
+            if ($min !== null && $max !== null) {
+                if ($value < $min) {
+                    return $min > 0.0 ? min(1.0, max(0.0, ((float) $value) / $min)) : 0.0;
+                }
+
+                if ($value > $max) {
+                    return 0.0;
+                }
+
+                return 1.0;
+            }
+
+            if ($min !== null) {
+                return $min > 0.0 ? min(1.0, max(0.0, ((float) $value) / $min)) : 0.0;
+            }
+
+            if ($max !== null) {
+                return $value <= $max ? 1.0 : 0.0;
+            }
+        }
+
+        return $this->checkSingleCriterion($type, $requirement, $userStats) ? 1.0 : 0.0;
     }
 }

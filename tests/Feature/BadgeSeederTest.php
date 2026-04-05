@@ -114,6 +114,34 @@ class BadgeSeederTest extends TestCase
         });
     }
 
+    public function testBadgeProgressPercentageUsesPartialProgressForNumericCriteria(): void
+    {
+        $badge = Badge::create([
+            'key' => 'progress_test_badge',
+            'name' => 'Progress Test Badge',
+            'description' => 'Test badge progress math',
+            'icon' => 'test',
+            'image_url' => '/images/badges/progress_test_badge.svg',
+            'category' => 'listening',
+            'tier' => 'bronze',
+            'points' => 10,
+            'criteria' => [
+                'books_completed' => 4,
+                'library_size' => 2,
+            ],
+            'is_active' => true,
+            'is_repeatable' => false,
+            'sort_order' => 1,
+        ]);
+
+        $progress = $badge->getProgressPercentage([
+            'books_completed' => 2,
+            'library_size' => 1,
+        ]);
+
+        $this->assertSame(50, $progress);
+    }
+
     private function canonicalKeys(): array
     {
         $sets = [

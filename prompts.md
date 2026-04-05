@@ -92,6 +92,9 @@ I would also like to have stats showing minutes listened per day, per week, and 
 
 in theory I should be able to go back and look at an given day/week/month and get the time listened along with requesting the details of which books and time per book
 
+from the server perspective the user should be able to request timeline data for any time period with any resolution of agregation. aka request one value per month for specified date range. or simply now-[specified start time]. Or get the same data for week or only on weekends, or only on thursdays. So there should be much flexibility based on client needs to get ranges summarized or specific data.
+include this in the final pass on timeline data
+
 ---
 
 ## 2026-02-13

@@ -3048,6 +3048,15 @@
                             },
                             "group_by": {
                                 "type": "string"
+                            },
+                            "day_filter": {
+                                "type": "string"
+                            },
+                            "weekdays": {
+                                "type": "array",
+                                "items": {
+                                    "type": "integer"
+                                }
                             }
                         }
                     },
@@ -13351,15 +13360,36 @@
                         "in": "query",
                         "schema": {
                             "type": "string",
-                            "enum": ["day", "month"]
+                            "enum": ["day", "week", "month", "year"]
                         }
+                    },
+                    {
+                        "name": "day_filter",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": ["any", "weekday", "weekend"]
+                        }
+                    },
+                    {
+                        "name": "weekdays[]",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 6
+                            }
+                        },
+                        "description": "Optional weekday filter using Monday=0 through Sunday=6."
                     },
                     {
                         "name": "detail_period_type",
                         "in": "query",
                         "schema": {
                             "type": "string",
-                            "enum": ["day", "week", "month"]
+                            "enum": ["day", "week", "month", "year"]
                         }
                     },
                     {

@@ -207,9 +207,12 @@ class StatisticsController extends Controller
         $validated = $request->validate([
             'from'               => 'nullable|date_format:Y-m-d',
             'to'                 => 'nullable|date_format:Y-m-d',
-            'group_by'           => 'nullable|string|in:day,month',
-            'detail_period_type' => 'nullable|string|in:day,week,month',
+            'group_by'           => 'nullable|string|in:day,week,month,year',
+            'detail_period_type' => 'nullable|string|in:day,week,month,year',
             'detail_period'      => 'nullable|string|max:20',
+            'day_filter'         => 'nullable|string|in:any,weekday,weekend',
+            'weekdays'           => 'nullable|array',
+            'weekdays.*'         => 'integer|between:0,6',
         ]);
 
         $userId   = Auth::id();
@@ -217,40 +220,29 @@ class StatisticsController extends Controller
         $from     = isset($validated['from']) ? Carbon::parse($validated['from']) : now()->subDays(29);
         $to       = isset($validated['to']) ? Carbon::parse($validated['to']) : now();
         $groupBy  = $validated['group_by'] ?? 'day';
+        $dayFilter = $validated['day_filter'] ?? 'any';
+        $weekdays = collect($validated['weekdays'] ?? [])->map(static fn ($day): int => (int) $day)->unique()->values()->all();
 
-        $summary = $this->listeningStatsQuery($userId, $deviceId)
-            ->whereDate('listening_date', '>=', $from->toDateString())
-            ->whereDate('listening_date', '<=', $to->toDateString())
+        $timelineQuery = $this->applyTimelineFilters(
+            $this->listeningStatsQuery($userId, $deviceId),
+            $from,
+            $to,
+            $dayFilter,
+            $weekdays
+        );
+
+        $summary = (clone $timelineQuery)
             ->selectRaw('SUM(seconds_listened) * 1000 as total_ms, COUNT(*) as total_sessions')
             ->first();
 
-        if ($groupBy === 'month') {
-            if (DB::getDriverName() === 'sqlite') {
-                $rows = $this->listeningStatsQuery($userId, $deviceId)
-                    ->whereDate('listening_date', '>=', $from->toDateString())
-                    ->whereDate('listening_date', '<=', $to->toDateString())
-                    ->selectRaw("strftime('%Y-%m', listening_date) as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
-                    ->groupByRaw("strftime('%Y-%m', listening_date)")
-                    ->orderByRaw("strftime('%Y-%m', listening_date)")
-                    ->toBase()->get();
-            } else {
-                $rows = $this->listeningStatsQuery($userId, $deviceId)
-                    ->whereDate('listening_date', '>=', $from->toDateString())
-                    ->whereDate('listening_date', '<=', $to->toDateString())
-                    ->selectRaw("DATE_FORMAT(listening_date, '%Y-%m') as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
-                    ->groupByRaw("DATE_FORMAT(listening_date, '%Y-%m')")
-                    ->orderByRaw("DATE_FORMAT(listening_date, '%Y-%m')")
-                    ->toBase()->get();
-            }
-        } else {
-            $rows = $this->listeningStatsQuery($userId, $deviceId)
-                ->whereDate('listening_date', '>=', $from->toDateString())
-                ->whereDate('listening_date', '<=', $to->toDateString())
-                ->selectRaw('listening_date as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count')
-                ->groupBy('listening_date')
-                ->orderBy('listening_date')
-                ->toBase()->get();
-        }
+        [$periodSelect, $periodGroup, $periodOrder] = $this->timelinePeriodSql($groupBy);
+
+        $rows = (clone $timelineQuery)
+            ->selectRaw("{$periodSelect} as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
+            ->groupByRaw($periodGroup)
+            ->orderByRaw($periodOrder)
+            ->toBase()
+            ->get();
 
         $bars = $rows->map(fn ($r) => [
             'period'            => $r->period,
@@ -264,7 +256,9 @@ class StatisticsController extends Controller
                 $userId,
                 $deviceId,
                 $validated['detail_period_type'],
-                $validated['detail_period']
+                $validated['detail_period'],
+                $dayFilter,
+                $weekdays
             );
         }
 
@@ -276,6 +270,8 @@ class StatisticsController extends Controller
                 'from'                    => $from->toDateString(),
                 'to'                      => $to->toDateString(),
                 'group_by'                => $groupBy,
+                'day_filter'              => $dayFilter,
+                'weekdays'                => $weekdays,
             ],
             'detail' => $detail,
         ]);
@@ -285,13 +281,19 @@ class StatisticsController extends Controller
         ?int $userId,
         string $deviceId,
         string $periodType,
-        string $period
+        string $period,
+        string $dayFilter = 'any',
+        array $weekdays = []
     ): array {
         [$startDate, $endDate] = $this->resolveTimelineDetailRange($periodType, $period);
 
-        $detailQuery = $this->listeningStatsQuery($userId, $deviceId)
-            ->whereDate('listening_date', '>=', $startDate->toDateString())
-            ->whereDate('listening_date', '<=', $endDate->toDateString());
+        $detailQuery = $this->applyTimelineFilters(
+            $this->listeningStatsQuery($userId, $deviceId),
+            $startDate,
+            $endDate,
+            $dayFilter,
+            $weekdays
+        );
 
         $summary = (clone $detailQuery)
             ->selectRaw('SUM(seconds_listened) as total_seconds, COUNT(*) as session_count, COUNT(DISTINCT book_id) as books_count')
@@ -338,6 +340,7 @@ class StatisticsController extends Controller
             'day' => $this->resolveDayRange($period),
             'week' => $this->resolveWeekRange($period),
             'month' => $this->resolveMonthRange($period),
+            'year' => $this->resolveYearRange($period),
             default => throw new \InvalidArgumentException('Unsupported detail period type.'),
         };
     }
@@ -373,6 +376,107 @@ class StatisticsController extends Controller
         $date = Carbon::createFromFormat('Y-m', $period);
 
         return [$date->copy()->startOfMonth(), $date->copy()->endOfMonth()];
+    }
+
+    private function resolveYearRange(string $period): array
+    {
+        if (! preg_match('/^\d{4}$/', $period)) {
+            abort(422, 'Invalid year period format. Use YYYY.');
+        }
+
+        $date = Carbon::createFromFormat('Y', $period);
+
+        return [$date->copy()->startOfYear(), $date->copy()->endOfYear()];
+    }
+
+    private function applyTimelineFilters(
+        \Illuminate\Database\Eloquent\Builder $query,
+        Carbon $from,
+        Carbon $to,
+        string $dayFilter = 'any',
+        array $weekdays = []
+    ): \Illuminate\Database\Eloquent\Builder {
+        $query->whereDate('listening_date', '>=', $from->toDateString())
+            ->whereDate('listening_date', '<=', $to->toDateString());
+
+        if (! empty($weekdays)) {
+            $this->applyWeekdayConstraint($query, $weekdays);
+        } elseif ($dayFilter !== 'any') {
+            $this->applyDayFilterConstraint($query, $dayFilter);
+        }
+
+        return $query;
+    }
+
+    private function applyDayFilterConstraint(\Illuminate\Database\Eloquent\Builder $query, string $dayFilter): void
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if ($dayFilter === 'weekday') {
+            if ($driver === 'sqlite') {
+                $query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) BETWEEN 1 AND 5");
+            } else {
+                $query->whereRaw('WEEKDAY(listening_date) BETWEEN 0 AND 4');
+            }
+
+            return;
+        }
+
+        if ($dayFilter === 'weekend') {
+            if ($driver === 'sqlite') {
+                $query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN (0, 6)");
+            } else {
+                $query->whereRaw('WEEKDAY(listening_date) IN (5, 6)');
+            }
+        }
+    }
+
+    private function applyWeekdayConstraint(\Illuminate\Database\Eloquent\Builder $query, array $weekdays): void
+    {
+        $normalizedDays = collect($weekdays)
+            ->map(static fn ($day): int => max(0, min(6, (int) $day)))
+            ->unique()
+            ->values();
+
+        if ($normalizedDays->isEmpty()) {
+            return;
+        }
+
+        $driver = DB::connection()->getDriverName();
+        $dayList = $normalizedDays->implode(',');
+
+        if ($driver === 'sqlite') {
+            $sqliteDays = $normalizedDays
+                ->map(static fn (int $day): int => $day === 6 ? 0 : $day + 1)
+                ->implode(',');
+
+            $query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN ({$sqliteDays})");
+
+            return;
+        }
+
+        $query->whereRaw("WEEKDAY(listening_date) IN ({$dayList})");
+    }
+
+    private function timelinePeriodSql(string $groupBy): array
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            return match ($groupBy) {
+                'week' => ["strftime('%Y-W%W', listening_date)", "strftime('%Y-W%W', listening_date)", "strftime('%Y-W%W', listening_date)"],
+                'month' => ["strftime('%Y-%m', listening_date)", "strftime('%Y-%m', listening_date)", "strftime('%Y-%m', listening_date)"],
+                'year' => ["strftime('%Y', listening_date)", "strftime('%Y', listening_date)", "strftime('%Y', listening_date)"],
+                default => ["date(listening_date)", "date(listening_date)", "date(listening_date)"],
+            };
+        }
+
+        return match ($groupBy) {
+            'week' => ["DATE_FORMAT(listening_date, '%x-W%v')", "DATE_FORMAT(listening_date, '%x-W%v')", "DATE_FORMAT(listening_date, '%x-W%v')"],
+            'month' => ["DATE_FORMAT(listening_date, '%Y-%m')", "DATE_FORMAT(listening_date, '%Y-%m')", "DATE_FORMAT(listening_date, '%Y-%m')"],
+            'year' => ["DATE_FORMAT(listening_date, '%Y')", "DATE_FORMAT(listening_date, '%Y')", "DATE_FORMAT(listening_date, '%Y')"],
+            default => ['DATE(listening_date)', 'DATE(listening_date)', 'DATE(listening_date)'],
+        };
     }
 
     /**

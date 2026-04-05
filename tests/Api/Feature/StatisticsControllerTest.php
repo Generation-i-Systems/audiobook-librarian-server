@@ -274,6 +274,110 @@ class StatisticsControllerTest extends TestCase
             ->assertJsonPath('detail.books.1.total_seconds', 900);
     }
 
+    public function test_timeline_supports_month_aggregation_for_custom_date_range(): void
+    {
+        $book = Book::factory()->create();
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 1800,
+            'session_type' => 'listening',
+            'listening_date' => '2026-01-15',
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 2400,
+            'session_type' => 'listening',
+            'listening_date' => '2026-02-10',
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'device-a',
+        ])->getJson('/api/v1/statistics/timeline?from=2026-01-01&to=2026-02-28&group_by=month');
+
+        $response->assertOk()
+            ->assertJsonPath('summary.group_by', 'month')
+            ->assertJsonCount(2, 'bars')
+            ->assertJsonPath('bars.0.period', '2026-01')
+            ->assertJsonPath('bars.0.listening_time_ms', 1800000)
+            ->assertJsonPath('bars.1.period', '2026-02')
+            ->assertJsonPath('bars.1.listening_time_ms', 2400000);
+    }
+
+    public function test_timeline_supports_weekend_only_filtering(): void
+    {
+        $book = Book::factory()->create();
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 1200,
+            'session_type' => 'listening',
+            'listening_date' => '2026-04-03',
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 1800,
+            'session_type' => 'listening',
+            'listening_date' => '2026-04-04',
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'device-a',
+        ])->getJson('/api/v1/statistics/timeline?from=2026-04-01&to=2026-04-05&day_filter=weekend');
+
+        $response->assertOk()
+            ->assertJsonPath('summary.day_filter', 'weekend')
+            ->assertJsonCount(1, 'bars')
+            ->assertJsonPath('bars.0.period', '2026-04-04')
+            ->assertJsonPath('bars.0.listening_time_ms', 1800000);
+    }
+
+    public function test_timeline_supports_specific_weekday_filtering(): void
+    {
+        $book = Book::factory()->create();
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 900,
+            'session_type' => 'listening',
+            'listening_date' => '2026-04-02',
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 600,
+            'session_type' => 'listening',
+            'listening_date' => '2026-04-03',
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'device-a',
+        ])->getJson('/api/v1/statistics/timeline?from=2026-04-01&to=2026-04-07&weekdays[]=3');
+
+        $response->assertOk()
+            ->assertJsonPath('summary.weekdays.0', 3)
+            ->assertJsonCount(1, 'bars')
+            ->assertJsonPath('bars.0.period', '2026-04-02')
+            ->assertJsonPath('bars.0.listening_time_ms', 900000);
+    }
+
     public function test_get_weekly_stats_returns_aggregated_data()
     {
         $book = Book::factory()->create();

@@ -24,6 +24,8 @@
     - Added day/week/month listening-minute totals to overview and dashboard responses
     - Timeline queries now support detailed day/week/month drill-downs with per-book listening totals
     - Playlist listening goals now count listening from all of the user's devices
+    - Timeline queries now support arbitrary date ranges with aggregation by day, week, month, or year
+    - Timeline queries now support weekend-only, weekday-only, or specific weekday filtering for client reporting needs
 
 - **CRITICAL**: Fixed auto-processing bug where books were imported without user confirmation
 
