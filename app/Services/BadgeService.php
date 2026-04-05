@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Badge;
+use App\Models\BookProgress;
 use App\Models\ClientEvent;
 use App\Models\ListeningGoal;
 use App\Models\ListeningStatistic;
@@ -95,12 +96,13 @@ class BadgeService
                 SUM(seconds_listened) as total_listening_time,
                 COUNT(*) as session_count,
                 COUNT(DISTINCT book_id) as books_started,
-                COUNT(DISTINCT CASE WHEN session_type = "completed" THEN book_id END) as books_completed,
                 COUNT(DISTINCT listening_date) as total_listening_days,
                 MIN(listening_date) as first_listening_date,
                 MAX(listening_date) as last_listening_date,
                 MAX(seconds_listened) as longest_session
             ')->first();
+
+            $completedBooks = $this->getCompletedBookProgressRecords($userId, $deviceId);
 
             // Calculate listening streak
             $currentStreak = $this->calculateCurrentStreak($userId, $deviceId);
@@ -151,7 +153,7 @@ class BadgeService
                 'total_listening_time'       => (int) ($allTimeStats->total_listening_time ?? 0),
                 'session_count'              => (int) ($allTimeStats->session_count ?? 0),
                 'books_started'              => (int) ($allTimeStats->books_started ?? 0),
-                'books_completed'            => (int) ($allTimeStats->books_completed ?? 0),
+                'books_completed'            => $completedBooks->count(),
                 'total_listening_days'       => (int) ($allTimeStats->total_listening_days ?? 0),
                 'longest_session'            => (int) ($allTimeStats->longest_session ?? 0),
                 'current_streak'             => $currentStreak,
@@ -318,13 +320,10 @@ class BadgeService
      */
     protected function getBooksCompletedInTimeframe(string $userId, ?string $deviceId, int $days): int
     {
-        $query = $this->userStatsQuery($userId, $deviceId);
-
         $startDate = Carbon::now()->subDays($days);
 
-        return $query->where('session_type', 'completed')
-            ->where('listening_date', '>=', $startDate)
-            ->distinct('book_id')
+        return $this->getCompletedBookProgressRecords($userId, $deviceId)
+            ->filter(fn (BookProgress $progress): bool => $progress->completed_at !== null && $progress->completed_at->gte($startDate))
             ->count();
     }
 
@@ -334,10 +333,7 @@ class BadgeService
     protected function getSeriesCompleted(string $userId, ?string $deviceId = null): int
     {
         try {
-            $completedBookIds = $this->userStatsQuery($userId, $deviceId)
-                ->where('session_type', 'completed')
-                ->distinct('book_id')
-                ->pluck('book_id');
+            $completedBookIds = $this->getCompletedBookIds($userId, $deviceId);
 
             if ($completedBookIds->isEmpty()) {
                 return 0;
@@ -430,7 +426,7 @@ class BadgeService
         $query = $this->userStatsQuery($userId, $deviceId);
 
         $totalBooks     = $query->distinct('book_id')->count();
-        $completedBooks = $query->where('session_type', 'completed')->distinct('book_id')->count();
+        $completedBooks = $this->getCompletedBookIds($userId, $deviceId)->count();
 
         if ($totalBooks === 0) {
             return 0;
@@ -486,48 +482,76 @@ class BadgeService
         $query = $this->userStatsQuery($userId, $deviceId);
 
         // Count books that have been "completed" more than once
-        return $query->where('session_type', 'completed')
-            ->select('book_id')
-            ->groupBy('book_id')
-            ->havingRaw('COUNT(*) > 1')
-            ->get()
-            ->count();
+        return 0;
     }
 
     protected function getBooksCompletedOnWeekend(string $userId, ?string $deviceId = null): int
     {
-        $query = $this->userStatsQuery($userId, $deviceId)->where('session_type', 'completed');
+        return $this->getCompletedBookProgressRecords($userId, $deviceId)
+            ->filter(function (BookProgress $progress): bool {
+                if ($progress->completed_at === null) {
+                    return false;
+                }
 
-        $driver = DB::connection()->getDriverName();
-        if ($driver === 'sqlite') {
-            return $query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN (0, 6)")
-                ->distinct('book_id')
-                ->count();
-        }
-
-        return $query->whereRaw('DAYOFWEEK(listening_date) IN (1, 7)')
-            ->distinct('book_id')
+                return in_array($progress->completed_at->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY], true);
+            })
             ->count();
     }
 
     protected function getQuickFinishCount(string $userId, ?string $deviceId = null): int
     {
+        $completedDates = $this->getCompletedBookProgressRecords($userId, $deviceId)
+            ->pluck('completed_at', 'book_id');
+
         $bookTimelines = $this->userStatsQuery($userId, $deviceId)
             ->whereNotNull('book_id')
-            ->selectRaw('book_id, MIN(listening_date) as first_date, MIN(CASE WHEN session_type = "completed" THEN listening_date END) as completed_date')
+            ->selectRaw('book_id, MIN(listening_date) as first_date')
             ->groupBy('book_id')
             ->get();
 
-        return $bookTimelines->filter(function ($timeline): bool {
+        return $bookTimelines->filter(function ($timeline) use ($completedDates): bool {
             $firstDate = $timeline->getAttribute('first_date');
-            $completedDate = $timeline->getAttribute('completed_date');
+            $completedDate = $completedDates->get((int) $timeline->getAttribute('book_id'));
 
             if ($firstDate === null || $completedDate === null) {
                 return false;
             }
 
-            return Carbon::parse($firstDate)->diffInDays(Carbon::parse($completedDate)) <= 7;
+            return Carbon::parse($firstDate)->diffInDays($completedDate) <= 7;
         })->count();
+    }
+
+    protected function getCompletedBookIds(string $userId, ?string $deviceId = null): Collection
+    {
+        return $this->getCompletedBookProgressRecords($userId, $deviceId)
+            ->pluck('book_id')
+            ->filter()
+            ->map(static fn ($bookId): int => (int) $bookId)
+            ->unique()
+            ->values();
+    }
+
+    protected function getCompletedBookProgressRecords(string $userId, ?string $deviceId = null): Collection
+    {
+        if (is_numeric($userId)) {
+            return BookProgress::query()
+                ->where('user_id', (int) $userId)
+                ->where('completed', true)
+                ->whereNotNull('book_id')
+                ->get(['book_id', 'completed_at']);
+        }
+
+        $query = BookProgress::query()
+            ->where('completed', true)
+            ->whereNotNull('book_id');
+
+        if ($deviceId !== null) {
+            $query->where('device_id', $deviceId);
+        } else {
+            $query->where('device_id', $userId);
+        }
+
+        return $query->get(['book_id', 'completed_at']);
     }
 
     protected function getClassicBooksExplored(string $userId, ?string $deviceId = null): int

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Book;
+use App\Models\BookProgress;
 use App\Models\ListeningStatistic;
+use App\Models\UserBookStatus;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -85,10 +87,15 @@ class StatisticsController extends Controller
         $stats = $query->selectRaw('
             SUM(seconds_listened) as total_listening_time_ms,
             COUNT(DISTINCT book_id) as books_started,
-            COUNT(DISTINCT CASE WHEN session_type = "completed" THEN book_id END) as books_finished,
             AVG(seconds_listened) as average_session_duration_ms,
             COUNT(DISTINCT listening_date) as days_with_activity
         ')->first();
+
+        $booksFinished = $userId !== null
+            ? $this->getCompletedBookDatesForUser($userId, $startDate)->count()
+            : $this->completedProgressQuery($userId, $deviceId, $startDate)
+                ->distinct('book_id')
+                ->count('book_id');
 
         // Calculate streaks
         $currentStreak = $this->calculateCurrentStreak($userId, $deviceId);
@@ -105,7 +112,7 @@ class StatisticsController extends Controller
             'daily_stats'                 => $dailyStats,
             'total_listening_time_ms'     => ($stats->total_listening_time_ms ?? 0) * 1000,
             'books_started'               => $stats->books_started ?? 0,
-            'books_finished'              => $stats->books_finished ?? 0,
+            'books_finished'              => $booksFinished,
             'average_session_duration_ms' => ($stats->average_session_duration_ms ?? 0) * 1000,
             'favorite_genres'             => $favoriteGenres,
             'current_streak'              => $currentStreak,
@@ -877,21 +884,19 @@ class StatisticsController extends Controller
         ];
 
         if ($userId) {
-            $userStats['total_completed'] = \App\Models\UserBookStatus::where('user_id', $userId)
-                ->where('status', 'completed')
+            $completedBookDates = $this->getCompletedBookDatesForUser($userId);
+
+            $userStats['total_completed'] = $completedBookDates->count();
+            $userStats['completed_this_month'] = $completedBookDates
+                ->filter(fn (Carbon $date): bool => $date->gte($thisMonth))
                 ->count();
 
-            $userStats['completed_this_month'] = \App\Models\UserBookStatus::where('user_id', $userId)
-                ->where('status', 'completed')
-                ->where('finished_at', '>=', $thisMonth)
-                ->count();
-
-            $userStats['upcoming_goals'] = \App\Models\UserBookStatus::where('user_id', $userId)
+            $userStats['upcoming_goals'] = UserBookStatus::where('user_id', $userId)
                 ->whereIn('status', ['queue', 'in_progress'])
                 ->where('target_date', '>=', now()->toDateString())
                 ->count();
 
-            $userStats['overdue_goals'] = \App\Models\UserBookStatus::where('user_id', $userId)
+            $userStats['overdue_goals'] = UserBookStatus::where('user_id', $userId)
                 ->whereIn('status', ['queue', 'in_progress'])
                 ->where('target_date', '<', now()->toDateString())
                 ->count();
@@ -954,6 +959,63 @@ class StatisticsController extends Controller
         ];
     }
 
+    private function completedProgressQuery(?int $userId, string $deviceId, ?Carbon $startDate = null)
+    {
+        $query = BookProgress::query()
+            ->where('completed', true)
+            ->whereNotNull('book_id');
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        } else {
+            $query->where('device_id', $deviceId);
+        }
+
+        if ($startDate !== null) {
+            $query->where('completed_at', '>=', $startDate);
+        }
+
+        return $query;
+    }
+
+    private function getCompletedBookDatesForUser(int $userId, ?Carbon $startDate = null): \Illuminate\Support\Collection
+    {
+        $statusDates = UserBookStatus::query()
+            ->where('user_id', $userId)
+            ->where('status', 'completed')
+            ->whereNotNull('book_id')
+            ->whereNotNull('finished_at')
+            ->get(['book_id', 'finished_at'])
+            ->mapWithKeys(function (UserBookStatus $status): array {
+                return [$status->book_id => Carbon::parse((string) $status->finished_at)];
+            });
+
+        $progressDates = BookProgress::query()
+            ->where('user_id', $userId)
+            ->where('completed', true)
+            ->whereNotNull('book_id')
+            ->whereNotNull('completed_at')
+            ->get(['book_id', 'completed_at'])
+            ->mapWithKeys(function (BookProgress $progress): array {
+                return [$progress->book_id => Carbon::parse((string) $progress->completed_at)];
+            });
+
+        $merged = $statusDates;
+
+        foreach ($progressDates as $bookId => $date) {
+            $existing = $merged->get($bookId);
+            if (! $existing instanceof Carbon || $date->gt($existing)) {
+                $merged->put($bookId, $date);
+            }
+        }
+
+        if ($startDate !== null) {
+            return $merged->filter(fn (Carbon $date): bool => $date->gte($startDate));
+        }
+
+        return $merged;
+    }
+
     /**
      * Get reading progress stats by date (finished books per month/year)
      */
@@ -967,15 +1029,9 @@ class StatisticsController extends Controller
 
         $groupBy = $request->input('group_by', 'month'); // month or year
 
-        $query = \App\Models\UserBookStatus::where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->whereNotNull('finished_at')
-            ->orderByDesc('finished_at');
+        $completedBookDates = $this->getCompletedBookDatesForUser($user->id);
 
-        $statuses = $query->get();
-
-        $stats = $statuses->groupBy(function ($item) use ($groupBy) {
-            $date = Carbon::parse((string) $item->finished_at);
+        $stats = $completedBookDates->groupBy(function (Carbon $date) use ($groupBy) {
             return $groupBy === 'year' ? $date->format('Y') : $date->format('Y-m');
         })->map(function ($items, $period) {
             return [

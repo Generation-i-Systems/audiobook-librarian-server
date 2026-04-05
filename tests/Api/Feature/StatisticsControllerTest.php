@@ -3,6 +3,7 @@
 namespace Tests\Api\Feature;
 
 use App\Models\Book;
+use App\Models\BookProgress;
 use App\Models\ListeningStatistic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -180,6 +181,42 @@ class StatisticsControllerTest extends TestCase
             ->assertJsonPath('listening_minutes.day', 25)
             ->assertJsonPath('listening_minutes.week', 25)
             ->assertJsonPath('listening_minutes.month', 25);
+    }
+
+    public function test_overview_uses_completed_progress_for_books_finished_instead_of_completed_sessions(): void
+    {
+        $book = Book::factory()->create();
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'seconds_listened' => 1200,
+            'session_type' => 'listening',
+            'listening_date' => now()->toDateString(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        BookProgress::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-a',
+            'current_position_seconds' => 7200,
+            'total_duration_seconds' => 7200,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'completed_at' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'device-a',
+        ])->getJson('/api/v1/statistics/overview?period=all_time');
+
+        $response->assertOk()
+            ->assertJsonPath('books_started', 1)
+            ->assertJsonPath('books_finished', 1);
     }
 
     public function test_timeline_returns_detail_for_specific_day_with_books(): void
@@ -504,6 +541,31 @@ class StatisticsControllerTest extends TestCase
             ]);
     }
 
+    public function test_dashboard_uses_completed_progress_for_user_completion_tracking(): void
+    {
+        $book = Book::factory()->create();
+
+        BookProgress::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => 'test-device',
+            'current_position_seconds' => 7200,
+            'total_duration_seconds' => 7200,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'completed_at' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'test-device',
+        ])->getJson('/api/v1/statistics/dashboard?device_id=test-device');
+
+        $response->assertOk()
+            ->assertJsonPath('data.user_tracking.total_completed', 1)
+            ->assertJsonPath('data.user_tracking.completed_this_month', 1);
+    }
+
     public function test_get_reading_history_stats()
     {
         /** @var User $user */
@@ -539,6 +601,32 @@ class StatisticsControllerTest extends TestCase
                     'count',
                 ],
             ]);
+    }
+
+    public function test_reading_history_includes_completed_progress_without_user_book_status(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($user, 'api');
+
+        $book = Book::factory()->create();
+
+        BookProgress::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'device_id' => 'test-device',
+            'current_position_seconds' => 3600,
+            'total_duration_seconds' => 3600,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'completed_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/statistics/reading-history', ['X-Acting-As-Test' => '1']);
+
+        $response->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.count', 1);
     }
 
     public function test_session_type_validation_accepts_valid_types()

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BookProgress;
 use App\Models\Book;
 use App\Models\ListeningEvent;
+use App\Models\ListeningStatistic;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -124,6 +125,10 @@ class ProgressController extends Controller
 
         // Record event in new system
         $this->recordListeningEvent($progress, $progress->completed ? 'BOOK_FINISH' : 'SESSION_END');
+        if ($progress->completed) {
+            $this->recordCompletedStatistic($progress);
+            $this->evaluateBadges($progress);
+        }
 
         return response()->json([
             'book_id' => $progress->book_id,
@@ -424,6 +429,8 @@ class ProgressController extends Controller
 
         // Record event in new system
         $this->recordListeningEvent($progress, 'BOOK_FINISH');
+        $this->recordCompletedStatistic($progress);
+        $this->evaluateBadges($progress);
 
         return response()->json([
             'success' => true,
@@ -531,6 +538,66 @@ class ProgressController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to record listening event: ' . $e->getMessage());
+        }
+    }
+
+    private function recordCompletedStatistic(BookProgress $progress): void
+    {
+        try {
+            $userId = $progress->getAttribute('user_id');
+            $deviceId = $progress->device_id ?? 'unknown';
+
+            $existingCompletion = ListeningStatistic::query()
+                ->where('book_id', $progress->book_id)
+                ->where('session_type', 'completed')
+                ->where(function ($query) use ($userId, $deviceId) {
+                    if ($userId) {
+                        $query->where('user_id', $userId);
+                    } else {
+                        $query->where('device_id', $deviceId);
+                    }
+                })
+                ->exists();
+
+            if ($existingCompletion) {
+                return;
+            }
+
+            ListeningStatistic::createSession(
+                $progress->book_id,
+                $deviceId,
+                1,
+                $progress->current_position_seconds,
+                $progress->current_position_seconds,
+                'completed',
+                [
+                    'source' => 'progress_controller',
+                    'progress_percentage' => $progress->progress_percentage,
+                ],
+                $userId ? (string) $userId : null
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to record completed statistic: ' . $e->getMessage());
+        }
+    }
+
+    private function evaluateBadges(BookProgress $progress): void
+    {
+        try {
+            $userId = $progress->getAttribute('user_id');
+            $deviceId = $progress->device_id ?? 'unknown';
+            $badgeUserId = $userId ? (string) $userId : $deviceId;
+
+            app(\App\Services\BadgeService::class)->evaluateUserBadges(
+                $badgeUserId,
+                $deviceId
+            );
+        } catch (\Exception $e) {
+            Log::warning('Badge evaluation failed after progress completion', [
+                'user_id' => $progress->user_id,
+                'book_id' => $progress->book_id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

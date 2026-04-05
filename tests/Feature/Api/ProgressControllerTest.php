@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Badge;
 use App\Models\Book;
 use App\Models\BookProgress;
+use App\Models\ListeningStatistic;
 use App\Models\User;
+use App\Models\UserBadge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use Laravel\Sanctum\Sanctum;
@@ -140,6 +143,54 @@ class ProgressControllerTest extends TestCase
         $this->assertTrue($progress->completed);
         $this->assertEquals(100.00, $progress->progress_percentage);
         $this->assertNotNull($progress->completed_at);
+    }
+
+    public function test_mark_completed_awards_first_finish_badge_from_completed_progress()
+    {
+        $book = Book::factory()->create();
+
+        Badge::create([
+            'key' => 'completion_first_finish_bronze',
+            'name' => 'First Finish',
+            'description' => 'Finish a book',
+            'category' => 'completion',
+            'tier' => 'bronze',
+            'points' => 10,
+            'criteria' => ['books_completed' => 1],
+            'is_active' => true,
+            'is_repeatable' => false,
+            'sort_order' => 1,
+        ]);
+
+        BookProgress::create([
+            'book_id' => $book->id,
+            'user_id' => $this->user->id,
+            'device_id' => 'test-device',
+            'current_position_seconds' => 3600,
+            'total_duration_seconds' => 7200,
+            'progress_percentage' => 50.00,
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])->postJson("/api/v1/books/{$book->id}/progress/complete", [
+            'device_id' => 'test-device',
+        ]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('listening_statistics', [
+            'book_id' => $book->id,
+            'user_id' => $this->user->id,
+            'device_id' => 'test-device',
+            'session_type' => 'completed',
+        ]);
+
+        $earnedBadge = UserBadge::query()->where('user_id', $this->user->id)->first();
+
+        $this->assertNotNull($earnedBadge);
+        $this->assertSame('completion_first_finish_bronze', $earnedBadge->badge->key);
+        $this->assertSame(1, ListeningStatistic::query()->where('book_id', $book->id)->where('session_type', 'completed')->count());
     }
 
     public function test_get_device_progress_returns_recent_books()
