@@ -91,10 +91,10 @@ class CanonicalBadgeSeeder extends Seeder
                 ['speed_variable_master_mythic', 'Variable Speed Master', 'diamond', 'Spend meaningful time at 3 playback speeds', ['speed_variety' => 3]],
             ]),
             self::category('exploration', [
-                ['exploration_new_series_bronze', 'New Series Sampler', 'bronze', 'Start a new series', ['series_started' => 1]],
+                ['exploration_new_series_bronze', 'New Series Sampler', 'bronze', 'Finish a book in your first series', ['series_explored' => 1]],
                 ['exploration_first_series_finish_silver', 'First Series Finish', 'silver', 'Complete a full series', ['series_completion' => 1]],
-                ['exploration_three_series_gold', 'Three Series Explorer', 'gold', 'Start 3 different series', ['series_started' => 3]],
-                ['exploration_five_series_platinum', 'Five Series Explorer', 'platinum', 'Start 5 different series', ['series_started' => 5]],
+                ['exploration_three_series_gold', 'Three Series Explorer', 'gold', 'Finish a book in 3 different series', ['series_explored' => 3]],
+                ['exploration_five_series_platinum', 'Five Series Explorer', 'platinum', 'Finish a book in 5 different series', ['series_explored' => 5]],
                 ['exploration_classics_diamond', 'Classics Explorer', 'diamond', 'Listen to 5 classic books', ['classic_books_explored' => 5]],
                 ['exploration_indie_gems_mythic', 'Indie Gems', 'diamond', 'Listen to 10 indie books', ['indie_books_explored' => 10]],
             ]),

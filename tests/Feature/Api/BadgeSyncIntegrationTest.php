@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Badge;
 use App\Models\Book;
+use App\Models\BookProgress;
 use App\Models\ClientEvent;
 use App\Models\Device;
 use App\Models\ListeningGoal;
@@ -11,6 +12,7 @@ use App\Models\ListeningStatistic;
 use App\Models\Message;
 use App\Models\User;
 use App\Models\UserBookStatus;
+use App\Models\UserRecommendation;
 use App\Services\BadgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -468,5 +470,114 @@ class BadgeSyncIntegrationTest extends TestCase
 
         $this->assertNotEmpty($newBadges);
         $this->assertEquals($badge->id, $newBadges[0]->badge_id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function recommendation_badges_require_listening_to_recommended_books(): void
+    {
+        Cache::flush();
+
+        $book = Book::factory()->create();
+        $badge = $this->createTestBadge(['discovery_rate' => 1], 'discovery');
+        $sender = User::factory()->create();
+
+        UserRecommendation::create([
+            'sender_id' => $sender->id,
+            'recipient_id' => $this->user->id,
+            'book_id' => $book->id,
+            'acknowledged_at' => now(),
+        ]);
+
+        $badgeService = app(BadgeService::class);
+        $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => $this->deviceId,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 1200,
+            'session_type' => 'listening',
+        ]);
+
+        Cache::flush();
+        $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertCount(1, $newBadges);
+        /** @var \App\Models\UserBadge $firstBadge */
+        $firstBadge = reset($newBadges);
+        $this->assertEquals($badge->id, $firstBadge->badge_id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function series_explorer_badges_require_completed_books_in_series(): void
+    {
+        Cache::flush();
+
+        /** @var \App\Models\Series $series */
+        $series = \App\Models\Series::factory()->create();
+        $book = Book::factory()->create(['series_id' => $series->getKey()]);
+        $badge = $this->createTestBadge(['series_explored' => 1], 'exploration');
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => $this->deviceId,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 1200,
+            'session_type' => 'listening',
+        ]);
+
+        $badgeService = app(BadgeService::class);
+        $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
+
+        BookProgress::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => $this->deviceId,
+            'current_position_seconds' => 7200,
+            'total_duration_seconds' => 7200,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'completed_at' => now(),
+        ]);
+
+        Cache::flush();
+        $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertCount(1, $newBadges);
+        /** @var \App\Models\UserBadge $firstBadge */
+        $firstBadge = reset($newBadges);
+        $this->assertEquals($badge->id, $firstBadge->badge_id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function badge_evaluation_uses_fresh_stats_after_progress_changes(): void
+    {
+        Cache::flush();
+
+        $book = Book::factory()->create();
+        $badge = $this->createTestBadge(['books_completed' => 1], 'completion');
+        $badgeService = app(BadgeService::class);
+
+        $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
+
+        BookProgress::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => $this->deviceId,
+            'current_position_seconds' => 7200,
+            'total_duration_seconds' => 7200,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'completed_at' => now(),
+        ]);
+
+        $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertCount(1, $newBadges);
+        /** @var \App\Models\UserBadge $firstBadge */
+        $firstBadge = reset($newBadges);
+        $this->assertEquals($badge->id, $firstBadge->badge_id);
     }
 }

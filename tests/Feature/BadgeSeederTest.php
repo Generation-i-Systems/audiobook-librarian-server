@@ -58,6 +58,62 @@ class BadgeSeederTest extends TestCase
         });
     }
 
+    public function testCanonicalBadgesOnlyUseSupportedCriteriaAndAvoidImpossibleWishlistBadges(): void
+    {
+        $this->seed(CanonicalBadgeSeeder::class);
+
+        $supportedCriteria = [
+            'total_listening_time',
+            'weekend_listening_time',
+            'current_streak',
+            'books_completed',
+            'genres_explored',
+            'language_variety',
+            'authors_explored',
+            'recommendations_sent',
+            'books_reviewed',
+            'quick_finishes',
+            'books_completed_on_weekend',
+            'completion_rate',
+            'books_completed_this_month',
+            'speed_time_110',
+            'speed_time_125',
+            'speed_time_150',
+            'speed_time_175',
+            'speed_time_200',
+            'speed_variety',
+            'series_explored',
+            'series_completion',
+            'classic_books_explored',
+            'indie_books_explored',
+            'morning_sessions',
+            'evening_sessions',
+            'commute_sessions',
+            'weekly_goal_streak',
+            'monthly_goal_streak',
+            'yearly_goal_achieved',
+            'bookmarks_created',
+            'playlist_count',
+            'books_started',
+            'discovery_rate',
+            'new_year_sessions',
+            'spring_sessions',
+            'summer_sessions',
+            'autumn_sessions',
+            'winter_sessions',
+            'anniversary_sessions',
+            'library_size',
+        ];
+
+        Badge::query()->get()->each(function (Badge $badge) use ($supportedCriteria): void {
+            foreach (array_keys($badge->criteria) as $criterion) {
+                $this->assertContains($criterion, $supportedCriteria, "Unsupported criterion {$criterion} on {$badge->key}");
+            }
+
+            $this->assertStringNotContainsString('Wishlist', $badge->name, "Impossible wishlist badge still present on {$badge->key}");
+        });
+    }
+
     private function canonicalKeys(): array
     {
         $sets = [

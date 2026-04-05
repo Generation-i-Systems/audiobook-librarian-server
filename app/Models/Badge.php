@@ -153,6 +153,7 @@ class Badge extends Model
         'current_streak'                 => 'Current listening streak (days)',
         'books_completed_this_week'      => 'Books completed in the current week',
         'books_completed_this_month'     => 'Books completed in the current month',
+        'series_explored'                => 'Series where at least one book was completed',
         'total_listening_days'           => 'Total number of days with listening activity',
         'action_app_installed'           => 'App installed on a platform',
         'action_app_installed_android'   => 'App installed on Android',

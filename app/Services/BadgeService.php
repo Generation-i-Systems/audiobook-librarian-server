@@ -39,6 +39,8 @@ class BadgeService
         $newBadges = [];
 
         try {
+            $this->clearUserStatsCache($userId, $deviceId);
+
             // Get user's current listening statistics
             $userStats = $this->getUserListeningStatistics($userId, $deviceId);
 
@@ -124,7 +126,7 @@ class BadgeService
             $quickFinishes = $this->getQuickFinishCount($userId, $deviceId);
 
             // Get series exploration stats
-            $seriesStarted = $this->getStartedSeriesCount($userId, $deviceId);
+            $seriesExplored = $this->getSeriesExploredCount($userId, $deviceId);
             $seriesCompleted = $this->getSeriesCompleted($userId, $deviceId);
 
             // Get additional statistics for expanded badge categories
@@ -167,7 +169,7 @@ class BadgeService
                 'books_completed_this_week'  => $booksCompletedThisWeek,
                 'books_completed_on_weekend' => $booksCompletedOnWeekend,
                 'quick_finishes'             => $quickFinishes,
-                'series_started'             => $seriesStarted,
+                'series_explored'           => $seriesExplored,
                 'series_completion'          => $seriesCompleted,
                 'bookmarks_created'          => $bookmarksCreated,
                 'books_reviewed'             => $booksReviewed,
@@ -360,14 +362,9 @@ class BadgeService
         }
     }
 
-    protected function getStartedSeriesCount(string $userId, ?string $deviceId = null): int
+    protected function getSeriesExploredCount(string $userId, ?string $deviceId = null): int
     {
-        return $this->getBookSeriesIds(
-            $this->userStatsQuery($userId, $deviceId)
-                ->whereNotNull('book_id')
-                ->distinct('book_id')
-                ->pluck('book_id')
-        )->count();
+        return $this->getBookSeriesIds($this->getCompletedBookIds($userId, $deviceId))->count();
     }
 
     /**
@@ -595,11 +592,28 @@ class BadgeService
             return 0;
         }
 
-        return UserRecommendation::query()
+        $recommendedBookIds = UserRecommendation::query()
             ->where('recipient_id', (int) $userId)
-            ->whereNotNull('acknowledged_at')
+            ->distinct('book_id')
+            ->pluck('book_id');
+
+        if ($recommendedBookIds->isEmpty()) {
+            return 0;
+        }
+
+        $startedRecommendedBooks = $this->userStatsQuery($userId)
+            ->whereIn('book_id', $recommendedBookIds)
             ->distinct('book_id')
             ->count('book_id');
+
+        $completedRecommendedBooks = BookProgress::query()
+            ->where('user_id', (int) $userId)
+            ->where('completed', true)
+            ->whereIn('book_id', $recommendedBookIds)
+            ->distinct('book_id')
+            ->count('book_id');
+
+        return max($startedRecommendedBooks, $completedRecommendedBooks);
     }
 
     protected function getPlaylistCount(string $userId): int
@@ -1108,6 +1122,15 @@ class BadgeService
                 'user_id'  => $userId,
                 'error'    => $e->getMessage(),
             ]);
+        }
+    }
+
+    protected function clearUserStatsCache(string $userId, ?string $deviceId = null): void
+    {
+        Cache::forget("user_stats_{$userId}");
+
+        if ($deviceId !== null) {
+            Cache::forget("user_stats_{$userId}_{$deviceId}");
         }
     }
 }
