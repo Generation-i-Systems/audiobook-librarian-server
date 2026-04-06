@@ -254,11 +254,16 @@ class BadgeService
      */
     protected function getGenresExplored(string $userId, ?string $deviceId = null): int
     {
-        return $this->userStatsQuery($userId, $deviceId)
-            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
-            ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-            ->distinct('book_genre.genre_id')
-            ->count();
+        $engagedBookIds = $this->getMeaningfullyEngagedBookIds($userId, $deviceId);
+
+        if ($engagedBookIds->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('book_genre')
+            ->whereIn('book_id', $engagedBookIds)
+            ->distinct('genre_id')
+            ->count('genre_id');
     }
 
     /**
@@ -266,11 +271,16 @@ class BadgeService
      */
     protected function getAuthorsExplored(string $userId, ?string $deviceId = null): int
     {
-        return $this->userStatsQuery($userId, $deviceId)
-            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
-            ->join('author_book', 'books.id', '=', 'author_book.book_id')
-            ->distinct('author_book.author_id')
-            ->count();
+        $engagedBookIds = $this->getMeaningfullyEngagedBookIds($userId, $deviceId);
+
+        if ($engagedBookIds->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('author_book')
+            ->whereIn('book_id', $engagedBookIds)
+            ->distinct('author_id')
+            ->count('author_id');
     }
 
     /**
@@ -278,12 +288,34 @@ class BadgeService
      */
     protected function getNarratorsExplored(string $userId, ?string $deviceId = null): int
     {
-        $query = $this->userStatsQuery($userId, $deviceId);
+        $engagedBookIds = $this->getMeaningfullyEngagedBookIds($userId, $deviceId);
 
-        return $query->join('books', 'listening_statistics.book_id', '=', 'books.id')
-            ->join('book_narrator', 'books.id', '=', 'book_narrator.book_id')
-            ->distinct('book_narrator.narrator_id')
-            ->count();
+        if ($engagedBookIds->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('book_narrator')
+            ->whereIn('book_id', $engagedBookIds)
+            ->distinct('narrator_id')
+            ->count('narrator_id');
+    }
+
+    protected function getMeaningfullyEngagedBookIds(string $userId, ?string $deviceId = null, int $minimumSeconds = 600): Collection
+    {
+        $listenedBookIds = $this->userStatsQuery($userId, $deviceId)
+            ->whereNotNull('book_id')
+            ->selectRaw('book_id, SUM(seconds_listened) as total_seconds')
+            ->groupBy('book_id')
+            ->get()
+            ->filter(static fn ($row): bool => (int) $row->getAttribute('total_seconds') >= $minimumSeconds)
+            ->pluck('book_id');
+
+        return $listenedBookIds
+            ->merge($this->getCompletedBookIds($userId, $deviceId))
+            ->filter()
+            ->map(static fn ($bookId): int => (int) $bookId)
+            ->unique()
+            ->values();
     }
 
     /**
@@ -447,11 +479,17 @@ class BadgeService
 
     protected function getLanguageVariety(string $userId, ?string $deviceId = null): int
     {
-        return $this->userStatsQuery($userId, $deviceId)
-            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
-            ->whereNotNull('books.language')
-            ->distinct('books.language')
-            ->count('books.language');
+        $engagedBookIds = $this->getMeaningfullyEngagedBookIds($userId, $deviceId);
+
+        if ($engagedBookIds->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('books')
+            ->whereIn('id', $engagedBookIds)
+            ->whereNotNull('language')
+            ->distinct('language')
+            ->count('language');
     }
 
     /**
@@ -553,26 +591,38 @@ class BadgeService
 
     protected function getClassicBooksExplored(string $userId, ?string $deviceId = null): int
     {
-        return $this->userStatsQuery($userId, $deviceId)
-            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
+        $engagedBookIds = $this->getMeaningfullyEngagedBookIds($userId, $deviceId);
+
+        if ($engagedBookIds->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('books')
+            ->whereIn('id', $engagedBookIds)
             ->where(function ($query): void {
-                $query->where('books.year', '<=', 1970)
-                    ->orWhereYear('books.release_date', '<=', 1970);
+                $query->where('year', '<=', 1970)
+                    ->orWhereYear('release_date', '<=', 1970);
             })
-            ->distinct('listening_statistics.book_id')
-            ->count('listening_statistics.book_id');
+            ->distinct('id')
+            ->count('id');
     }
 
     protected function getIndieBooksExplored(string $userId, ?string $deviceId = null): int
     {
-        return $this->userStatsQuery($userId, $deviceId)
-            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
+        $engagedBookIds = $this->getMeaningfullyEngagedBookIds($userId, $deviceId);
+
+        if ($engagedBookIds->isEmpty()) {
+            return 0;
+        }
+
+        return DB::table('books')
+            ->whereIn('id', $engagedBookIds)
             ->where(function ($query): void {
-                $query->whereNull('books.publisher_id')
-                    ->orWhere('books.source', '!=', 'audible');
+                $query->whereNull('publisher_id')
+                    ->orWhere('source', '!=', 'audible');
             })
-            ->distinct('listening_statistics.book_id')
-            ->count('listening_statistics.book_id');
+            ->distinct('id')
+            ->count('id');
     }
 
     protected function getRecommendationsSent(string $userId): int
@@ -601,19 +651,9 @@ class BadgeService
             return 0;
         }
 
-        $startedRecommendedBooks = $this->userStatsQuery($userId)
-            ->whereIn('book_id', $recommendedBookIds)
-            ->distinct('book_id')
-            ->count('book_id');
-
-        $completedRecommendedBooks = BookProgress::query()
-            ->where('user_id', (int) $userId)
-            ->where('completed', true)
-            ->whereIn('book_id', $recommendedBookIds)
-            ->distinct('book_id')
-            ->count('book_id');
-
-        return max($startedRecommendedBooks, $completedRecommendedBooks);
+        return $this->getMeaningfullyEngagedBookIds($userId)
+            ->intersect($recommendedBookIds->map(static fn ($bookId): int => (int) $bookId))
+            ->count();
     }
 
     protected function getPlaylistCount(string $userId): int

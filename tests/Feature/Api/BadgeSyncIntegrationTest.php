@@ -7,6 +7,7 @@ use App\Models\Book;
 use App\Models\BookProgress;
 use App\Models\ClientEvent;
 use App\Models\Device;
+use App\Models\Genre;
 use App\Models\ListeningGoal;
 use App\Models\ListeningStatistic;
 use App\Models\Message;
@@ -571,6 +572,49 @@ class BadgeSyncIntegrationTest extends TestCase
             'progress_percentage' => 100,
             'completed' => true,
             'completed_at' => now(),
+        ]);
+
+        $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
+
+        $this->assertCount(1, $newBadges);
+        /** @var \App\Models\UserBadge $firstBadge */
+        $firstBadge = reset($newBadges);
+        $this->assertEquals($badge->id, $firstBadge->badge_id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function exploration_badges_require_meaningful_book_engagement(): void
+    {
+        Cache::flush();
+
+        /** @var Genre $genre */
+        $genre = Genre::factory()->create();
+        $book = Book::factory()->create();
+        $book->genres()->attach($genre->getKey());
+        $badge = $this->createTestBadge(['genres_explored' => 1], 'variety');
+        $badgeService = app(BadgeService::class);
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => $this->deviceId,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 300,
+            'session_type' => 'listening',
+        ]);
+
+        $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
+
+        ListeningStatistic::query()->delete();
+        Cache::flush();
+
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'device_id' => $this->deviceId,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 600,
+            'session_type' => 'listening',
         ]);
 
         $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
