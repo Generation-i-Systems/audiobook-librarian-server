@@ -580,6 +580,8 @@ class StatisticsControllerTest extends TestCase
     {
         $book = Book::factory()->create();
         $today = now();
+        $weekDate = now()->startOfWeek()->copy()->addDays(1);
+        $monthDate = now()->startOfMonth()->copy()->addDays(1);
 
         // Create statistics for today, this week, and this month
         ListeningStatistic::create([
@@ -592,14 +594,14 @@ class StatisticsControllerTest extends TestCase
         ListeningStatistic::create([
             'book_id' => $book->id,
             'device_id' => 'test-device',
-            'listening_date' => $today->subDays(2)->toDateString(),
+            'listening_date' => $weekDate->toDateString(),
             'seconds_listened' => 3600,
         ]);
 
         ListeningStatistic::create([
             'book_id' => $book->id,
             'device_id' => 'test-device',
-            'listening_date' => $today->subWeeks(2)->toDateString(),
+            'listening_date' => $monthDate->toDateString(),
             'seconds_listened' => 2400,
         ]);
 
@@ -614,7 +616,7 @@ class StatisticsControllerTest extends TestCase
             ])
             ->assertJsonPath('data.listening_minutes.day', 30)
             ->assertJsonPath('data.listening_minutes.week', 90)
-            ->assertJsonPath('data.listening_minutes.month', 90)
+            ->assertJsonPath('data.listening_minutes.month', 130)
             ->assertJsonStructure([
                 'success',
                 'data' => [
