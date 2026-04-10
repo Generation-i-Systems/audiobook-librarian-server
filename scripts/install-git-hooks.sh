@@ -9,18 +9,24 @@ SOURCE_DIR="$SCRIPT_DIR/git-hooks"
 
 echo "Installing git hooks..."
 
-# Copy pre-push hook
-if [ -f "$SOURCE_DIR/pre-push" ]; then
-    cp "$SOURCE_DIR/pre-push" "$HOOKS_DIR/pre-push"
-    chmod +x "$HOOKS_DIR/pre-push"
-    echo "✅ Installed pre-push hook"
-else
-    echo "❌ pre-push hook not found in $SOURCE_DIR"
-    exit 1
-fi
+# Function to install a hook
+install_hook() {
+    local name=$1
+    if [ -f "$SOURCE_DIR/$name" ]; then
+        cp "$SOURCE_DIR/$name" "$HOOKS_DIR/$name"
+        chmod +x "$HOOKS_DIR/$name"
+        echo "✅ Installed $name hook"
+    else
+        echo "❌ $name hook not found in $SOURCE_DIR"
+        return 1
+    fi
+}
+
+install_hook "pre-push"
+install_hook "pre-commit"
 
 echo ""
 echo "✅ Git hooks installed successfully!"
 echo ""
-echo "The pre-push hook will now run automatically before every push."
-echo "To test the validation manually, run: ./scripts/validate-build.sh"
+echo "The hooks will now run automatically before every commit and push."
+echo "To test the push validation manually, run: ./scripts/validate-build.sh"

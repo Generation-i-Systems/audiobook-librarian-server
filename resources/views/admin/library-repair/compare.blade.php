@@ -78,6 +78,15 @@ td:hover > div .btn-edit-field { opacity: 1; }
         $bookPct         = (int) floor((100 - $labelPct) / max(1, $bookCount));
         $coverValues     = $books->map(fn($b) => $b->cover_image ?? '')->all();
         $coversdiffer    = count(array_unique($coverValues)) > 1;
+        $bookRelationData = $books->mapWithKeys(function ($book): array {
+            return [
+                $book->id => [
+                    'authors' => $book->authors->pluck('name')->values()->all(),
+                    'narrators' => $book->narrators->pluck('name')->values()->all(),
+                    'genres' => $book->genres->pluck('name')->values()->all(),
+                ],
+            ];
+        })->all();
         // colour classes cycling per book index
         $headerClasses   = ['book-col-0','book-col-1','book-col-2','book-col-3'];
     @endphp
@@ -832,15 +841,7 @@ window.openImageViewer = function (filename, url) {
 };
 
 // ── Relations edit modal ──────────────────────────────────
-const BOOK_RELATION_DATA = @json(
-    $books->mapWithKeys(fn($book) => [
-        $book->id => [
-            'authors'   => $book->authors->pluck('name')->values()->all(),
-            'narrators' => $book->narrators->pluck('name')->values()->all(),
-            'genres'    => $book->genres->pluck('name')->values()->all(),
-        ]
-    ])->all()
-);
+const BOOK_RELATION_DATA = @json($bookRelationData);
 const GENRE_LIST    = @json($genreList);
 const AC_URLS       = @json($autocompleteUrls);
 const CSRF_TOKEN    = document.querySelector('meta[name="csrf-token"]')?.content ?? '';

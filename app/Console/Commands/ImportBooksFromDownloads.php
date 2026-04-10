@@ -92,7 +92,7 @@ class ImportBooksFromDownloads extends Command
 
     // Persistent cache
     protected string $cacheDirectory = 'path/to/cache/directory';
-    protected string $cacheFilePath = 'path/to/cache/file';
+    protected ?string $cacheFilePath = null;
     protected array $backgroundCache = [];
     protected int $cacheVersion = 2; // Increment when cache structure changes
     protected bool $cacheEnabled = true;

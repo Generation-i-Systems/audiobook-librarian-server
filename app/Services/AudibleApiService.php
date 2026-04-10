@@ -619,7 +619,7 @@ class AudibleApiService
                 if (is_array($ancestorNode) && !empty($ancestorNode['Name']) && !empty($ancestorNode['BrowseNodeId'])) {
                     $isAlreadyAdded = false;
                     foreach ($genres as $g) {
-                        if (($g['id'] ?? null) === ($ancestorNode['BrowseNodeId'] ?? null)) {
+                        if ($g['id'] === $ancestorNode['BrowseNodeId']) {
                             $isAlreadyAdded = true;
                             break;
                         }

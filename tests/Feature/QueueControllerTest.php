@@ -30,7 +30,7 @@ class QueueControllerTest extends TestCase
         // Authenticate as admin user
         $this->actingAs($adminUser);
         $this->withHeader('Accept', 'application/json');
-        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
 
         $defaultDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $defaultDocumentStore->shouldReceive('isAdmin')->andReturn(true);

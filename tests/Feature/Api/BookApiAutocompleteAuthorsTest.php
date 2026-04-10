@@ -27,7 +27,7 @@ class BookApiAutocompleteAuthorsTest extends TestCase
 
         $this->actingAs($user, 'api_test');
         $this->withHeader('Accept', 'application/json');
-        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

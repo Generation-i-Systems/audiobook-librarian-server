@@ -193,7 +193,7 @@ class BookImportController extends Controller
             Log::info('Book imported successfully', ['finalId' => $id]);
 
             // If we have import path information, attempt to move the files to the library
-            if ($importPath && $importRoot && $directoryPath) {
+            if (is_string($importPath) && is_string($importRoot) && is_string($directoryPath)) {
                 try {
                     // Use the ImportFileController to move the files
                     $importFileController = app()->make('App\Http\Controllers\Admin\ImportFileController');

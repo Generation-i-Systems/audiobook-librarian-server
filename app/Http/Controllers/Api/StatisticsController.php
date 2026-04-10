@@ -239,8 +239,8 @@ class StatisticsController extends Controller
 
         $rows = (clone $timelineQuery)
             ->selectRaw("{$periodSelect} as period, SUM(seconds_listened) * 1000 as listening_time_ms, COUNT(*) as sessions_count")
-            ->groupByRaw($periodGroup)
-            ->orderByRaw($periodOrder)
+            ->groupByRaw((string) $periodGroup) /** @phpstan-ignore argument.type */
+            ->orderByRaw((string) $periodOrder) /** @phpstan-ignore argument.type */
             ->toBase()
             ->get();
 
