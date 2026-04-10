@@ -22,6 +22,20 @@ abstract class TestCase extends BaseTestCase
         // CRITICAL: Verify runtime DB connection is safe (post-bootstrap)
         $this->ensureDatabaseSafetyRuntime();
 
+        // ISO-test: Isolate book storage for parallel tests
+        $booksRoot = config('filesystems.disks.books.root');
+        $parallelToken = $_SERVER['LARAVEL_PARALLEL_TESTING_TOKEN'] ?? $_ENV['LARAVEL_PARALLEL_TESTING_TOKEN'] ?? $_SERVER['TEST_TOKEN'] ?? $_ENV['TEST_TOKEN'] ?? null;
+        if ($booksRoot === '/tmp/ab-librarian-test-books' && $parallelToken) {
+            $booksRoot = "/tmp/ab-librarian-test-books-{$parallelToken}";
+            config([
+                'filesystems.disks.books.root' => $booksRoot,
+                'app.book_root' => $booksRoot,
+                'app.library_repair_sync_path' => "{$booksRoot}/sync",
+            ]);
+            // Purge disk to ensure the change is picked up
+            \Illuminate\Support\Facades\Storage::forgetDisk('books');
+        }
+
         $connection = DB::connection();
         while ($connection->transactionLevel() > 0) {
             $connection->rollBack();
@@ -33,9 +47,11 @@ abstract class TestCase extends BaseTestCase
         }
         config(['view.compiled' => $compiledPath]);
 
-        // All test configuration is handled by phpunit.xml
-        // Database connection is set to 'testing' via phpunit.xml
-        // Individual tests should use RefreshDatabase trait as needed
+        // Clean directory for this specific process
+        // Support both the default path and the isolated parallel paths
+        if ($booksRoot === '/tmp/ab-librarian-test-books' || (str_starts_with($booksRoot, '/tmp/ab-librarian-test-books-') && $parallelToken)) {
+            $this->cleanTestDirectory($booksRoot);
+        }
     }
 
     /**
@@ -44,9 +60,8 @@ abstract class TestCase extends BaseTestCase
     protected function tearDown(): void
     {
         // Clean up books disk if it's using the testing path
-        if (config('filesystems.disks.books.root') === '/tmp/ab-librarian-test-books') {
-            $this->cleanTestDirectory('/tmp/ab-librarian-test-books');
-        }
+        // Removed cleanup from tearDown as it's redundant with setUp and can cause race conditions
+        // during fast parallel execution.
 
         // Force garbage collection to clean up PendingCommand objects
         // BEFORE parent::tearDown() destroys the application

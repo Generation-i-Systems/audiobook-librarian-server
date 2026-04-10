@@ -20,10 +20,7 @@ class LibraryJsonUpdateTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Ensure clean state for books disk
-        if (config('filesystems.disks.books.root') === '/tmp/ab-librarian-test-books') {
-            File::cleanDirectory('/tmp/ab-librarian-test-books');
-        }
+        // Base TestCase now handles clean state for isolated books disk in parallel mode
     }
 
     protected function createBookDirectory(string $path, bool $withAudio = true): void

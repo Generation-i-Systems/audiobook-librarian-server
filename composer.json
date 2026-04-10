@@ -17,6 +17,7 @@
         "james-heinrich/getid3": "^1.9",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.41",
+        "laravel/pulse": "^1.7",
         "laravel/ui": "^4.6",
         "league/flysystem-aws-s3-v3": "^3.30",
         "mozex/anthropic-php": "^1.1",
@@ -24,12 +25,14 @@
         "neuron-core/neuron-laravel": "^1.0",
         "openai-php/client": "^0.14.0",
         "predis/predis": "^3.3",
-        "soloterm/screen": "^1.1"
+        "soloterm/screen": "^1.1",
+        "spatie/laravel-data": "^4.21"
     },
     "require-dev": {
         "ext-xdebug": "*",
         "barryvdh/laravel-debugbar": "^4.2",
         "barryvdh/laravel-ide-helper": "^3.6",
+        "brianium/paratest": "^7.8",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.9",
         "laravel/dusk": "^8.3",
