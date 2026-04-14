@@ -43,14 +43,16 @@ class ImportUIService implements ImportUIInterface
             return $this->ttyStream;
         }
 
-        $tty = @fopen('/dev/tty', 'rb');
-        if (is_resource($tty)) {
-            $this->ttyStream = $tty;
-            if (function_exists('stream_set_blocking')) {
-                @stream_set_blocking($this->ttyStream, true);
-            }
+        if (!$this->plainMode && !app()->runningUnitTests()) {
+            $tty = @fopen('/dev/tty', 'rb');
+            if (is_resource($tty)) {
+                $this->ttyStream = $tty;
+                if (function_exists('stream_set_blocking')) {
+                    @stream_set_blocking($this->ttyStream, true);
+                }
 
-            return $this->ttyStream;
+                return $this->ttyStream;
+            }
         }
 
         return STDIN;
@@ -668,19 +670,28 @@ class ImportUIService implements ImportUIInterface
 
     protected function enableRawInput(): ?string
     {
-        if (!function_exists('shell_exec')) {
+        if (!function_exists('shell_exec') || $this->plainMode || app()->runningUnitTests()) {
             return null;
         }
 
-        $state = (string) @shell_exec('stty -g < /dev/tty');
-        @shell_exec('stty -icanon -echo min 1 time 0 < /dev/tty');
+        // Check if /dev/tty is actually accessible and a TTY
+        if (!@is_readable('/dev/tty') || !@stream_isatty(fopen('/dev/tty', 'r'))) {
+            return null;
+        }
+
+        $state = (string) @shell_exec('stty -g < /dev/tty 2>/dev/null');
+        if (trim($state) === '') {
+            return null;
+        }
+
+        @shell_exec('stty -icanon -echo min 1 time 0 < /dev/tty 2>/dev/null');
 
         $stream = $this->getInputStream();
         if (function_exists('stream_set_blocking') && is_resource($stream)) {
             @stream_set_blocking($stream, true);
         }
 
-        return trim($state) !== '' ? trim($state) : null;
+        return trim($state);
     }
 
     protected function restoreRawInput(?string $state): void

@@ -81,7 +81,7 @@ trait HandlesLibraryJson
         try {
             // If we have a Book model, load its relationships
             if ($book instanceof Book) {
-                $book = $book->load([
+                $book = $book->refresh()->load([
                     'authors',
                     'narrators',
                     'genres',
