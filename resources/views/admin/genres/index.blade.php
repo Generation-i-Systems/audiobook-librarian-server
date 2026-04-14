@@ -62,6 +62,7 @@
                 <thead>
                     <tr>
                         <th>Select</th>
+                        <th>Icon</th>
                         <th>Name</th>
                         <th>Actions</th>
                     </tr>
@@ -71,6 +72,16 @@
                         <tr>
                             <td>
                                 <input type="checkbox" name="genre_ids[]" value="{{ $genre['id'] }}">
+                            </td>
+                            <td class="align-middle">
+                                <div class="d-flex align-items-center gap-2">
+                                    @if(!empty($genre['iconPath']))
+                                        <img src="{{ $genre['iconPath'] }}" alt="{{ $genre['name'] }} icon" style="width: 28px; height: 28px; object-fit: contain;">
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                    <span style="font-size: 1.4rem; line-height: 1;">{{ $genre['emoji'] ?? '' }}</span>
+                                </div>
                             </td>
                             <td>
                                 <div>{{ $genre['name'] }}</div>
@@ -85,7 +96,9 @@
                                     class="btn btn-sm btn-outline-secondary" title="View Authors"><i
                                         class="fas fa-users"></i></a>
                                 <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
-                                    onclick="if(confirm('Are you sure you want to delete genre &quot;{{ addslashes($genre['name']) }}&quot;?')) { document.getElementById('delete-genre-form').action = '{{ route('admin.genres.destroy', $genre['id']) }}'; document.getElementById('delete-genre-form').submit(); }">
+                                    data-confirm-message="Are you sure you want to delete genre &quot;{{ $genre['name'] }}&quot;?"
+                                    data-action-url="{{ route('admin.genres.destroy', $genre['id']) }}"
+                                    onclick="if(confirm(this.dataset.confirmMessage)) { document.getElementById('delete-genre-form').action = this.dataset.actionUrl; document.getElementById('delete-genre-form').submit(); }">
                                     <i class="fas fa-trash-alt"></i>
                                 </button>
                             </td>

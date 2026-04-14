@@ -86,7 +86,10 @@ class BookAuthorController extends Controller
         // Add genre filtering if specified
         if ($genreId || $genreName) {
             $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+                ->join('genres', function ($join) {
+                    $join->on('book_genre.genre_id', '=', 'genres.id')
+                        ->whereNull('genres.deleted_at');
+                });
 
             if ($genreId) {
                 $query->where('genres.id', $genreId);
@@ -149,7 +152,10 @@ class BookAuthorController extends Controller
         // Add same genre filtering as main query if present
         if ($genreId || $genreName) {
             $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+                ->join('genres', function ($join) {
+                    $join->on('book_genre.genre_id', '=', 'genres.id')
+                        ->whereNull('genres.deleted_at');
+                });
             if ($genreId) {
                 $countQuery->where('genres.id', $genreId);
             } elseif ($genreName) {
@@ -201,7 +207,10 @@ class BookAuthorController extends Controller
             }
             $author->genres = $authorBooksQuery
                 ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                ->join('genres', 'book_genre.genre_id', '=', 'genres.id')
+                ->join('genres', function ($join) {
+                    $join->on('book_genre.genre_id', '=', 'genres.id')
+                        ->whereNull('genres.deleted_at');
+                })
                 ->select('genres.name')
                 ->distinct()
                 ->pluck('name')
@@ -293,7 +302,10 @@ class BookAuthorController extends Controller
                 $q->where('books.needs_review', false);
             })
             ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-            ->join('genres', 'book_genre.genre_id', '=', 'genres.id')
+            ->join('genres', function ($join) {
+                $join->on('book_genre.genre_id', '=', 'genres.id')
+                    ->whereNull('genres.deleted_at');
+            })
             ->select('genres.name')
             ->distinct()
             ->orderBy('genres.name')

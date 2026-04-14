@@ -11,6 +11,8 @@ use App\Traits\Auditable;
 /**
  * @property int $id
  * @property string $name
+ * @property string|null $emoji
+ * @property string|null $icon_path
  * @property bool|null $is_fiction
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -39,7 +41,7 @@ class Genre extends Model
     use Auditable;
     use SoftDeletes;
 
-    protected $fillable = ['name', 'is_fiction'];
+    protected $fillable = ['name', 'emoji', 'icon_path', 'is_fiction'];
 
     protected $casts = ['is_fiction' => 'boolean'];
 

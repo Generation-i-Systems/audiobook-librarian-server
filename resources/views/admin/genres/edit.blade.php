@@ -23,6 +23,26 @@
                                 <input type="text" class="form-control" id="name" name="name" value="{{ $genre['name'] }}" required>
                             </div>
 
+                            <div class="form-group mb-3">
+                                <label for="emoji">Emoji:</label>
+                                <input type="text" class="form-control" id="emoji" name="emoji" value="{{ old('emoji', $genre['emoji'] ?? '') }}" maxlength="16">
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="icon_path">Icon path:</label>
+                                <input type="text" class="form-control" id="icon_path" name="icon_path" value="{{ old('icon_path', $genre['icon_path'] ?? '') }}" placeholder="/images/genres/fantasy.svg">
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="text-muted small mb-2">Preview</div>
+                                <div class="d-flex align-items-center gap-2">
+                                    @if(!empty($genre['icon_path']))
+                                        <img src="{{ $genre['icon_path'] }}" alt="{{ $genre['name'] }} icon" style="width: 36px; height: 36px; object-fit: contain;">
+                                    @endif
+                                    <span style="font-size: 1.6rem; line-height: 1;">{{ $genre['emoji'] ?? '' }}</span>
+                                </div>
+                            </div>
+
                             <button type="submit" class="btn btn-primary w-100 mb-2">
                                 <i class="fas fa-save"></i> Update Genre
                             </button>

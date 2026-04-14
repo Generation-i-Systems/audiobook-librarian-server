@@ -19,6 +19,8 @@ class GenreFactory extends Factory
 
         return [
             'name' => $this->faker->unique()->randomElement($genres),
+            'emoji' => null,
+            'icon_path' => null,
         ];
     }
 }

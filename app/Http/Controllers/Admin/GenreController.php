@@ -86,6 +86,8 @@ class GenreController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'emoji' => 'nullable|string|max:16',
+            'icon_path' => 'nullable|string|max:255',
         ]);
 
         try {
@@ -97,7 +99,11 @@ class GenreController extends Controller
                 }
             }
 
-            $this->documentStoreService->createGenre(['name' => $validated['name']]);
+            $this->documentStoreService->createGenre([
+                'name' => $validated['name'],
+                'emoji' => $validated['emoji'] ?: null,
+                'icon_path' => $validated['icon_path'] ?: null,
+            ]);
             return redirect()->route('admin.genres.index')->with('success', 'Genre created successfully!');
         } catch (\Exception $e) {
             Log::error('Failed to create genre: ' . $e->getMessage());
@@ -149,6 +155,8 @@ class GenreController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'emoji' => 'nullable|string|max:16',
+            'icon_path' => 'nullable|string|max:255',
         ]);
 
         try {
@@ -166,7 +174,11 @@ class GenreController extends Controller
                 }
             }
 
-            $this->documentStoreService->updateGenre($id, ['name' => $validated['name']]);
+            $this->documentStoreService->updateGenre($id, [
+                'name' => $validated['name'],
+                'emoji' => $validated['emoji'] ?: null,
+                'icon_path' => $validated['icon_path'] ?: null,
+            ]);
             return redirect()->route('admin.genres.index')->with('success', 'Genre updated successfully!');
         } catch (\Exception $e) {
             Log::error('Failed to update genre: ' . $e->getMessage());
