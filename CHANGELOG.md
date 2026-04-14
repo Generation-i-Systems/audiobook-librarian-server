@@ -3,7 +3,8 @@
 ### Changed
 
 - Import CLI layout redesigned to fit within actual terminal height
-
+- Genre management now stores an emoji plus a local icon path for each genre, shows both on the admin manage page, and returns them from genre API responses
+- Genre-related API queries now ignore soft-deleted genres consistently in author filters, listening goals, and listening statistics
     - Replaced outer box with a simple title row; eliminated progress bar gaps
     - Menu fixed at 14 rows with dynamic scroll (all 9 edit-field options visible)
     - Activity Log gets all remaining space and grows with terminal height (6 visible lines at 40 rows)
@@ -20,7 +21,6 @@
     - Speed badges now require meaningful listening time at each playback speed instead of any brief speed change
     - Library and goal badges now use `user_book_status`, playlists, listening goals, and cross-device listening data correctly
 - Reading timeline and dashboard stats now aggregate correctly across a user's devices and return usable listening-minute summaries
-
     - Added day/week/month listening-minute totals to overview and dashboard responses
     - Timeline queries now support detailed day/week/month drill-downs with per-book listening totals
     - Playlist listening goals now count listening from all of the user's devices
@@ -28,7 +28,6 @@
     - Timeline queries now support weekend-only, weekday-only, or specific weekday filtering for client reporting needs
 
 - **CRITICAL**: Fixed auto-processing bug where books were imported without user confirmation
-
     - reviewAndApprove method was auto-approving books when no enrichment data existed
     - Restructured to always run the review loop regardless of enrichment data presence
     - Ensures user can review and approve ALL imports, set cover images, and verify metadata
@@ -166,7 +165,6 @@
 ### Added
 
 - Added API health check endpoints for uptime monitoring (no authentication required)
-
     - `GET /api/v1/health/ping` - Basic ping endpoint for uptime checks
     - `GET /api/v1/health` - Detailed health check with database, format, and spec validation
     - `GET /api/v1/health/validate` - Full OpenAPI spec compliance validation

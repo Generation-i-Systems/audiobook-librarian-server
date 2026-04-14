@@ -2130,6 +2130,15 @@
                     },
                     "name": {
                         "type": "string"
+                    },
+                    "emoji": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "iconPath": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "/images/genres/fantasy.svg"
                     }
                 }
             },
@@ -10320,7 +10329,7 @@
                                             "type": "object"
                                         },
                                         "genre": {
-                                            "type": "object"
+                                            "$ref": "#/components/schemas/GenreListItem"
                                         },
                                         "data": {
                                             "type": "array",
@@ -10403,7 +10412,7 @@
                                     "type": "object",
                                     "properties": {
                                         "genre": {
-                                            "type": "object"
+                                            "$ref": "#/components/schemas/GenreListItem"
                                         },
                                         "data": {
                                             "type": "array",
@@ -10443,9 +10452,9 @@
                                     "type": "object",
                                     "properties": {
                                         "genre": {
-                                            "type": "object"
+                                            "$ref": "#/components/schemas/GenreListItem"
                                         },
-                                        "data": {
+                                        "authors": {
                                             "type": "array",
                                             "items": {
                                                 "type": "object"

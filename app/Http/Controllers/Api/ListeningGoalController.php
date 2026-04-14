@@ -126,18 +126,28 @@ class ListeningGoalController extends Controller
             case 'genre_hours':
                 $query->join('books', 'books.id', '=', 'listening_statistics.book_id')
                     ->join('book_genre', 'book_genre.book_id', '=', 'books.id')
+                    ->join('genres', function ($join) {
+                        $join->on('genres.id', '=', 'book_genre.genre_id')
+                            ->whereNull('genres.deleted_at');
+                    })
                     ->where('book_genre.genre_id', $goal->genre_id);
                 break;
             case 'fiction_hours':
                 $query->join('books', 'books.id', '=', 'listening_statistics.book_id')
                     ->join('book_genre', 'book_genre.book_id', '=', 'books.id')
-                    ->join('genres', 'genres.id', '=', 'book_genre.genre_id')
+                    ->join('genres', function ($join) {
+                        $join->on('genres.id', '=', 'book_genre.genre_id')
+                            ->whereNull('genres.deleted_at');
+                    })
                     ->where('genres.is_fiction', true);
                 break;
             case 'nonfiction_hours':
                 $query->join('books', 'books.id', '=', 'listening_statistics.book_id')
                     ->join('book_genre', 'book_genre.book_id', '=', 'books.id')
-                    ->join('genres', 'genres.id', '=', 'book_genre.genre_id')
+                    ->join('genres', function ($join) {
+                        $join->on('genres.id', '=', 'book_genre.genre_id')
+                            ->whereNull('genres.deleted_at');
+                    })
                     ->where('genres.is_fiction', false);
                 break;
             case 'playlist_hours':

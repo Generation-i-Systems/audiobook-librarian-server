@@ -172,3 +172,15 @@ add logic to check for existing books in a series when determining genre. If the
 for multi-book archives the title still has the series
 
 commit all changes
+
+---
+
+## 2026-04-13
+
+delete genres that do not contain any books
+
+make sure the api endpoints ignore deleted genres
+
+add an icon and an emoji to the genre table for each genre. Search the internet for good images
+
+make sure to add the new content to the genre manage page and to the api (and obviously openapi.json)

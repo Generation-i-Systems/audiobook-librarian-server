@@ -1211,7 +1211,10 @@ class StatisticsController extends Controller
         $query = $this->listeningStatsQuery($userId, $deviceId)
             ->join('books', 'listening_statistics.book_id', '=', 'books.id')
             ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-            ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+            ->join('genres', function ($join) {
+                $join->on('book_genre.genre_id', '=', 'genres.id')
+                    ->whereNull('genres.deleted_at');
+            });
 
         if ($startDate) {
             $query->where('listening_date', '>=', $startDate->toDateString());
