@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuthorController;
 use App\Http\Controllers\Api\BadgeController;
 use App\Http\Controllers\Api\BookApiController;
 use App\Http\Controllers\Api\BookAuthorController;
+use App\Http\Controllers\Api\BookContributionController;
 use App\Http\Controllers\Api\BookCoverController;
 use App\Http\Controllers\Api\BookDownloadController;
 use App\Http\Controllers\Api\BookImportApiController;
@@ -337,6 +338,18 @@ Route::prefix('v1')->group(function () {
             Route::get('/queue/pending', [BookImportApiController::class, 'getPendingImports']);
             Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
             Route::get('/genres', [BookImportApiController::class, 'getGenres']);
+        });
+
+        // Book Contribution Routes
+        Route::post('/books/{book}/contributions', [BookContributionController::class, 'store']);
+        Route::get('/contributions', [BookContributionController::class, 'mine']);
+        Route::delete('/contributions/{contribution}', [BookContributionController::class, 'destroy']);
+
+        // Admin: Contribution review routes
+        Route::middleware('admin')->prefix('admin/contributions')->group(function () {
+            Route::get('/', [BookContributionController::class, 'pending']);
+            Route::post('/{contribution}/approve', [BookContributionController::class, 'approve']);
+            Route::post('/{contribution}/reject', [BookContributionController::class, 'reject']);
         });
 
         // Logout
