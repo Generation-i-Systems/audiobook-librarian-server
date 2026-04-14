@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\Device;
 use App\Models\ListeningGoal;
 use App\Models\ListeningStatistic;
+use App\Models\Genre;
 use App\Models\Playlist;
 use App\Models\User;
 use App\Models\UserBookStatus;
@@ -88,5 +89,44 @@ class ListeningGoalControllerTest extends TestCase
             ->assertJsonPath('goals.0.metric', 'playlist_hours')
             ->assertJsonPath('goals.0.progress_minutes', 60)
             ->assertJsonPath('goals.0.progress_percent', 100);
+    }
+
+    public function test_genre_goal_ignores_soft_deleted_genres(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $genre = Genre::factory()->create(['name' => 'Deleted Goal Genre']);
+        $book = Book::factory()->create();
+        $book->genres()->attach($genre);
+
+        ListeningGoal::create([
+            'user_id' => $user->id,
+            'period_type' => 'week',
+            'metric' => 'genre_hours',
+            'target_minutes' => 60,
+            'genre_id' => $genre->getKey(),
+            'is_active' => true,
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $user->id,
+            'device_id' => 'deleted-genre-goal-device',
+            'book_id' => $book->id,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 1800,
+            'session_type' => 'listening',
+        ]);
+
+        $genre->delete();
+
+        $response = $this->getJson('/api/v1/goals/listening', ['X-Acting-As-Test' => '1']);
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'goals')
+            ->assertJsonPath('goals.0.metric', 'genre_hours')
+            ->assertJsonPath('goals.0.genre_name', null)
+            ->assertJsonPath('goals.0.progress_minutes', 0)
+            ->assertJsonPath('goals.0.progress_percent', 0);
     }
 }

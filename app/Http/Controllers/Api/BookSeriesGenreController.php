@@ -339,13 +339,43 @@ class BookSeriesGenreController extends Controller
         });
 
         $genres = array_map(function (array $genre) {
+            $visuals = $this->defaultGenreVisuals()[$genre['name']] ?? null;
+            $emoji = $genre['emoji'] ?? ($visuals['emoji'] ?? null);
+            $iconPath = $genre['iconPath'] ?? ($visuals['icon_path'] ?? null);
+
             return [
                 'id' => $genre['id'],
                 'name' => $genre['name'],
+                'emoji' => $emoji,
+                'iconPath' => $iconPath,
+                'icon_url' => $iconPath,
             ];
         }, $genres);
 
         return response()->json($genres);
+    }
+
+    private function defaultGenreVisuals(): array
+    {
+        return [
+            'Action' => ['emoji' => '🎬', 'icon_path' => '/images/genres/action.svg'],
+            'Church' => ['emoji' => '⛪', 'icon_path' => '/images/genres/church.svg'],
+            'Classic' => ['emoji' => '📚', 'icon_path' => '/images/genres/classic.svg'],
+            'Computer' => ['emoji' => '💻', 'icon_path' => '/images/genres/computer.svg'],
+            'Fantasy' => ['emoji' => '🧙', 'icon_path' => '/images/genres/fantasy.svg'],
+            'General Fiction' => ['emoji' => '📖', 'icon_path' => '/images/genres/general-fiction.svg'],
+            'Historical Fiction' => ['emoji' => '🏺', 'icon_path' => '/images/genres/historical-fiction.svg'],
+            'History' => ['emoji' => '🏛️', 'icon_path' => '/images/genres/history.svg'],
+            'Kids' => ['emoji' => '🧸', 'icon_path' => '/images/genres/kids.svg'],
+            'LitRPG' => ['emoji' => '🎮', 'icon_path' => '/images/genres/litrpg.svg'],
+            'Mystery' => ['emoji' => '🔎', 'icon_path' => '/images/genres/mystery.svg'],
+            'Non Fiction' => ['emoji' => '🧠', 'icon_path' => '/images/genres/non-fiction.svg'],
+            'Other' => ['emoji' => '🗂️', 'icon_path' => '/images/genres/other.svg'],
+            'Religion' => ['emoji' => '🙏', 'icon_path' => '/images/genres/religion.svg'],
+            'Romance' => ['emoji' => '💖', 'icon_path' => '/images/genres/romance.svg'],
+            'Science' => ['emoji' => '🔬', 'icon_path' => '/images/genres/science.svg'],
+            'Science Fiction' => ['emoji' => '🚀', 'icon_path' => '/images/genres/science-fiction.svg'],
+        ];
     }
 
     /**
@@ -385,6 +415,12 @@ class BookSeriesGenreController extends Controller
         $paginatedAuthors = array_slice($authors, $offset, $perPage);
 
         return response()->json([
+            'genre' => [
+                'id' => $genre['id'],
+                'name' => $genre['name'],
+                'emoji' => $genre['emoji'] ?? null,
+                'iconPath' => $genre['icon_path'] ?? $genre['iconPath'] ?? null,
+            ],
             'data' => $paginatedAuthors,
             'meta' => [
                 'current_page' => $page,
@@ -420,7 +456,12 @@ class BookSeriesGenreController extends Controller
         $authors = array_map(fn ($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
 
         return response()->json([
-            'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
+            'genre' => [
+                'id' => $genre['id'],
+                'name' => $genre['name'],
+                'emoji' => $genre['emoji'] ?? null,
+                'iconPath' => $genre['icon_path'] ?? $genre['iconPath'] ?? null,
+            ],
             'authors' => $authors,
         ]);
     }

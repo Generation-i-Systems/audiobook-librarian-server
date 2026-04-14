@@ -31,7 +31,6 @@ class BookObserver
                 }
 
                 $result = $this->updateLibraryJson($book);
-
                 Log::debug($result ? 'Updated librarian.json for book' : 'Skipped librarian.json update for book', [
                     'book_id' => $book->id,
                     'title' => $book->title,
@@ -54,6 +53,11 @@ class BookObserver
      */
     public function pivotAttached(Book $book, string $relationName, array $pivotIds, array $pivotIdsAttributes): void
     {
+        Log::info('Pivot attached event intercepted', [
+            'book_id' => $book->id,
+            'relation' => $relationName,
+            'ids' => $pivotIds,
+        ]);
         $this->handlePivotChange($book, $relationName);
     }
 
@@ -81,7 +85,6 @@ class BookObserver
 
         try {
             $result = $this->updateLibraryJson($book);
-
             Log::debug($result ? 'Updated librarian.json for book after pivot change' : 'Skipped librarian.json update after pivot change', [
                 'book_id' => $book->id,
                 'title' => $book->title,
@@ -113,5 +116,10 @@ class BookObserver
             'title' => $book->title,
             'soft_deleted' => $book->trashed(),
         ]);
+    }
+
+    public static function clearUpdateCache(): void
+    {
+        // No-op: retained for test compatibility after removing request-local cache state.
     }
 }

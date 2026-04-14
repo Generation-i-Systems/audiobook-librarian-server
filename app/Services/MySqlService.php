@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\ListeningEvent;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -932,6 +933,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     public function listGenresWithStats(?int $since = null): array
     {
         try {
+            $hasGenreEmoji = Schema::hasColumn('genres', 'emoji');
+            $hasGenreIconPath = Schema::hasColumn('genres', 'icon_path');
+
             $query = DB::table('genres')
                 ->leftJoin('book_genre', 'genres.id', '=', 'book_genre.genre_id')
                 ->leftJoin('books', function ($join) {
@@ -950,6 +954,16 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     DB::raw('COUNT(DISTINCT author_book.author_id) as author_count')
                 );
 
+            if ($hasGenreEmoji) {
+                $query->addSelect('genres.emoji')
+                    ->groupBy('genres.emoji');
+            }
+
+            if ($hasGenreIconPath) {
+                $query->addSelect('genres.icon_path')
+                    ->groupBy('genres.icon_path');
+            }
+
             if ($since) {
                 $query->where('genres.updated_at', '>=', date('Y-m-d H:i:s', $since));
             }
@@ -959,6 +973,8 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             return $rows->map(fn ($row) => [
                 'id' => (string) $row->id,
                 'name' => (string) $row->name,
+                'emoji' => $hasGenreEmoji ? ($row->emoji ?: null) : null,
+                'iconPath' => $hasGenreIconPath ? ($row->icon_path ?: null) : null,
                 'updatedAt' => $row->updated_at,
                 'bookCount' => (int) $row->book_count,
                 'authorCount' => (int) $row->author_count,
