@@ -17,7 +17,8 @@ class LibraryRepairService
     public function __construct(
         private BookPathService $bookPathService,
         private AudiobookBayService $audiobookBayService,
-        private BookImportService $bookImportService
+        private BookImportService $bookImportService,
+        private AudioFileAnalyzer $audioFileAnalyzer
     ) {
     }
 
@@ -34,6 +35,7 @@ class LibraryRepairService
                 LibraryRepairIssueType::NESTED_AUDIO => $this->scanNestedAudio($attemptFixes),
                 LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY => $this->scanNumberedSuffixDirectories(),
                 LibraryRepairIssueType::BOGUS_DIRECTORY => $this->scanBogusDirectories($attemptFixes),
+                LibraryRepairIssueType::INVALID_AUDIO => $this->scanInvalidAudio(),
             };
         }
 
@@ -60,6 +62,7 @@ class LibraryRepairService
             LibraryRepairIssueType::NESTED_AUDIO->value => $this->rescanNestedAudioIssue($issue),
             LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY->value => $this->rescanNumberedSuffixIssue($issue),
             LibraryRepairIssueType::BOGUS_DIRECTORY->value => $this->rescanBogusDirectoryIssue($issue),
+            LibraryRepairIssueType::INVALID_AUDIO->value => $this->rescanInvalidAudioIssue($issue),
             default => [
                 'status' => 'error',
                 'message' => 'Unsupported issue type.',
@@ -1582,5 +1585,196 @@ class LibraryRepairService
         }
 
         return $affectedBooks;
+    }
+
+    private function scanInvalidAudio(): array
+    {
+        $created = 0;
+        $resolved = 0;
+        $autoResolved = 0;
+
+        $root = $this->bookPathService->getBookRoot();
+
+        $books = Book::query()
+            ->whereNotNull('directory_path')
+            ->where('directory_path', '!=', '')
+            ->get();
+
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'm4p', 'mp4', 'aac', 'ogg', 'oga', 'wav', 'flac', 'wma'];
+
+        foreach ($books as $book) {
+            $fullPath = $this->buildFullPath($root, $book->directory_path);
+
+            if (!File::exists($fullPath)) {
+                continue;
+            }
+
+            $invalidFiles = [];
+
+            if (File::isDirectory($fullPath)) {
+                $files = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($fullPath, \RecursiveDirectoryIterator::SKIP_DOTS)
+                );
+
+                foreach ($files as $file) {
+                    if (!$file->isFile()) {
+                        continue;
+                    }
+
+                    $extension = strtolower($file->getExtension());
+                    if (!in_array($extension, $audioExtensions)) {
+                        continue;
+                    }
+
+                    $isValid = $this->isAudioFileValid($file->getPathname());
+
+                    if (!$isValid) {
+                        $relativePath = $file->getPathname();
+                        if (str_starts_with($relativePath, $root)) {
+                            $relativePath = substr($relativePath, strlen($root) + 1);
+                        }
+
+                        $invalidFiles[] = [
+                            'relativePath' => $relativePath,
+                            'error' => 'Failed to analyze - file may be corrupted or not a valid audio file',
+                        ];
+                    }
+                }
+            } else {
+                // Single file
+                $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
+                if (in_array($extension, $audioExtensions)) {
+                    $isValid = $this->isAudioFileValid($fullPath);
+                    if (!$isValid) {
+                        $invalidFiles[] = [
+                            'relativePath' => $book->directory_path,
+                            'error' => 'Failed to analyze - file may be corrupted or not a valid audio file',
+                        ];
+                    }
+                }
+            }
+
+            if (!empty($invalidFiles)) {
+                $metadata = [
+                    'invalid_files' => $invalidFiles,
+                    'invalid_count' => count($invalidFiles),
+                    'scanned_at' => now()->toIso8601String(),
+                ];
+
+                $this->createOrUpdateIssue(
+                    $book,
+                    LibraryRepairIssueType::INVALID_AUDIO,
+                    $book->directory_path,
+                    $metadata
+                );
+                $created++;
+            } else {
+                // Resolve any existing issues for this book
+                $resolved += $this->resolveIssueIfExists(
+                    $book->id,
+                    LibraryRepairIssueType::INVALID_AUDIO
+                );
+            }
+        }
+
+        return [
+            'created' => $created,
+            'resolved' => $resolved,
+            'auto_resolved' => $autoResolved,
+        ];
+    }
+
+    private function rescanInvalidAudioIssue(LibraryRepairIssue $issue): array
+    {
+        $book = $issue->book;
+
+        if (!$book) {
+            return [
+                'status' => 'error',
+                'message' => 'Book not found for this issue.',
+            ];
+        }
+
+        $root = $this->bookPathService->getBookRoot();
+        $fullPath = $this->buildFullPath($root, $book->directory_path);
+
+        if (!File::exists($fullPath)) {
+            // Directory missing - resolve the issue
+            $this->resolveIssueWithNotes($issue, 'Directory no longer exists', true);
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Issue resolved - directory no longer exists.',
+            ];
+        }
+
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'm4p', 'mp4', 'aac', 'ogg', 'oga', 'wav', 'flac', 'wma'];
+        $invalidFiles = [];
+
+        if (File::isDirectory($fullPath)) {
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($fullPath, \RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+
+            foreach ($files as $file) {
+                if (!$file->isFile()) {
+                    continue;
+                }
+
+                $extension = strtolower($file->getExtension());
+                if (!in_array($extension, $audioExtensions)) {
+                    continue;
+                }
+
+                $isValid = $this->isAudioFileValid($file->getPathname());
+
+                if (!$isValid) {
+                    $relativePath = $file->getPathname();
+                    if (str_starts_with($relativePath, $root)) {
+                        $relativePath = substr($relativePath, strlen($root) + 1);
+                    }
+
+                    $invalidFiles[] = [
+                        'relativePath' => $relativePath,
+                        'error' => 'Failed to analyze - file may be corrupted or not a valid audio file',
+                    ];
+                }
+            }
+        }
+
+        if (empty($invalidFiles)) {
+            $this->resolveIssueWithNotes($issue, 'All audio files are now valid', true);
+
+            return [
+                'status' => 'resolved',
+                'message' => 'All audio files are now valid.',
+            ];
+        }
+
+        // Update the issue with new invalid files
+        $metadata = [
+            'invalid_files' => $invalidFiles,
+            'invalid_count' => count($invalidFiles),
+            'scanned_at' => now()->toIso8601String(),
+        ];
+
+        $issue->metadata = $metadata;
+        $issue->status = 'pending';
+        $issue->auto_resolved = false;
+        $issue->resolved_at = null;
+        $issue->resolution_notes = null;
+        $issue->save();
+
+        return [
+            'status' => 'pending',
+            'message' => 'Found ' . count($invalidFiles) . ' invalid audio file(s).',
+            'invalid_count' => count($invalidFiles),
+        ];
+    }
+
+    private function isAudioFileValid(string $filePath): bool
+    {
+        $result = $this->audioFileAnalyzer->validateAudioFile($filePath);
+        return $result['valid'];
     }
 }

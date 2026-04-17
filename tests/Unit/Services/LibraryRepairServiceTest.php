@@ -10,6 +10,7 @@ use App\Models\LibraryRepairIssue;
 use App\Services\BookImportService;
 use App\Services\BookPathService;
 use App\Services\AudiobookBayService;
+use App\Services\AudioFileAnalyzer;
 use App\Services\LibraryRepairService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -461,6 +462,13 @@ class LibraryRepairServiceTest extends TestCase
         $bookImportService = Mockery::mock(BookImportService::class);
         $bookImportService->shouldReceive('moveFilesToLibrary')->andReturnTrue();
 
-        return new LibraryRepairService($bookPathService, $audiobookBayService, $bookImportService);
+        $audioFileAnalyzer = Mockery::mock(AudioFileAnalyzer::class);
+        $audioFileAnalyzer->shouldReceive('getID3Analyzer')->andReturnUsing(function () {
+            $getID3 = Mockery::mock('getID3');
+            $getID3->shouldReceive('analyze')->andReturn(['audio' => ['dataformat' => 'mp3']]);
+            return $getID3;
+        });
+
+        return new LibraryRepairService($bookPathService, $audiobookBayService, $bookImportService, $audioFileAnalyzer);
     }
 }

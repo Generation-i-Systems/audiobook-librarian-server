@@ -64,6 +64,7 @@ class BookImportController extends Controller
                 'import_path' => 'nullable|string',
                 'import_root' => 'nullable|string',
                 'import_type' => 'nullable|string',
+                'directoryPath' => 'nullable|string',
                 'cover_url' => 'nullable|url',
                 'description' => 'nullable|string',
                 'year' => 'nullable|string|max:4',
@@ -149,7 +150,12 @@ class BookImportController extends Controller
                     session(['import_default_genre_path' => $genrePath]);
                 }
 
-                $directoryPath = $this->buildDirectoryPath($validated);
+                // Use user-provided directoryPath if available, otherwise build from metadata
+                if (!empty($validated['directoryPath'])) {
+                    $directoryPath = $validated['directoryPath'];
+                } else {
+                    $directoryPath = $this->buildDirectoryPath($validated);
+                }
 
                 $validated['import_metadata'] = [
                     'path' => $importPath,

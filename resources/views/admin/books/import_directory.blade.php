@@ -425,6 +425,82 @@
                     });
                 });
 
+                // Clean up any stale form state when modal is closed
+                $(document).on('hidden.bs.modal', '#addBookModal, #editBookModal', function () {
+                    // Remove any pending form submission state
+                    $(document).off('submit', '#book-form');
+                    // Re-attach the form submission handler
+                    setupBookFormSubmit();
+                });
+
+                // Separate function for form submission to allow re-attachment
+                function setupBookFormSubmit() {
+                    $(document).on('submit', '#book-form', function (e) {
+                        e.preventDefault();
+                        const $form = $(this);
+                        const $modal = $form.closest('.modal');
+                        const $submitBtn = $form.find('button[type="submit"]');
+                        const originalBtnText = $submitBtn.html();
+                        const directoryPath = $form.find('input[name="directoryPath"]').val() || '';
+
+                        // Show loading state
+                        $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+
+                        // Submit form via AJAX
+                        $.ajax({
+                            url: $form.attr('action'),
+                            method: $form.attr('method'),
+                            data: $form.serialize(),
+                            dataType: 'json',
+                            success: function (response) {
+                                if (response.success) {
+                                    // Close the modal
+                                    $modal.modal('hide');
+
+                                    // If we have row HTML, replace the existing row
+                                    if (response.row_html) {
+                                        // Find the row to replace (either by book ID or path)
+                                        let $existingRow = $(`tr[data-book-id="${response.book_id}"]`);
+                                        const path = response.directoryPath || directoryPath;
+
+                                        if (!$existingRow.length && path) {
+                                            // Try to find by path if not found by ID
+                                            $existingRow = $(`tr a[data-path*="${path}"]`).closest('tr');
+                                        }
+
+                                        if ($existingRow.length) {
+                                            // Replace the existing row with the new one
+                                            $existingRow.replaceWith(response.row_html);
+
+                                            // Show success message
+                                            showAlert('Book saved successfully!', 'success');
+                                        } else {
+                                            // If we can't find the row, reload the directory
+                                            loadDirectory(currentPath, false, false, function () {
+                                                showAlert('Book saved successfully!', 'success');
+                                            });
+                                        }
+                                    } else if (typeof updateBookAction === 'function') {
+                                        // Fallback to the old update method if no row HTML
+                                        updateBookAction(response.book_id, response.edit_url, response.directoryPath || directoryPath);
+                                    }
+                                } else {
+                                    showAlert(response.message || 'An error occurred while saving the book.', 'danger');
+                                    $submitBtn.prop('disabled', false).html(originalBtnText);
+                                }
+                            },
+                            error: function (xhr) {
+                                const response = xhr.responseJSON || {};
+                                showAlert(response.message || 'An error occurred while saving the book.', 'danger');
+                                $submitBtn.prop('disabled', false).html(originalBtnText);
+                            }
+                        });
+                    });
+                }
+
+                // Initialize the form submission handler
+                setupBookFormSubmit();
+
                 // Filter UI events
                 $('#letter-filter').on('click', 'button', function () {
                     filterLetter = $(this).data('letter');
@@ -439,69 +515,6 @@
 
                 // Letter filter: start with All active
                 $('#letter-filter button[data-letter=""]').addClass('active');
-
-                // Handle form submission
-                $(document).on('submit', '#book-form', function (e) {
-                    e.preventDefault();
-                    const $form = $(this);
-                    const $modal = $form.closest('.modal');
-                    const $submitBtn = $form.find('button[type="submit"]');
-                    const originalBtnText = $submitBtn.html();
-                    const directoryPath = $form.find('input[name="directoryPath"]').val() || '';
-
-                    // Show loading state
-                    $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
-
-                    // Submit form via AJAX
-                    $.ajax({
-                        url: $form.attr('action'),
-                        method: $form.attr('method'),
-                        data: $form.serialize(),
-                        dataType: 'json',
-                        success: function (response) {
-                            if (response.success) {
-                                // Close the modal
-                                $modal.modal('hide');
-
-                                // If we have row HTML, replace the existing row
-                                if (response.row_html) {
-                                    // Find the row to replace (either by book ID or path)
-                                    let $existingRow = $(`tr[data-book-id="${response.book_id}"]`);
-                                    const path = response.directoryPath || directoryPath;
-
-                                    if (!$existingRow.length && path) {
-                                        // Try to find by path if not found by ID
-                                        $existingRow = $(`tr a[data-path*="${path}"]`).closest('tr');
-                                    }
-
-                                    if ($existingRow.length) {
-                                        // Replace the existing row with the new one
-                                        $existingRow.replaceWith(response.row_html);
-
-                                        // Show success message
-                                        showAlert('Book saved successfully!', 'success');
-                                    } else {
-                                        // If we can't find the row, reload the directory
-                                        loadDirectory(currentPath, false, false, function () {
-                                            showAlert('Book saved successfully!', 'success');
-                                        });
-                                    }
-                                } else if (typeof updateBookAction === 'function') {
-                                    // Fallback to the old update method if no row HTML
-                                    updateBookAction(response.book_id, response.edit_url, response.directoryPath || directoryPath);
-                                }
-                            } else {
-                                showAlert(response.message || 'An error occurred while saving the book.', 'danger');
-                                $submitBtn.prop('disabled', false).html(originalBtnText);
-                            }
-                        },
-                        error: function (xhr) {
-                            const response = xhr.responseJSON || {};
-                            showAlert(response.message || 'An error occurred while saving the book.', 'danger');
-                            $submitBtn.prop('disabled', false).html(originalBtnText);
-                        }
-                    });
-                });
 
                 // Per-directory bulk import
                 $(document).on('click', '.bulk-import-dir-btn', function () {

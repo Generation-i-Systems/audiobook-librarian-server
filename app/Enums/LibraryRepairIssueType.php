@@ -12,4 +12,5 @@ enum LibraryRepairIssueType: string
     case NESTED_AUDIO = 'nested_audio';
     case NUMBERED_SUFFIX_DIRECTORY = 'numbered_suffix_directory';
     case BOGUS_DIRECTORY = 'bogus_directory';
+    case INVALID_AUDIO = 'invalid_audio';
 }

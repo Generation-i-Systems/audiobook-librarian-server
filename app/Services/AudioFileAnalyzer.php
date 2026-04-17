@@ -46,6 +46,137 @@ class AudioFileAnalyzer
     }
 
     /**
+     * Get the getID3 instance for direct access
+     */
+    public function getID3Analyzer(): \getID3
+    {
+        return $this->getID3;
+    }
+
+    /**
+     * Check if an audio file is valid using ffprobe (primary) and getID3 (fallback)
+     *
+     * @return array{valid: bool, error?: string, duration?: float, format?: string}
+     */
+    public function validateAudioFile(string $filePath): array
+    {
+        if (!file_exists($filePath) || !is_file($filePath)) {
+            return ['valid' => false, 'error' => 'File does not exist'];
+        }
+
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        if (!in_array($extension, $this->supportedExtensions)) {
+            return ['valid' => false, 'error' => 'Unsupported file extension: ' . $extension];
+        }
+
+        // Try ffprobe first (most reliable for all formats including m4b, m4a, etc.)
+        $ffprobeResult = $this->validateWithFFprobe($filePath);
+        if ($ffprobeResult['valid']) {
+            return $ffprobeResult;
+        }
+
+        // Fallback to getID3
+        return $this->validateWithGetID3($filePath);
+    }
+
+    /**
+     * Validate using ffprobe
+     *
+     * @return array{valid: bool, error?: string, duration?: float, format?: string}
+     */
+    private function validateWithFFprobe(string $filePath): array
+    {
+        if (!$this->commandExists('ffprobe')) {
+            return ['valid' => false, 'error' => 'ffprobe not available'];
+        }
+
+        try {
+            $escapedPath = escapeshellarg($filePath);
+            $command = "ffprobe -v quiet -print_format json -show_format -show_streams {$escapedPath} 2>&1";
+            $output = shell_exec($command);
+
+            if (empty($output)) {
+                return ['valid' => false, 'error' => 'ffprobe returned no output'];
+            }
+
+            $data = json_decode($output, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return ['valid' => false, 'error' => 'Failed to parse ffprobe output: ' . json_last_error_msg()];
+            }
+
+            // Check for audio stream
+            $hasAudioStream = false;
+            if (isset($data['streams']) && is_array($data['streams'])) {
+                foreach ($data['streams'] as $stream) {
+                    if (isset($stream['codec_type']) && $stream['codec_type'] === 'audio') {
+                        $hasAudioStream = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!$hasAudioStream) {
+                return ['valid' => false, 'error' => 'No audio stream found'];
+            }
+
+            // Check format
+            $format = $data['format']['format_name'] ?? null;
+            $duration = isset($data['format']['duration']) ? (float) $data['format']['duration'] : null;
+
+            return [
+                'valid' => true,
+                'duration' => $duration,
+                'format' => $format,
+            ];
+        } catch (\Throwable $e) {
+            return ['valid' => false, 'error' => 'ffprobe exception: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Validate using getID3
+     *
+     * @return array{valid: bool, error?: string, duration?: float, format?: string}
+     */
+    private function validateWithGetID3(string $filePath): array
+    {
+        try {
+            $fileInfo = $this->getID3->analyze($filePath);
+
+            if (isset($fileInfo['error'])) {
+                return ['valid' => false, 'error' => 'getID3 error: ' . implode(', ', $fileInfo['error'])];
+            }
+
+            if (!isset($fileInfo['audio'])) {
+                return ['valid' => false, 'error' => 'No audio track found'];
+            }
+
+            if (empty($fileInfo['audio']['dataformat'])) {
+                return ['valid' => false, 'error' => 'No audio data format'];
+            }
+
+            $duration = isset($fileInfo['playtime_seconds']) ? (float) $fileInfo['playtime_seconds'] : null;
+
+            return [
+                'valid' => true,
+                'duration' => $duration,
+                'format' => $fileInfo['audio']['dataformat'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            return ['valid' => false, 'error' => 'getID3 exception: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Check if a command exists on the system
+     */
+    private function commandExists(string $command): bool
+    {
+        $which = shell_exec('which ' . $command);
+        return !empty(trim($which));
+    }
+
+    /**
      * Get the duration of an audio file in seconds
      *
      * @return float|null Duration in seconds, or null if not an audio file or error
