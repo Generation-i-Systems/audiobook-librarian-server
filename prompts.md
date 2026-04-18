@@ -184,3 +184,22 @@ make sure the api endpoints ignore deleted genres
 add an icon and an emoji to the genre table for each genre. Search the internet for good images
 
 make sure to add the new content to the genre manage page and to the api (and obviously openapi.json)
+
+---
+
+## 2026-04-17
+
+I need a separate server instance that uses a separate db and separate file source that is 100% api compatible with the main server. The admin interface will be somewhat different because the source of the books will be the librivox api. it should allow browsing books that are already on librivox and selecting which ones to download and store on the server but also may expose the librivox content directly via the api and provide a passthrough to the client without ever storing the book locally as anything more than a cache. this may be able to expose the librivox books based on a permission on the server. I haven't decided if it needs to be a fully separate instance or integrated into the regular app and gated between the two libraries on permissions. One core goal is to be able to test the client app or even distribute it entirely based on librivox content but using an api that is 100% compatible with the regular content.
+
+I also need to make sure that there is 0!!! drift in the api between the two variants. If there is ever any drift the project will have failed.
+
+it is this 0 drift requirement that makes me wonder if the idea of useing a separate project or even instance may be the wrong direction
+
+local ids with librivox ids also available in the db
+
+1
+add the ability to scan a QR code on the api selection page that will be the primary way that clients change modes. So they will hit a different instance by changing the api. The client should never know that the two modes exist just that they get data from an api and that api confirms to the expected standards
+
+Allow running both "instances" from the same codebase gated on the uri requesting the data. so the same .env can support both variants and swap the data sources based on the incoming address
+
+proceed on a branch

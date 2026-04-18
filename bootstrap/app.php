@@ -82,6 +82,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ->appendOutputTo(storage_path('logs/import-queue.log'));
     })
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
+
         $middleware->validateCsrfTokens(except: [
             'admin/adminer*',
         ]);

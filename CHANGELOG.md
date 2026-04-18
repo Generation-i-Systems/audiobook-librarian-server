@@ -2,6 +2,7 @@
 
 ### Changed
 
+- Added host-based library profile routing so one running server can serve multiple isolated library variants (`main`, `librivox`) from the same codebase and `.env`, with request-time DB/storage switching by incoming host
 - Import CLI layout redesigned to fit within actual terminal height
 - Genre management now stores an emoji plus a local icon path for each genre, shows both on the admin manage page, and returns them from genre API responses
 - Genre-related API queries now ignore soft-deleted genres consistently in author filters, listening goals, and listening statistics
