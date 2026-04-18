@@ -481,6 +481,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class)->except(['create']);
+    Route::post('books/{book}/autofill-from-path', [Admin\BookController::class, 'autofillFromPath'])
+        ->name('books.autofillFromPath');
     Route::get('books/create', [BookFormController::class, 'create'])->name('books.create');
     Route::get('books/{id}/download-zip', [BookExportController::class, 'download'])->name('books.downloadZip');
     Route::get('books/{id}/raw-json', [BookJsonController::class, 'getRawJson'])->name('books.rawJson');

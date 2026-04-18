@@ -302,6 +302,13 @@
                             @endphp
                             <a href="{{ route('admin.books.edit', array_merge([$bookId], request()->query())) }}"
                                 class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                            <form action="{{ route('admin.books.autofillFromPath', $bookId) }}" method="POST" style="display: inline;">
+                                @csrf
+                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success"
+                                    title="Autofill metadata from path-based best match (prefers Audible)"><i
+                                        class="fas fa-magic"></i></button>
+                            </form>
                             <form action="{{ route('admin.books.destroy', $bookId) }}"
                                 method="POST" style="display: inline;">
                                 @csrf
@@ -365,6 +372,30 @@
     </div>
     @endif
 
+    @if(session('success') || session('error'))
+        @php
+            $toastType = session('error') ? 'danger' : 'success';
+            $toastMessage = session('error') ?: session('success');
+        @endphp
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1085;">
+            <div
+                id="book-action-toast"
+                class="toast align-items-center text-bg-{{ $toastType }} border-0"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                data-bs-delay="3800"
+            >
+                <div class="d-flex">
+                    <div class="toast-body">
+                        {{ $toastMessage }}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function () {
@@ -387,6 +418,18 @@
                         }
                     });
                 });
+
+                const actionToast = document.getElementById('book-action-toast');
+                if (actionToast) {
+                    if (window.bootstrap && window.bootstrap.Toast) {
+                        window.bootstrap.Toast.getOrCreateInstance(actionToast).show();
+                    } else {
+                        actionToast.classList.add('show');
+                        setTimeout(function () {
+                            actionToast.classList.remove('show');
+                        }, 3800);
+                    }
+                }
             });
         </script>
     @endpush

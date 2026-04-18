@@ -5,6 +5,9 @@ namespace Tests\Feature\Controllers\Admin;
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Book;
+use App\Services\AudibleService;
+use App\Services\BookDirectoryParser;
+use App\Services\GoogleBooksApiService;
 use App\Services\ExternalCoverService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -185,6 +188,101 @@ class BookControllerTest extends TestCase
         $response = $this->put(route('admin.books.update', $bookId), $updateData);
 
         $response->assertRedirect(route('admin.books.index'));
+    }
+
+    #[Test]
+    public function indexIncludesAutofillFromPathAction(): void
+    {
+        $books = [
+            ['id' => '1', 'title' => 'Test Book 1', 'directoryPath' => 'Author/Test Book 1'],
+        ];
+
+        $this->documentStoreServiceMock->shouldReceive('listBooks')->andReturn([
+            'data' => $books,
+            'total' => count($books),
+        ]);
+
+        $response = $this->get(route('admin.books.index'));
+
+        $response->assertStatus(200)
+            ->assertSee(route('admin.books.autofillFromPath', '1'), false);
+    }
+
+    #[Test]
+    public function autofillFromPathPrefersAudibleAndUpdatesBook(): void
+    {
+        $bookId = 'existing-book-id';
+        $bookData = [
+            'id' => $bookId,
+            'title' => 'Old Title',
+            'directoryPath' => 'SciFi/John Doe/01 - New Path Title',
+        ];
+
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->once()->andReturn($bookData);
+
+        $parserMock = Mockery::mock(BookDirectoryParser::class);
+        $parserMock->shouldReceive('extractAuthorFromPath')->once()->andReturn('John Doe');
+        $this->app->instance(BookDirectoryParser::class, $parserMock);
+
+        $audibleServiceMock = Mockery::mock(AudibleService::class);
+        $audibleServiceMock->shouldReceive('searchBooksWithFiltering')
+            ->once()
+            ->andReturn([
+                [
+                    'id' => 'B0TESTASIN',
+                    'title' => 'New Path Title',
+                    'author' => ['John Doe'],
+                    'narrator' => ['Jane Voice'],
+                    'series' => ['Cool Series' => '1'],
+                    'description' => 'Auto description',
+                    'publishedYear' => '2024',
+                    'audibleCoverImageUrl' => 'https://example.com/cover.jpg',
+                ],
+            ]);
+        $this->app->instance(AudibleService::class, $audibleServiceMock);
+
+        $googleBooksMock = Mockery::mock(GoogleBooksApiService::class);
+        $googleBooksMock->shouldNotReceive('searchBooks');
+        $this->app->instance(GoogleBooksApiService::class, $googleBooksMock);
+
+        $this->documentStoreServiceMock->shouldReceive('findOrCreateMany')
+            ->with('authors', ['John Doe'])
+            ->once()
+            ->andReturn(['author-id']);
+        $this->documentStoreServiceMock->shouldReceive('findOrCreateMany')
+            ->with('narrators', ['Jane Voice'])
+            ->once()
+            ->andReturn(['narrator-id']);
+        $this->documentStoreServiceMock->shouldReceive('getSeriesByName')
+            ->with('Cool Series')
+            ->once()
+            ->andReturn(null);
+        $this->documentStoreServiceMock->shouldReceive('createSeries')
+            ->with('Cool Series')
+            ->once()
+            ->andReturn('series-id');
+
+        $this->externalCoverServiceMock->shouldReceive('downloadCoverImage')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'path' => 'SciFi/John Doe/01 - New Path Title/cover_audible_B0TESTASIN.jpg',
+            ]);
+
+        $this->documentStoreServiceMock->shouldReceive('updateBook')
+            ->with($bookId, Mockery::on(function (array $updates): bool {
+                return ($updates['title'] ?? null) === 'New Path Title'
+                    && ($updates['audibleId'] ?? null) === 'B0TESTASIN'
+                    && ($updates['coverImage'] ?? null) === 'cover_audible_B0TESTASIN.jpg';
+            }))
+            ->once();
+
+        $response = $this->post(route('admin.books.autofillFromPath', $bookId), [
+            'return_url' => route('admin.books.index'),
+        ]);
+
+        $response->assertRedirect(route('admin.books.index'));
+        $response->assertSessionHas('success');
     }
 
     #[Test]
