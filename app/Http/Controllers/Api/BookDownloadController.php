@@ -22,6 +22,13 @@ class BookDownloadController extends Controller
         $this->documentStoreService = $documentStoreService;
     }
 
+    private function buildDownloadFileUrl(int|string $bookId, string $relativeFile): string
+    {
+        $encodedFile = implode('/', array_map(static fn (string $segment): string => rawurlencode($segment), explode('/', $relativeFile)));
+
+        return url("/api/v1/books/{$bookId}/download/{$encodedFile}");
+    }
+
     public function download($id)
     {
         // Log download request with token preview for comparison
@@ -88,7 +95,7 @@ class BookDownloadController extends Controller
                 'filename' => $relativeFile,
                 'path' => $file,
                 'size' => Storage::disk('books')->size($file),
-                'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => $relativeFile]),
+                'download_url' => $this->buildDownloadFileUrl($id, $relativeFile),
             ];
 
             if (in_array($extension, ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac', 'm4b'])) {
@@ -459,10 +466,7 @@ class BookDownloadController extends Controller
             $fileUrls[] = [
                 'filename' => $fileName,
                 'size' => $fileSize,
-                'download_url' => route('api.books.downloadFile', [
-                    'book' => $id,
-                    'file' => urlencode($fileName),
-                ]) . "?expires={$expiresAt->timestamp}&signature={$signature}",
+                'download_url' => $this->buildDownloadFileUrl($id, $fileName) . "?expires={$expiresAt->timestamp}&signature={$signature}",
             ];
         }
 
