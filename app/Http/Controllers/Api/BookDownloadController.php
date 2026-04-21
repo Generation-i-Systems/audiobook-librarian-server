@@ -22,6 +22,118 @@ class BookDownloadController extends Controller
         $this->documentStoreService = $documentStoreService;
     }
 
+    private const TRUSTED_CDN_HOSTS = [
+        'archive.org',
+        'www.archive.org',
+        'ia800.archive.org',
+        'librivox.org',
+        'www.librivox.org',
+    ];
+
+    /**
+     * Build a manifest for a LibriVox book using CDN chapter URLs.
+     * download_url points to our auth-gated API which redirects to the CDN.
+     * cdn_url is the raw CDN URL for clients that want direct access.
+     */
+    private function librivoxManifest(int|string $id, array $book)
+    {
+        $chapters = \App\Models\LibriVox\Chapter::where('book_id', $id)
+            ->whereNotNull('listen_url')
+            ->orderBy('chapter_number')
+            ->get();
+
+        if ($chapters->isEmpty()) {
+            return response()->json([
+                'error' => 'No chapters found',
+                'message' => 'This LibriVox book has no chapter data. Try reimporting it.',
+            ], 404);
+        }
+
+        $files = $chapters->map(fn ($ch) => [
+            'filename'       => $ch->file_name ?: "chapter_{$ch->chapter_number}.mp3",
+            'type'           => 'audio',
+            'size'           => 0,
+            'chapter_number' => $ch->chapter_number,
+            'title'          => $ch->title,
+            'reader'         => $ch->reader,
+            'duration'       => $ch->duration,
+            'download_url'   => $this->buildDownloadFileUrl($id, $ch->file_name ?: "chapter_{$ch->chapter_number}.mp3"),
+            'cdn_url'        => $ch->listen_url,
+        ])->values()->all();
+
+        $librivoxInfo = $book['librivoxInfo'] ?? $book['librivox_info'] ?? [];
+        $coverUrl = $librivoxInfo['cover_url'] ?? null;
+
+        if ($coverUrl) {
+            array_unshift($files, [
+                'filename'     => 'cover.jpg',
+                'type'         => 'cover',
+                'size'         => 0,
+                'download_url' => url('/api/v1/download/remote?url=' . rawurlencode($coverUrl)),
+                'cdn_url'      => $coverUrl,
+            ]);
+        }
+
+        $manifest = [
+            'book_id'    => (int) $id,
+            'title'      => $book['title'] ?? '',
+            'source'     => 'librivox',
+            'total_files' => count($files),
+            'total_size' => 0,
+            'files'      => $files,
+            'librivox'   => [
+                'url_librivox' => $librivoxInfo['url_librivox'] ?? null,
+                'url_zip_file' => $librivoxInfo['url_zip_file'] ?? null,
+                'url_iarchive' => $librivoxInfo['url_iarchive'] ?? null,
+            ],
+            'download_instructions' => [
+                'method'   => 'Use download_url for auth-gated access (redirects to CDN). Use cdn_url for direct CDN access.',
+                'resume'   => 'CDN supports HTTP Range headers for resumable downloads.',
+                'auth'     => 'download_url requires Authorization header. cdn_url is public.',
+            ],
+            'generated_at' => now()->toISOString(),
+        ];
+
+        return response()->json($manifest);
+    }
+
+    /**
+     * Redirect to a trusted remote CDN URL (LibriVox / archive.org).
+     * Enforces authentication and domain allowlist before redirecting.
+     */
+    public function remoteDownload(Request $request)
+    {
+        $url = $request->query('url');
+
+        if (!$url) {
+            return response()->json(['error' => 'Missing url parameter'], 400);
+        }
+
+        $parsed = parse_url($url);
+        $host   = strtolower($parsed['host'] ?? '');
+
+        // Strip leading www. for wildcard matching of *.archive.org subdomains
+        $isTrusted = in_array($host, self::TRUSTED_CDN_HOSTS, true)
+            || str_ends_with($host, '.archive.org');
+
+        if (!$isTrusted) {
+            Log::warning('LibriVox remote download blocked: untrusted host', [
+                'url'     => $url,
+                'host'    => $host,
+                'user_id' => Auth::id(),
+            ]);
+            return response()->json(['error' => 'URL host is not on the trusted CDN allowlist'], 403);
+        }
+
+        Log::info('LibriVox remote download redirect', [
+            'url'     => $url,
+            'user_id' => Auth::id(),
+            'ip'      => $request->ip(),
+        ]);
+
+        return redirect($url, 302);
+    }
+
     private function buildDownloadFileUrl(int|string $bookId, string $relativeFile): string
     {
         $encodedFile = implode('/', array_map(static fn (string $segment): string => rawurlencode($segment), explode('/', $relativeFile)));
@@ -64,6 +176,19 @@ class BookDownloadController extends Controller
                 'error' => 'File not found',
                 'message' => 'Files not available for a book pending review',
             ], 404);
+        }
+
+        $lvBook = \App\Models\LibriVox\Book::find($id);
+        if ($lvBook) {
+            return $this->librivoxManifest($id, [
+                'title'        => $lvBook->title,
+                'librivox_info' => $lvBook->librivox_info ?? [],
+                'source'       => 'librivox',
+            ]);
+        }
+
+        if (($book['source'] ?? null) === 'librivox') {
+            return $this->librivoxManifest($id, $book);
         }
 
         $directoryPath = $book['directoryPath'] ?? null;
@@ -209,6 +334,25 @@ class BookDownloadController extends Controller
                 'error' => 'Book not found',
                 'message' => 'The specified book could not be found',
             ], 404);
+        }
+
+        // LibriVox: redirect to chapter CDN URL by chapter number or filename
+        $isLibrivox = ($book['source'] ?? null) === 'librivox'
+            || \App\Models\LibriVox\Book::where('id', $id)->exists();
+        if ($isLibrivox) {
+            $decoded = urldecode($fileName);
+            $chapter = \App\Models\LibriVox\Chapter::where('book_id', $id)
+                ->where(function ($q) use ($decoded): void {
+                    $q->where('file_name', $decoded)->orWhere('chapter_number', (int) $decoded);
+                })
+                ->whereNotNull('listen_url')
+                ->first();
+
+            if (!$chapter) {
+                return response()->json(['error' => 'Chapter not found'], 404);
+            }
+
+            return redirect((string) $chapter->listen_url, 302);
         }
 
         $directoryPath = $book['directoryPath'] ?? null;
