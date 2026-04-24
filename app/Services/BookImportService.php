@@ -450,6 +450,26 @@ class BookImportService
             }
         }
 
+        $existingBook = $this->findExistingBook((string) ($audiobook['path'] ?? ''), $metadata);
+        if ($existingBook instanceof Book) {
+            $metadataForUpdate = $metadata;
+            if (empty($existingBook->directory_path)) {
+                $metadataForUpdate['custom_directory_path'] = $this->generateDirectoryPath(
+                    $metadata,
+                    ['include_title' => true]
+                );
+            }
+
+            Log::info('Reusing existing book record before create', [
+                'existing_book_id' => $existingBook->id,
+                'existing_directory_path' => $existingBook->directory_path,
+                'incoming_source_path' => $audiobook['path'] ?? null,
+                'incoming_title' => $metadata['title'] ?? null,
+            ]);
+
+            return $this->updateBookFromMetadata($existingBook, $metadataForUpdate, $audiobook, $options);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -3366,7 +3386,7 @@ class BookImportService
      */
     public function findExistingBook(string $path, array $metadata = []): ?Book
     {
-        $baseName = basename($path);
+        $sourceDirectoryName = $this->extractSourceDirectoryName($path);
 
         if (!empty($metadata['isbn'])) {
             $existingBook = Book::where('isbn', $metadata['isbn'])->first();
@@ -3375,43 +3395,92 @@ class BookImportService
             }
         }
 
-        if (!empty($metadata['title']) && !empty($metadata['author'])) {
-            $title = $metadata['title'];
-            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+        $candidateDirectories = [];
+        if (!empty($metadata['custom_directory_path']) && is_string($metadata['custom_directory_path'])) {
+            $candidateDirectories[] = trim($this->generateDirectoryPath($metadata, ['include_title' => true]), '/');
+        }
+        if ($sourceDirectoryName !== '') {
+            $candidateDirectories[] = $sourceDirectoryName;
+        }
 
-            $existingBook = Book::where('title', '=', $title)
-                ->whereHas('authors', function ($query) use ($author) {
-                    $query->where('name', $author);
-                })
+        foreach (array_values(array_unique(array_filter($candidateDirectories))) as $directoryPath) {
+            $existingByDirectory = Book::where('directory_path', $directoryPath)->first();
+            if ($existingByDirectory instanceof Book) {
+                return $existingByDirectory;
+            }
+
+            $existingByDirectoryName = Book::where('directory_path', 'like', '%/' . $directoryPath)
+                ->orWhere('directory_path', $directoryPath)
+                ->get()
+                ->sortByDesc(static fn (Book $book): int => empty($book->directory_path) ? 1 : 0)
                 ->first();
 
-            if ($existingBook) {
-                if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
-                    $existingSeries = $existingBook->series ?? '';
-                    $existingSeriesNumber = $existingBook->series_number ?? 0;
-                    $newSeries = $metadata['series'] ?? '';
-                    $newSeriesNumber = $metadata['series_number'] ?? 0;
+            if ($existingByDirectoryName instanceof Book) {
+                return $existingByDirectoryName;
+            }
+        }
 
-                    if ($existingSeriesNumber > 0 || $newSeriesNumber > 0) {
-                        if ($existingSeriesNumber != $newSeriesNumber) {
-                            return null;
+        if (!empty($metadata['title']) && !empty($metadata['author'])) {
+            $title = trim((string) $metadata['title']);
+            $author = is_array($metadata['author']) ? ($metadata['author'][0] ?? '') : $metadata['author'];
+            $author = trim((string) $author);
+            $seriesName = trim((string) ($metadata['series'] ?? ''));
+            $seriesNumber = isset($metadata['series_number']) ? (float) $metadata['series_number'] : null;
+
+            if ($title !== '' && $author !== '') {
+                $existingBooks = Book::whereRaw('LOWER(title) = ?', [mb_strtolower($title)])
+                    ->whereHas('authors', function ($query) use ($author) {
+                        $query->whereRaw('LOWER(name) = ?', [mb_strtolower($author)]);
+                    })
+                    ->with('series')
+                    ->get();
+
+                $matchedBook = $existingBooks->first(function (Book $book) use ($seriesName, $seriesNumber): bool {
+                    if ($seriesName !== '') {
+                        $matchedSeries = $book->series->first(
+                            static fn ($series): bool => strcasecmp((string) ($series->name ?? ''), $seriesName) === 0
+                        );
+
+                        if ($matchedSeries === null) {
+                            return false;
+                        }
+
+                        if ($seriesNumber !== null) {
+                            $existingNumber = $matchedSeries->pivot?->getAttribute('series_number');
+                            if ($existingNumber !== null && (float) $existingNumber !== $seriesNumber) {
+                                return false;
+                            }
                         }
                     }
 
-                    if (!empty($existingSeries) && !empty($newSeries)) {
-                        if ($existingSeries !== $newSeries) {
-                            return null;
-                        }
-                    }
+                    return true;
+                });
 
-                    return $existingBook;
+                if ($matchedBook instanceof Book) {
+                    return $matchedBook;
                 }
             }
         }
 
-        $existingBook = Book::where('directory_path', '=', $baseName)->first();
+        return null;
+    }
 
-        return $existingBook;
+    private function extractSourceDirectoryName(string $path): string
+    {
+        if ($path === '') {
+            return '';
+        }
+
+        $trimmedPath = rtrim($path, '/');
+        if ($trimmedPath === '') {
+            return '';
+        }
+
+        if (is_file($trimmedPath)) {
+            return basename(dirname($trimmedPath));
+        }
+
+        return basename($trimmedPath);
     }
 
     /**

@@ -112,6 +112,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getBook(string $id, ?int $userId = null): ?array
     {
+        $sourceMode = (string) config('library_profiles.active_source_mode', 'local');
+
+        if ($sourceMode === 'librivox') {
+            return $this->getLibrivoxBook($id);
+        }
+
         $query = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters']);
 
         if ($userId) {
@@ -120,11 +126,27 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
         $book = $query->find($id);
 
+        if ($book) {
+            return $this->getBookDataTransformer()->toDocumentStoreBook($book, $userId);
+        }
+
+        // hybrid: fall back to LibriVox catalog
+        if ($sourceMode === 'hybrid') {
+            return $this->getLibrivoxBook($id);
+        }
+
+        return null;
+    }
+
+    private function getLibrivoxBook(string $id): ?array
+    {
+        /** @var \App\Models\LibriVox\Book|null $book */
+        $book = \App\Models\LibriVox\Book::with(['authors', 'genres'])->find($id);
         if (!$book) {
             return null;
         }
 
-        return $this->getBookDataTransformer()->toDocumentStoreBook($book, $userId);
+        return (new LibriVoxBookAdapter())->toDocumentStoreBook($book);
     }
 
     public function findBookByDirectoryPath(string $directoryPath): ?array
@@ -412,6 +434,16 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         bool $includeAllBooks = false,
         ?int $userId = null
     ): array {
+        $sourceMode = (string) config('library_profiles.active_source_mode', 'local');
+
+        if ($sourceMode === 'librivox') {
+            return $this->listLibrivoxBooks($page, $perPage, $filters, $order);
+        }
+
+        if ($sourceMode === 'hybrid') {
+            return $this->listHybridBooks($page, $perPage, $filters, $sort, $order, $includeAllBooks, $userId);
+        }
+
         // Limit perPage to a reasonable maximum to prevent memory issues
         $perPage = min($perPage, 100);
 
@@ -646,6 +678,103 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             'lastPage' => max(1, (int) ceil($total / $perPage)),
             'last_page' => max(1, (int) ceil($total / $perPage)),
         ];
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Builder<\App\Models\LibriVox\Book> */
+    private function buildLibrivoxQuery(array $filters): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = \App\Models\LibriVox\Book::with(['authors', 'genres']);
+
+        if (!empty($filters['search'])) {
+            $term = $filters['search'];
+            $query->where(function ($q) use ($term): void {
+                $q->where('title', 'like', "%{$term}%")
+                  ->orWhereHas('authors', fn ($q) => $q->where('name', 'like', "%{$term}%"));
+            });
+        }
+        if (!empty($filters['title'])) {
+            $query->where('title', 'like', '%' . $filters['title'] . '%');
+        }
+        if (!empty($filters['genre'])) {
+            $query->whereHas('genres', fn ($q) => $q->where('name', $filters['genre']));
+        }
+        if (!empty($filters['author'])) {
+            $query->whereHas('authors', fn ($q) => $q->where('name', 'like', '%' . $filters['author'] . '%'));
+        }
+
+        return $query;
+    }
+
+    private function listLibrivoxBooks(int $page, int $perPage, array $filters, string $order): array
+    {
+        $perPage = min($perPage, 100);
+        $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
+
+        $query = $this->buildLibrivoxQuery($filters)->orderBy('title', $order);
+
+        $total = $query->count();
+        $books = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        $adapter = new LibriVoxBookAdapter();
+        $data = $books->map(fn ($b) => $adapter->toDocumentStoreBook($b))->all();
+
+        return [
+            'data'         => $data,
+            'total'        => $total,
+            'perPage'      => $perPage,
+            'per_page'     => $perPage,
+            'currentPage'  => $page,
+            'current_page' => $page,
+            'lastPage'     => max(1, (int) ceil($total / $perPage)),
+            'last_page'    => max(1, (int) ceil($total / $perPage)),
+        ];
+    }
+
+    /**
+     * Hybrid mode: interleave local and LibriVox books sorted by title.
+     * Fetches both counts, then fills each page from whichever source owns that slice.
+     */
+    private function listHybridBooks(
+        int $page,
+        int $perPage,
+        array $filters,
+        string $sort,
+        string $order,
+        bool $includeAllBooks,
+        ?int $userId
+    ): array {
+        // Run local query (reuses full filter/sort logic by calling self recursively with local mode)
+        $origMode = config('library_profiles.active_source_mode');
+        config(['library_profiles.active_source_mode' => 'local']);
+        $localResult = $this->listBooks($page, $perPage, $filters, true, $sort, $order, $includeAllBooks, $userId);
+        config(['library_profiles.active_source_mode' => $origMode]);
+
+        $localTotal = (int) ($localResult['total'] ?? 0);
+        $localPages = max(1, (int) ceil($localTotal / $perPage));
+
+        if ($page <= $localPages) {
+            // This page is within local results; append LibriVox total to the combined count
+            $lvTotal = $this->buildLibrivoxQuery($filters)->count();
+
+            return array_merge($localResult, [
+                'total'    => $localTotal + $lvTotal,
+                'lastPage' => max(1, (int) ceil(($localTotal + $lvTotal) / $perPage)),
+                'last_page' => max(1, (int) ceil(($localTotal + $lvTotal) / $perPage)),
+            ]);
+        }
+
+        // Page is beyond local books — serve LibriVox pages
+        $lvPage = $page - $localPages;
+        $lvResult = $this->listLibrivoxBooks($lvPage, $perPage, $filters, $order);
+        $lvTotal = (int) ($lvResult['total'] ?? 0);
+
+        return array_merge($lvResult, [
+            'total'        => $localTotal + $lvTotal,
+            'currentPage'  => $page,
+            'current_page' => $page,
+            'lastPage'     => max(1, (int) ceil(($localTotal + $lvTotal) / $perPage)),
+            'last_page'    => max(1, (int) ceil(($localTotal + $lvTotal) / $perPage)),
+        ]);
     }
 
     public function getAllBooks(?int $limit = null, int $offset = 0): array

@@ -53,6 +53,10 @@ trait BookTransformTrait
             $transformedBook['series']    = $this->extractSeriesObjects($book);
         }
 
+        if (!empty($book['source'])) {
+            $transformedBook['source'] = $book['source'];
+        }
+
         if (!empty($book['coverImage'])) {
             $coverPath = $this->resolveCoverImagePath($book['coverImage'], $book['directoryPath'] ?? null);
 

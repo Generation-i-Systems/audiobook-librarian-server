@@ -156,6 +156,10 @@ if (app()->environment('local')) {
 
 Route::get('/', function () {
     if (Auth::check()) {
+        if (config('library_profiles.active_source_mode') === 'librivox') {
+            return redirect()->route('admin.librivox.index');
+        }
+
         if (Auth::user()->is_admin) {
             return redirect()->route('admin.books.index')->with('status', 'Welcome to Audiobook Librarian!');
         }
@@ -544,6 +548,18 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\SeriesController::class,
         'destroy',
     ])->name('series.destroy');
+
+    // LibriVox management
+    Route::prefix('librivox')->name('librivox.')->group(function (): void {
+        Route::get('/', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'index'])->name('index');
+        Route::get('/search', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'search'])->name('search');
+        Route::get('/genres', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genres'])->name('genres');
+        Route::get('/genres/{genre}', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genreBooks'])->name('genre.books')->where('genre', '.+');
+        Route::get('/authors', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authors'])->name('authors');
+        Route::get('/authors/{authorId}/books', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authorBooks'])->name('author.books');
+        Route::post('/sync', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'triggerSync'])->name('sync');
+        Route::post('/sync/cancel', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'cancelSync'])->name('sync.cancel');
+    });
 
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [

@@ -59,6 +59,10 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
+        if (config('library_profiles.active_source_mode') === 'librivox') {
+            return redirect()->route('admin.librivox.index');
+        }
+
         // Emergency: Increase memory limit aggressively
         try {
             // Get pagination and filter parameters from request
