@@ -45,16 +45,19 @@ class Book extends Model
         'duration'      => 'integer',
     ];
 
+    /** @return BelongsToMany<Author, $this> */
     public function authors(): BelongsToMany
     {
         return $this->belongsToMany(Author::class, 'librivox_book_author', 'book_id', 'author_id');
     }
 
+    /** @return BelongsToMany<Genre, $this> */
     public function genres(): BelongsToMany
     {
         return $this->belongsToMany(Genre::class, 'librivox_book_genre', 'book_id', 'genre_id');
     }
 
+    /** @return HasMany<Chapter, $this> */
     public function chapters(): HasMany
     {
         return $this->hasMany(Chapter::class, 'book_id');
