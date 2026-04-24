@@ -1,0 +1,70 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Models\LibriVox\Author;
+use App\Models\LibriVox\Book;
+use App\Models\LibriVox\Genre;
+
+/**
+ * Converts LibriVox\Book models into the document store array shape so they
+ * pass through the existing API pipeline (BookTransformTrait, etc.) identically
+ * to local books.
+ */
+class LibriVoxBookAdapter
+{
+    public function toDocumentStoreBook(Book $book): array
+    {
+        $authors = $book->relationLoaded('authors')
+            ? $book->authors->map(fn (Author $a) => ['id' => $a->id, 'name' => $a->name])->all()
+            : $book->authors()->get()->map(fn (Author $a) => ['id' => $a->id, 'name' => $a->name])->all();
+
+        $genres = $book->relationLoaded('genres')
+            ? $book->genres->map(fn (Genre $g) => ['id' => $g->id, 'name' => $g->name])->all()
+            : $book->genres()->get()->map(fn (Genre $g) => ['id' => $g->id, 'name' => $g->name])->all();
+
+        $info = $book->librivox_info ?? [];
+        $coverImage = $book->cover_image ?? $info['cover_url'] ?? null;
+
+        return [
+            'id'               => (string) $book->id,
+            'title'            => $book->title ?? '',
+            'author'           => array_column($authors, 'name'),
+            'authors_data'     => $authors,
+            'narrator'         => [],
+            'narrators_data'   => [],
+            'genre'            => array_column($genres, 'name'),
+            'genres_data'      => $genres,
+            'series'           => [],
+            'series_data'      => [],
+            'description'      => $book->description,
+            'year'             => $book->year,
+            'published_year'   => $book->year,
+            'duration'         => $this->formatDuration($book->duration),
+            'audio_file_count' => $book->audio_file_count,
+            'total_size'       => null,
+            'created_at'       => $book->created_at?->toIso8601String(),
+            'updated_at'       => $book->updated_at?->toIso8601String(),
+            'coverImage'       => $coverImage,
+            'directoryPath'    => null,
+            'needs_review'     => false,
+            'source'           => 'librivox',
+            'librivox_id'      => $book->librivox_id,
+            'librivoxInfo'     => $info,
+        ];
+    }
+
+    private function formatDuration(?int $seconds): ?string
+    {
+        if ($seconds === null) {
+            return null;
+        }
+        $h = intdiv($seconds, 3600);
+        $m = intdiv($seconds % 3600, 60);
+        $s = $seconds % 60;
+
+        return sprintf('%d:%02d:%02d', $h, $m, $s);
+    }
+}
