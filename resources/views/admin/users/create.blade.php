@@ -21,9 +21,10 @@
             <label for="role" class="form-label">Role</label>
             <select name="role" id="role" class="form-control" required>
                 <option value="unverified" {{ old('role') == 'unverified' ? 'selected' : '' }}>Unverified</option>
-                <option value="user" {{ old('role') == 'user' ? 'selected' : '' }}>User (Player Access)</option>
-                <option value="library-user" {{ old('role') == 'library-user' ? 'selected' : '' }}>Library User (Library Access)</option>
-                <option value="standard" {{ old('role') == 'standard' ? 'selected' : '' }}>Standard</option>
+                <option value="user" {{ old('role') == 'user' ? 'selected' : '' }}>User (Player Only)</option>
+                <option value="library-user" {{ old('role') == 'library-user' ? 'selected' : '' }}>Library User (Local Books)</option>
+                <option value="librivox-user" {{ old('role') == 'librivox-user' ? 'selected' : '' }}>LibriVox User (LibriVox Books)</option>
+                <option value="hybrid-user" {{ old('role') == 'hybrid-user' ? 'selected' : '' }}>Hybrid User (Local + LibriVox)</option>
                 <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Admin</option>
                 <option value="super-admin" {{ old('role') == 'super-admin' ? 'selected' : '' }}>Super Admin</option>
             </select>

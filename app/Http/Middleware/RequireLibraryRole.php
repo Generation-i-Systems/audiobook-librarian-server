@@ -46,7 +46,7 @@ class RequireLibraryRole
         }
 
         // Only allow if role is library-level or higher
-        $allowedRoles = ['library-user', 'standard', 'admin', 'super-admin'];
+        $allowedRoles = ['library-user', 'librivox-user', 'hybrid-user', 'admin', 'super-admin'];
         if (!in_array($user->role, $allowedRoles, true)) {
             Log::warning('Library role access denied: Insufficient role', [
                 'ip' => $clientIp,
