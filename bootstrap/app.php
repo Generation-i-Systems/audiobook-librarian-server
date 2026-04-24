@@ -80,6 +80,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('imports:process-queue --cleanup --cleanup-days=30')
             ->monthlyOn(1, '03:30')
             ->appendOutputTo(storage_path('logs/import-queue.log'));
+
+        // Sync LibriVox catalog daily at 6:00 AM (delta after first full sync)
+        $schedule->command('librivox:sync --language=English')
+            ->dailyAt('06:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/librivox-sync.log'));
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
