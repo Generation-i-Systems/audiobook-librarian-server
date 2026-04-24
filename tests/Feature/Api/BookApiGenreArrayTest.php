@@ -20,7 +20,7 @@ class BookApiGenreArrayTest extends TestCase
 
         // Create a user and token for API authentication
         $user = User::factory()->create([
-            'role' => 'standard',
+            'role' => 'library-user',
             'is_admin' => true
         ]);
         $this->token = $user->createToken('test-token')->plainTextToken;

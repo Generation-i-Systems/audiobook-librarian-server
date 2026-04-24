@@ -16,7 +16,7 @@ class BadgeApiTest extends TestCase
     protected function authenticateUser(): array
     {
         $user = User::factory()->create([
-            'role' => 'standard',
+            'role' => 'library-user',
         ]);
 
         $token = $user->createToken('test-token')->plainTextToken;

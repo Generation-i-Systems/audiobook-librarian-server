@@ -133,18 +133,34 @@
                     <div class="modal-body">
                         <p>What type of access should <strong id="verifyUserName"></strong> have?</p>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer flex-wrap gap-2">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <form id="verifyPlayerForm" method="POST" class="d-inline">
                             @csrf
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-play"></i> Player Access (User)
+                            <input type="hidden" name="role" value="user">
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="fas fa-play"></i> Player Only
                             </button>
                         </form>
                         <form id="verifyLibraryForm" method="POST" class="d-inline">
                             @csrf
+                            <input type="hidden" name="role" value="library-user">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-book"></i> Library User
+                            </button>
+                        </form>
+                        <form id="verifyLibrivoxForm" method="POST" class="d-inline">
+                            @csrf
+                            <input type="hidden" name="role" value="librivox-user">
                             <button type="submit" class="btn btn-info">
-                                <i class="fas fa-library"></i> Library Access (Library User)
+                                <i class="fas fa-microphone"></i> LibriVox User
+                            </button>
+                        </form>
+                        <form id="verifyHybridForm" method="POST" class="d-inline">
+                            @csrf
+                            <input type="hidden" name="role" value="hybrid-user">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-layer-group"></i> Hybrid User
                             </button>
                         </form>
                     </div>
@@ -154,23 +170,16 @@
     </div>
 
     <script>
-        // Set up verify modal with user data
         document.getElementById('verifyModal').addEventListener('show.bs.modal', function(event) {
-            const button = event.relatedTarget;
-            const userId = button.getAttribute('data-user-id');
-            const userName = button.getAttribute('data-user-name');
+            const userId = event.relatedTarget.getAttribute('data-user-id');
+            const userName = event.relatedTarget.getAttribute('data-user-name');
+            const baseUrl = '/admin/users/' + userId + '/verify';
 
             document.getElementById('verifyUserName').textContent = userName;
 
-            // Set form actions
-            const playerForm = document.getElementById('verifyPlayerForm');
-            const libraryForm = document.getElementById('verifyLibraryForm');
-
-            playerForm.setAttribute('action', '/admin/users/' + userId + '/verify');
-            playerForm.innerHTML = '@csrf<input type="hidden" name="role" value="user"><button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> Player Access (User)</button>';
-
-            libraryForm.setAttribute('action', '/admin/users/' + userId + '/verify');
-            libraryForm.innerHTML = '@csrf<input type="hidden" name="role" value="library-user"><button type="submit" class="btn btn-info"><i class="fas fa-library"></i> Library Access (Library User)</button>';
+            ['verifyPlayerForm', 'verifyLibraryForm', 'verifyLibrivoxForm', 'verifyHybridForm'].forEach(function(id) {
+                document.getElementById(id).setAttribute('action', baseUrl);
+            });
         });
     </script>
 @endsection

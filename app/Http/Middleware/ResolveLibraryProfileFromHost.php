@@ -137,11 +137,11 @@ class ResolveLibraryProfileFromHost
 
         $previousConnection = DB::getDefaultConnection();
 
-        if ($previousConnection !== $connection) {
-            DB::purge($previousConnection);
+        if ($previousConnection === $connection) {
+            return;
         }
 
-        DB::purge($connection);
+        DB::purge($previousConnection);
         DB::setDefaultConnection($connection);
 
         config(['database.default' => $connection]);
