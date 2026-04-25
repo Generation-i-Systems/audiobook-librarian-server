@@ -178,15 +178,6 @@ class BookDownloadController extends Controller
             ], 404);
         }
 
-        $lvBook = \App\Models\LibriVox\Book::find($id);
-        if ($lvBook) {
-            return $this->librivoxManifest($id, [
-                'title'        => $lvBook->title,
-                'librivox_info' => $lvBook->librivox_info ?? [],
-                'source'       => 'librivox',
-            ]);
-        }
-
         if (($book['source'] ?? null) === 'librivox') {
             return $this->librivoxManifest($id, $book);
         }
@@ -337,9 +328,7 @@ class BookDownloadController extends Controller
         }
 
         // LibriVox: redirect to chapter CDN URL by chapter number or filename
-        $isLibrivox = ($book['source'] ?? null) === 'librivox'
-            || \App\Models\LibriVox\Book::where('id', $id)->exists();
-        if ($isLibrivox) {
+        if (($book['source'] ?? null) === 'librivox') {
             $decoded = urldecode($fileName);
             $chapter = \App\Models\LibriVox\Chapter::where('book_id', $id)
                 ->where(function ($q) use ($decoded): void {
