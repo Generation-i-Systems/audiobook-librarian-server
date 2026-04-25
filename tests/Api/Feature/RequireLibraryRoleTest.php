@@ -94,4 +94,43 @@ class RequireLibraryRoleTest extends TestCase
     {
         $this->getJson('http://localhost/api/v1/me')->assertStatus(401);
     }
+
+    // X-Library-Profile header selects a profile without changing the host
+    public function testXLibraryProfileHeaderSelectsProfile(): void
+    {
+        config([
+            'library_profiles.profiles.librivox.source_mode' => 'librivox',
+            'library_profiles.profiles.main.source_mode' => 'local',
+        ]);
+
+        [, $headers] = $this->makeUser('hybrid-user');
+
+        $this->withHeaders(array_merge($headers, ['X-Library-Profile' => 'librivox']))
+            ->getJson('http://localhost/api/v1/me')
+            ->assertStatus(200);
+
+        $this->withHeaders(array_merge($headers, ['X-Library-Profile' => 'main']))
+            ->getJson('http://localhost/api/v1/me')
+            ->assertStatus(200);
+    }
+
+    public function testXLibraryProfileHeaderWithUnknownProfileFallsBackToHost(): void
+    {
+        [, $headers] = $this->makeUser('hybrid-user');
+
+        $this->withHeaders(array_merge($headers, ['X-Library-Profile' => 'nonexistent']))
+            ->getJson('http://localhost/api/v1/me')
+            ->assertStatus(200);
+    }
+
+    public function testXLibraryProfileHeaderIsIgnoredForFixedRoles(): void
+    {
+        config(['library_profiles.profiles.librivox.source_mode' => 'librivox']);
+
+        // library-user always gets local source mode regardless of header
+        [, $headers] = $this->makeUser('library-user');
+        $this->withHeaders(array_merge($headers, ['X-Library-Profile' => 'librivox']))
+            ->getJson('http://localhost/api/v1/me')
+            ->assertStatus(200);
+    }
 }

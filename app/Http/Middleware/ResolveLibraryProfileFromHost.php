@@ -20,14 +20,36 @@ class ResolveLibraryProfileFromHost
      */
     public function handle(Request $request, Closure $next): mixed
     {
-        $host = $this->normalizeHost($request);
-        $profileName = $this->resolveProfileName($host);
+        $profileName = $this->resolveProfileNameFromHeader($request);
+
+        if ($profileName === null) {
+            $host = $this->normalizeHost($request);
+            $profileName = $this->resolveProfileName($host);
+        }
 
         if ($profileName !== null) {
+            $host = $this->normalizeHost($request);
             $this->applyProfileConfiguration($request, $profileName, $host);
         }
 
         return $next($request);
+    }
+
+    private function resolveProfileNameFromHeader(Request $request): ?string
+    {
+        $headerValue = $request->header('X-Library-Profile');
+        if (!is_string($headerValue) || trim($headerValue) === '') {
+            return null;
+        }
+
+        $name = strtolower(trim($headerValue));
+        $profiles = config('library_profiles.profiles', []);
+        if (!is_array($profiles) || !array_key_exists($name, $profiles)) {
+            Log::warning('X-Library-Profile header specified unknown profile', ['profile' => $name]);
+            return null;
+        }
+
+        return $name;
     }
 
     private function normalizeHost(Request $request): string
