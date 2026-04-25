@@ -10,6 +10,20 @@ use Illuminate\Support\Facades\Log;
 class RequireLibraryRole
 {
     /**
+     * Roles that may access library API endpoints.
+     */
+    private const ALLOWED_ROLES = ['library-user', 'librivox-user', 'hybrid-user', 'admin', 'super-admin'];
+
+    /**
+     * Roles that have a fixed source mode regardless of which host they access.
+     * Hybrid users and admins follow the host-resolved source mode instead.
+     */
+    private const ROLE_SOURCE_MODE = [
+        'library-user'  => 'local',
+        'librivox-user' => 'librivox',
+    ];
+
+    /**
      * Handle an incoming request.
      *
      * @return mixed
@@ -17,49 +31,32 @@ class RequireLibraryRole
     public function handle(Request $request, Closure $next)
     {
         $user = Auth::user();
-        $clientIp = $request->ip();
-        $userAgent = $request->header('User-Agent');
-        $requestUri = $request->getRequestUri();
-        $requestMethod = $request->getMethod();
 
-        Log::error('RequireLibraryRole middleware START', [
-            'uri' => $requestUri,
-            'user_id' => $user->id ?? 'null',
-            'user_email' => $user->email ?? 'null',
-            'user_role' => $user->role ?? 'null_role',
-            'authenticated' => (bool) $user,
-        ]);
-
-        // If not logged in or role is not set, block
         if (!$user || !isset($user->role)) {
-            Log::warning('Library role access denied: User not authenticated or missing role', [
-                'ip' => $clientIp,
-                'user_agent' => $userAgent,
-                'uri' => $requestUri,
-                'method' => $requestMethod,
-                'user_id' => $user->id ?? null,
-                'user_email' => $user->email ?? null,
-                'user_role' => $user->role ?? 'not_set',
-                'reason' => !$user ? 'not_authenticated' : 'role_not_set'
+            Log::warning('Library role access denied: not authenticated', [
+                'uri' => $request->getRequestUri(),
+                'reason' => !$user ? 'not_authenticated' : 'role_not_set',
             ]);
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        // Only allow if role is library-level or higher
-        $allowedRoles = ['library-user', 'librivox-user', 'hybrid-user', 'admin', 'super-admin'];
-        if (!in_array($user->role, $allowedRoles, true)) {
-            Log::warning('Library role access denied: Insufficient role', [
-                'ip' => $clientIp,
-                'user_agent' => $userAgent,
-                'uri' => $requestUri,
-                'method' => $requestMethod,
+        $role = $user->role;
+
+        if (!in_array($role, self::ALLOWED_ROLES, true)) {
+            Log::warning('Library role access denied: insufficient role', [
+                'uri' => $request->getRequestUri(),
                 'user_id' => $user->id,
-                'user_email' => $user->email,
-                'user_role' => $user->role,
-                'allowed_roles' => $allowedRoles,
-                'reason' => 'insufficient_role'
+                'user_role' => $role,
             ]);
             return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // For library-user and librivox-user, enforce source mode from the role
+        // rather than from the host, so users always see their correct data
+        // regardless of which hostname they connect through.
+        // hybrid-user, admin, and super-admin use the host-resolved source mode.
+        if (isset(self::ROLE_SOURCE_MODE[$role])) {
+            config(['library_profiles.active_source_mode' => self::ROLE_SOURCE_MODE[$role]]);
         }
 
         return $next($request);
