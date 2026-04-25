@@ -52,7 +52,7 @@ class BookDownloadController extends Controller
         $files = $chapters->map(fn ($ch) => [
             'filename'       => $ch->file_name ?: "chapter_{$ch->chapter_number}.mp3",
             'type'           => 'audio',
-            'size'           => 0,
+            'size'           => $ch->size_bytes ?? 0,
             'chapter_number' => $ch->chapter_number,
             'title'          => $ch->title,
             'reader'         => $ch->reader,
@@ -74,12 +74,14 @@ class BookDownloadController extends Controller
             ]);
         }
 
+        $totalSize = (int) array_sum(array_column($files, 'size'));
+
         $manifest = [
             'book_id'    => (int) $id,
             'title'      => $book['title'] ?? '',
             'source'     => 'librivox',
             'total_files' => count($files),
-            'total_size' => 0,
+            'total_size' => $totalSize,
             'files'      => $files,
             'librivox'   => [
                 'url_librivox' => $librivoxInfo['url_librivox'] ?? null,
