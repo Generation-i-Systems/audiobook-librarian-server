@@ -9,6 +9,7 @@ use App\Models\LibriVox\Book;
 use App\Models\LibriVox\Chapter;
 use App\Models\LibriVox\Genre;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class LibriVoxImportService
@@ -21,7 +22,7 @@ class LibriVoxImportService
     {
         $librivoxId = (string) $apiBook['id'];
 
-        return DB::transaction(function () use ($apiBook, $librivoxId): Book {
+        $book = DB::transaction(function () use ($apiBook, $librivoxId): Book {
             $sections = $apiBook['sections'] ?? $this->api->getSections($librivoxId);
 
             $attrs = [
@@ -56,14 +57,18 @@ class LibriVoxImportService
             $this->syncGenres($book, $apiBook['genres'] ?? []);
             $this->syncChapters($book, $sections);
 
-            Log::info('LibriVox book imported', [
-                'librivox_id' => $librivoxId,
-                'book_id'     => $book->id,
-                'title'       => $book->title,
-            ]);
-
             return $book;
         });
+
+        $this->fetchChapterSizes($book);
+
+        Log::info('LibriVox book imported', [
+            'librivox_id' => $librivoxId,
+            'book_id'     => $book->id,
+            'title'       => $book->title,
+        ]);
+
+        return $book;
     }
 
     /**
@@ -168,6 +173,97 @@ class LibriVoxImportService
                 'listen_url'     => $section['listen_url'] ?? null,
             ]);
         }
+    }
+
+    /**
+     * Fetch content-length for all zero-size chapters of a book via concurrent HEAD requests.
+     */
+    public function fetchChapterSizes(Book $book): void
+    {
+        $chapters = $book->chapters()
+            ->whereNotNull('listen_url')
+            ->where('size_bytes', 0)
+            ->get(['id', 'listen_url']);
+
+        if ($chapters->isEmpty()) {
+            return;
+        }
+
+        foreach ($chapters->chunk(10) as $batch) {
+            $indexed = $batch->values();
+            $urls = $indexed->pluck('listen_url')->all();
+
+            try {
+                $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($urls): array {
+                    return array_map(
+                        fn (string $url) => $pool->withOptions(['allow_redirects' => true])->head($url),
+                        $urls
+                    );
+                });
+            } catch (\Throwable $e) {
+                Log::warning('LibriVox HEAD pool failed', ['book_id' => $book->id, 'error' => $e->getMessage()]);
+                continue;
+            }
+
+            foreach ($indexed as $i => $chapter) {
+                $response = $responses[$i] ?? null;
+                if ($response === null || $response instanceof \Throwable || !$response->successful()) {
+                    continue;
+                }
+
+                $length = $response->header('Content-Length');
+                if ($length !== '' && ((int) $length) > 0) {
+                    Chapter::where('id', $chapter->id)->update(['size_bytes' => (int) $length]);
+                }
+            }
+        }
+    }
+
+    /**
+     * Backfill size_bytes for all chapters that still have size_bytes = 0.
+     * Returns the number of chapters updated.
+     */
+    public function backfillChapterSizes(?int $bookId = null): int
+    {
+        $query = Chapter::whereNotNull('listen_url')->where('size_bytes', 0);
+
+        if ($bookId !== null) {
+            $query->where('book_id', $bookId);
+        }
+
+        $updated = 0;
+        $query->select(['id', 'book_id', 'listen_url'])
+            ->chunkById(10, function ($batch) use (&$updated): void {
+                $indexed = $batch->values();
+                $urls = $indexed->pluck('listen_url')->all();
+
+                try {
+                    $responses = Http::pool(function (\Illuminate\Http\Client\Pool $pool) use ($urls): array {
+                        return array_map(
+                            fn (string $url) => $pool->withOptions(['allow_redirects' => true])->head($url),
+                            $urls
+                        );
+                    });
+                } catch (\Throwable $e) {
+                    Log::warning('LibriVox HEAD backfill pool failed', ['error' => $e->getMessage()]);
+                    return;
+                }
+
+                foreach ($indexed as $i => $chapter) {
+                    $response = $responses[$i] ?? null;
+                    if ($response === null || $response instanceof \Throwable || !$response->successful()) {
+                        continue;
+                    }
+
+                    $length = $response->header('Content-Length');
+                    if ($length !== '' && ((int) $length) > 0) {
+                        Chapter::where('id', $chapter->id)->update(['size_bytes' => (int) $length]);
+                        $updated++;
+                    }
+                }
+            });
+
+        return $updated;
     }
 
     private function parseDuration(string $duration): int
