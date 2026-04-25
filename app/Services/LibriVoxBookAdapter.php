@@ -56,6 +56,58 @@ class LibriVoxBookAdapter
         ];
     }
 
+    /**
+     * Convert a raw LibriVox API response array (from LibriVoxApiService) to the
+     * document store shape. Used when the local sync table is empty.
+     *
+     * @param array<string, mixed> $apiBook
+     * @return array<string, mixed>
+     */
+    public function fromApiArray(array $apiBook): array
+    {
+        $authors = [];
+        foreach ($apiBook['authors'] ?? [] as $a) {
+            $name = trim(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? ''));
+            $authors[] = ['id' => (string) ($a['id'] ?? ''), 'name' => $name];
+        }
+
+        $genres = [];
+        foreach ($apiBook['genres'] ?? [] as $g) {
+            $genres[] = ['id' => (string) ($g['id'] ?? ''), 'name' => (string) ($g['name'] ?? '')];
+        }
+
+        $librivoxId = (string) ($apiBook['id'] ?? '');
+        $coverImage = $apiBook['cover_url'] ?? null;
+        $duration = isset($apiBook['totaltimesecs']) ? (int) $apiBook['totaltimesecs'] : null;
+
+        return [
+            'id'               => $librivoxId,
+            'title'            => (string) ($apiBook['title'] ?? ''),
+            'author'           => array_column($authors, 'name'),
+            'authors_data'     => $authors,
+            'narrator'         => [],
+            'narrators_data'   => [],
+            'genre'            => array_column($genres, 'name'),
+            'genres_data'      => $genres,
+            'series'           => [],
+            'series_data'      => [],
+            'description'      => $apiBook['description'] ?? null,
+            'year'             => isset($apiBook['copyright_year']) ? (int) $apiBook['copyright_year'] : null,
+            'published_year'   => isset($apiBook['copyright_year']) ? (int) $apiBook['copyright_year'] : null,
+            'duration'         => $this->formatDuration($duration),
+            'audio_file_count' => isset($apiBook['num_sections']) ? (int) $apiBook['num_sections'] : null,
+            'total_size'       => null,
+            'created_at'       => null,
+            'updated_at'       => null,
+            'coverImage'       => is_string($coverImage) && $coverImage !== '' ? $coverImage : null,
+            'directoryPath'    => null,
+            'needs_review'     => false,
+            'source'           => 'librivox',
+            'librivox_id'      => $librivoxId,
+            'librivoxInfo'     => $apiBook,
+        ];
+    }
+
     private function formatDuration(?int $seconds): ?string
     {
         if ($seconds === null) {

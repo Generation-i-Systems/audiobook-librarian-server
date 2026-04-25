@@ -39,6 +39,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     private ?AdminMaintenanceService $adminMaintenanceService = null;
     private ?TokenMaintenanceService $tokenMaintenanceService = null;
     private ?LegacyCompatibilityService $legacyCompatibilityService = null;
+    private ?LibriVoxApiService $libriVoxApiService = null;
 
     private function getTrashService(): BookTrashService
     {
@@ -110,6 +111,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $this->legacyCompatibilityService ??= app(LegacyCompatibilityService::class);
     }
 
+    private function getLibriVoxApiService(): LibriVoxApiService
+    {
+        return $this->libriVoxApiService ??= app(LibriVoxApiService::class);
+    }
+
     public function getBook(string $id, ?int $userId = null): ?array
     {
         $sourceMode = (string) config('library_profiles.active_source_mode', 'local');
@@ -140,13 +146,22 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     private function getLibrivoxBook(string $id): ?array
     {
+        $adapter = new LibriVoxBookAdapter();
+
         /** @var \App\Models\LibriVox\Book|null $book */
-        $book = \App\Models\LibriVox\Book::with(['authors', 'genres'])->find($id);
-        if (!$book) {
-            return null;
+        $book = \App\Models\LibriVox\Book::with(['authors', 'genres'])->find($id)
+            ?? \App\Models\LibriVox\Book::with(['authors', 'genres'])->where('librivox_id', $id)->first();
+
+        if ($book) {
+            return $adapter->toDocumentStoreBook($book);
         }
 
-        return (new LibriVoxBookAdapter())->toDocumentStoreBook($book);
+        $apiBook = $this->getLibriVoxApiService()->getById($id);
+        if ($apiBook !== null) {
+            return $adapter->fromApiArray($apiBook);
+        }
+
+        return null;
     }
 
     public function findBookByDirectoryPath(string $directoryPath): ?array
@@ -709,14 +724,52 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     {
         $perPage = min($perPage, 100);
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
+        $adapter = new LibriVoxBookAdapter();
+
+        if (!\App\Models\LibriVox\Book::exists()) {
+            return $this->listLibrivoxBooksFromApi($page, $perPage, $filters, $adapter);
+        }
 
         $query = $this->buildLibrivoxQuery($filters)->orderBy('title', $order);
 
         $total = $query->count();
         $books = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
 
-        $adapter = new LibriVoxBookAdapter();
         $data = $books->map(fn ($b) => $adapter->toDocumentStoreBook($b))->all();
+
+        return [
+            'data'         => $data,
+            'total'        => $total,
+            'perPage'      => $perPage,
+            'per_page'     => $perPage,
+            'currentPage'  => $page,
+            'current_page' => $page,
+            'lastPage'     => max(1, (int) ceil($total / $perPage)),
+            'last_page'    => max(1, (int) ceil($total / $perPage)),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function listLibrivoxBooksFromApi(int $page, int $perPage, array $filters, LibriVoxBookAdapter $adapter): array
+    {
+        $offset = ($page - 1) * $perPage;
+        $search = (string) ($filters['search'] ?? $filters['title'] ?? '');
+        $language = (string) ($filters['language'] ?? '');
+
+        if ($search !== '') {
+            $raw = $this->getLibriVoxApiService()->searchBooks($search, []) ?? [];
+            $total = count($raw);
+            $slice = array_slice($raw, $offset, $perPage);
+        } else {
+            $raw = $this->getLibriVoxApiService()->listBooks($perPage, $offset, null, $language ?: null) ?? [];
+            $slice = $raw['books'] ?? [];
+            $total = $perPage * $page;
+        }
+
+        $data = array_map(fn ($b) => $adapter->fromApiArray($b), $slice);
 
         return [
             'data'         => $data,
