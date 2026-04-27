@@ -208,6 +208,27 @@ class SyncLibriVoxCommand extends Command
                 }
             } while (count($books) === $pageSize);
 
+            $sizesUpdated = 0;
+
+            if (!$dryRun && !$this->cancelled && $imported > 0) {
+                $this->line('  Fetching chapter sizes via HTTP HEAD...');
+                $lastReport   = 0;
+                $sizesUpdated = $this->importService->backfillChapterSizes(
+                    null,
+                    function (int $processed, int $updated) use (&$lastReport): void {
+                        if ($processed - $lastReport >= 500) {
+                            $this->line(sprintf(
+                                '    %s processed, %s sizes fetched',
+                                number_format($processed),
+                                number_format($updated),
+                            ));
+                            $lastReport = $processed;
+                        }
+                    },
+                );
+                $this->line(sprintf('  Chapter sizes updated: %s', number_format($sizesUpdated)));
+            }
+
             $finalStatus = $this->cancelled ? 'cancelled' : 'completed';
             $elapsed     = microtime(true) - $this->startTime;
 
@@ -222,12 +243,13 @@ class SyncLibriVoxCommand extends Command
             }
 
             $this->info(sprintf(
-                '%s %s: %s imported%s in %d pages (%s)',
+                '%s %s: %s imported%s in %d pages, %s chapter sizes fetched (%s)',
                 $dryRun ? 'Dry-run' : ucfirst($syncType),
                 $finalStatus,
                 number_format($imported),
                 $failed > 0 ? ", {$failed} failed" : '',
                 $pages,
+                number_format($sizesUpdated),
                 $this->formatElapsed($elapsed),
             ));
 

@@ -60,8 +60,6 @@ class LibriVoxImportService
             return $book;
         });
 
-        $this->fetchChapterSizes($book);
-
         Log::info('LibriVox book imported', [
             'librivox_id' => $librivoxId,
             'book_id'     => $book->id,
@@ -189,7 +187,7 @@ class LibriVoxImportService
             return;
         }
 
-        foreach ($chapters->chunk(10) as $batch) {
+        foreach ($chapters->chunk(50) as $batch) {
             $indexed = $batch->values();
             $urls = $indexed->pluck('listen_url')->all();
 
@@ -221,9 +219,12 @@ class LibriVoxImportService
 
     /**
      * Backfill size_bytes for all chapters that still have size_bytes = 0.
+     * Calls $onProgress(processed, updated) after each batch if provided.
      * Returns the number of chapters updated.
+     *
+     * @param callable(int, int): void|null $onProgress
      */
-    public function backfillChapterSizes(?int $bookId = null): int
+    public function backfillChapterSizes(?int $bookId = null, ?callable $onProgress = null): int
     {
         $query = Chapter::whereNotNull('listen_url')->where('size_bytes', 0);
 
@@ -231,9 +232,11 @@ class LibriVoxImportService
             $query->where('book_id', $bookId);
         }
 
-        $updated = 0;
+        $processed = 0;
+        $updated   = 0;
+
         $query->select(['id', 'book_id', 'listen_url'])
-            ->chunkById(10, function ($batch) use (&$updated): void {
+            ->chunkById(50, function ($batch) use (&$processed, &$updated, $onProgress): void {
                 $indexed = $batch->values();
                 $urls = $indexed->pluck('listen_url')->all();
 
@@ -246,6 +249,10 @@ class LibriVoxImportService
                     });
                 } catch (\Throwable $e) {
                     Log::warning('LibriVox HEAD backfill pool failed', ['error' => $e->getMessage()]);
+                    $processed += count($indexed);
+                    if ($onProgress !== null) {
+                        ($onProgress)($processed, $updated);
+                    }
                     return;
                 }
 
@@ -260,6 +267,11 @@ class LibriVoxImportService
                         Chapter::where('id', $chapter->id)->update(['size_bytes' => (int) $length]);
                         $updated++;
                     }
+                }
+
+                $processed += count($indexed);
+                if ($onProgress !== null) {
+                    ($onProgress)($processed, $updated);
                 }
             });
 
