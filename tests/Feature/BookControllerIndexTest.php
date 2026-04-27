@@ -201,4 +201,93 @@ class BookControllerIndexTest extends TestCase
             throw $e;
         }
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function testItRendersCoverlessLibrivoxBooksWithoutPlaceholderCards()
+    {
+        $testBooks = [
+            [
+                'id' => 10,
+                'title' => 'Coverless LibriVox Book',
+                'authors' => ['Volunteer Reader'],
+                'genres' => ['Poetry'],
+                'series' => [],
+                'coverImage' => null,
+                'duration' => '1:23:45',
+                'source' => 'librivox',
+            ],
+        ];
+
+        $this->mockDocumentStoreService->shouldReceive('listBooks')
+            ->once()
+            ->with(1, 12, [], true)
+            ->andReturn([
+                'data' => $testBooks,
+                'total' => 1,
+                'per_page' => 24,
+                'current_page' => 1,
+                'last_page' => 1,
+            ]);
+
+        $this->mockDocumentStoreService->shouldReceive('getUniqueValues')
+            ->with('genre')
+            ->andReturn([]);
+
+        $this->mockDocumentStoreService->shouldReceive('getUniqueValues')
+            ->with('author')
+            ->andReturn([]);
+
+        $this->mockDocumentStoreService->shouldReceive('getUniqueValues')
+            ->with('series', 'seriesName')
+            ->andReturn([]);
+
+        $this->mockDocumentStoreService->shouldReceive('getRecentBooks')
+            ->with(5, 7)
+            ->andReturn([]);
+
+        $response = $this->get(route('books.index'));
+
+        $response->assertStatus(200)
+            ->assertSee('Coverless LibriVox Book')
+            ->assertSee('data-source="librivox"', false)
+            ->assertSee('Cover unavailable');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function testLibrivoxModeOnlyShowsListViewToggle(): void
+    {
+        $user = User::create([
+            'name' => 'LibriVox User',
+            'username' => 'librivoxuser',
+            'email' => 'librivox@example.com',
+            'password' => bcrypt('password'),
+            'email_verified_at' => now(),
+            'role' => 'librivox-user',
+        ]);
+
+        $this->actingAs($user);
+
+        $this->mockDocumentStoreService->shouldReceive('listBooks')
+            ->once()
+            ->with(1, 12, [], true)
+            ->andReturn([
+                'data' => [],
+                'total' => 0,
+                'per_page' => 24,
+                'current_page' => 1,
+                'last_page' => 1,
+            ]);
+
+        $this->mockDocumentStoreService->shouldReceive('getUniqueValues')->with('genre')->andReturn([]);
+        $this->mockDocumentStoreService->shouldReceive('getUniqueValues')->with('author')->andReturn([]);
+        $this->mockDocumentStoreService->shouldReceive('getUniqueValues')->with('series', 'seriesName')->andReturn([]);
+        $this->mockDocumentStoreService->shouldReceive('getRecentBooks')->with(5, 7)->andReturn([]);
+
+        $response = $this->get(route('books.index'));
+
+        $response->assertStatus(200)
+            ->assertSee('id="main-list-btn"', false)
+            ->assertDontSee('id="main-grid-btn"', false)
+            ->assertDontSee('id="main-compact-btn"', false);
+    }
 }

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Api\Feature;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 class RequireLibraryRoleTest extends TestCase
@@ -132,5 +134,123 @@ class RequireLibraryRoleTest extends TestCase
         $this->withHeaders(array_merge($headers, ['X-Library-Profile' => 'librivox']))
             ->getJson('http://localhost/api/v1/me')
             ->assertStatus(200);
+    }
+
+    // Web requests: role sets source mode but does not gate access
+
+    private function mockDocumentStore(): void
+    {
+        $mockStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockStore->shouldReceive('listBooks')->andReturn([
+            'data' => [], 'total' => 0, 'currentPage' => 1, 'lastPage' => 1,
+        ]);
+        $mockStore->shouldReceive('getUniqueValues')->andReturn([]);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockStore);
+    }
+
+    public function testLibrivoxUserWebBooksRequestSetsLibrivoxSourceMode(): void
+    {
+        config([
+            'library_profiles.profiles.main.source_mode' => 'local',
+            'library_profiles.active_source_mode' => 'local',
+        ]);
+
+        $this->mockDocumentStore();
+
+        [$user] = $this->makeUser('librivox-user');
+        $this->actingAs($user)->get('http://localhost/books')->assertStatus(200);
+
+        $this->assertEquals('librivox', config('library_profiles.active_source_mode'));
+    }
+
+    public function testLibrivoxUserJsonBooksEndpointSetsLibrivoxSourceMode(): void
+    {
+        config([
+            'library_profiles.profiles.main.source_mode' => 'local',
+            'library_profiles.active_source_mode' => 'local',
+        ]);
+
+        $mockStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockStore->shouldReceive('listBooks')->andReturn([
+            'data' => [], 'total' => 0, 'currentPage' => 1, 'lastPage' => 1,
+        ]);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockStore);
+
+        [$user] = $this->makeUser('librivox-user');
+        $this->actingAs($user)->getJson('http://localhost/api/books/json')->assertStatus(200);
+
+        $this->assertEquals('librivox', config('library_profiles.active_source_mode'));
+    }
+
+    public function testLibrivoxUserJsonBooksEndpointForcesListView(): void
+    {
+        config([
+            'library_profiles.profiles.main.source_mode' => 'local',
+            'library_profiles.active_source_mode' => 'local',
+        ]);
+
+        $mockStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockStore->shouldReceive('listBooks')->once()->andReturn([
+            'data' => [], 'total' => 0, 'currentPage' => 1, 'lastPage' => 1,
+        ]);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockStore);
+
+        [$user] = $this->makeUser('librivox-user');
+
+        $this->actingAs($user)
+            ->getJson('http://localhost/api/books/json?view_type=grid')
+            ->assertStatus(200)
+            ->assertJsonPath('view_type', 'list');
+    }
+
+    public function testJsonBooksEndpointAcceptsEmptySearchString(): void
+    {
+        config([
+            'library_profiles.profiles.main.source_mode' => 'local',
+            'library_profiles.active_source_mode' => 'local',
+        ]);
+
+        $mockStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockStore->shouldReceive('listBooks')->once()->andReturn([
+            'data' => [], 'total' => 0, 'currentPage' => 1, 'lastPage' => 1,
+        ]);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockStore);
+
+        [$user] = $this->makeUser('library-user');
+
+        $this->actingAs($user)
+            ->getJson('http://localhost/api/books/json?search=')
+            ->assertStatus(200);
+    }
+
+    public function testUserRoleWebBooksRequestIsNotBlocked(): void
+    {
+        $this->mockDocumentStore();
+
+        [$user] = $this->makeUser('user');
+        $this->actingAs($user)->get('http://localhost/books')->assertStatus(200);
+    }
+
+    // Root / redirect: library roles always go to books.index, not admin
+
+    public function testLibrivoxUserWithIsAdminRedirectsToBookIndexNotAdmin(): void
+    {
+        $user = User::factory()->create(['role' => 'librivox-user', 'is_admin' => true]);
+        $response = $this->actingAs($user)->get('http://localhost/');
+        $response->assertRedirect(route('books.index'));
+    }
+
+    public function testLibraryUserWithIsAdminRedirectsToBookIndex(): void
+    {
+        $user = User::factory()->create(['role' => 'library-user', 'is_admin' => true]);
+        $response = $this->actingAs($user)->get('http://localhost/');
+        $response->assertRedirect(route('books.index'));
+    }
+
+    public function testAdminRoleWithIsAdminRedirectsToAdminBooks(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'is_admin' => true]);
+        $response = $this->actingAs($user)->get('http://localhost/');
+        $response->assertRedirect(route('admin.books.index'));
     }
 }

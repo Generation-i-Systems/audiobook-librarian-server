@@ -21,11 +21,12 @@ class Controller extends BaseController
      * Example: "genreId:12 Mistborn" → ['genre_id' => 12, 'search' => 'Mistborn', ...]
      * Compound: "authorId:5 genreId:12 Mistborn" → all three keys set
      */
-    protected function parseSearchTokens(string $raw): array
+    protected function parseSearchTokens(?string $raw): array
     {
         $result = ['author_id' => null, 'genre_id' => null, 'series_id' => null, 'search' => ''];
 
         $tokenMap = ['authorId' => 'author_id', 'genreId' => 'genre_id', 'seriesId' => 'series_id'];
+        $raw = $raw ?? '';
 
         $remaining = preg_replace_callback(
             '/\b(authorId|genreId|seriesId):(\d+)\b/',

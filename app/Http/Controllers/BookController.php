@@ -34,6 +34,8 @@ class BookController extends Controller
      */
     public function index(Request $request)
     {
+        $isLibrivoxMode = (string) config('library_profiles.active_source_mode', 'local') === 'librivox';
+
         // Memory monitoring
         $memoryStart = memory_get_usage();
         Log::debug('BookController index start', ['memory_mb' => round($memoryStart / 1024 / 1024, 2)]);
@@ -101,7 +103,7 @@ class BookController extends Controller
         $recentBooks = $this->getRecentBooks([], 5);
 
         // Get view preferences from session
-        $mainViewType = session('main_view_type', 'grid');
+        $mainViewType = $isLibrivoxMode ? 'list' : session('main_view_type', 'grid');
 
         // Pass pagination data to the view
         $pagination = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -119,6 +121,7 @@ class BookController extends Controller
             'authors' => $authors,
             'series' => $series,
             'recentBooks' => $recentBooks,
+            'isLibrivoxMode' => $isLibrivoxMode,
             'mainViewType' => $mainViewType,
             'mainPerPage' => $perPage,
             'currentFilters' => $filters,
@@ -201,6 +204,8 @@ class BookController extends Controller
      */
     public function jsonIndex(Request $request)
     {
+        $isLibrivoxMode = (string) config('library_profiles.active_source_mode', 'local') === 'librivox';
+
         // Get pagination and filter parameters from request
         $page = max(1, (int) $request->input('page', 1));
         $perPage = (int) $request->input('per_page', session('main_per_page', 24));
@@ -267,7 +272,7 @@ class BookController extends Controller
                 'current_page' => $result['currentPage'] ?? $result['current_page'] ?? $page,
                 'last_page' => $result['lastPage'] ?? $result['last_page'] ?? 1,
             ],
-            'view_type' => $request->input('view_type', session('main_view_type', 'grid')),
+            'view_type' => $isLibrivoxMode ? 'list' : $request->input('view_type', session('main_view_type', 'grid')),
         ];
 
         // Log::debug('JSON API Response for books.json: ' . json_encode($response, JSON_PRETTY_PRINT));
@@ -444,12 +449,13 @@ class BookController extends Controller
             'title' => (string) ($book['title'] ?? 'Unknown Title'),
             'authors' => [],
             'genres' => [],
-            'coverImage' => '/images/placeholder.png',
+            'coverImage' => null,
             'description' => 'No description available.',
             'createdAt' => date('Y-m-d H:i:s'),
             'duration' => '00:00:00',
             'narrators' => [],
             'series' => [],
+            'source' => null,
         ];
 
         foreach ($defaults as $key => $value) {
@@ -497,8 +503,8 @@ class BookController extends Controller
             $book['series'] = [];
         }
 
-        // Process cover image with directory path handling
         $book['coverImage'] = $this->processCoverImage($book['coverImage'] ?? null, $book['directoryPath'] ?? null);
+        $book['hasCoverImage'] = $book['coverImage'] !== null;
 
         return $book;
     }
@@ -536,18 +542,20 @@ class BookController extends Controller
             'authors' => $authors,
             'genres' => $genres,
             'coverImage' => $this->processCoverImage($book['coverImage'] ?? null, $book['directoryPath'] ?? null),
+            'hasCoverImage' => !empty($book['coverImage']),
             'description' => substr($book['description'] ?? 'No description available.', 0, 200),
             'series' => $series,
+            'source' => $book['source'] ?? null,
         ];
     }
 
     /**
      * Process cover image URL efficiently with directory path handling
      */
-    protected function processCoverImage(?string $coverImage, ?string $directoryPath = null): string
+    protected function processCoverImage(?string $coverImage, ?string $directoryPath = null): ?string
     {
         if (empty($coverImage)) {
-            return $this->normalizeCoverImageUrl(asset('images/placeholder.png'));
+            return null;
         }
 
         // If it's already a full URL, return as-is (avoid double processing)
