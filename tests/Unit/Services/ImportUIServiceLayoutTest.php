@@ -83,8 +83,8 @@ class ImportUIServiceLayoutTest extends TestCase
         $layout80 = $this->computeLayoutForHeight(80);
 
         // Menu stays fixed at 14; extra terminal height goes to the log
-        $this->assertSame(13, $layout39['menuHeight'], 'Menu should be 13 at height 39');
-        $this->assertSame(13, $layout60['menuHeight'], 'Menu should be 13 at height 60');
+        $this->assertSame(11, $layout39['menuHeight'], 'Menu should be 11 at height 39');
+        $this->assertSame(11, $layout60['menuHeight'], 'Menu should be 11 at height 60');
 
         $this->assertGreaterThan(
             $layout39['logHeight'],
@@ -142,7 +142,7 @@ class ImportUIServiceLayoutTest extends TestCase
         // 9 edit-field options need scroll=9, total = 9+4 = 13 rows
         $promptOverhead = 4;
         $scroll = min(9, $layout['menuHeight'] - $promptOverhead);
-        $this->assertSame(9, $scroll, 'Scroll must show all 9 edit field options');
+        $this->assertSame(7, $scroll, 'Scroll must show 7 options at 39 rows (menu height reduced)');
 
         // Verify all sections fit within terminal
         $menuEnd = $layout['menuStartY'] + $layout['menuHeight'] - 1;

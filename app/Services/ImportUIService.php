@@ -142,7 +142,7 @@ class ImportUIService implements ImportUIInterface
 
         // Work backwards from the bottom: fix the menu to 13 rows.
         // All remaining space goes to the activity log.
-        $fixedMenuHeight = 13;
+        $fixedMenuHeight = 11;
         $remaining = $totalHeight - $logY;
 
         // Menu gets its fixed allocation; log gets the rest
