@@ -28,14 +28,20 @@ class LibriVoxBookAdapter
         $info = $book->librivox_info ?? [];
         $coverImage = $book->cover_image ?? $info['cover_url'] ?? null;
 
+        $authorNames = array_column($authors, 'name');
+        $genreNames = array_column($genres, 'name');
+
         return [
             'id'               => (string) $book->id,
             'title'            => $book->title ?? '',
-            'author'           => array_column($authors, 'name'),
+            'author'           => $authorNames,
+            'authors'          => $authorNames,
             'authors_data'     => $authors,
             'narrator'         => [],
+            'narrators'        => [],
             'narrators_data'   => [],
-            'genre'            => array_column($genres, 'name'),
+            'genre'            => $genreNames,
+            'genres'           => $genreNames,
             'genres_data'      => $genres,
             'series'           => [],
             'series_data'      => [],
@@ -80,14 +86,20 @@ class LibriVoxBookAdapter
         $coverImage = $apiBook['cover_url'] ?? null;
         $duration = isset($apiBook['totaltimesecs']) ? (int) $apiBook['totaltimesecs'] : null;
 
+        $authorNames = array_column($authors, 'name');
+        $genreNames = array_column($genres, 'name');
+
         return [
             'id'               => $librivoxId,
             'title'            => (string) ($apiBook['title'] ?? ''),
-            'author'           => array_column($authors, 'name'),
+            'author'           => $authorNames,
+            'authors'          => $authorNames,
             'authors_data'     => $authors,
             'narrator'         => [],
+            'narrators'        => [],
             'narrators_data'   => [],
-            'genre'            => array_column($genres, 'name'),
+            'genre'            => $genreNames,
+            'genres'           => $genreNames,
             'genres_data'      => $genres,
             'series'           => [],
             'series_data'      => [],
