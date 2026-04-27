@@ -19,7 +19,7 @@ class UserApiTest extends TestCase
         $user = User::factory()->create([
             'name' => 'John Doe',
             'email' => 'john.doe@example.com',
-            'role' => 'standard',
+            'role' => 'library-user',
         ]);
 
         // Create a personal access token and authenticate via Authorization header
@@ -63,14 +63,14 @@ class UserApiTest extends TestCase
     }
 
     /**
-     * Test that the /me endpoint works with standard role.
+     * Test that the /me endpoint works with library-user role.
      */
-    public function testMeEndpointWorksWithStandardRole(): void
+    public function testMeEndpointWorksWithLibraryUserRole(): void
     {
         $user = User::factory()->create([
-            'name' => "Test standard",
-            'email' => "test.standard@example.com",
-            'role' => 'standard',
+            'name' => "Test library user",
+            'email' => "test.libraryuser@example.com",
+            'role' => 'library-user',
         ]);
 
         $token = $user->createToken('api-token')->plainTextToken;
@@ -80,8 +80,8 @@ class UserApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'name' => "Test standard",
-                'email' => "test.standard@example.com",
+                'name' => "Test library user",
+                'email' => "test.libraryuser@example.com",
             ]);
     }
 
@@ -117,7 +117,7 @@ class UserApiTest extends TestCase
         $user = User::factory()->create([
             'name' => '',
             'email' => 'no.name@example.com',
-            'role' => 'standard',
+            'role' => 'library-user',
         ]);
 
         // Create a token and authenticate via Authorization header

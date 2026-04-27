@@ -156,6 +156,16 @@ if (app()->environment('local')) {
 
 Route::get('/', function () {
     if (Auth::check()) {
+        if (config('library_profiles.active_source_mode') === 'librivox') {
+            return redirect()->route('admin.librivox.index');
+        }
+
+        $role = Auth::user()->role ?? '';
+        $libraryRoles = ['library-user', 'librivox-user', 'hybrid-user'];
+        if (in_array($role, $libraryRoles, true)) {
+            return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
+        }
+
         if (Auth::user()->is_admin) {
             return redirect()->route('admin.books.index')->with('status', 'Welcome to Audiobook Librarian!');
         }
@@ -207,7 +217,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/goals', [UserLibraryController::class, 'goals'])->name('goals');
     });
 
-    Route::resource('books', BookController::class)->only(['index', 'show']);
+    Route::resource('books', BookController::class)->only(['index', 'show'])->middleware('library');
     Route::get('/books/create', [
         \App\Http\Controllers\Admin\BookController::class,
         'showCreateForm',
@@ -262,8 +272,10 @@ Route::get('/csrf-token', fn () => response()->json(['csrf_token' => csrf_token(
 // Regular book routes (handled by the auth middleware group above)
 
 // JSON API endpoints for AJAX requests
-Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');
-Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
+Route::middleware(['auth', 'library'])->group(function (): void {
+    Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');
+    Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
+});
 Route::post('/books/set-preference', [BookController::class, 'setPreference'])->name('books.set-preference');
 
 // General image proxy for covers and previews
@@ -481,6 +493,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class)->except(['create']);
+    Route::post('books/{book}/autofill-from-path', [Admin\BookController::class, 'autofillFromPath'])
+        ->name('books.autofillFromPath');
     Route::get('books/create', [BookFormController::class, 'create'])->name('books.create');
     Route::get('books/{id}/download-zip', [BookExportController::class, 'download'])->name('books.downloadZip');
     Route::get('books/{id}/raw-json', [BookJsonController::class, 'getRawJson'])->name('books.rawJson');
@@ -542,6 +556,18 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\SeriesController::class,
         'destroy',
     ])->name('series.destroy');
+
+    // LibriVox management
+    Route::prefix('librivox')->name('librivox.')->group(function (): void {
+        Route::get('/', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'index'])->name('index');
+        Route::get('/search', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'search'])->name('search');
+        Route::get('/genres', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genres'])->name('genres');
+        Route::get('/genres/{genre}', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genreBooks'])->name('genre.books')->where('genre', '.+');
+        Route::get('/authors', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authors'])->name('authors');
+        Route::get('/authors/{authorId}/books', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authorBooks'])->name('author.books');
+        Route::post('/sync', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'triggerSync'])->name('sync');
+        Route::post('/sync/cancel', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'cancelSync'])->name('sync.cancel');
+    });
 
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [

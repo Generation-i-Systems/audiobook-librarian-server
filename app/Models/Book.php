@@ -64,6 +64,8 @@ use App\Traits\Auditable;
  * @property array<array-key, mixed>|null $google_books_info
  * @property array<array-key, mixed>|null $audiobook_bay_info
  * @property array<array-key, mixed>|null $hardcover_info
+ * @property string|null $librivox_id
+ * @property array<array-key, mixed>|null $librivox_info
  * @property array<array-key, mixed>|null $mongo_record
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -169,6 +171,9 @@ class Book extends Model
         'google_books_info',
         'hardcover_info',
         'audiobook_bay_info',
+        'librivox_id',
+        'librivox_info',
+        'year',
     ];
 
     /**
@@ -188,6 +193,7 @@ class Book extends Model
         'google_books_info' => 'array',
         'hardcover_info' => 'array',
         'audiobook_bay_info' => 'array',
+        'librivox_info' => 'array',
         'directory_exists' => 'boolean',
         'directory_last_checked' => 'datetime',
         'created_at' => 'datetime',

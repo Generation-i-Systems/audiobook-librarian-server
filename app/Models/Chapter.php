@@ -10,10 +10,13 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property int $id
  * @property int $book_id
  * @property int $chapter_number
+ * @property string|null $title
+ * @property string|null $reader
  * @property string $file_name
  * @property string $format
  * @property int $duration
  * @property int $size_bytes
+ * @property string|null $listen_url
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
@@ -40,10 +43,13 @@ class Chapter extends Model
     protected $fillable = [
         'book_id',
         'chapter_number',
+        'title',
+        'reader',
         'file_name',
         'format',
         'duration',
         'size_bytes',
+        'listen_url',
     ];
 
     public function book()

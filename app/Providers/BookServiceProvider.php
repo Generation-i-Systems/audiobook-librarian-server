@@ -6,6 +6,7 @@ use App\Contracts\BookServiceInterface;
 use App\Services\AudibleService;
 use App\Services\GoogleBooksApiService;
 use App\Services\HardcoverService;
+use App\Services\LibriVoxApiService;
 use Illuminate\Support\ServiceProvider;
 
 class BookServiceProvider extends ServiceProvider
@@ -22,6 +23,10 @@ class BookServiceProvider extends ServiceProvider
         // Register each book service
         $this->registerBookService('audible', function () {
             return new AudibleService();
+        });
+
+        $this->registerBookService('librivox', function () {
+            return new LibriVoxApiService();
         });
 
         // TODO: Register other services once they're updated to use the interface

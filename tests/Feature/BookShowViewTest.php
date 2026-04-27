@@ -26,7 +26,7 @@ class BookShowViewTest extends TestCase
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
             'email_verified_at' => now(),
-            'role' => 'standard',
+            'role' => 'library-user',
         ]);
 
         // Set up test book data first

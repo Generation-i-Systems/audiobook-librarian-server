@@ -18,7 +18,7 @@ class BookApiAutocompleteAuthorsTest extends TestCase
         parent::setUp();
         $this->withoutMiddleware([\App\Http\Middleware\RequireStandardRole::class]);
 
-        $user = new DocumentstoreUser(['id' => 'test-user', 'name' => 'Test User', 'email' => 'test@example.com', 'role' => 'standard']);
+        $user = new DocumentstoreUser(['id' => 'test-user', 'name' => 'Test User', 'email' => 'test@example.com', 'role' => 'library-user']);
 
         // Mock the DocumentStoreServiceInterface to return our test user's attributes
         $this->documentStoreMock = Mockery::mock(DocumentStoreServiceInterface::class);

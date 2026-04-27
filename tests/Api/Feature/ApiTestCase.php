@@ -23,7 +23,7 @@ abstract class ApiTestCase extends TestCase
 
         // Create a test user and authenticate
         $this->user = User::factory()->create([
-            'role' => 'standard',
+            'role' => 'library-user',
             'email_verified_at' => now(),
         ]);
 

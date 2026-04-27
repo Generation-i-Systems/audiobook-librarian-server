@@ -270,7 +270,7 @@ class AuthControllerTest extends TestCase
             'username' => 'testuser' . $uniqueSuffix,
             'email' => $testEmail,
             'password' => Hash::make('password'),
-            'role' => 'standard',
+            'role' => 'library-user',
         ]);
 
         // Log in to get a valid token

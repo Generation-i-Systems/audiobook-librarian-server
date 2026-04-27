@@ -99,11 +99,18 @@ class LoginController extends Controller
         return redirect()->intended($this->redirectPath());
     }
 
+    private function googleRedirectUri(): string
+    {
+        return request()->getSchemeAndHttpHost() . '/login/google/callback';
+    }
+
     /**
      * Redirect the user to the Google authentication page.
      */
     public function redirectToGoogle()
     {
+        config(['services.google.redirect' => $this->googleRedirectUri()]);
+
         return Socialite::driver('google')->redirect();
     }
 
@@ -115,6 +122,7 @@ class LoginController extends Controller
     public function handleGoogleCallback()
     {
         try {
+            config(['services.google.redirect' => $this->googleRedirectUri()]);
             $googleUser = Socialite::driver('google')->user();
         } catch (\Exception $e) {
             Log::error('Google login error: ' . $e->getMessage());

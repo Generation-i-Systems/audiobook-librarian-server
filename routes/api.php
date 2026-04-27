@@ -153,6 +153,7 @@ Route::prefix('v1')->group(function () {
             ->where('file', '.*')
             ->name('api.books.downloadFile');
         Route::get('/books/{book}/download-url', [BookDownloadController::class, 'downloadUrl']);
+        Route::get('/download/remote', [BookDownloadController::class, 'remoteDownload'])->name('api.download.remote');
         Route::get('/books/browse', [BookApiController::class, 'browse']);
         Route::get('/books/search', [BookApiController::class, 'search']);
         Route::post('/books/queue/download', [BookDownloadController::class, 'queueDownload']);

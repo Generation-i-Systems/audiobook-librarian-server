@@ -6,8 +6,13 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
 use App\Services\AudioFileAnalyzer;
+use App\Services\AudibleService;
+use App\Services\AudiobookBayService;
 use App\Services\BookDirectoryMoveService;
+use App\Services\BookDirectoryParser;
 use App\Services\ExternalCoverService;
+use App\Services\GoogleBooksApiService;
+use App\Services\HardcoverService;
 use App\Traits\BookImportTrait;
 use App\Traits\HandlesLibraryJson;
 use App\Traits\ProcessesBookData;
@@ -54,6 +59,10 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
+        if (config('library_profiles.active_source_mode') === 'librivox') {
+            return redirect()->route('admin.librivox.index');
+        }
+
         // Emergency: Increase memory limit aggressively
         try {
             // Get pagination and filter parameters from request
@@ -1201,6 +1210,442 @@ class BookController extends Controller
         // Redirect to returnUrl if present, else fallback to last list or main index
         $returnUrl = $request->input('returnUrl') ?? session('last_admin_list_url') ?? route('admin.books.index');
         return redirect($returnUrl)->with('success', 'Book updated successfully');
+    }
+
+    public function autofillFromPath(Request $request, string $book)
+    {
+        $returnUrl = $request->input('return_url') ?? session('last_admin_list_url') ?? route('admin.books.index');
+        $bookData = $this->documentStoreService->getBook($book);
+
+        if (!$bookData) {
+            return redirect($returnUrl)->with('error', 'Book not found.');
+        }
+
+        $directoryPath = trim((string) ($bookData['directoryPath'] ?? ''));
+        if ($directoryPath === '') {
+            return redirect($returnUrl)->with('error', 'Cannot autofill: book has no directory path.');
+        }
+
+        $seed = $this->buildAutofillSearchSeed($directoryPath);
+        if ($seed['title'] === '') {
+            return redirect($returnUrl)->with('error', 'Could not derive a title from the directory path.');
+        }
+
+        $match = $this->findBestAutofillMatch($seed['title'], $seed['author']);
+        if ($match === null) {
+            return redirect($returnUrl)
+                ->with('error', 'No metadata match found from path-derived search (Audible/Google/AudiobookBay/Hardcover).');
+        }
+
+        $updates = $this->buildAutofillUpdatesFromResult($match['result'], $match['source'], $bookData, $seed);
+        if (empty($updates)) {
+            return redirect($returnUrl)->with('error', 'Autofill match found, but no usable metadata was returned.');
+        }
+
+        $this->documentStoreService->updateBook($book, $updates);
+
+        return redirect($returnUrl)->with(
+            'success',
+            'Autofilled metadata using ' . ucfirst($match['source']) . ' from directory-path search.'
+        );
+    }
+
+    private function buildAutofillSearchSeed(string $directoryPath): array
+    {
+        $normalizedPath = trim(str_replace('\\', '/', $directoryPath), '/');
+        $segments = array_values(array_filter(explode('/', $normalizedPath), fn ($part) => $part !== ''));
+        $leaf = $segments[count($segments) - 1] ?? '';
+
+        $title = trim($leaf);
+        $author = '';
+        $series = '';
+
+        if (str_contains($leaf, ' - ')) {
+            [$left, $right] = array_map('trim', explode(' - ', $leaf, 2));
+            if ($right !== '') {
+                $author = $left;
+                $title = $right;
+            }
+        }
+
+        if ($title !== '') {
+            $title = preg_replace('/^\d+\s*[-._)]\s*/', '', $title) ?: $title;
+            $title = preg_replace('/\s+\(Unabridged\)$/i', '', $title) ?: $title;
+            $title = trim($title);
+        }
+
+        try {
+            $parsedAuthor = app(BookDirectoryParser::class)->extractAuthorFromPath($normalizedPath);
+            if ($parsedAuthor !== '' && strtolower($parsedAuthor) !== 'unknown author') {
+                $author = $parsedAuthor;
+            }
+        } catch (\Throwable $e) {
+            Log::debug('autofillFromPath: failed to parse author from path', [
+                'directoryPath' => $directoryPath,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if (count($segments) >= 2) {
+            $parent = trim($segments[count($segments) - 2]);
+            if ($parent !== '' && !str_contains($parent, ' - ') && $parent !== $author) {
+                $series = $parent;
+            }
+        }
+
+        return [
+            'title' => $title,
+            'author' => trim($author),
+            'series' => $series,
+        ];
+    }
+
+    private function findBestAutofillMatch(string $title, string $author): ?array
+    {
+        $audibleService = app(AudibleService::class);
+        $audibleResults = $audibleService->searchBooksWithFiltering($title, $author !== '' ? $author : null, ['limit' => 10]);
+        if (!empty($audibleResults)) {
+            return [
+                'source' => 'audible',
+                'result' => $audibleResults[0],
+            ];
+        }
+
+        $fallbackCandidates = [];
+
+        try {
+            $googleService = app(GoogleBooksApiService::class);
+            $authorQuery = $author !== '' ? ' inauthor:"' . $author . '"' : '';
+            $query = trim('intitle:"' . $title . '"' . $authorQuery);
+            $googleResults = $googleService->searchBooks($query, ['limit' => 10]);
+            foreach ($googleResults as $result) {
+                $fallbackCandidates[] = ['source' => 'googlebooks', 'result' => $result];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('autofillFromPath: Google Books fallback search failed', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $audiobookBayService = app(AudiobookBayService::class);
+            $searchQuery = trim($title . ' ' . $author);
+            $audiobookBayResults = $audiobookBayService->searchBooks($searchQuery, ['limit' => 10]);
+            foreach ($audiobookBayResults ?? [] as $result) {
+                $fallbackCandidates[] = ['source' => 'audiobookbay', 'result' => $result];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('autofillFromPath: AudiobookBay fallback search failed', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $hardcoverService = app(HardcoverService::class);
+            if ($hardcoverService->isAvailable()) {
+                $hardcoverResults = $hardcoverService->searchBooks($title, [
+                    'author' => $author,
+                    'limit' => 10,
+                ]);
+                foreach ($hardcoverResults ?? [] as $result) {
+                    $fallbackCandidates[] = ['source' => 'hardcover', 'result' => $result];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('autofillFromPath: Hardcover fallback search failed', ['error' => $e->getMessage()]);
+        }
+
+        if (empty($fallbackCandidates)) {
+            return null;
+        }
+
+        usort($fallbackCandidates, function (array $left, array $right) use ($title, $author): int {
+            return $this->scoreAutofillCandidate($right['result'], $title, $author)
+                <=> $this->scoreAutofillCandidate($left['result'], $title, $author);
+        });
+
+        return $fallbackCandidates[0];
+    }
+
+    private function scoreAutofillCandidate(array $result, string $expectedTitle, string $expectedAuthor): int
+    {
+        $score = 0;
+
+        $candidateTitle = trim((string) ($result['title'] ?? ''));
+        $candidateAuthorList = $this->extractAuthorsFromResult($result);
+        $candidateAuthor = trim((string) ($candidateAuthorList[0] ?? ''));
+
+        if ($candidateTitle !== '') {
+            similar_text(
+                $this->normalizeForSimilarity($candidateTitle),
+                $this->normalizeForSimilarity($expectedTitle),
+                $titleSimilarity
+            );
+            $score += (int) round($titleSimilarity);
+        }
+
+        if ($expectedAuthor !== '' && $candidateAuthor !== '') {
+            $expected = $this->normalizeForSimilarity($expectedAuthor);
+            $actual = $this->normalizeForSimilarity($candidateAuthor);
+            if ($expected === $actual) {
+                $score += 40;
+            } elseif (str_contains($actual, $expected) || str_contains($expected, $actual)) {
+                $score += 20;
+            }
+        }
+
+        if ($this->extractCoverUrlFromResult($result) !== null) {
+            $score += 5;
+        }
+
+        return $score;
+    }
+
+    private function normalizeForSimilarity(string $value): string
+    {
+        $value = strtolower($value);
+        $value = preg_replace('/[^a-z0-9\s]/', ' ', $value) ?: $value;
+        $value = preg_replace('/\s+/', ' ', $value) ?: $value;
+
+        return trim($value);
+    }
+
+    private function buildAutofillUpdatesFromResult(array $result, string $source, array $bookData, array $seed): array
+    {
+        $updates = [];
+
+        $resolvedTitle = trim((string) ($result['title'] ?? $seed['title'] ?? ''));
+        if ($resolvedTitle !== '') {
+            $updates['title'] = $resolvedTitle;
+        }
+
+        $authors = $this->extractAuthorsFromResult($result);
+        if (empty($authors) && !empty($seed['author'])) {
+            $authors = [$seed['author']];
+        }
+
+        if (!empty($authors)) {
+            $updates['author'] = $authors;
+            try {
+                $updates['authors'] = $this->documentStoreService->findOrCreateMany('authors', $authors);
+            } catch (\Throwable $e) {
+                Log::warning('autofillFromPath: author ID resolution failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        $narrators = $this->extractNarratorsFromResult($result);
+        if (!empty($narrators)) {
+            $updates['narrator'] = $narrators;
+            try {
+                $updates['narrators'] = $this->documentStoreService->findOrCreateMany('narrators', $narrators);
+            } catch (\Throwable $e) {
+                Log::warning('autofillFromPath: narrator ID resolution failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        [$seriesName, $seriesNumber] = $this->extractSeriesFromResult($result);
+        if ($seriesName === '' && !empty($seed['series'])) {
+            $seriesName = trim((string) $seed['series']);
+        }
+        if ($seriesName !== '') {
+            $existingSeries = $this->documentStoreService->getSeriesByName($seriesName);
+            $seriesId = $existingSeries['id'] ?? null;
+            if (!$seriesId) {
+                $seriesId = $this->documentStoreService->createSeries($seriesName);
+            }
+            $updates['series'] = [[
+                'id' => $seriesId,
+                'seriesName' => $seriesName,
+                'number' => $seriesNumber,
+            ]];
+        }
+
+        $description = trim((string) ($result['description'] ?? ''));
+        if ($description !== '') {
+            $updates['description'] = $description;
+        }
+
+        $releaseDate = $this->extractReleaseDateFromResult($result);
+        if ($releaseDate !== null) {
+            $updates['release_date'] = $releaseDate;
+        }
+
+        if ($source === 'audible') {
+            $audibleId = trim((string) ($result['id'] ?? $result['asin'] ?? ''));
+            if ($audibleId !== '') {
+                $updates['audibleId'] = $audibleId;
+            }
+        }
+        if ($source === 'googlebooks') {
+            $googleBooksId = trim((string) ($result['id'] ?? $result['googlebooksId'] ?? ''));
+            if ($googleBooksId !== '') {
+                $updates['googleBooksId'] = $googleBooksId;
+            }
+        }
+        if ($source === 'hardcover') {
+            $hardcoverId = trim((string) ($result['id'] ?? $result['hardcoverId'] ?? ''));
+            if ($hardcoverId !== '') {
+                $updates['hardcoverId'] = $hardcoverId;
+            }
+        }
+
+        $coverUrl = $this->extractCoverUrlFromResult($result);
+        $directoryPath = trim((string) ($bookData['directoryPath'] ?? ''));
+        if ($coverUrl !== null && $directoryPath !== '') {
+            $coverSource = $source === 'audible' ? 'audible' : 'googlebooks';
+            $sourceId = trim((string) ($result['id'] ?? ''));
+
+            $coverResult = $this->externalCoverService->downloadCoverImage(
+                $coverUrl,
+                $directoryPath,
+                $coverSource,
+                $sourceId !== '' ? $sourceId : null
+            );
+
+            if (($coverResult['success'] ?? false) === true && !empty($coverResult['path'])) {
+                $updates['coverImage'] = basename((string) $coverResult['path']);
+            }
+        }
+
+        return $updates;
+    }
+
+    private function extractAuthorsFromResult(array $result): array
+    {
+        $raw = $result['author'] ?? $result['authors'] ?? $result['audibleAuthors'] ?? [];
+        $names = [];
+
+        if (is_string($raw)) {
+            $names[] = $raw;
+        } elseif (is_array($raw)) {
+            foreach ($raw as $value) {
+                if (is_string($value)) {
+                    $names[] = $value;
+                    continue;
+                }
+
+                if (is_array($value)) {
+                    $authorValue = $value['author'] ?? null;
+                    if (is_string($authorValue)) {
+                        $names[] = $authorValue;
+                        continue;
+                    }
+
+                    if (is_array($authorValue) && isset($authorValue['name']) && is_string($authorValue['name'])) {
+                        $names[] = $authorValue['name'];
+                        continue;
+                    }
+
+                    if (isset($value['name']) && is_string($value['name'])) {
+                        $names[] = $value['name'];
+                    }
+                }
+            }
+        }
+
+        $names = array_values(array_unique(array_filter(array_map('trim', $names), fn ($name) => $name !== '')));
+
+        return $names;
+    }
+
+    private function extractNarratorsFromResult(array $result): array
+    {
+        $raw = $result['narrator'] ?? $result['narrators'] ?? $result['audibleNarrators'] ?? [];
+        $names = [];
+
+        if (is_string($raw)) {
+            $names[] = $raw;
+        } elseif (is_array($raw)) {
+            foreach ($raw as $value) {
+                if (is_string($value)) {
+                    $names[] = $value;
+                    continue;
+                }
+
+                if (is_array($value)) {
+                    $narratorValue = $value['narrator'] ?? null;
+                    if (is_string($narratorValue)) {
+                        $names[] = $narratorValue;
+                        continue;
+                    }
+
+                    if (is_array($narratorValue) && isset($narratorValue['name']) && is_string($narratorValue['name'])) {
+                        $names[] = $narratorValue['name'];
+                        continue;
+                    }
+
+                    if (isset($value['name']) && is_string($value['name'])) {
+                        $names[] = $value['name'];
+                    }
+                }
+            }
+        }
+
+        $names = array_values(array_unique(array_filter(array_map('trim', $names), fn ($name) => $name !== '')));
+
+        return $names;
+    }
+
+    private function extractSeriesFromResult(array $result): array
+    {
+        $seriesName = '';
+        $seriesNumber = '';
+
+        if (isset($result['series']) && is_string($result['series'])) {
+            $seriesName = trim($result['series']);
+        } elseif (isset($result['series']) && is_array($result['series'])) {
+            if (isset($result['series']['name']) && is_string($result['series']['name'])) {
+                $seriesName = trim($result['series']['name']);
+                $seriesNumber = trim((string) ($result['series']['part'] ?? ''));
+            } else {
+                $firstKey = array_key_first($result['series']);
+                if (is_string($firstKey)) {
+                    $seriesName = trim($firstKey);
+                    $seriesNumber = trim((string) ($result['series'][$firstKey] ?? ''));
+                }
+            }
+        }
+
+        if (isset($result['seriesName']) && is_string($result['seriesName']) && trim($result['seriesName']) !== '') {
+            $seriesName = trim($result['seriesName']);
+        }
+        if (isset($result['seriesNumber']) && trim((string) $result['seriesNumber']) !== '') {
+            $seriesNumber = trim((string) $result['seriesNumber']);
+        }
+
+        return [$seriesName, $seriesNumber];
+    }
+
+    private function extractReleaseDateFromResult(array $result): ?string
+    {
+        $rawDate = $result['release_date'] ?? $result['releaseDate'] ?? $result['published_date'] ?? null;
+        if (is_string($rawDate) && trim($rawDate) !== '') {
+            try {
+                return \Carbon\Carbon::parse($rawDate)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                Log::debug('autofillFromPath: could not parse release date', ['value' => $rawDate]);
+            }
+        }
+
+        $rawYear = $result['publishedYear'] ?? $result['year'] ?? null;
+        if ($rawYear !== null && preg_match('/^\d{4}$/', (string) $rawYear)) {
+            return (string) $rawYear . '-01-01';
+        }
+
+        return null;
+    }
+
+    private function extractCoverUrlFromResult(array $result): ?string
+    {
+        $coverUrl = $result['audibleCoverImageUrl']
+            ?? $result['coverImageUrl']
+            ?? $result['cover_image_url']
+            ?? $result['cover']
+            ?? null;
+
+        if (!is_string($coverUrl)) {
+            return null;
+        }
+
+        $coverUrl = trim($coverUrl);
+
+        return $coverUrl !== '' ? $coverUrl : null;
     }
 
     /**

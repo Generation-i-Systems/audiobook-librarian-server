@@ -86,6 +86,75 @@
             background-color: #0d6efd;
             color: white;
         }
+
+        .book-media-panel {
+            background: #f8f9fa;
+            border-top-left-radius: 0.375rem;
+            border-top-right-radius: 0.375rem;
+            min-height: 160px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .book-media-panel--compact {
+            min-height: 120px;
+        }
+
+        .book-media-panel--recent-compact {
+            min-height: 96px;
+            border-top-right-radius: 0;
+            border-bottom-left-radius: 0.375rem;
+            border-bottom-right-radius: 0;
+        }
+
+        .book-media-panel--coverless {
+            background: linear-gradient(160deg, #f8f9fa 0%, #eef2ff 100%);
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.75rem;
+        }
+
+        .book-media-panel__badge {
+            align-self: flex-start;
+            background: rgba(13, 110, 253, 0.12);
+            border-radius: 999px;
+            color: #0d6efd;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            padding: 0.25rem 0.55rem;
+            text-transform: uppercase;
+        }
+
+        .book-media-panel__icon {
+            color: #6c757d;
+            font-size: 1.75rem;
+        }
+
+        .book-media-panel--compact .book-media-panel__icon,
+        .book-media-panel--recent-compact .book-media-panel__icon {
+            font-size: 1.35rem;
+        }
+
+        .book-media-panel__meta {
+            color: #6c757d;
+            font-size: 0.75rem;
+            text-align: center;
+        }
+
+        .book-list-media-fallback {
+            align-items: center;
+            background: #f8f9fa;
+            border-radius: 0.375rem;
+            color: #6c757d;
+            display: inline-flex;
+            height: 64px;
+            justify-content: center;
+            width: 48px;
+        }
     </style>
 @endpush
 
@@ -95,6 +164,7 @@
 
         @php
 $showFilters = request()->has('search') || request()->has('genre_id') || request()->has('author_id') || request()->has('series');
+$isLibrivoxMode = $isLibrivoxMode ?? false;
         @endphp
 
         <!-- Show Recently Added Books Only If There Are No Filters And There Are Recent Books -->
@@ -103,10 +173,12 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Recent Books</h5>
                     <div class="btn-group" role="group" aria-label="View options">
-                        <button class="btn btn-sm btn-outline-secondary view-toggle-btn active" id="recent-grid-btn"
-                            data-view="grid"><i class="fas fa-th"></i> Grid</button>
-                        <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-compact-btn"
-                            data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
+                        @if(!$isLibrivoxMode)
+                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn active" id="recent-grid-btn"
+                                data-view="grid"><i class="fas fa-th"></i> Grid</button>
+                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-compact-btn"
+                                data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
+                        @endif
                         <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-list-btn"
                             data-view="list"><i class="fas fa-list"></i> List</button>
                     </div>
@@ -119,7 +191,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                     <div class="row g-2" id="recent-books-grid" style="display: flex; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-                                $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                                $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
+                                $cover = $hasCover ? $book['coverImage'] : null;
+                                $sourceLabel = ($book['source'] ?? null) === 'librivox' ? 'LibriVox' : 'Audiobook';
                                 $title = $book['title'] ?? 'Untitled';
                                 $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
@@ -127,12 +201,19 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                 <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link"
                                     style="color:inherit">
                                     <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                        <div class="pt-3"
-                                            style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-                                            <img src="{{ $cover }}" class="card-img-top book-cover-thumb"
-                                                alt="{{ is_array($book['title']) ? ($book['title'][0] ?? 'Untitled') : ($book['title'] ?? 'Untitled') }}"
-                                                style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
-                                        </div>
+                                        @if($hasCover)
+                                            <div class="book-media-panel pt-3">
+                                                <img src="{{ $cover }}" class="card-img-top book-cover-thumb"
+                                                    alt="{{ is_array($book['title']) ? ($book['title'][0] ?? 'Untitled') : ($book['title'] ?? 'Untitled') }}"
+                                                    style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                                            </div>
+                                        @else
+                                            <div class="book-media-panel book-media-panel--coverless" data-source="{{ strtolower($sourceLabel) }}">
+                                                <span class="book-media-panel__badge">{{ $sourceLabel }}</span>
+                                                <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
+                                                <span class="book-media-panel__meta">Cover unavailable</span>
+                                            </div>
+                                        @endif
                                         <div class="card-body p-2">
                                             <h6 class="card-title small mb-0">
                                                 {{ $title }}
@@ -163,7 +244,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                     <div class="row g-2" id="recent-books-compact" style="display: none; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-                                $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                                $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
+                                $cover = $hasCover ? $book['coverImage'] : null;
+                                $sourceLabel = ($book['source'] ?? null) === 'librivox' ? 'LibriVox' : 'Audiobook';
                                 $title = $book['title'] ?? 'Untitled';
                                 $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
@@ -172,11 +255,22 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                     style="color:inherit">
                                     <div class="card h-100 book-card-hover" data-book-id="{{ $book['id'] }}">
                                         <div class="row g-0">
-                                            <div class="col-4"
-                                                style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-bottom-left-radius: 0.375rem;">
-                                                <img src="{{ $cover }}" class="img-fluid rounded-start" alt="{{ $title }}"
-                                                    style="height: 96px; width: auto; object-fit: contain;">
-                                            </div>
+                                            @if($hasCover)
+                                                <div class="col-4">
+                                                    <div class="book-media-panel book-media-panel--recent-compact">
+                                                        <img src="{{ $cover }}" class="img-fluid rounded-start" alt="{{ $title }}"
+                                                            style="height: 96px; width: auto; object-fit: contain;">
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <div class="col-4">
+                                                    <div class="book-media-panel book-media-panel--recent-compact book-media-panel--coverless"
+                                                        data-source="{{ strtolower($sourceLabel) }}">
+                                                        <span class="book-media-panel__badge">{{ $sourceLabel }}</span>
+                                                        <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
+                                                    </div>
+                                                </div>
+                                            @endif
                                             <div class="col-8">
                                                 <div class="card-body p-2">
                                                     <h6 class="card-title mb-0">
@@ -218,12 +312,17 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                     <tr>
                                         <td>
                                             @php
-                                                $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                                                $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
+                                                $cover = $hasCover ? $book['coverImage'] : null;
                                                 $title = $book['title'] ?? 'Untitled';
                                                 $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                                             @endphp
-                                            <img src="{{ $cover }}" alt="{{ $title }}"
-                                                style="height: 64px; width: auto; max-width: 48px; object-fit: contain;">
+                                            @if($hasCover)
+                                                <img src="{{ $cover }}" alt="{{ $title }}"
+                                                    style="height: 64px; width: auto; max-width: 48px; object-fit: contain;">
+                                            @else
+                                                <span class="book-list-media-fallback"><i class="fas fa-headphones-alt" aria-hidden="true"></i></span>
+                                            @endif
                                         </td>
                                         <td>
                                             <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none">
@@ -302,10 +401,12 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="btn-group" role="group" aria-label="View options">
-                <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-grid-btn" data-view="grid"><i
-                        class="fas fa-th"></i> Grid</button>
-                <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-compact-btn"
-                    data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
+                @if(!$isLibrivoxMode)
+                    <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-grid-btn" data-view="grid"><i
+                            class="fas fa-th"></i> Grid</button>
+                    <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-compact-btn"
+                        data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
+                @endif
                 <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-list-btn" data-view="list"><i
                         class="fas fa-list"></i> List</button>
             </div>
@@ -365,7 +466,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 @if(isset($books) && count($books) > 0)
                     @foreach($books as $book)
                         @php
-                            $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                            $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
+                            $cover = $hasCover ? $book['coverImage'] : null;
+                            $sourceLabel = ($book['source'] ?? null) === 'librivox' ? 'LibriVox' : 'Audiobook';
                             $title = $book['title'] ?? 'Unknown Title';
                             $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
                             $authors = !empty($book['authors']) && is_array($book['authors']) ? implode(', ', $book['authors']) : 'Unknown';
@@ -383,10 +486,18 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                         <div class="col-md-3 mb-4">
                             <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
                                 <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                    <div class="pt-3" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-                                        <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
-                                             style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
-                                    </div>
+                                    @if($hasCover)
+                                        <div class="book-media-panel pt-3">
+                                            <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
+                                                 style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                                        </div>
+                                    @else
+                                        <div class="book-media-panel book-media-panel--coverless" data-source="{{ strtolower($sourceLabel) }}">
+                                            <span class="book-media-panel__badge">{{ $sourceLabel }}</span>
+                                            <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
+                                            <span class="book-media-panel__meta">Cover unavailable</span>
+                                        </div>
+                                    @endif
                                     <div class="card-body p-2">
                                         <h6 class="card-title small mb-0">{{ $title }}</h6>
                                         <p class="card-text small mb-0">{{ $authors }}</p>
@@ -409,7 +520,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 @if(isset($books) && count($books) > 0)
                     @foreach($books as $book)
                         @php
-                            $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                            $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
+                            $cover = $hasCover ? $book['coverImage'] : null;
+                            $sourceLabel = ($book['source'] ?? null) === 'librivox' ? 'LibriVox' : 'Audiobook';
                             $title = $book['title'] ?? 'Unknown Title';
                             $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
                             $authors = !empty($book['authors']) && is_array($book['authors']) ? implode(', ', $book['authors']) : 'Unknown';
@@ -427,10 +540,18 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                         <div class="col-md-2 mb-3">
                             <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
                                 <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                    <div class="pt-2" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-                                        <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
-                                             style="height: 120px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
-                                    </div>
+                                    @if($hasCover)
+                                        <div class="book-media-panel book-media-panel--compact pt-2">
+                                            <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
+                                                 style="height: 120px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                                        </div>
+                                    @else
+                                        <div class="book-media-panel book-media-panel--compact book-media-panel--coverless" data-source="{{ strtolower($sourceLabel) }}">
+                                            <span class="book-media-panel__badge">{{ $sourceLabel }}</span>
+                                            <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
+                                            <span class="book-media-panel__meta">Cover unavailable</span>
+                                        </div>
+                                    @endif
                                     <div class="card-body p-2">
                                         <h6 class="card-title small mb-0" style="font-size: 0.8rem;">{{ $title }}</h6>
                                         <p class="card-text small mb-0" style="font-size: 0.75rem;">{{ $authors }}</p>
@@ -465,7 +586,8 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                         @if(isset($books) && count($books) > 0)
                             @foreach($books as $book)
                                 @php
-                                    $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                                    $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
+                                    $cover = $hasCover ? $book['coverImage'] : null;
                                     $title = $book['title'] ?? 'Unknown Title';
                                     $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
                                     $authors = !empty($book['authors']) && is_array($book['authors']) ? implode(', ', $book['authors']) : 'Unknown';
@@ -483,7 +605,11 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                 @endphp
                                 <tr>
                                     <td>
-                                        <img src="{{ $cover }}" alt="{{ $title }}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">
+                                        @if($hasCover)
+                                            <img src="{{ $cover }}" alt="{{ $title }}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">
+                                        @else
+                                            <span class="book-list-media-fallback"><i class="fas fa-headphones-alt" aria-hidden="true"></i></span>
+                                        @endif
                                     </td>
                                     <td>
                                         <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none">{{ $title }}</a>
@@ -522,37 +648,47 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const librivoxListOnly = @json($isLibrivoxMode);
+
             // Toggle recent books visibility
             const toggleButton = document.getElementById('toggle-recent-books');
             const recentBooksBlock = document.getElementById('recent-books-block');
             const toggleText = document.getElementById('recent-books-toggle-text');
 
-            toggleButton.addEventListener('click', function () {
-                if (recentBooksBlock.style.display === 'none') {
-                    recentBooksBlock.style.display = 'block';
-                    toggleText.textContent = 'Hide';
-                } else {
-                    recentBooksBlock.style.display = 'none';
-                    toggleText.textContent = 'Show';
-                }
-            });
+            if (toggleButton && recentBooksBlock) {
+                toggleButton.addEventListener('click', function () {
+                    if (recentBooksBlock.style.display === 'none') {
+                        recentBooksBlock.style.display = 'block';
+                        if (toggleText) toggleText.textContent = 'Hide';
+                    } else {
+                        recentBooksBlock.style.display = 'none';
+                        if (toggleText) toggleText.textContent = 'Show';
+                    }
+                });
+            }
 
             // Recent books view type toggle
             const recentViewButtons = document.querySelectorAll('.recent-view-type');
             const recentViews = document.querySelectorAll('.recent-view');
 
             // Initialize view - show grid view by default
-            $('#recent-books-grid').show();
-            $('#recent-books-compact, #recent-books-list').hide();
+            if (librivoxListOnly) {
+                $('#recent-books-list').show();
+                $('#recent-books-grid, #recent-books-compact').hide();
+                $('#recent-list-btn').addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
+            } else {
+                $('#recent-books-grid').show();
+                $('#recent-books-compact, #recent-books-list').hide();
 
-            // Set active button for recent books view
-            $('#recent-grid-btn').addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
-            $('#recent-compact-btn, #recent-list-btn').removeClass('active').removeClass('btn-secondary').addClass('btn-outline-secondary');
+                // Set active button for recent books view
+                $('#recent-grid-btn').addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
+                $('#recent-compact-btn, #recent-list-btn').removeClass('active').removeClass('btn-secondary').addClass('btn-outline-secondary');
+            }
 
             // Variables for pagination and view state
             let currentMainPage = 1;
             let mainPerPage = 24;
-            let mainViewType = '{{ session("main_view_type", "grid") }}';
+            let mainViewType = librivoxListOnly ? 'list' : '{{ $mainViewType }}';
 
             // Route variables with placeholders
             const bookShowRoute = '{{ route("books.show", ":id") }}';
@@ -563,6 +699,41 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 "author": '{{ request()->input("author", "") }}',
                 "series": '{{ request()->input("series", "") }}'
             };
+
+            function hasCoverImage(book) {
+                return book.hasCoverImage === true || (typeof book.coverImage === 'string' && book.coverImage.trim() !== '');
+            }
+
+            function getSourceLabel(book) {
+                return book.source === 'librivox' ? 'LibriVox' : 'Audiobook';
+            }
+
+            function createGridMedia(book, title, height) {
+                if (hasCoverImage(book)) {
+                    return `
+                        <div class="book-media-panel ${height === 120 ? 'book-media-panel--compact pt-2' : 'pt-3'}">
+                            <img src="${book.coverImage}" class="card-img-top book-cover-thumb" alt="${title}"
+                                style="height: ${height}px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="book-media-panel ${height === 120 ? 'book-media-panel--compact ' : ''}book-media-panel--coverless" data-source="${getSourceLabel(book).toLowerCase()}">
+                        <span class="book-media-panel__badge">${getSourceLabel(book)}</span>
+                        <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
+                        <span class="book-media-panel__meta">Cover unavailable</span>
+                    </div>
+                `;
+            }
+
+            function createListMedia(book, title) {
+                if (hasCoverImage(book)) {
+                    return `<img src="${book.coverImage}" alt="${title}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">`;
+                }
+
+                return '<span class="book-list-media-fallback"><i class="fas fa-headphones-alt" aria-hidden="true"></i></span>';
+            }
 
             // Function to render main books based on current view type
             function renderMainBooks(books) {
@@ -588,7 +759,6 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 
                 // Render books based on view type
                 books.forEach(function (book) {
-                    const cover = book.coverImage ? book.coverImage : '{{ url("images/placeholder.png") }}';
                     const title = book.title || 'Unknown Title';
                     const author = book.authors && book.authors.length > 0 ? book.authors.join(', ') : 'Unknown';
 
@@ -604,10 +774,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                                                 <div class="col-md-3 mb-4">
                                                                     <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
                                                                         <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                                                            <div class="pt-3" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-                                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                                                                     style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
-                                                                            </div>
+                                                                            ${createGridMedia(book, title, 160)}
                                                                             <div class="card-body p-2">
                                                                                 <h6 class="card-title small mb-0">${title}</h6>
                                                                                 <p class="card-text small mb-0">${author}</p>
@@ -624,10 +791,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                                                 <div class="col-md-2 mb-3">
                                                                     <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
                                                                         <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                                                            <div class="pt-2" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-                                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                                                                     style="height: 120px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
-                                                                            </div>
+                                                                            ${createGridMedia(book, title, 120)}
                                                                             <div class="card-body p-2">
                                                                                 <h6 class="card-title small mb-0" style="font-size: 0.8rem;">${title}</h6>
                                                                                 <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
@@ -643,7 +807,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                         $('#main-books-list tbody').append(`
                                                                 <tr>
                                                                     <td>
-                                                                        <img src="${cover}" alt="${title}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">
+                                                                        ${createListMedia(book, title)}
                                                                     </td>
                                                                     <td>
                                                                         <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none">${title}</a>
@@ -727,6 +891,10 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 
             // Function to load main books via AJAX
             function loadMainBooks() {
+                if (librivoxListOnly) {
+                    mainViewType = 'list';
+                }
+
                 // Show loading spinner
                 $('#main-loading-spinner').show();
                 $('#main-books-grid, #main-books-compact, #main-books-list').hide();
@@ -796,6 +964,10 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
             // Handle main books view toggle
             $('#main-grid-btn, #main-compact-btn, #main-list-btn').on('click', function () {
                 const viewType = $(this).data('view');
+
+                if (librivoxListOnly && viewType !== 'list') {
+                    return;
+                }
 
                 // Update view type
                 mainViewType = viewType;
@@ -920,6 +1092,10 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
             $('#recent-grid-btn, #recent-compact-btn, #recent-list-btn').on('click', function () {
                 const viewType = $(this).data('view');
 
+                if (librivoxListOnly && viewType !== 'list') {
+                    return;
+                }
+
                 // Update active button styling
                 $('#recent-grid-btn, #recent-compact-btn, #recent-list-btn').removeClass('active').removeClass('btn-secondary').addClass('btn-outline-secondary');
                 $(this).addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
@@ -997,7 +1173,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
             let currentOffset = 10;
             const booksPerLoad = 8;
 
-            loadMoreButton.addEventListener('click', function () {
+            if (loadMoreButton) loadMoreButton.addEventListener('click', function () {
                 // Show loading state
                 loadMoreButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
                 loadMoreButton.disabled = true;
@@ -1095,7 +1271,6 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
             // Helper functions to create HTML for different view types
             function createGridCard(book) {
                 // Fix cover URL to handle paths with slashes correctly
-                const cover = book.coverImage ? book.coverImage : '/images/placeholder.png';
                 const title = String(book.title || 'Unknown Title'); // Ensure title is a string
                 const author = book.authors && book.authors.length > 0 ? book.authors.join(', ') : 'Unknown';
                 let seriesText = '';
@@ -1104,11 +1279,10 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 }
                 const duration = book.duration && book.duration !== '00:00:00' ? book.duration : '';
                 return `
-                                                        <a href="/books/${book.id}" class="text-decoration-none">
-                                                            <div class="card h-100 book-card-hover">
-                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                                                     style="height: 150px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 15px;">
-                                                                <div class="card-body p-2">
+                                                            <a href="/books/${book.id}" class="text-decoration-none">
+                                                                <div class="card h-100 book-card-hover">
+                                                                    ${createGridMedia(book, title, 150)}
+                                                                    <div class="card-body p-2">
                                                                     <h6 class="card-title small mb-0">${title}</h6>
                                                                     <p class="card-text small text-muted">${author}</p>
                                                                     ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
@@ -1121,7 +1295,6 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 
             function createCompactCard(book) {
                 // Fix cover URL to handle paths with slashes correctly
-                const cover = book.coverImage ? book.coverImage : '/images/placeholder.png';
                 const title = String(book.title || 'Unknown Title'); // Ensure title is a string
                 const author = book.authors && book.authors.length > 0 ? book.authors.join(', ') : 'Unknown';
                 let seriesText = '';
@@ -1130,11 +1303,10 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 }
                 const duration = book.duration && book.duration !== '00:00:00' ? book.duration : '';
                 return `
-                                                        <a href="/books/${book.id}" class="text-decoration-none">
-                                                            <div class="card h-100 book-card-hover">
-                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                                                     style="height: 120px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 10px;">
-                                                                <div class="card-body p-2">
+                                                            <a href="/books/${book.id}" class="text-decoration-none">
+                                                                <div class="card h-100 book-card-hover">
+                                                                    ${createGridMedia(book, title, 120)}
+                                                                    <div class="card-body p-2">
                                                                     <p class="card-title small mb-0 text-truncate">${title}</p>
                                                                     <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
                                                                     ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
@@ -1147,7 +1319,6 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 
             function createListRow(book) {
                 // Fix cover URL to handle paths with slashes correctly
-                const cover = book.coverImage ? book.coverImage : '/images/placeholder.png';
                 const title = String(book.title || 'Unknown Title'); // Ensure title is a string
                 const author = book.authors && book.authors.length > 0 ? book.authors.join(', ') : 'Unknown';
                 const genre = book.genres && book.genres.length > 0 ? book.genres.join(', ') : 'Unknown';
@@ -1158,7 +1329,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 const duration = book.duration && book.duration !== '00:00:00' ? book.duration : '';
                 return `
                                                         <td>
-                                                            <img src="${cover}" alt="${title}" style="height: 48px; width: auto; object-fit: contain;">
+                                                            ${createListMedia(book, title)}
                                                         </td>
                                                         <td>
                                                             <a href="/books/${book.id}">${title}</a>

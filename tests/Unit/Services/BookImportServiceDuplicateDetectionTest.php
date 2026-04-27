@@ -104,4 +104,50 @@ class BookImportServiceDuplicateDetectionTest extends TestCase
         // So it returns null (correct outcome for different series, but for wrong reason).
         $this->assertNull($result);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findExistingBookMatchesByDirectoryNameSuffix(): void
+    {
+        $book = Book::create([
+            'title' => 'Archive Title',
+            'directory_path' => 'Fantasy/Author Name/Series Name/Archive Title',
+            'language' => 'en',
+        ]);
+
+        $result = $this->service->findExistingBook('/incoming/Archive Title', []);
+
+        $this->assertNotNull($result);
+        $this->assertSame($book->id, $result->id);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function createBookFromMetadataReusesExistingRecordWithMissingDirectoryPath(): void
+    {
+        $author = Author::create(['name' => 'Brandon Sanderson']);
+        $series = Series::create(['name' => 'Mistborn']);
+
+        $existingBook = Book::create([
+            'title' => 'The Final Empire',
+            'directory_path' => null,
+            'language' => 'en',
+        ]);
+        $existingBook->authors()->attach($author);
+        $existingBook->series()->attach($series, ['series_number' => 1]);
+
+        $metadata = [
+            'title' => 'The Final Empire',
+            'author' => ['Brandon Sanderson'],
+            'series' => 'Mistborn',
+            'series_number' => 1,
+            'genre' => ['Fantasy'],
+            'language' => 'en',
+        ];
+
+        $book = $this->service->createBookFromMetadata($metadata, ['path' => '/incoming/The Final Empire', 'files' => []]);
+
+        $this->assertNotNull($book);
+        $this->assertSame($existingBook->id, $book->id);
+        $this->assertSame(1, Book::query()->count());
+        $this->assertNotNull($book->fresh()?->directory_path);
+    }
 }

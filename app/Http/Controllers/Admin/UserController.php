@@ -174,7 +174,7 @@ class UserController extends Controller
         }
 
         $role = $request->input('role', 'user');
-        if (!in_array($role, ['user', 'library-user', 'standard', 'admin', 'super-admin'], true)) {
+        if (!in_array($role, ['user', 'library-user', 'librivox-user', 'hybrid-user', 'admin', 'super-admin'], true)) {
             return back()->with('error', 'Invalid role selected.');
         }
 
