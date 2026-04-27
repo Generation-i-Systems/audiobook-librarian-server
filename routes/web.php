@@ -160,6 +160,12 @@ Route::get('/', function () {
             return redirect()->route('admin.librivox.index');
         }
 
+        $role = Auth::user()->role ?? '';
+        $libraryRoles = ['library-user', 'librivox-user', 'hybrid-user'];
+        if (in_array($role, $libraryRoles, true)) {
+            return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
+        }
+
         if (Auth::user()->is_admin) {
             return redirect()->route('admin.books.index')->with('status', 'Welcome to Audiobook Librarian!');
         }
@@ -211,7 +217,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/goals', [UserLibraryController::class, 'goals'])->name('goals');
     });
 
-    Route::resource('books', BookController::class)->only(['index', 'show']);
+    Route::resource('books', BookController::class)->only(['index', 'show'])->middleware('library');
     Route::get('/books/create', [
         \App\Http\Controllers\Admin\BookController::class,
         'showCreateForm',
@@ -266,8 +272,10 @@ Route::get('/csrf-token', fn () => response()->json(['csrf_token' => csrf_token(
 // Regular book routes (handled by the auth middleware group above)
 
 // JSON API endpoints for AJAX requests
-Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');
-Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
+Route::middleware(['auth', 'library'])->group(function (): void {
+    Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');
+    Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
+});
 Route::post('/books/set-preference', [BookController::class, 'setPreference'])->name('books.set-preference');
 
 // General image proxy for covers and previews

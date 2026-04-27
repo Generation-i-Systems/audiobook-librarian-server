@@ -37,6 +37,9 @@ class RequireLibraryRole
                 'uri' => $request->getRequestUri(),
                 'reason' => !$user ? 'not_authenticated' : 'role_not_set',
             ]);
+            if (!$request->expectsJson()) {
+                return $next($request);
+            }
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -48,6 +51,9 @@ class RequireLibraryRole
                 'user_id' => $user->id,
                 'user_role' => $role,
             ]);
+            if (!$request->expectsJson()) {
+                return $next($request);
+            }
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
