@@ -178,6 +178,10 @@ Route::get('/', function () {
 
 Auth::routes();
 
+Route::get('/password/reset/success', function () {
+    return view('auth.password-reset-success');
+})->name('password.reset.success');
+
 // Google Sign-In
 Route::get(
     'login/google',
