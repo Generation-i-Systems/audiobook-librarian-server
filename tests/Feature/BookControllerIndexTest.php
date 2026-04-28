@@ -286,8 +286,10 @@ class BookControllerIndexTest extends TestCase
         $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
-            ->assertSee('id="main-list-btn"', false)
+            ->assertDontSee('id="main-list-btn"', false)
+            ->assertDontSee('id="recent-list-btn"', false)
             ->assertDontSee('id="main-grid-btn"', false)
-            ->assertDontSee('id="main-compact-btn"', false);
+            ->assertDontSee('id="main-compact-btn"', false)
+            ->assertDontSee('View Mode');
     }
 }

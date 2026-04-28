@@ -172,16 +172,16 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Recent Books</h5>
-                    <div class="btn-group" role="group" aria-label="View options">
-                        @if(!$isLibrivoxMode)
+                    @if(!$isLibrivoxMode)
+                        <div class="btn-group" role="group" aria-label="View options">
                             <button class="btn btn-sm btn-outline-secondary view-toggle-btn active" id="recent-grid-btn"
                                 data-view="grid"><i class="fas fa-th"></i> Grid</button>
                             <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-compact-btn"
                                 data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
-                        @endif
-                        <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-list-btn"
-                            data-view="list"><i class="fas fa-list"></i> List</button>
-                    </div>
+                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-list-btn"
+                                data-view="list"><i class="fas fa-list"></i> List</button>
+                        </div>
+                    @endif
                     <button class="btn btn-link text-decoration-none" id="toggle-recent-books" type="button" tabindex="0">
                         <span id="recent-books-toggle-text">Hide</span>
                     </button>
@@ -399,43 +399,21 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
             </div>
         </form>
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="btn-group" role="group" aria-label="View options">
-                @if(!$isLibrivoxMode)
+        @if(!$isLibrivoxMode)
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="btn-group" role="group" aria-label="View options">
                     <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-grid-btn" data-view="grid"><i
                             class="fas fa-th"></i> Grid</button>
                     <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-compact-btn"
                         data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
-                @endif
-                <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-list-btn" data-view="list"><i
-                        class="fas fa-list"></i> List</button>
+                    <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-list-btn" data-view="list"><i
+                            class="fas fa-list"></i> List</button>
+                </div>
             </div>
-        </div>
+        @endif
 
         <div class="per-page-controls">
             <div class="dropdown">
-                <!-- Alpine.js demonstration: View mode toggle -->
-                <div x-data="{ 
-                    viewMode: 'grid',
-                    toggleView() {
-                        this.viewMode = this.viewMode === 'grid' ? 'list' : 'grid';
-                    }
-                }" class="mb-3 p-2 bg-light rounded">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5>View Mode</h5>
-                        <div>
-                            <button x-on:click="toggleView" 
-                                    class="btn btn-sm"
-                                    :class="viewMode === 'grid' ? 'btn-primary' : 'btn-outline-primary'">
-                                <span x-text="viewMode === 'grid' ? 'Grid View' : 'List View'"></span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="text-muted small">
-                        Current: <strong x-text="viewMode"></strong>
-                    </div>
-                </div>
-
                 <button class="btn btn-secondary dropdown-toggle" type="button" id="perPageDropdown"
                     data-bs-toggle="dropdown" aria-expanded="false">
                     <span id="current-per-page">24</span> per page
