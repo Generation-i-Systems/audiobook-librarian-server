@@ -283,7 +283,7 @@ DEBUG_FOUND=false
 # Use a safer way to check for changed files that doesn't necessarily require a remote connection
 BASE_COMMIT=$(git merge-base HEAD $BASE_BRANCH 2>/dev/null || echo "HEAD^")
 for file in $(git diff --name-only --diff-filter=d $BASE_COMMIT...HEAD 2>/dev/null | grep "\.php$"); do
-    if [ -f "$file" ] && grep -q "dd(\|dump(\|var_dump(\|print_r(" "$file" 2>/dev/null; then
+    if [ -f "$file" ] && grep -E -q "\b(dd|dump|var_dump|print_r)\(" "$file" 2>/dev/null; then
         echo -e "${YELLOW}⚠️  Debug statement found in: $file${NC}"
         DEBUG_FOUND=true
     fi
