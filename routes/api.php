@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\ExternalReadApiController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
+use App\Http\Controllers\Api\EmailOtpController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PositionSyncController;
 use App\Http\Controllers\Api\ProgressController;
@@ -364,6 +365,8 @@ Route::prefix('v1')->group(function () {
     Route::post('/check-status', [AuthController::class, 'checkStatus']);
     Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+    Route::post('/auth/otp/request', [EmailOtpController::class, 'request']);
+    Route::post('/auth/otp/verify', [EmailOtpController::class, 'verify']);
     Route::post('/auth/google', [AuthController::class, 'googleLogin']);
     Route::post('/auth/facebook', [AuthController::class, 'facebookLogin']);
     Route::post('/auth/apple', [AuthController::class, 'appleLogin']);
@@ -377,6 +380,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/check-status', [AuthController::class, 'checkStatus']);
         Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
         Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+        Route::post('/otp/request', [EmailOtpController::class, 'request']);
+        Route::post('/otp/verify', [EmailOtpController::class, 'verify']);
         Route::post('/google', [AuthController::class, 'googleLogin']);
         Route::post('/facebook', [AuthController::class, 'facebookLogin']);
         Route::post('/apple', [AuthController::class, 'appleLogin']);
