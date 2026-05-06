@@ -318,7 +318,7 @@ class ImportUIService implements ImportUIInterface
         $this->screen->write("\e[" . ($y + $h - 1) . ";{$x}H{$c}" . str_repeat($block, $w) . "{$reset}");
 
         if ($title) {
-            $titleLen = strlen($title);
+            $titleLen = mb_strlen($title);
             $posX = $x + (int) (($w - $titleLen) / 2);
             $this->screen->write("\e[{$y};{$posX}H{$c} $title {$reset}");
         }
@@ -508,13 +508,13 @@ class ImportUIService implements ImportUIInterface
     protected static function applyLineEditorAction(array $state, array $action): array
     {
         $buffer = (string) ($state['buffer'] ?? '');
-        $cursor = (int) ($state['cursor'] ?? strlen($buffer));
+        $cursor = (int) ($state['cursor'] ?? mb_strlen($buffer));
 
         if ($cursor < 0) {
             $cursor = 0;
         }
-        if ($cursor > strlen($buffer)) {
-            $cursor = strlen($buffer);
+        if ($cursor > mb_strlen($buffer)) {
+            $cursor = mb_strlen($buffer);
         }
 
         $type = $action[0] ?? '';
@@ -522,25 +522,25 @@ class ImportUIService implements ImportUIInterface
         if ($type === 'char') {
             $char = (string) ($action[1] ?? '');
             if ($char !== '' && $char !== "\x1B") {
-                $buffer = substr($buffer, 0, $cursor) . $char . substr($buffer, $cursor);
-                $cursor += strlen($char);
+                $buffer = mb_substr($buffer, 0, $cursor) . $char . mb_substr($buffer, $cursor);
+                $cursor += mb_strlen($char);
             }
         } elseif ($type === 'left') {
             $cursor = max(0, $cursor - 1);
         } elseif ($type === 'right') {
-            $cursor = min(strlen($buffer), $cursor + 1);
+            $cursor = min(mb_strlen($buffer), $cursor + 1);
         } elseif ($type === 'home') {
             $cursor = 0;
         } elseif ($type === 'end') {
-            $cursor = strlen($buffer);
+            $cursor = mb_strlen($buffer);
         } elseif ($type === 'backspace') {
             if ($cursor > 0) {
-                $buffer = substr($buffer, 0, $cursor - 1) . substr($buffer, $cursor);
+                $buffer = mb_substr($buffer, 0, $cursor - 1) . mb_substr($buffer, $cursor);
                 $cursor -= 1;
             }
         } elseif ($type === 'delete') {
-            if ($cursor < strlen($buffer)) {
-                $buffer = substr($buffer, 0, $cursor) . substr($buffer, $cursor + 1);
+            if ($cursor < mb_strlen($buffer)) {
+                $buffer = mb_substr($buffer, 0, $cursor) . mb_substr($buffer, $cursor + 1);
             }
         }
 
@@ -550,7 +550,7 @@ class ImportUIService implements ImportUIInterface
     protected function renderLineEditorState(int $cursorY, int $cursorX, array $state): void
     {
         $buffer = (string) ($state['buffer'] ?? '');
-        $cursor = (int) ($state['cursor'] ?? strlen($buffer));
+        $cursor = (int) ($state['cursor'] ?? mb_strlen($buffer));
 
         echo "\e[{$cursorY};{$cursorX}H\e[K";
         echo $buffer;
@@ -638,7 +638,7 @@ class ImportUIService implements ImportUIInterface
         $stream = $this->getInputStream();
 
         try {
-            $state = ['buffer' => $default, 'cursor' => strlen($default)];
+            $state = ['buffer' => $default, 'cursor' => mb_strlen($default)];
             $this->renderLineEditorState($cursorY, $cursorX, $state);
 
             while (true) {
@@ -730,7 +730,7 @@ class ImportUIService implements ImportUIInterface
                 $maxItemLen = 0;
                 foreach ($options as $key => $val) {
                     $candidate = '(' . $key . ') ' . $val;
-                    $maxItemLen = max($maxItemLen, strlen($candidate));
+                    $maxItemLen = max($maxItemLen, mb_strlen($candidate));
                 }
                 $idealColWidth = min($availableWidth, max(10, $maxItemLen + 2));
                 $maxColumnsThatFit = (int) max(1, floor($availableWidth / $idealColWidth));
@@ -915,8 +915,8 @@ class ImportUIService implements ImportUIInterface
         $coverUrlLabel = $coverUrl !== '' ? $coverUrl : 'N/A';
 
         $description = $this->stringifyForDisplay($this->currentBook['description'] ?? null) ?: '';
-        if ($description !== '' && strlen($description) > 140) {
-            $description = substr($description, 0, 140) . '...';
+        if ($description !== '' && mb_strlen($description) > 140) {
+            $description = mb_substr($description, 0, 140) . '...';
         }
         $descriptionLabel = $description !== '' ? $description : 'N/A';
 
@@ -982,8 +982,8 @@ class ImportUIService implements ImportUIInterface
             $displayValue = $this->stringifyForDisplay($value);
 
             // Truncate long values to fit on one line
-            if (strlen($displayValue) > $valueMaxWidth) {
-                $displayValue = substr($displayValue, 0, $valueMaxWidth - 3) . '...';
+            if (mb_strlen($displayValue) > $valueMaxWidth) {
+                $displayValue = mb_substr($displayValue, 0, $valueMaxWidth - 3) . '...';
             }
 
             $labelText = str_pad($label . ':', $labelWidth);
@@ -1005,7 +1005,7 @@ class ImportUIService implements ImportUIInterface
         $maxLogs = $layout['maxLogs'];
         $displayLogs = array_slice($this->logs, -$maxLogs);
         foreach ($displayLogs as $log) {
-            $this->screen->write("\e[{$row};4H" . substr($log, 0, $this->width - 6));
+            $this->screen->write("\e[{$row};4H" . mb_substr($log, 0, $this->width - 6));
             $row++;
         }
     }
@@ -1041,7 +1041,7 @@ class ImportUIService implements ImportUIInterface
             if ($row > $endY) {
                 break;
             }
-            $this->screen->write("\e[{$row};4H" . substr($line, 0, $this->width - 6));
+            $this->screen->write("\e[{$row};4H" . mb_substr($line, 0, $this->width - 6));
             $row++;
         }
     }
@@ -1060,7 +1060,7 @@ class ImportUIService implements ImportUIInterface
 
     protected function padAnsi(string $value, int $width): string
     {
-        $visibleLen = strlen($this->stripAnsi($value));
+        $visibleLen = mb_strlen($this->stripAnsi($value));
         if ($visibleLen >= $width) {
             return $value;
         }
@@ -1075,15 +1075,15 @@ class ImportUIService implements ImportUIInterface
             return '';
         }
 
-        if (strlen($value) <= $maxWidth) {
+        if (mb_strlen($value) <= $maxWidth) {
             return $value;
         }
 
         if ($maxWidth <= 1) {
-            return substr($value, 0, $maxWidth);
+            return mb_substr($value, 0, $maxWidth);
         }
 
-        return substr($value, 0, $maxWidth - 1) . '…';
+        return mb_substr($value, 0, $maxWidth - 1) . '…';
     }
 
     protected function formatOptionsAsColumns(array $options, int $columns = 3): array
@@ -1094,7 +1094,7 @@ class ImportUIService implements ImportUIInterface
         $maxItemLen = 0;
         foreach ($options as $key => $val) {
             $candidate = '(' . $key . ') ' . $val;
-            $maxItemLen = max($maxItemLen, strlen($candidate));
+            $maxItemLen = max($maxItemLen, mb_strlen($candidate));
         }
 
         $idealColWidth = min($availableWidth, max(10, $maxItemLen + 2));
@@ -1125,7 +1125,7 @@ class ImportUIService implements ImportUIInterface
                     continue;
                 }
 
-                $maxWidth = max($maxWidth, strlen($this->stripAnsi($items[$idx])));
+                $maxWidth = max($maxWidth, mb_strlen($this->stripAnsi($items[$idx])));
             }
 
             $colWidths[$c] = min($maxCellWidth, $maxWidth);
@@ -1695,25 +1695,25 @@ class ImportUIService implements ImportUIInterface
         if ($this->plainMode) {
             $colWidths = [];
             foreach ($headers as $i => $header) {
-                $colWidths[$i] = strlen((string) $header);
+                $colWidths[$i] = mb_strlen((string) $header);
             }
             foreach ($rows as $row) {
                 foreach ($row as $i => $cell) {
-                    $colWidths[$i] = max($colWidths[$i] ?? 0, strlen((string) $cell));
+                    $colWidths[$i] = max($colWidths[$i] ?? 0, mb_strlen((string) $cell));
                 }
             }
 
             $line = '';
             foreach ($headers as $i => $header) {
-                $line .= str_pad((string) $header, $colWidths[$i] + 2);
+                $line .= mb_str_pad((string) $header, $colWidths[$i] + 2);
             }
             echo $line . PHP_EOL;
-            echo str_repeat('-', strlen($line)) . PHP_EOL;
+            echo str_repeat('-', mb_strlen($line)) . PHP_EOL;
 
             foreach ($rows as $row) {
                 $line = '';
                 foreach ($row as $i => $cell) {
-                    $line .= str_pad((string) $cell, $colWidths[$i] + 2);
+                    $line .= mb_str_pad((string) $cell, $colWidths[$i] + 2);
                 }
                 echo $line . PHP_EOL;
             }
@@ -1723,25 +1723,25 @@ class ImportUIService implements ImportUIInterface
         $lines = [];
         $colWidths = [];
         foreach ($headers as $i => $header) {
-            $colWidths[$i] = strlen((string) $header);
+            $colWidths[$i] = mb_strlen((string) $header);
         }
         foreach ($rows as $row) {
             foreach ($row as $i => $cell) {
-                $colWidths[$i] = max($colWidths[$i] ?? 0, strlen((string) $cell));
+                $colWidths[$i] = max($colWidths[$i] ?? 0, mb_strlen((string) $cell));
             }
         }
 
         $headerLine = '';
         foreach ($headers as $i => $header) {
-            $headerLine .= str_pad((string) $header, $colWidths[$i] + 2);
+            $headerLine .= mb_str_pad((string) $header, $colWidths[$i] + 2);
         }
         $lines[] = "\e[1;36m" . $headerLine . "\e[0m";
-        $lines[] = str_repeat('-', strlen($headerLine));
+        $lines[] = str_repeat('-', mb_strlen($headerLine));
 
         foreach ($rows as $row) {
             $line = '';
             foreach ($row as $i => $cell) {
-                $line .= str_pad((string) $cell, $colWidths[$i] + 2);
+                $line .= mb_str_pad((string) $cell, $colWidths[$i] + 2);
             }
             $lines[] = $line;
         }
