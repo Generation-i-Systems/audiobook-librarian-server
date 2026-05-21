@@ -31,7 +31,7 @@ use App\Traits\Auditable;
  * @property-read int|null $book_statuses_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
  * @property-read int|null $books_count
-
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\BookTag> $bookTags
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBookStatus> $queuedBooks
@@ -162,6 +162,11 @@ class User extends Authenticatable
     public function recommendationsReceived(): HasMany
     {
         return $this->hasMany(UserRecommendation::class, 'recipient_id');
+    }
+
+    public function bookTags(): HasMany
+    {
+        return $this->hasMany(BookTag::class);
     }
 
     public function reviews(): HasMany

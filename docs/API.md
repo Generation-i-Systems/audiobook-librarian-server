@@ -27,6 +27,7 @@ The API includes the following main resource categories:
 
 - **Series** - Endpoints related to book series management
 - **Books** - Endpoints for book information and management
+- **Book Tags** - Endpoints for per-user tags saved against individual books
 - **Authors** - Endpoints for author information
 - **Recommendations** - Endpoints for book sharing between users
 - **Status** - Endpoints for personal book tracking (Queue, Wishlist, etc.)
@@ -49,6 +50,13 @@ Example series document:
   "books": [...]
 }
 ```
+
+#### Book Tags
+
+Authenticated clients can store a per-user tag list for a book at `/api/v1/books/{book}/tags`.
+The server keeps these tags attached to the requesting user, returns them as `userTags` in book
+payloads, and accepts a `tag` query parameter on book listing and search endpoints to filter by a
+saved tag.
 
 ## Using the API
 

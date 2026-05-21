@@ -833,6 +833,32 @@
                     "recommendation": {
                         "$ref": "#/components/schemas/UserRecommendation",
                         "nullable": true
+                    },
+                    "userTags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "User-defined tags saved for this book",
+                        "example": ["Favorites", "Series"]
+                    }
+                }
+            },
+            "BookTag": {
+                "type": "object",
+                "properties": {
+                    "bookId": {
+                        "type": "integer",
+                        "description": "Book identifier",
+                        "example": 1
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "User-defined book tags",
+                        "example": ["Favorites", "Series"]
                     }
                 }
             },
@@ -6254,6 +6280,16 @@
                         }
                     },
                     {
+                        "name": "tag",
+                        "in": "query",
+                        "description": "Filter by user tag",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Favorites"
+                        }
+                    },
+                    {
                         "name": "genre_id",
                         "in": "query",
                         "description": "Filter by genre ID (requires enhanced=true)",
@@ -6663,6 +6699,15 @@
                         }
                     },
                     {
+                        "name": "tag",
+                        "in": "query",
+                        "description": "Filter by user tag",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "status",
                         "in": "query",
                         "description": "Filter by reading status",
@@ -6960,6 +7005,106 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/books/{book}/tags": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "Get user-defined tags for a book",
+                "description": "Returns the authenticated user's saved tags for the specified book.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "book",
+                        "in": "path",
+                        "description": "Book ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tags retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BookTag"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            },
+            "put": {
+                "tags": ["Books"],
+                "summary": "Update user-defined tags for a book",
+                "description": "Stores the authenticated user's tags for the specified book.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "book",
+                        "in": "path",
+                        "description": "Book ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["tags"],
+                                "properties": {
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "maxLength": 64
+                                        },
+                                        "example": ["Favorites", "Series"]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tags stored successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BookTag"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
                     }
                 }
             }

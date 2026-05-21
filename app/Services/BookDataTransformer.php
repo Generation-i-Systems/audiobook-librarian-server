@@ -229,6 +229,7 @@ class BookDataTransformer
             'progress' => null,
             'status' => null,
             'recommendation' => null,
+            'userTags' => [],
         ];
 
         if ($book->relationLoaded('progress') && $book->progress->isNotEmpty()) {
@@ -268,6 +269,10 @@ class BookDataTransformer
                 'message' => $recommendation->message,
                 'sentAt' => $recommendation->created_at?->toIso8601String(),
             ];
+        }
+
+        if ($book->relationLoaded('userTags') && $book->userTags->isNotEmpty()) {
+            $userData['userTags'] = $book->userTags->first()->tags ?? [];
         }
 
         return $userData;

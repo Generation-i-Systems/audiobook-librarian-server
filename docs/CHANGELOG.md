@@ -1,5 +1,12 @@
 # OpenAPI Documentation Changelog
 
+## 2026-05-08
+
+### Added
+
+- Documented per-user book tag endpoints in `openapi.json`
+- Documented tag filtering support on book list and search endpoints
+
 ## 2026-01-15
 
 ### Added

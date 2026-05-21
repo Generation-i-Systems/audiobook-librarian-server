@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\BookContributionController;
 use App\Http\Controllers\Api\BookCoverController;
 use App\Http\Controllers\Api\BookDownloadController;
 use App\Http\Controllers\Api\BookImportApiController;
+use App\Http\Controllers\Api\BookTagController;
 use App\Http\Controllers\Api\BookSeriesGenreController;
 use App\Http\Controllers\Api\BookmarkApiController;
 use App\Http\Controllers\Api\BookmarkSyncController;
@@ -149,6 +150,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/books', [BookApiController::class, 'index']);
         Route::post('/books/batch', [BookApiController::class, 'batch']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
+        Route::get('/books/{book}/tags', [BookTagController::class, 'show']);
+        Route::put('/books/{book}/tags', [BookTagController::class, 'update']);
         Route::get('/books/{book}/download', [BookDownloadController::class, 'download']);
         Route::get('/books/{book}/download/{file}', [BookDownloadController::class, 'downloadFile'])
             ->where('file', '.*')
