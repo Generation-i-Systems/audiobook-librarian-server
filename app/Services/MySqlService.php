@@ -541,6 +541,16 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             });
         }
 
+        if ($userId && !empty($filters['tag']) && Schema::hasTable('book_tags')) {
+            $tag = trim((string) $filters['tag']);
+
+            if ($tag !== '') {
+                $query->whereHas('userTags', function ($q) use ($userId, $tag): void {
+                    $q->where('user_id', $userId)->whereJsonContains('tags', $tag);
+                });
+            }
+        }
+
         if (!empty($filters['series_id'])) {
             $query->whereHas('series', function ($q) use ($filters): void {
                 $q->where('series.id', $filters['series_id']);

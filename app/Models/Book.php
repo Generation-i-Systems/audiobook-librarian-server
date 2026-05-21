@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Relations\TouchesParentBelongsToMany;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * @property int $id
@@ -49,6 +50,7 @@ use App\Traits\Auditable;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\BookProgress> $progress
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserRecommendation> $recommendations
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBookStatus> $statuses
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\BookTag> $userTags
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property string|null $mongo_id
  * @property bool $directory_exists
@@ -322,15 +324,26 @@ class Book extends Model
         return $this->hasMany(UserBookStatus::class);
     }
 
+    public function userTags(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BookTag::class);
+    }
+
     /**
      * Scope to include user-specific data (progress, recommendation, status)
      */
     public function scopeWithUserData(Builder $query, int|string $userId): Builder
     {
-        return $query->with([
+        $relations = [
             'progress' => fn ($q) => $q->where('user_id', $userId),
             'recommendations' => fn ($q) => $q->where('recipient_id', $userId)->whereNull('acknowledged_at'),
             'statuses' => fn ($q) => $q->where('user_id', $userId),
-        ]);
+        ];
+
+        if (Schema::hasTable('book_tags')) {
+            $relations['userTags'] = fn ($q) => $q->where('user_id', $userId);
+        }
+
+        return $query->with($relations);
     }
 }
