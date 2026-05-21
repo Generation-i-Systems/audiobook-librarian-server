@@ -178,6 +178,9 @@ Route::get('/', function () {
 
 Auth::routes();
 
+Route::get('/privacy', fn () => view('privacy'))->name('privacy');
+Route::get('/terms', fn () => view('terms'))->name('terms');
+
 Route::get('/password/reset/success', function () {
     return view('auth.password-reset-success');
 })->name('password.reset.success');
