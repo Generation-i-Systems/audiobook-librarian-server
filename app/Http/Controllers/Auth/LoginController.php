@@ -8,6 +8,7 @@ use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\NewUserRegistrationNotifier;
+use App\Support\MailConfiguration;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -38,6 +39,16 @@ class LoginController extends Controller
         $this->registrationNotifier = $registrationNotifier;
         $this->middleware('guest')->except('logout');
         $this->middleware('auth')->only('logout');
+    }
+
+    /**
+     * Show the login form.
+     */
+    public function showLoginForm()
+    {
+        return view('auth.login', [
+            'otpEnabled' => MailConfiguration::isMailConfigured(),
+        ]);
     }
 
     /**

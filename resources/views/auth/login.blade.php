@@ -1,5 +1,4 @@
 <?php
-use Illuminate\Support\Facades\Route;
 ?>
 @extends('layouts.app')
 
@@ -75,6 +74,7 @@ use Illuminate\Support\Facades\Route;
                         </form>
                     </div>
                 </div>
+
                 <div class="text-center mt-4">
                     <a href="{{ route('login.google') }}" class="btn btn-outline-primary"
                         style="background: #fff; color: #444; border-color: #ddd;">
@@ -83,6 +83,80 @@ use Illuminate\Support\Facades\Route;
                         Sign in with Google
                     </a>
                 </div>
+
+                @if ($otpEnabled)
+                    <div class="mt-4 mb-3">
+                        <div class="text-center mb-3" style="color: #888;">
+                            <span style="background: #fff; padding: 0 12px; font-size: 13px;">or sign in with a code</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <label for="otp-email"
+                                        class="col-md-4 col-form-label text-md-end">{{ __('Email') }}</label>
+                                    <div class="col-md-6">
+                                        <input id="otp-email" type="email"
+                                            class="form-control" placeholder="your@email.com" required>
+                                    </div>
+                                </div>
+                                <div class="row mb-0">
+                                    <div class="col-md-8 offset-md-4">
+                                        <button type="button" id="send-otp-btn" class="btn btn-outline-primary">
+                                            Send sign-in code
+                                        </button>
+                                        <span id="otp-status" class="ms-2" style="display:none;"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @push('scripts')
+                        <script>
+                            (function ($) {
+                                "use strict";
+                                $(document).ready(function () {
+                                    var $btn = $('#send-otp-btn');
+                                    var $email = $('#otp-email');
+                                    var $status = $('#otp-status');
+
+                                    $btn.on('click', function () {
+                                        var email = $email.val().trim();
+                                        if (!email) {
+                                            $status.text('Please enter your email.').removeClass('text-success').addClass('text-danger').show();
+                                            return;
+                                        }
+
+                                        $btn.prop('disabled', true).text('Sending...');
+                                        $status.hide();
+
+                                        $.ajax({
+                                            url: '{{ route('auth.otp.request') }}',
+                                            method: 'POST',
+                                            data: {
+                                                email: email,
+                                                _token: '{{ csrf_token() }}'
+                                            },
+                                            success: function () {
+                                                $status.text('Check your email for the sign-in code.').removeClass('text-danger').addClass('text-success').show();
+                                            },
+                                            error: function (xhr) {
+                                                var msg = 'Failed to send. Please try again.';
+                                                if (xhr.responseJSON && xhr.responseJSON.message) {
+                                                    msg = xhr.responseJSON.message;
+                                                }
+                                                $status.text(msg).removeClass('text-success').addClass('text-danger').show();
+                                            },
+                                            complete: function () {
+                                                $btn.prop('disabled', false).text('Send sign-in code');
+                                            }
+                                        });
+                                    });
+                                });
+                            })(window.jQuery);
+                        </script>
+                    @endpush
+                @endif
             </div>
         </div>
     </div>

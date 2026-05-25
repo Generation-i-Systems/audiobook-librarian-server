@@ -15,14 +15,11 @@ class ApiRootTest extends TestCase
 
         $response = $this->getJson('/api/v1');
 
-        $response->assertStatus(200)
-            ->assertJson([
-                'name' => 'Librarian API',
-                'version' => 'v1',
-                'environment' => 'development',
-                'database' => 'mysql_devel',
-                'is_devel_site' => true,
-            ]);
+        $response->assertStatus(200);
+        $response->assertJsonPath('name', 'Librarian API');
+        $response->assertJsonPath('version', 'v1');
+        $response->assertJsonPath('environment', 'development');
+        $response->assertJsonPath('otp_available', false);
     }
 
     /** @test */

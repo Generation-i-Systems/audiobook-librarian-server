@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Mail\EmailOtpMail;
+use App\Mail\RegistrationInvitationMail;
 use App\Models\EmailOtp;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,12 +16,16 @@ class EmailOtpControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_request_otp_sends_email_and_creates_record(): void
+    public function test_request_otp_for_existing_user_sends_otp_email_and_creates_record(): void
     {
         Mail::fake();
 
+        $user = User::factory()->create([
+            'email' => 'existing@example.com',
+        ]);
+
         $response = $this->postJson('/api/v1/auth/otp/request', [
-            'email' => 'test@example.com',
+            'email' => 'existing@example.com',
             'allow_signup' => true,
         ]);
 
@@ -30,14 +35,41 @@ class EmailOtpControllerTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('email_otps', [
-            'email' => 'test@example.com',
+            'email' => 'existing@example.com',
             'allow_signup' => 1,
             'attempts' => 0,
         ]);
 
         Mail::assertSent(EmailOtpMail::class, function (EmailOtpMail $mail) {
-            return $mail->hasTo('test@example.com');
+            return $mail->hasTo('existing@example.com');
         });
+
+        Mail::assertNotSent(RegistrationInvitationMail::class);
+    }
+
+    public function test_request_otp_for_non_existent_user_sends_registration_invitation(): void
+    {
+        Mail::fake();
+
+        $response = $this->postJson('/api/v1/auth/otp/request', [
+            'email' => 'newuser@example.com',
+            'allow_signup' => true,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'message' => 'If an account is associated with that email, a sign-in code has been sent.',
+        ]);
+
+        $this->assertDatabaseMissing('email_otps', [
+            'email' => 'newuser@example.com',
+        ]);
+
+        Mail::assertSent(RegistrationInvitationMail::class, function (RegistrationInvitationMail $mail) {
+            return $mail->hasTo('newuser@example.com');
+        });
+
+        Mail::assertNotSent(EmailOtpMail::class);
     }
 
     public function test_verify_otp_with_valid_code_creates_user_if_allowed(): void
@@ -63,7 +95,6 @@ class EmailOtpControllerTest extends TestCase
             'code' => $code,
         ]);
 
-        // Since user didn't exist, it should create a pending user and return 403
         $response->assertStatus(403);
         $response->assertJsonFragment([
             'code' => 'ACCOUNT_PENDING_APPROVAL',

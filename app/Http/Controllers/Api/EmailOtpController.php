@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Mail\EmailOtpMail;
+use App\Mail\RegistrationInvitationMail;
 use App\Models\EmailOtp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -69,6 +70,31 @@ class EmailOtpController extends Controller
         }
         RateLimiter::hit($throttleKey, 60);
 
+        $user = $this->documentStoreService->getUserByEmail($email);
+
+        if ($user === null) {
+            $recipientName = null;
+
+            try {
+                Mail::to($email)->send(new RegistrationInvitationMail(
+                    email: $email,
+                    recipientName: $recipientName,
+                ));
+            } catch (\Throwable $e) {
+                Log::error('RegistrationInvitation: failed to send mail', [
+                    'email' => $email,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            return response()->json([
+                'message' => 'If an account is associated with that email, a sign-in code has been sent.',
+                'expires_in_seconds' => EmailOtp::TTL_MINUTES * 60,
+            ]);
+        }
+
+        $recipientName = $user['name'] ?? null;
+
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $magicToken = bin2hex(random_bytes(32));
 
@@ -91,9 +117,6 @@ class EmailOtpController extends Controller
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
         ]);
-
-        $user = $this->documentStoreService->getUserByEmail($email);
-        $recipientName = $user['name'] ?? null;
 
         $magicLinkUrl = url('/auth/magic/' . $magicToken);
 

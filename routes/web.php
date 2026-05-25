@@ -37,6 +37,8 @@ Route::post('/auth/magic/{token}/continue', [EmailOtpController::class, 'magicCo
     ->where('token', '[a-f0-9]{64}')
     ->middleware('web')
     ->name('auth.magic.continue');
+Route::post('/auth/otp/request', [EmailOtpController::class, 'request'])
+    ->name('auth.otp.request');
 
 // --- EMERGENCY ROUTES ---
 // Emergency book routes that bypass memory-intensive models
