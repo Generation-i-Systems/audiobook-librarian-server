@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\ExternalReadApiController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
+use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\EmailOtpController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PositionSyncController;
@@ -356,6 +357,16 @@ Route::prefix('v1')->group(function () {
             Route::post('/{contribution}/approve', [BookContributionController::class, 'approve']);
             Route::post('/{contribution}/reject', [BookContributionController::class, 'reject']);
         });
+
+        // Admin: User management routes
+        Route::middleware('admin')->prefix('admin/users')->group(function () {
+            Route::get('/', [AdminUserController::class, 'index']);
+            Route::post('/', [AdminUserController::class, 'store']);
+            Route::post('/{id}/send-otp', [AdminUserController::class, 'sendOtp']);
+        });
+
+        // Authenticated: set initial password (used after OTP login when must_change_password=true)
+        Route::post('/auth/set-initial-password', [EmailOtpController::class, 'setInitialPassword']);
 
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);

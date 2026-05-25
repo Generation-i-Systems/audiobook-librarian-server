@@ -24,9 +24,19 @@ use App\Http\Controllers\BuiltinSkinController;
 use App\Http\Controllers\SkinWebController;
 use App\Http\Controllers\ThemeWebController;
 use App\Http\Controllers\UserLibraryController;
+use App\Http\Controllers\Api\EmailOtpController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+
+// Magic link OTP web routes (no auth required — these ARE the auth mechanism)
+Route::get('/auth/magic/{token}', [EmailOtpController::class, 'magicLanding'])
+    ->where('token', '[a-f0-9]{64}')
+    ->name('auth.magic.landing');
+Route::post('/auth/magic/{token}/continue', [EmailOtpController::class, 'magicContinue'])
+    ->where('token', '[a-f0-9]{64}')
+    ->middleware('web')
+    ->name('auth.magic.continue');
 
 // --- EMERGENCY ROUTES ---
 // Emergency book routes that bypass memory-intensive models

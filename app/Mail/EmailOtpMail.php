@@ -21,24 +21,35 @@ class EmailOtpMail extends Mailable
 
     public ?string $recipientName;
 
-    public function __construct(string $code, string $magicLinkUrl, int $ttlMinutes, ?string $recipientName = null)
-    {
+    public bool $isPasswordReset;
+
+    public function __construct(
+        string $code,
+        string $magicLinkUrl,
+        int $ttlMinutes,
+        ?string $recipientName = null,
+        bool $isPasswordReset = false,
+    ) {
         $this->code = $code;
         $this->magicLinkUrl = $magicLinkUrl;
         $this->ttlMinutes = $ttlMinutes;
         $this->recipientName = $recipientName;
+        $this->isPasswordReset = $isPasswordReset;
     }
 
     public function build(): self
     {
+        $subject = $this->isPasswordReset ? 'Reset your password' : 'Your sign-in code';
+
         return $this
-            ->subject('Your sign-in code')
+            ->subject($subject)
             ->view('emails.auth.otp')
             ->with([
                 'code' => $this->code,
                 'magicLinkUrl' => $this->magicLinkUrl,
                 'ttlMinutes' => $this->ttlMinutes,
                 'recipientName' => $this->recipientName,
+                'isPasswordReset' => $this->isPasswordReset,
             ]);
     }
 }

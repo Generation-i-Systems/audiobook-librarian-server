@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -42,8 +43,9 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
             'email' => 'required|email',
-            'password' => 'required|string|min:6|confirmed',
+            'password' => 'nullable|string|min:6|confirmed',
             'role' => 'required|string',
+            'send_otp_email' => 'sometimes|boolean',
         ]);
         // Uniqueness check
         if ($this->documentStoreService->userExistsByUsername($validated['username'])) {
@@ -52,12 +54,28 @@ class UserController extends Controller
         if ($this->documentStoreService->userExistsByEmail($validated['email'])) {
             return back()->withErrors(['email' => 'Email already exists.']);
         }
-        // Never store password_confirmation on user record
         unset($validated['password_confirmation']);
-        $validated['password'] = Hash::make($validated['password']);
-        $this->documentStoreService->createUser($validated);
 
-        return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
+        $sendOtp = $request->boolean('send_otp_email', true);
+        $hasPassword = !empty($validated['password']);
+
+        $userData = [
+            'name' => $validated['name'],
+            'username' => $validated['username'],
+            'email' => $validated['email'],
+            'password' => $hasPassword ? Hash::make($validated['password']) : Hash::make(\Illuminate\Support\Str::random(32)),
+            'role' => $validated['role'],
+            'must_change_password' => !$hasPassword || $sendOtp,
+        ];
+
+        $userId = $this->documentStoreService->createUser($userData);
+
+        if ($userId && $sendOtp) {
+            $apiController = app(AdminUserController::class);
+            $apiController->sendOtp(request(), (string) $userId);
+        }
+
+        return redirect()->route('admin.users.index')->with('success', 'User created successfully.' . ($sendOtp ? ' A sign-in email has been sent.' : ''));
     }
 
 

@@ -10,6 +10,7 @@ use App\Mail\EmailOtpMail;
 use App\Models\EmailOtp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -20,8 +21,12 @@ class EmailOtpController extends Controller
 {
     public const REQUEST_THROTTLE_KEY = 'otp-request:';
     public const VERIFY_THROTTLE_KEY = 'otp-verify:';
+    public const SET_PASSWORD_THROTTLE_KEY = 'otp-set-password:';
     public const REQUEST_PER_MINUTE = 5;
     public const VERIFY_PER_MINUTE = 10;
+
+    public const TYPE_LOGIN = 'login';
+    public const TYPE_PASSWORD_RESET = 'password_reset';
 
     protected DocumentStoreServiceInterface $documentStoreService;
 
@@ -35,18 +40,17 @@ class EmailOtpController extends Controller
      *
      * Body:
      *   email          (required, string, email)
-     *   allow_signup   (optional, bool) — when true, verification will create
-     *                                    a pending-approval user if no user
-     *                                    with this email exists yet.
+     *   allow_signup   (optional, bool)
+     *   type           (optional, string) — "login" or "password_reset"
      *
-     * Always returns 200 with a generic message (do not leak existence of
-     * accounts). Rate-limited per email + IP.
+     * Always returns 200 with a generic message. Rate-limited per email + IP.
      */
     public function request(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|string|email|max:255',
             'allow_signup' => 'sometimes|boolean',
+            'type' => 'sometimes|string|in:login,password_reset',
         ]);
 
         if ($validator->fails()) {
@@ -55,6 +59,7 @@ class EmailOtpController extends Controller
 
         $email = strtolower(trim((string) $request->input('email')));
         $allowSignup = (bool) $request->input('allow_signup', false);
+        $type = $request->input('type', self::TYPE_LOGIN);
 
         $throttleKey = self::REQUEST_THROTTLE_KEY . sha1($email . '|' . $request->ip());
         if (RateLimiter::tooManyAttempts($throttleKey, self::REQUEST_PER_MINUTE)) {
@@ -64,33 +69,29 @@ class EmailOtpController extends Controller
         }
         RateLimiter::hit($throttleKey, 60);
 
-        // Generate code + magic token. Code is 6 digits zero-padded.
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $magicToken = bin2hex(random_bytes(32));
 
         $codeHash = hash('sha256', $code);
         $magicTokenHash = hash('sha256', $magicToken);
 
-        // Invalidate any outstanding active OTPs for this email so only the latest is usable.
         EmailOtp::where('email', $email)
             ->whereNull('used_at')
             ->where('expires_at', '>', now())
             ->update(['used_at' => now()]);
 
-        $otp = EmailOtp::create([
+        EmailOtp::create([
             'email' => $email,
             'code_hash' => $codeHash,
             'magic_token_hash' => $magicTokenHash,
             'allow_signup' => $allowSignup,
+            'type' => $type,
             'attempts' => 0,
             'expires_at' => now()->addMinutes(EmailOtp::TTL_MINUTES),
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
         ]);
 
-        // Look up the user (if any) for personalisation. We do NOT require the
-        // user to exist here — that is only enforced at verify time when
-        // allow_signup is false.
         $user = $this->documentStoreService->getUserByEmail($email);
         $recipientName = $user['name'] ?? null;
 
@@ -102,13 +103,13 @@ class EmailOtpController extends Controller
                 magicLinkUrl: $magicLinkUrl,
                 ttlMinutes: EmailOtp::TTL_MINUTES,
                 recipientName: $recipientName,
+                isPasswordReset: $type === self::TYPE_PASSWORD_RESET,
             ));
         } catch (\Throwable $e) {
             Log::error('EmailOtp: failed to send mail', [
                 'email' => $email,
                 'error' => $e->getMessage(),
             ]);
-            // Still return generic 200 to avoid leaking which addresses exist.
         }
 
         return response()->json([
@@ -122,7 +123,7 @@ class EmailOtpController extends Controller
      *
      * Body (one of):
      *   { email, code }    — verify the typed 6-digit code
-     *   { token }          — verify the magic-link token (no email required)
+     *   { token }          — verify the magic-link token
      *
      * On success returns the same shape as POST /auth/login.
      */
@@ -166,23 +167,55 @@ class EmailOtpController extends Controller
             return response()->json(['message' => 'Invalid code.'], 400);
         }
 
-        // Mark used to prevent replay.
         $otp->forceFill(['used_at' => now()])->save();
 
-        return $this->issueAuthResponseForEmail($otp->email, $otp->allow_signup);
+        $forcePasswordChange = $otp->type === self::TYPE_PASSWORD_RESET;
+
+        return $this->issueAuthResponseForEmail($otp->email, $otp->allow_signup, $forcePasswordChange);
+    }
+
+    /**
+     * POST /auth/set-initial-password
+     *
+     * Authenticated endpoint. Sets a new password and clears must_change_password flag.
+     */
+    public function setInitialPassword(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if ($user === null) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        $throttleKey = self::SET_PASSWORD_THROTTLE_KEY . $user->getAuthIdentifier();
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            return response()->json(['message' => 'Too many attempts. Please wait a minute.'], 429);
+        }
+        RateLimiter::hit($throttleKey, 60);
+
+        $this->documentStoreService->updateUser((string) $user->getAuthIdentifier(), [
+            'password' => Hash::make((string) $request->input('password')),
+            'must_change_password' => false,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Password set successfully.']);
     }
 
     /**
      * GET /auth/magic/{token}
      *
-     * Web landing page for magic-link emails. Tries the mobile deep-link first
-     * (custom scheme handled by the installed app), then offers a "Continue in
-     * browser" path that performs a server-side login via the same OTP record.
+     * Web landing page for magic-link emails.
      */
     public function magicLanding(Request $request, string $token)
     {
-        // Lightly validate so we don't render a useless page for obviously
-        // malformed tokens.
         $hash = hash('sha256', $token);
         $otp = EmailOtp::where('magic_token_hash', $hash)->first();
 
@@ -199,9 +232,7 @@ class EmailOtpController extends Controller
     /**
      * POST /auth/magic/{token}/continue
      *
-     * Web fallback: log the user into the Laravel web session using the magic
-     * token and redirect to the homepage. Useful when the user clicks the link
-     * on a device that does not have the mobile app installed.
+     * Web fallback: log the user into the Laravel web session.
      */
     public function magicContinue(Request $request, string $token)
     {
@@ -226,7 +257,6 @@ class EmailOtpController extends Controller
 
         $otp->forceFill(['used_at' => now()])->save();
 
-        // Log in via the standard web guard if a matching Eloquent user exists.
         $userId = $userArray['id'] ?? null;
         /** @var \App\Models\User|null $eloquentUser */
         $eloquentUser = $userId === null ? null : \App\Models\User::query()->find($userId);
@@ -253,7 +283,7 @@ class EmailOtpController extends Controller
             ->first();
     }
 
-    private function issueAuthResponseForEmail(string $email, bool $allowSignup): JsonResponse
+    private function issueAuthResponseForEmail(string $email, bool $allowSignup, bool $forcePasswordChange = false): JsonResponse
     {
         $user = $this->documentStoreService->getUserByEmail($email);
 
@@ -278,6 +308,15 @@ class EmailOtpController extends Controller
             ], 403);
         }
 
+        // For password_reset type, set must_change_password on the user record
+        if ($forcePasswordChange) {
+            $this->documentStoreService->updateUser((string) ($user['id'] ?? ''), [
+                'must_change_password' => true,
+                'updated_at' => now(),
+            ]);
+            $user['must_change_password'] = true;
+        }
+
         $tokenValue = bin2hex(random_bytes(32));
         $this->documentStoreService->createApiToken([
             'user_id' => (string) ($user['id'] ?? ''),
@@ -293,6 +332,7 @@ class EmailOtpController extends Controller
             'email' => $user['email'] ?? null,
             'photo_url' => $user['photo_url'] ?? null,
             'role' => $user['role'] ?? null,
+            'must_change_password' => (bool) ($user['must_change_password'] ?? false),
             'authToken' => $tokenValue,
             'refreshToken' => $tokenValue,
             'token' => $tokenValue,
@@ -313,14 +353,12 @@ class EmailOtpController extends Controller
             }
         }
 
-        $userData = [
+        return $this->documentStoreService->createUser([
             'name' => $base,
             'username' => $username,
             'email' => $email,
-            'password' => Str::random(32),
+            'password' => Hash::make(Str::random(32)),
             'role' => 'unverified',
-        ];
-
-        return $this->documentStoreService->createUser($userData);
+        ]);
     }
 }

@@ -32,6 +32,7 @@ class EmailOtp extends Model
         'code_hash',
         'magic_token_hash',
         'allow_signup',
+        'type',
         'attempts',
         'expires_at',
         'used_at',
