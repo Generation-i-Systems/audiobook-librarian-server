@@ -66,43 +66,6 @@ npm run test:watch
 npm run test:coverage
 ```
 
-## Implementation Best Practices
-
-### Before Coding
-
-- **MUST** Ask user clarifying questions for complex work
-- **MUST** Draft and confirm approach for complex work
-- **SHOULD** List pros/cons for multiple approaches
-- **MUST** Use git to track changes
-- **MUST** Keep README updated
-- **MUST** Keep Blueprint updated
-- **MUST** Keep documentation updated
-- **MUST** document all API changes in `docs/openapi.json` as it is the source of truth for the API, and provide human-readable documentation explaining the feature, usage logic, and purpose.
-- **MUST** Keep changelog updated
-- **MUST** Store prompts in prompts.md
-
-### While Coding
-
-- **MUST** Follow TDD: scaffold stub → write failing test → implement
-- **MUST** Name functions with existing domain vocabulary
-- **SHOULD NOT** Introduce classes when small functions suffice
-- **SHOULD** Prefer simple, composable, testable functions
-- **SHOULD NOT** Add comments except for critical caveats
-- **SHOULD NOT** Extract new functions unless reused, untestable, or major readability improvement
-- **MUST** Remove trailing whitespace
-- **MUST** Ensure all code is formatted consistently
-- **MUST** Keep code simple and readable
-- **MUST** Avoid special case handling - address issues generally
-- **SHOULD** Split classes >1000 lines into smaller pieces
-
-### Platform Philosophy
-
-- **"Let the platform do what it does best"** - Leverage platform strengths over custom abstractions
-- **Avoid over-engineering**: Question custom abstraction value vs platform solutions
-- **Prefer**: Essential logging + coordination over complex resource management layers
-- **Always detect and follow existing project patterns and conventions**
-- **Check for existing scripts** in package.json, build.gradle.kts, Makefile, etc.
-
 ## Code Style Guidelines
 
 ### PHP
@@ -146,8 +109,8 @@ npm run test:coverage
 - Always use strict types in method signatures
 - Use `declare(strict_types=1);` at file top
 - Use PHPStan level 5 analysis (baseline allowed in `phpstan-baseline.neon`)
-- **MUST NOT** introduce any new PHPStan issues with any change.
-- **MUST NOT** update the PHPStan baseline without the express request of the USER.
+- **MUST NOT** introduce any new PHPStan issues with any change
+- **MUST NOT** update the PHPStan baseline without the express request of the USER
 - Use null safety: `?string` for nullable, never omit nullability
 
 #### Testing
@@ -173,10 +136,9 @@ npm run test:coverage
 #### Database Conventions
 
 - **MANDATORY WARNING**: The local database is live. Never damage it. Protect all non-badge data from destructive changes at all times.
-- **CRITICAL**: Assume database is _production_ with live data - never execute destructive commands
 - **FORBIDDEN COMMANDS**: Never execute `php artisan migrate:fresh`, `php artisan migrate:reset`, `DB::raw('DROP TABLE...')`, `TRUNCATE`, or `rm -rf` on user-facing paths
-- **ONLY ALLOWED RESET SCOPE**: If a reset/reseed is truly needed, it may apply only to badge tables, never the full database or unrelated user data.
-- **MIGRATIONS**: All migrations MUST be non-destructive (`Schema::table` or `Schema::create`). Destructive operations require explicit user confirmation and prefer safe alternatives (soft deletes, renaming)
+- **ONLY ALLOWED RESET SCOPE**: If a reset/reseed is truly needed, it may apply only to badge tables, never the full database or unrelated user data
+- **MIGRATIONS**: All migrations MUST be non-destructive. Destructive operations require explicit user confirmation and prefer safe alternatives (soft deletes, renaming)
 - **MUST** Use Eloquent for database access
 - **MUST** Use snake_case for database fields
 - **MUST** Use camelCase for model attributes accessed via toArray()
@@ -232,12 +194,6 @@ npm run test:coverage
 - **MUST** run syntax check on all code
 - **MUST** run code formatter on all code
 
-### Before Coding
-
-1. Confirm approach with user for complex work
-2. Follow TDD: scaffold stub → write failing test → implement
-3. Use existing patterns - don't reinvent abstractions
-
 ### Running Tests
 
 Always run relevant tests after changes:
@@ -268,19 +224,13 @@ php artisan test tests/Path/To/Module/
 - **Before reverting ANY commit for ANY reason, MUST create a git tag and prompt for confirmation**
 - Always verify revert targets with `git log --oneline` before executing
 - Use descriptive tag messages: `git tag pre-revert-[YYYYMMDD]-[feature]`
-- **MUST** use git to track changes
-- **MUST** use conventional commit format: `type(scope): description`
-- **MUST NEVER add AI attribution in commit messages**
-- **SHOULD** split large commits into smaller, focused pieces when reasonable
-- **MUST NOT** use `--no-verify` to bypass pre-commit hooks unless explicitly requested by the user.
-- **MUST** ensure all changes are added before retrying failed commits
 
 ### Pre-commit Hooks
 
-- **Syntax Check**: All PHP (`php -l`) and JS (`node --check`) files are verified for syntax before commit.
-- **Formatting**: Laravel Pint runs on staged PHP files.
-- **Static Analysis**: PHPStan runs on the `app/` directory.
-- **Testing**: Relevant tests (Import, Web, Api, Cli) or a smoke test are executed automatically.
+- **Syntax Check**: All PHP (`php -l`) and JS (`node --check`) files are verified for syntax before commit
+- **Formatting**: Laravel Pint runs on staged PHP files
+- **Static Analysis**: PHPStan runs on the `app/` directory
+- **Testing**: Relevant tests (Import, Web, Api, Cli) or a smoke test are executed automatically
 
 ### Verification & Reporting
 
@@ -288,45 +238,8 @@ php artisan test tests/Path/To/Module/
 - Use `git diff`, `git status`, or file reading to verify changes before reporting
 - Never claim changes are complete unless explicitly confirmed they are in place
 - If uncertain about state, run verification commands before responding
-- **MUST** always verify/validate changes through compilation, tests, etc.
-- **NEVER** consider a task complete when any syntax errors exist. Run `php -l` on modified files to verify.
+- **NEVER** consider a task complete when any syntax errors exist. Run `php -l` on modified files to verify
 
-### Tool Usage Guidelines
+## Commit Guidelines (Project-Specific)
 
-- **MUST** read files fully before updating them
-- **SHOULD** do batch updates when possible to reduce tool calls
-- **MUST** use full paths instead of changing directories
-- **SHOULD** use quiet/minimal output flags for fire-and-forget tasks
-
-## Commit Guidelines
-
-- Work in logical, reviewable chunks
-- **MUST leave code in working state**
-- Use conventional commit format: `type(scope): description`
-- **MUST NEVER add AI attribution in commit messages**
-- Commit often and keep commits small
-- Write clear, concise commit messages
-- Group related changes together
-- Avoid committing broken code
-- Keep commits focused on a single purpose
-- Make sure each commit is buildable and functional
-- Split large commits when reasonable
-- **MUST** prompt the user to commit and push if more than 10 files have been locally modified at the end of a response.
-
-## Function Quality Guidelines
-
-When evaluating function quality:
-
-1. Can you read the function and easily follow what it's doing?
-2. Does the function have high cyclomatic complexity (too many nested paths)?
-3. Are there common data structures/algorithms that would simplify it?
-4. Are there unused parameters or unnecessary type casts?
-5. Is the function easily testable?
-6. Are there hidden untested dependencies?
-7. Can you brainstorm 3 better function names?
-
-**Only extract separate functions when**:
-
-- The function is used in multiple places
-- The extracted function is testable while the original is not
-- The original function is extremely hard to follow without comments
+- **MUST** prompt the user to commit and push if more than 10 files have been locally modified at the end of a response
