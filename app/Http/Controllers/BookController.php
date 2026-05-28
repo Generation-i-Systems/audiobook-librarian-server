@@ -476,7 +476,7 @@ class BookController extends Controller
         }
 
         // Ensure series is an array of objects with seriesName and number
-        if (isset($book['series']) && is_array($book['series'])) {
+        if (is_array($book['series'])) {
             $book['series'] = collect($book['series'])->map(function ($seriesItem) {
                 // If it's already an object with seriesName and number, return it
                 if (isset($seriesItem['seriesName']) && isset($seriesItem['number'])) {

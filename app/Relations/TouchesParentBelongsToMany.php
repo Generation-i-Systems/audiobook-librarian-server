@@ -2,8 +2,16 @@
 
 namespace App\Relations;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
+/**
+ * @template TRelatedModel of Model
+ * @template TDeclaringModel of Model
+ *
+ * @extends BelongsToMany<TRelatedModel, TDeclaringModel, Pivot>
+ */
 class TouchesParentBelongsToMany extends BelongsToMany
 {
     public function attach($id, array $attributes = [], $touch = true)
@@ -46,10 +54,6 @@ class TouchesParentBelongsToMany extends BelongsToMany
 
     private function touchParent(): void
     {
-        $parent = $this->parent;
-
-        if ($parent && method_exists($parent, 'touch')) {
-            $parent->touch();
-        }
+        $this->parent->touch();
     }
 }

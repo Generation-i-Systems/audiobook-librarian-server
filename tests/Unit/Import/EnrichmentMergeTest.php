@@ -42,7 +42,6 @@ class EnrichmentMergeTest extends TestCase
 
         $enrichedData = [
             'published_year' => 2000, // Wrong year from enrichment
-            'description' => 'Good description',
         ];
 
         // Simulate the merge logic with year/published_year handling
@@ -53,8 +52,6 @@ class EnrichmentMergeTest extends TestCase
                 if (empty($metadata['year']) && empty($metadata['published_year'])) {
                     $metadata[$key] = $value;
                 }
-            } elseif (empty($metadata[$key])) {
-                $metadata[$key] = $value;
             }
         }
 

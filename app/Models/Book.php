@@ -264,7 +264,6 @@ class Book extends Model
         $relatedKey,
         $relationName = null
     ): BelongsToMany {
-        // @phpstan-ignore-next-line
         return new TouchesParentBelongsToMany(
             $query,
             $parent,

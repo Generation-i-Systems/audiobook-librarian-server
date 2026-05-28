@@ -6685,7 +6685,7 @@ class BookImportService
         if ($extractedYear && $extractedYear > 1900 && $extractedYear <= (int) date('Y') + 2) {
             $aiResult['year'] = $extractedYear;
             // Clean year from title if it was found there
-            if (!empty($aiResult['title']) && $yearPattern) {
+            if (!empty($aiResult['title'])) {
                 $aiResult['title'] = trim(preg_replace($yearPattern, '', $aiResult['title']));
                 // Clean up any double separators left behind
                 $aiResult['title'] = trim($aiResult['title'], " \t\n\r\0\x0B-_");

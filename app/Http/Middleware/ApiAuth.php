@@ -53,7 +53,7 @@ class ApiAuth
                     'uri' => $requestUri,
                     'method' => $requestMethod,
                     'guard' => Auth::getDefaultDriver(),
-                    'user_class' => is_object($user) ? get_class($user) : gettype($user),
+                    'user_class' => get_class($user),
                 ]);
                 Auth::setUser($user);
                 $request->setUserResolver(fn () => $user);

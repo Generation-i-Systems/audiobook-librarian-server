@@ -42,7 +42,7 @@ trait ProcessesBookData
             }
         }
 
-        if (isset($book['series']) && is_array($book['series'])) {
+        if (is_array($book['series'])) {
             $book['series'] = collect($book['series'])->map(function ($seriesItem) {
                 if (isset($seriesItem['seriesName']) && isset($seriesItem['number'])) {
                     return $seriesItem;
@@ -66,7 +66,7 @@ trait ProcessesBookData
             $book['series'] = [];
         }
 
-        $book['coverImage'] = $this->processCoverImage($book['coverImage'] ?? null, $book['directoryPath'] ?? null);
+        $book['coverImage'] = $this->processCoverImage($book['coverImage'], $book['directoryPath'] ?? null);
 
         return $book;
     }
