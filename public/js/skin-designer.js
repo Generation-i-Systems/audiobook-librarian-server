@@ -974,6 +974,7 @@ class SkinRenderer {
         if (action === 'next-chapter') return '⏭';
         if (action === 'prev-chapter') return '⏮';
         if (action === 'create-bookmark') return '🔖';
+        if (action === 'open-notes' || action === 'show-notes') return 'N';
         if (action === 'show-bookmarks' || action === 'open-bookmarks') return 'B';
         if (action === 'enter-drive-mode' || action === 'drive-mode') return '🚗';
         if (action === 'exit-drive-mode') return '✕';
@@ -1144,7 +1145,7 @@ const VALIDATORS = {
         const validActions = [
             'toggle-play-pause', 'play', 'pause', 'stop',
             'next-chapter', 'prev-chapter', 'next-book', 'prev-book',
-            'show-chapters', 'show-bookmarks', 'create-bookmark',
+            'show-chapters', 'show-bookmarks', 'create-bookmark', 'open-notes', 'show-notes',
             'sleep-timer', 'playback-speed', 'exit-drive-mode',
             'show-sleep-timer', 'enter-drive-mode', 'show-speed-selector'
         ];
@@ -1334,6 +1335,7 @@ class PropertyEditor {
             { label: 'Show Chapters', value: 'show-chapters' },
             { label: 'Bookmarks', value: 'show-bookmarks' },
             { label: 'Add Bookmark', value: 'create-bookmark' },
+            { label: 'Open Notes', value: 'open-notes' },
             { label: 'Sleep Timer', value: 'sleep-timer' },
             { label: 'Show Sleep Timer', value: 'show-sleep-timer' },
             { label: 'Playback Speed', value: 'playback-speed' },
