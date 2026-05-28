@@ -703,6 +703,21 @@ class ImportUIService implements ImportUIInterface
         @shell_exec('stty ' . escapeshellarg($state) . ' < /dev/tty');
     }
 
+    protected function drainPendingInput(mixed $stream): void
+    {
+        if (!is_resource($stream) || !function_exists('stream_select')) {
+            return;
+        }
+
+        $read = [$stream];
+        $write = $except = [];
+        while (@stream_select($read, $write, $except, 0, 0) > 0) {
+            fgetc($stream);
+            $read = [$stream];
+            $write = $except = [];
+        }
+    }
+
     protected function selectWithArrowKeys(string $question, array $options, string $default = ''): string
     {
         $keys = array_keys($options);
@@ -830,6 +845,7 @@ class ImportUIService implements ImportUIInterface
                     }
 
                     if (self::shouldAutoCommitChoice($choice, $options)) {
+                        $this->drainPendingInput($stream);
                         $this->promptLines = [];
                         $this->renderFull();
                         return $choice;
