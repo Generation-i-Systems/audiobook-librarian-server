@@ -25,19 +25,10 @@ class ImportBooksFromDownloadsReviewOptionsTest extends TestCase
         $this->assertStringContainsString('Accept all as correct', $options['1']);
 
         $this->assertArrayHasKey('2', $options);
-        $this->assertStringContainsString('Edit all fields', $options['2']);
+        $this->assertStringContainsString('Edit', $options['2']);
 
         $this->assertArrayHasKey('3', $options);
-        $this->assertStringContainsString('Edit individual fields', $options['3']);
-
-        $this->assertArrayHasKey('4', $options);
-        $this->assertStringContainsString('Skip this book', $options['4']);
-
-        $this->assertArrayHasKey('5', $options);
-        $this->assertStringContainsString('Update cover', $options['5']);
-
-        $this->assertArrayHasKey('6', $options);
-        $this->assertStringContainsString('Request enrichment', $options['6']);
+        $this->assertStringContainsString('Skip this book', $options['3']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

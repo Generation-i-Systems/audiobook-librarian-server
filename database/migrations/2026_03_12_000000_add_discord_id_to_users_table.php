@@ -23,7 +23,10 @@ return new class () extends Migration {
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['discord_id']);
+            if (Schema::hasColumn('users', 'discord_id')) {
+                $table->dropUnique(['discord_id']);
+                $table->dropColumn('discord_id');
+            }
         });
     }
 };

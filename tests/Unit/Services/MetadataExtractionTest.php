@@ -15,10 +15,8 @@ class MetadataExtractionTest extends TestCase
     {
         parent::setUp();
 
-        // Create a mock of AIBookProcessor
         $this->aiBookProcessorMock = $this->createMock(AIBookProcessor::class);
 
-        // Create the service with the mock
         $this->service = new class ($this->aiBookProcessorMock) extends MetadataProcessingService {
             protected ?AIBookProcessor $aiProcessor;
 
@@ -27,19 +25,37 @@ class MetadataExtractionTest extends TestCase
                 $this->aiProcessor = $aiProcessor;
             }
 
-            // Override the method that uses facades if needed
-            protected function methodThatUsesFacades()
+            public function getAuthorPreferredGenre($authors): ?string
             {
-                // Mock the facade behavior here if needed
-                return [];
+                return null;
             }
         };
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function it_extracts_author_from_artist_tag()
+    public function it_extracts_author_from_artist_tag(): void
     {
-        // Skip this test for now as it requires more setup
-        $this->markTestSkipped('This test requires additional setup to work with the current implementation');
+        $this->aiBookProcessorMock->method('extractFileTags')
+            ->willReturn([
+                'artist' => 'Brandon Sanderson',
+                'title' => 'The Way of Kings',
+            ]);
+
+        $audiobook = [
+            'name' => 'The Way of Kings',
+            'path' => '/test/path',
+            'files' => ['/test/path/audio.mp3'],
+        ];
+
+        $result = $this->service->processWithoutAI($audiobook);
+
+        $this->assertNotNull($result);
+        $this->assertContains('Brandon Sanderson', $result['author']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function test_placeholder(): void
+    {
+        $this->expectNotToPerformAssertions();
     }
 }

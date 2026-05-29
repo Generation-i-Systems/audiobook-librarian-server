@@ -866,10 +866,21 @@ class BookControllerTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function testProcessImportMethodHandlesCoverUrl()
+    public function testProcessImportMethodHandlesCoverUrl(): void
     {
-        // Skip this test as importCoverImageFromUrl is a private method in BookImportTrait
-        // and can't be easily mocked
-        $this->markTestSkipped('Cannot mock private trait method importCoverImageFromUrl');
+        // Test storeCoverImage behavior via reflection (importCoverImageFromUrl is private on trait)
+        $reflection = new \ReflectionClass($this->importController);
+        $method = $reflection->getMethod('storeCoverImage');
+        $method->setAccessible(true);
+
+        // Non-URL, non-base64 string returns null
+        $result = $method->invoke($this->importController, 'not-a-url', 'test-book-id');
+        $this->assertNull($result);
+
+        // Base64 image is stored and returns a path
+        $base64Image = 'data:image/jpeg;base64,' . base64_encode('fake-image-data');
+        $result = $method->invoke($this->importController, $base64Image, 'test-book-id');
+        $this->assertNotNull($result);
+        $this->assertStringContainsString('test-book-id', $result);
     }
 }

@@ -12,7 +12,6 @@ class BookControllerPlannedActionsTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function plannedActionsReturnsMoveFilesWhenOldHasFilesAndNewEmpty(): void
     {
-        Storage::fake('books');
         Storage::disk('books')->put('OldDir/book.m4b', 'data');
 
         $mock = $this->createMock(DocumentStoreServiceInterface::class);
@@ -27,7 +26,7 @@ class BookControllerPlannedActionsTest extends TestCase
             'id' => 'test-admin-user',
             'name' => 'Admin User',
             'email' => 'admin@example.com',
-            'roles' => ['admin'],
+            'role' => 'admin',
         ]);
         $this->actingAs($admin);
 
@@ -44,8 +43,6 @@ class BookControllerPlannedActionsTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function plannedActionsIncludesDownloadCoverWhenCoverUrlAndDirectoryPresent(): void
     {
-        Storage::fake('books');
-
         $mock = $this->createMock(DocumentStoreServiceInterface::class);
         $mock->method('isAdmin')->willReturn(true);
         $mock->method('getBook')->willReturn([
@@ -58,7 +55,7 @@ class BookControllerPlannedActionsTest extends TestCase
             'id' => 'test-admin-user',
             'name' => 'Admin User',
             'email' => 'admin@example.com',
-            'roles' => ['admin'],
+            'role' => 'admin',
         ]);
         $this->actingAs($admin);
 

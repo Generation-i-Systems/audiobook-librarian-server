@@ -6,24 +6,42 @@ namespace Tests\Cli\Feature\Commands;
 
 use App\Console\Commands\FixSeriesStartingWithNumberCommand;
 use App\Models\Series;
-use Illuminate\Console\Command;
-use Mockery;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FixSeriesStartingWithNumberCommandTest extends TestCase
 {
-    /**
-     * Test that the command correctly identifies series starting with numbers.
-     */
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Register SQLite REGEXP function for series name matching
+        try {
+            $pdo = DB::connection()->getPdo();
+            if ($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                $pdo->sqliteCreateFunction('REGEXP', function ($pattern, $value) {
+                    return preg_match('/' . $pattern . '/', (string) $value) > 0 ? 1 : 0;
+                });
+            }
+        } catch (\Exception $e) {
+            // Non-SQLite databases support REGEXP natively
+        }
+    }
+
     #[Test]
     public function test_command_identifies_series_with_number_prefix(): void
     {
-        // Skip this test - Mockery overload causes conflicts
-        $this->markTestSkipped('Mockery overload causes class conflicts - skipping for now');
-    }
+        Series::create(['name' => '1st Law Series']);
+        Series::create(['name' => 'The Wheel of Time']);
 
-    /**
+        $this->artisan('series:fix-number-prefix', ['--dry-run' => true])
+            ->expectsOutputToContain('Found 1 series that start with a number')
+            ->assertExitCode(0);
+    }
 
     /**
      * Test the parseDirectoryPath method in the command.

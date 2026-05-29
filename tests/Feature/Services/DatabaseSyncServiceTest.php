@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\Services;
 
 use App\Services\DatabaseSyncService;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DatabaseSyncServiceTest extends TestCase
@@ -51,7 +54,7 @@ class DatabaseSyncServiceTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function it_syncs_a_table_completely()
     {
         $prod = DB::connection('sqlite_prod');
@@ -72,7 +75,7 @@ class DatabaseSyncServiceTest extends TestCase
         $this->assertEquals('Tolkien', ((object) $devel->table('authors')->find(1))->name);
     }
 
-    /** @test */
+    #[Test]
     public function it_syncs_a_book_and_links_authors_by_name()
     {
         $prod = DB::connection('sqlite_prod');

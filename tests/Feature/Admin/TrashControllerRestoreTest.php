@@ -43,7 +43,10 @@ class TrashControllerRestoreTest extends TestCase
 
         Auth::login($user);
         $this->actingAs($user);
-        $this->withoutMiddleware(\App\Http\Middleware\CheckAdminRole::class);
+        $this->withoutMiddleware([
+            \App\Http\Middleware\CheckAdminRole::class,
+            \App\Http\Middleware\ResolveLibraryProfileFromHost::class,
+        ]);
 
         $bookId = 123;
         $directoryPath = 'Science Fiction/Test Author/Test Series/01 Test Book';

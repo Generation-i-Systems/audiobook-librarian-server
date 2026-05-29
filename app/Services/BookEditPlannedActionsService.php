@@ -23,8 +23,8 @@ class BookEditPlannedActionsService
 
         $disk = Storage::disk('books');
 
-        $oldHasFiles = $oldDirectoryPath !== '' && $disk->exists($oldDirectoryPath) && count($disk->allFiles($oldDirectoryPath)) > 0;
-        $newHasFiles = $newDirectoryPath !== '' && $disk->exists($newDirectoryPath) && count($disk->allFiles($newDirectoryPath)) > 0;
+        $oldHasFiles = $oldDirectoryPath !== '' && count($disk->allFiles($oldDirectoryPath)) > 0;
+        $newHasFiles = $newDirectoryPath !== '' && count($disk->allFiles($newDirectoryPath)) > 0;
 
         $actions = [];
 

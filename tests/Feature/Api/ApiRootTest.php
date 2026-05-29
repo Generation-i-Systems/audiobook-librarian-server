@@ -1,12 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\Api;
 
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ApiRootTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function it_exposes_environment_information_at_root()
     {
         // Mock the environment
@@ -22,7 +25,7 @@ class ApiRootTest extends TestCase
         $response->assertJsonPath('otp_available', false);
     }
 
-    /** @test */
+    #[Test]
     public function it_identifies_production_environment()
     {
         // Mock production

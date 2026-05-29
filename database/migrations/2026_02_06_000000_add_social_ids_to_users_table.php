@@ -29,7 +29,18 @@ return new class () extends Migration {
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['google_id', 'facebook_id', 'apple_id']);
+            if (Schema::hasColumn('users', 'google_id')) {
+                $table->dropUnique(['google_id']);
+                $table->dropColumn('google_id');
+            }
+            if (Schema::hasColumn('users', 'facebook_id')) {
+                $table->dropUnique(['facebook_id']);
+                $table->dropColumn('facebook_id');
+            }
+            if (Schema::hasColumn('users', 'apple_id')) {
+                $table->dropUnique(['apple_id']);
+                $table->dropColumn('apple_id');
+            }
         });
     }
 };

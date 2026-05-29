@@ -23,14 +23,17 @@ class QueueControllerTest extends TestCase
             'id' => 'admin-user',
             'name' => 'Test Admin',
             'email' => 'admin@test.com',
-            'is_admin' => true,
+            'role' => 'admin',
             'permissions' => ['admin.*'],
         ]);
 
         // Authenticate as admin user
         $this->actingAs($adminUser);
         $this->withHeader('Accept', 'application/json');
-        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class);
+        $this->withoutMiddleware([
+            \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
+            \App\Http\Middleware\ResolveLibraryProfileFromHost::class,
+        ]);
 
         $defaultDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $defaultDocumentStore->shouldReceive('isAdmin')->andReturn(true);
@@ -80,10 +83,10 @@ class QueueControllerTest extends TestCase
 
     public function test_bulk_import_books_queues_jobs_and_skips_existing()
     {
-        $this->markTestSkipped('Directory path validation issues in test environment');
         // Mock the DocumentStoreService to return no existing jobs and books
         $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockDocumentStore->shouldReceive('listJobs')->andReturn([]);
+        $mockDocumentStore->shouldReceive('getJobs')->andReturn([]);
         $mockDocumentStore->shouldReceive('bookExistsByDirectoryPath')->andReturn(false);
         $mockDocumentStore->shouldReceive('jobExistsByDirectoryPath')->andReturn(false);
         $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
@@ -95,13 +98,13 @@ class QueueControllerTest extends TestCase
         mkdir($testDir . '/subdir/book1', 0755, true);
         file_put_contents($testDir . '/subdir/book1/metadata.abs', '{"title": "Test Book"}');
 
-        // Set the BOOK_STORAGE_PATH to our test directory
-        $this->app['config']->set('app.env.BOOK_STORAGE_PATH', $testDir);
-        putenv("BOOK_STORAGE_PATH=$testDir");
+        // Configure books disk root to our test directory — controller prepends this to the relative dir
+        $this->app['config']->set('filesystems.disks.books.root', $testDir);
 
         try {
+            // Pass the relative path (the controller prepends the books disk root)
             $response = $this->post('/admin/books/bulk-import', [
-                'dir' => $testDir . '/subdir',
+                'dir' => 'subdir',
             ]);
 
             // Debug validation errors

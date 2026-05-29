@@ -205,11 +205,6 @@ class ImportFileControllerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_extract_file_metadata()
     {
-        // Skip test if getID3 class doesn't exist
-        if (!class_exists('\getID3')) {
-            $this->markTestSkipped('getID3 class not available');
-        }
-
         // Set up Log facade mock
         Log::shouldReceive('debug')->atLeast()->once();
 
@@ -283,11 +278,6 @@ class ImportFileControllerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_extract_series_from_artist_parentheses()
     {
-        // Skip test if getID3 class doesn't exist
-        if (!class_exists('\getID3')) {
-            $this->markTestSkipped('getID3 class not available');
-        }
-
         // Set up Log facade mock
         Log::shouldReceive('debug')->atLeast()->once();
 
@@ -353,11 +343,6 @@ class ImportFileControllerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_extract_series_number_from_album_prefix()
     {
-        // Skip test if getID3 class doesn't exist
-        if (!class_exists('\getID3')) {
-            $this->markTestSkipped('getID3 class not available');
-        }
-
         // Set up Log facade mock
         Log::shouldReceive('debug')->atLeast()->once();
 
@@ -425,11 +410,6 @@ class ImportFileControllerTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_extract_cover_image_from_picture_tag()
     {
-        // Skip test if getID3 class doesn't exist
-        if (!class_exists('\getID3')) {
-            $this->markTestSkipped('getID3 class not available');
-        }
-
         // Set up Log facade mock
         Log::shouldReceive('debug')->atLeast()->once();
 

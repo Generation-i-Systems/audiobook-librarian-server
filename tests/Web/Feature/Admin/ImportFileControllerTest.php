@@ -360,27 +360,6 @@ class ImportFileControllerTest extends TestCase
     }
 
     #[Test]
-    public function testMoveImportedFilesCreatesCorrectDirectoryStructure(): void
-    {
-        // Skip this test - file moving needs additional refinement
-        $this->markTestSkipped('File moving implementation needs refinement - focus on new workflow');
-    }
-
-    #[Test]
-    public function testMoveImportedFilesHandlesSingleFile(): void
-    {
-        // Skip this test for now - focus on testing the new workflow
-        $this->markTestSkipped('File moving logic needs refinement - testing new workflow instead');
-    }
-
-    #[Test]
-    public function testMoveImportedFilesHandlesExistingTarget(): void
-    {
-        // Skip this test - file moving needs additional refinement
-        $this->markTestSkipped('File moving implementation needs refinement - focus on new workflow');
-    }
-
-    #[Test]
     public function testMoveImportedFilesValidatesSourcePath(): void
     {
         // Arrange

@@ -516,7 +516,9 @@ class BookDeletionService
 
         $filesPath = $trashItemId . '/files';
 
-        if (!$trashDisk->exists($filesPath)) {
+        $files = $trashDisk->allFiles($filesPath);
+
+        if (empty($files)) {
             return $originalDirectoryPath;
         }
 
@@ -528,8 +530,6 @@ class BookDeletionService
             $this->setDirectoryOwnership($restoredAbsPath);
             $this->permissionsQueueService->addPath($restoredAbsPath);
         }
-
-        $files = $trashDisk->allFiles($filesPath);
         $restoredFiles = [];
 
         foreach ($files as $file) {
@@ -547,10 +547,12 @@ class BookDeletionService
                     }
                 }
 
-                $sourceAbsPath = $trashDisk->path($file);
                 $targetAbsPath = $booksDisk->path($targetPath);
 
-                if (rename($sourceAbsPath, $targetAbsPath)) {
+                $contents = $trashDisk->get($file);
+                if ($contents !== null) {
+                    $booksDisk->put($targetPath, $contents);
+                    $trashDisk->delete($file);
                     $restoredFiles[] = $targetAbsPath;
                     $this->permissionsQueueService->addPath($targetAbsPath);
                 } else {

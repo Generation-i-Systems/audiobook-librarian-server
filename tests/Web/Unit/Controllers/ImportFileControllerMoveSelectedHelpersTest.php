@@ -68,6 +68,8 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
         File::shouldReceive('deleteDirectory')->with('/src');
 
         $controller->exposeMoveDirectoryContentsToTarget('/src', '/dest');
+
+        $this->addToAssertionCount(1);
     }
 }
 

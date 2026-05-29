@@ -24,8 +24,13 @@ return new class () extends Migration {
     public function down(): void
     {
         Schema::table('client_events', function (Blueprint $table) {
-            $table->dropColumn('event_timestamp');
-            $table->bigInteger('timestamp')->comment('Unix timestamp in milliseconds');
+            if (Schema::hasColumn('client_events', 'event_timestamp')) {
+                $table->dropIndex('client_events_event_timestamp_index');
+                $table->dropColumn('event_timestamp');
+            }
+            if (!Schema::hasColumn('client_events', 'timestamp')) {
+                $table->bigInteger('timestamp')->comment('Unix timestamp in milliseconds');
+            }
         });
     }
 };

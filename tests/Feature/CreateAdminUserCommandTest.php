@@ -41,12 +41,10 @@ class CreateAdminUserCommandTest extends TestCase
 
     public function test_does_not_create_if_admin_exists(): void
     {
-        $this->markTestSkipped('Command output assertion issues in test environment');
-        // @phpstan-ignore-next-line
         $mock = Mockery::mock(DocumentStoreServiceInterface::class);
         $mock->shouldReceive('getUserByCredentials')->with(['role' => 'admin'])->andReturn(['id' => 'existing']);
         $this->app->instance(DocumentStoreServiceInterface::class, $mock);
-        $this->artisan('app:create-admin-user')
+        $this->artisan('app:create-admin-user', ['--no-backup' => true])
             ->expectsOutput('An admin user already exists.')
             ->assertExitCode(0);
     }

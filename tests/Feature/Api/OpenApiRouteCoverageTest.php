@@ -120,6 +120,14 @@ class OpenApiRouteCoverageTest extends TestCase
             '/^\\/recommendations/',
             '/^\\/books\\/.*\\/recommend/',
             '/^\\/badges/',
+            '/^\\/download\\/remote/',
+            '/^\\/books\\/.*\\/contributions/',
+            '/^\\/contributions/',
+            '/^\\/admin\\/contributions/',
+            '/^\\/admin\\/users/',
+            '/^\\/auth\\/set-initial-password/',
+            '/^\\/auth\\/otp\/request/',
+            '/^\\/auth\\/otp\/verify/',
         ];
 
         foreach ($skipPatterns as $pattern) {

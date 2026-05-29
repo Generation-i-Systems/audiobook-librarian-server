@@ -58,7 +58,7 @@ return new class () extends Migration {
         Schema::table('user_book_status', function (Blueprint $table) {
             // Reverse 5: Drop new primary key, indexes, and foreign keys
             $table->dropPrimary(['user_id', 'book_id']);
-            $table->dropIndex(['user_book_status_user_id_status_index']);
+            $table->dropIndex('user_book_status_user_id_status_index');
             $table->dropForeign(['user_id']);
             $table->dropForeign(['book_id']);
 

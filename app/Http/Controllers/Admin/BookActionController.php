@@ -32,7 +32,7 @@ class BookActionController extends Controller
 
         $coverUrl = $audibleCoverImageUrl !== '' ? $audibleCoverImageUrl : $coverImageUrl;
 
-        $service = app(BookEditPlannedActionsService::class);
+        $service = new BookEditPlannedActionsService($this->documentStoreService);
         $plan = $service->computePlannedActions($id, $directoryPath, $coverUrl);
 
         return response()->json($plan);

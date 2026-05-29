@@ -67,7 +67,7 @@ class PasswordResetWebTest extends TestCase
         ]);
 
         $response->assertStatus(302);
-        $response->assertRedirect('/home');
+        $response->assertRedirect(route('password.reset.success'));
 
         $user->refresh();
         $this->assertTrue(password_verify('new-password-123', (string) $user->password));

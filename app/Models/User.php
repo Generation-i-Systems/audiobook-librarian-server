@@ -113,6 +113,11 @@ class User extends Authenticatable
 
     public function getIsAdminAttribute(): bool
     {
+        return $this->isAdmin();
+    }
+
+    public function isAdmin(): bool
+    {
         $role = $this->role ?? 'user';
 
         return in_array($role, ['admin', 'super-admin'], true);

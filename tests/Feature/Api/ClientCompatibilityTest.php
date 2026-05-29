@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\Api;
 
 use App\Models\Book;
@@ -8,6 +10,7 @@ use App\Models\BookProgress;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ClientCompatibilityTest extends TestCase
@@ -29,7 +32,7 @@ class ClientCompatibilityTest extends TestCase
         Sanctum::actingAs($this->user, ['*']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_delete_bookmark_by_id_only()
     {
         $bookmark = Bookmark::factory()->create([
@@ -43,7 +46,7 @@ class ClientCompatibilityTest extends TestCase
         $this->assertDatabaseMissing('bookmarks', ['id' => $bookmark->id]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_mark_book_completed_using_alias_route()
     {
         // Setup initial progress manually
@@ -68,7 +71,7 @@ class ClientCompatibilityTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_device_progress_using_alias_route()
     {
         $deviceId = 'test-device-123';

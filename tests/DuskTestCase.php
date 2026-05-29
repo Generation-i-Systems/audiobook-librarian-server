@@ -11,6 +11,8 @@ use PHPUnit\Framework\Attributes\BeforeClass;
 
 abstract class DuskTestCase extends BaseTestCase
 {
+    protected static bool $chromedriverAvailable = false;
+
     /**
      * Prepare for Dusk test execution.
      */
@@ -18,8 +20,21 @@ abstract class DuskTestCase extends BaseTestCase
     public static function prepare(): void
     {
         if (!static::runningInSail()) {
+            $binary = dirname(__DIR__) . '/vendor/laravel/dusk/bin/chromedriver-linux';
+            if (!file_exists($binary)) {
+                return;
+            }
+            static::$chromedriverAvailable = true;
             static::startChromeDriver(['--port=9515']);
         }
+    }
+
+    protected function setUp(): void
+    {
+        if (!static::runningInSail() && !static::$chromedriverAvailable) {
+            $this->markTestSkipped('Chromedriver binary not found. Run: php artisan dusk:chrome-driver');
+        }
+        parent::setUp();
     }
 
     /**
