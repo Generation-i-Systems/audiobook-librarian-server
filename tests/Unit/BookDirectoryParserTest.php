@@ -54,7 +54,7 @@ class BookDirectoryParserTest extends TestCase
         $this->root = vfsStream::setup('testDir');
 
         // Create a mock for the BookMetadataService
-        $this->mockMetadataService = $this->createMock(BookMetadataService::class);
+        $this->mockMetadataService = $this->createStub(BookMetadataService::class);
 
         // Configure the default mock behavior to return empty metadata by default
         // This ensures tests explicitly set up the mocks they need
@@ -65,7 +65,7 @@ class BookDirectoryParserTest extends TestCase
             ->willReturn([]);
 
         // Create a mock AudioFileAnalyzer
-        $this->mockAudioAnalyzer = $this->createMock(AudioFileAnalyzer::class);
+        $this->mockAudioAnalyzer = $this->createStub(AudioFileAnalyzer::class);
 
         // Create the parser with mocked services
         $this->parser = new BookDirectoryParser(

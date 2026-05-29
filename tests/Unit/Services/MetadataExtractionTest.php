@@ -15,7 +15,7 @@ class MetadataExtractionTest extends TestCase
     {
         parent::setUp();
 
-        $this->aiBookProcessorMock = $this->createMock(AIBookProcessor::class);
+        $this->aiBookProcessorMock = $this->createStub(AIBookProcessor::class);
 
         $this->service = new class ($this->aiBookProcessorMock) extends MetadataProcessingService {
             protected ?AIBookProcessor $aiProcessor;

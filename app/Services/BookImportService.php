@@ -3955,7 +3955,7 @@ class BookImportService
     /**
      * Search for alternative book covers using Google Image Search
      */
-    public function searchAlternativeCovers(array $metadata, int $limit = 3, ?GoogleImageSearchService $googleImageService): array
+    public function searchAlternativeCovers(array $metadata, ?GoogleImageSearchService $googleImageService, int $limit = 3): array
     {
         if (!$googleImageService) {
             return ['success' => false, 'images' => [], 'error' => 'Google Image Service not available'];

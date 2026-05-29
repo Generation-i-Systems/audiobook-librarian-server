@@ -8,6 +8,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -31,6 +32,7 @@ class BookImportTest extends TestCase
     }
 
     #[Test]
+    #[AllowMockObjectsWithoutExpectations]
     public function testProcessDirPathWithSeries(): void
     {
         $this->documentStore->method('listGenres')->willReturn([['name' => 'Test Genre']]);
@@ -47,6 +49,7 @@ class BookImportTest extends TestCase
     }
 
     #[Test]
+    #[AllowMockObjectsWithoutExpectations]
     public function testProcessDirPathWithoutSeries(): void
     {
         $this->documentStore->method('listGenres')->willReturn([['name' => 'Test Genre']]);

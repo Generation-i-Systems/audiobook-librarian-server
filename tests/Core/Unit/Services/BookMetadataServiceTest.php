@@ -37,7 +37,7 @@ class BookMetadataServiceTest extends TestCase
         Config::set('bookparser.metadata_storage', 'local');
         Config::set('bookparser.local_metadata_filename', 'librarian.json');
 
-        $mockDocumentStoreService = $this->createMock(\App\Contracts\DocumentStoreServiceInterface::class);
+        $mockDocumentStoreService = $this->createStub(\App\Contracts\DocumentStoreServiceInterface::class);
         $this->service = new BookMetadataService($mockDocumentStoreService);
     }
 

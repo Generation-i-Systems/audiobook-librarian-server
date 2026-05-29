@@ -12,7 +12,7 @@ class BookDownloadControllerUrlEncodingTest extends TestCase
 {
     public function test_build_download_file_url_encodes_reserved_characters_per_segment(): void
     {
-        $controller = new BookDownloadController($this->createMock(DocumentStoreServiceInterface::class));
+        $controller = new BookDownloadController($this->createStub(DocumentStoreServiceInterface::class));
         $method = new \ReflectionMethod(BookDownloadController::class, 'buildDownloadFileUrl');
         $method->setAccessible(true);
 
@@ -26,7 +26,7 @@ class BookDownloadControllerUrlEncodingTest extends TestCase
 
     public function test_build_download_file_url_preserves_safe_path_separators(): void
     {
-        $controller = new BookDownloadController($this->createMock(DocumentStoreServiceInterface::class));
+        $controller = new BookDownloadController($this->createStub(DocumentStoreServiceInterface::class));
         $method = new \ReflectionMethod(BookDownloadController::class, 'buildDownloadFileUrl');
         $method->setAccessible(true);
 

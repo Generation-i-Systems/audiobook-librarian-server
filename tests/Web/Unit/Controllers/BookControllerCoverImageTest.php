@@ -25,7 +25,7 @@ class BookControllerCoverImageTest extends TestCase
 
         // Create mock services
         $this->documentStore = new MockDocumentStoreService();
-        $externalCoverService = $this->createMock(ExternalCoverService::class);
+        $externalCoverService = $this->createStub(ExternalCoverService::class);
 
         $this->controller = new BookController(
             $this->documentStore,

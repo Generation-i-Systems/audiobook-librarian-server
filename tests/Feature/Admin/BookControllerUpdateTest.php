@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Tests\TestCase;
 
 class BookControllerUpdateTest extends TestCase
@@ -72,6 +73,7 @@ class BookControllerUpdateTest extends TestCase
      * Test that updating a book with a cover candidate works correctly
      */
     #[\PHPUnit\Framework\Attributes\Test]
+    #[AllowMockObjectsWithoutExpectations]
     public function updateBookRedirectsToIndexAndSavesCoverCandidate()
     {
         // Test book data
@@ -125,6 +127,7 @@ class BookControllerUpdateTest extends TestCase
      * Test that updating a book with an uploaded cover image works correctly
      */
     #[\PHPUnit\Framework\Attributes\Test]
+    #[AllowMockObjectsWithoutExpectations]
     public function updateBookSavesUploadedCoverImage()
     {
         // Mock Storage facade
@@ -189,6 +192,7 @@ class BookControllerUpdateTest extends TestCase
      * Test that updating a non-existent book returns an error
      */
     #[\PHPUnit\Framework\Attributes\Test]
+    #[AllowMockObjectsWithoutExpectations]
     public function updateBookReturnsErrorIfNotFound()
     {
         // Set up DocumentStoreService to return null (book not found)
@@ -395,6 +399,7 @@ class BookControllerUpdateTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    #[AllowMockObjectsWithoutExpectations]
     public function updateBookMovesFilesWhenDirectoryPathChangesAndDestinationExists(): void
     {
         Log::spy();

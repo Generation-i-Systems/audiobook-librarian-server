@@ -14,8 +14,8 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
     public function normalizeSourcePathForMoveSelectedUnwrapsSingleRootDirectory(): void
     {
         $controller = new ImportFileControllerMoveSelectedHelpersTestDouble(
-            $this->createMock(DocumentStoreServiceInterface::class),
-            $this->createMock(BookImportService::class)
+            $this->createStub(DocumentStoreServiceInterface::class),
+            $this->createStub(BookImportService::class)
         );
 
         File::shouldReceive('isDirectory')->with('/src')->andReturn(true);
@@ -34,8 +34,8 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
     public function moveDirectoryContentsToTargetMovesFilesIntoDestWithoutNesting(): void
     {
         $controller = new ImportFileControllerMoveSelectedHelpersTestDouble(
-            $this->createMock(DocumentStoreServiceInterface::class),
-            $this->createMock(BookImportService::class)
+            $this->createStub(DocumentStoreServiceInterface::class),
+            $this->createStub(BookImportService::class)
         );
 
         $file1 = new class () {

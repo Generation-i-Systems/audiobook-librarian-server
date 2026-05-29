@@ -75,7 +75,7 @@ class BookApiControllerGenreTest extends TestCase
      */
     private function getControllerInstance()
     {
-        $documentStoreMock = $this->createMock(DocumentStoreServiceInterface::class);
+        $documentStoreMock = $this->createStub(DocumentStoreServiceInterface::class);
         return new BookApiController($documentStoreMock);
     }
 

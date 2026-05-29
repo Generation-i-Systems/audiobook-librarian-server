@@ -32,7 +32,7 @@ class BookControllerUpdateNarratorSeriesTest extends TestCase
 
         $this->controller = new BookController(
             $this->documentStoreService,
-            $this->createMock(\App\Services\ExternalCoverService::class),
+            $this->createStub(\App\Services\ExternalCoverService::class),
             new AudioFileAnalyzer()
         );
 

@@ -14,7 +14,7 @@ class BookControllerPlannedActionsTest extends TestCase
     {
         Storage::disk('books')->put('OldDir/book.m4b', 'data');
 
-        $mock = $this->createMock(DocumentStoreServiceInterface::class);
+        $mock = $this->createStub(DocumentStoreServiceInterface::class);
         $mock->method('isAdmin')->willReturn(true);
         $mock->method('getBook')->willReturn([
             'id' => 'book-1',
@@ -43,7 +43,7 @@ class BookControllerPlannedActionsTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function plannedActionsIncludesDownloadCoverWhenCoverUrlAndDirectoryPresent(): void
     {
-        $mock = $this->createMock(DocumentStoreServiceInterface::class);
+        $mock = $this->createStub(DocumentStoreServiceInterface::class);
         $mock->method('isAdmin')->willReturn(true);
         $mock->method('getBook')->willReturn([
             'id' => 'book-2',

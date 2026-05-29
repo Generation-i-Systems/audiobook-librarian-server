@@ -1561,7 +1561,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function searchAlternativeCovers(array $metadata, int $limit = 3): array
     {
-        return $this->getImportService()->searchAlternativeCovers($metadata, $limit, $this->googleImageService);
+        return $this->getImportService()->searchAlternativeCovers($metadata, $this->googleImageService, $limit);
     }
 
     /**

@@ -15,8 +15,8 @@ class AuthorNormalizationTest extends TestCase
         parent::setUp();
 
         // Mock the GenreMappingService and SourceTrashService
-        $genreMappingService = $this->createMock(\App\Services\GenreMappingService::class);
-        $sourceTrashService = $this->createMock(\App\Services\SourceTrashService::class);
+        $genreMappingService = $this->createStub(\App\Services\GenreMappingService::class);
+        $sourceTrashService = $this->createStub(\App\Services\SourceTrashService::class);
 
         // Create a new instance of BookImportService with the mocks
         $this->service = new class ($genreMappingService, $sourceTrashService) extends BookImportService {

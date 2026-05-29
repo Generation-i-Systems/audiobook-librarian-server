@@ -31,7 +31,7 @@ class ListMissingBookDirectoriesAiTest extends TestCase
         Book::factory()->create(['directory_path' => 'missing/bookB']);
 
         // Mock AI processor
-        $mock = $this->createMock(AIBookProcessor::class);
+        $mock = $this->createStub(AIBookProcessor::class);
         $mock->method('complete')->willReturn([
             'success' => true,
             'data' => "```json\n" . json_encode([
@@ -89,7 +89,7 @@ class ListMissingBookDirectoriesAiTest extends TestCase
         Book::factory()->create(['directory_path' => 'missing/bookC']);
 
         // Mock AI processor returning a plain 'json\n' prefix without fences
-        $mock = $this->createMock(AIBookProcessor::class);
+        $mock = $this->createStub(AIBookProcessor::class);
         $mock->method('complete')->willReturn([
             'success' => true,
             'data' => "json\n" . json_encode([

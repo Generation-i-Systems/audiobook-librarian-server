@@ -31,7 +31,7 @@ class BookEnrichmentServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function enrichWithExternalDataMapsAudibleNarratorsListAndCategoryToNarratorAndGenre(): void
     {
-        $audibleMock = $this->createMock(AudibleService::class);
+        $audibleMock = $this->createStub(AudibleService::class);
         $audibleMock->method('searchBooksWithFiltering')->willReturn([
             [
                 'description' => 'Test description',
@@ -61,7 +61,7 @@ class BookEnrichmentServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function enrichWithExternalDataNormalizesAudibleCategoryObjectsToGenreStrings(): void
     {
-        $audibleMock = $this->createMock(AudibleService::class);
+        $audibleMock = $this->createStub(AudibleService::class);
         $audibleMock->method('searchBooksWithFiltering')->willReturn([
             [
                 'description' => 'Test description',
@@ -121,7 +121,7 @@ class BookEnrichmentServiceTest extends TestCase
     #[Test]
     public function enrichWithExternalDataMapsAudibleCategoryToValidSystemGenre(): void
     {
-        $audibleMock = $this->createMock(AudibleService::class);
+        $audibleMock = $this->createStub(AudibleService::class);
         $audibleMock->method('searchBooksWithFiltering')->willReturn([
             [
                 'description' => 'Test description',

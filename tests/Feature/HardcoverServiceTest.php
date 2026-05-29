@@ -38,7 +38,7 @@ class HardcoverServiceTest extends TestCase
             ->getMock();
 
         // Mock the makeRequest method to return our test data
-        $mock->method('makeRequest')
+        $mock->expects($this->once())->method('makeRequest')
             ->willReturn([
                 'data' => [
                     'search' => [
@@ -138,7 +138,7 @@ class HardcoverServiceTest extends TestCase
             ->getMock();
 
         // Mock the makeRequest method to return our test data
-        $mock->method('makeRequest')
+        $mock->expects($this->once())->method('makeRequest')
             ->willReturn([
                 'data' => [
                     'books_by_pk' => [

@@ -28,7 +28,7 @@ class BookControllerDebugTest extends TestCase
         // Create the controller with the mock services
         $this->controller = new BookController(
             $this->documentStore,
-            $this->createMock(\App\Services\ExternalCoverService::class),
+            $this->createStub(\App\Services\ExternalCoverService::class),
             new AudioFileAnalyzer()
         );
 
@@ -89,7 +89,7 @@ class BookControllerDebugTest extends TestCase
         // Re-create the controller with the standard mock service
         $this->controller = new BookController(
             $this->documentStore,
-            $this->createMock(\App\Services\ExternalCoverService::class),
+            $this->createStub(\App\Services\ExternalCoverService::class),
             new AudioFileAnalyzer()
         );
 

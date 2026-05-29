@@ -164,7 +164,7 @@ class ExternalCoverServiceTest extends TestCase
             ->getMock();
 
         // Configure the mock to return a specific error result
-        $mockService->method('downloadCoverImage')
+        $mockService->expects($this->once())->method('downloadCoverImage')
             ->willReturn([
                 'success' => false,
                 'path' => null,
