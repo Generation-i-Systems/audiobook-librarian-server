@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\External\MetadataLookup;
+namespace Tests\Integration\MetadataLookup;
 
 use App\Auth\DocumentstoreUser;
 use Illuminate\Support\Facades\Auth;

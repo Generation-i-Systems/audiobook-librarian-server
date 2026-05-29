@@ -74,7 +74,8 @@
             "Tests\\Import\\Unit\\Controllers\\Admin\\": "tests/Import/Unit/",
             "Tests\\Import\\Unit\\Services\\": "tests/Import/Unit/",
             "Tests\\Import\\Unit\\Traits\\": "tests/Import/Unit/",
-            "Tests\\Core\\": "tests/Core/"
+            "Tests\\Core\\": "tests/Core/",
+            "Tests\\Integration\\": "tests-integration/"
         }
     },
     "scripts": {
