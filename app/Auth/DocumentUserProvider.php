@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Auth;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -25,23 +27,21 @@ class DocumentUserProvider implements UserProvider
             'user_class' => $user ? get_class($user) : null,
             'guard' => get_class($auth->guard()),
             'session_id' => session()->getId(),
-            'session_data' => session()->all(),
         ]);
     }
 
     /**
      * Rehash the user's password if necessary. Laravel 11+ requirement.
-     *
-     * @param  string  $password
-     */
-    /**
-     * Rehash the user's password if necessary. Laravel 11+ requirement.
      */
     public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): string
     {
-        Log::debug('DocumentUserProvider::rehashPasswordIfRequired called with user=' .
-            print_r($user, true) . ', credentials=' . print_r($credentials, true) . ', force=' . $force);
-        // Get the plain password from credentials
+        Log::debug('DocumentUserProvider::rehashPasswordIfRequired called', [
+            'user_id' => $user->getAuthIdentifier(),
+            'user_class' => $user::class,
+            'force' => $force,
+            'has_password' => isset($credentials['password']),
+        ]);
+
         $plain = $credentials['password'] ?? null;
         $currentHash = $user->getAuthPassword();
         if ($plain && ($force || \Illuminate\Support\Facades\Hash::needsRehash($currentHash))) {

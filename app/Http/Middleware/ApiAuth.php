@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Middleware;
 
 use App\Models\User;
@@ -20,13 +22,11 @@ class ApiAuth
         $requestUri = $request->getRequestUri();
         $requestMethod = $request->getMethod();
 
-        // Log EVERY request that hits this middleware - before any logic
-        Log::error('ApiAuth middleware START', [
+        Log::debug('ApiAuth middleware start', [
             'uri' => $requestUri,
             'method' => $requestMethod,
             'ip' => $clientIp,
             'has_auth_header' => !empty($authHeader),
-            'auth_header' => $authHeader,
         ]);
 
         // Bypass for testing actingAs ONLY if explicitly requested via header
@@ -89,16 +89,12 @@ class ApiAuth
         }
         $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4); // Show first 8 and last 4 chars
 
-        // Log the exact token details for debugging hash mismatches
         Log::info('Token details for debugging', [
             'uri' => $requestUri,
             'token_preview' => $tokenPreview,
             'token_length' => strlen($token),
-            'token_starts_with' => substr($token, 0, 10),
-            'token_ends_with' => substr($token, -10),
             'token_has_spaces' => strpos($token, ' ') !== false,
             'token_has_plus' => strpos($token, '+') !== false,
-            'raw_auth_header' => $authHeader
         ]);
 
         // Try to find the token in the personal_access_tokens table
