@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -58,13 +60,12 @@ class DebugController extends Controller
             'auth_user' => Auth::user(),
             'auth_id' => Auth::id(),
             'session_id' => session()->getId(),
-            'session_data' => session()->all(),
             'user_class' => Auth::user() ? get_class(Auth::user()) : null,
             'guard' => Auth::getDefaultDriver(),
             'provider' => config('auth.guards.' . Auth::getDefaultDriver() . '.provider'),
             'session_driver' => config('session.driver'),
             'session_cookie' => config('session.cookie'),
-            'session_cookie_value' => request()->cookie(config('session.cookie')),
+            'has_session_cookie' => request()->hasCookie(config('session.cookie')),
         ]);
     }
 
@@ -76,7 +77,7 @@ class DebugController extends Controller
     {
         return response()->json([
             'session_id' => session()->getId(),
-            'session_data' => session()->all(),
+            'session_keys' => array_keys(session()->all()),
         ]);
     }
 
@@ -122,7 +123,7 @@ class DebugController extends Controller
 
         return response()->json([
             'session_id' => session()->getId(),
-            'session_data' => session()->all(),
+            'session_keys' => array_keys(session()->all()),
         ]);
     }
 

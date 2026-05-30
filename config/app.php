@@ -119,6 +119,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Local Debug Routes
+    |--------------------------------------------------------------------------
+    |
+    | These routes expose internal application and database state. Keep them
+    | disabled by default, even in local environments with live data.
+    |
+    */
+
+    'enable_debug_routes' => (bool) env('LIBRARIAN_ENABLE_DEBUG_ROUTES', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |

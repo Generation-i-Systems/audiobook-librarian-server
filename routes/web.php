@@ -26,7 +26,6 @@ use App\Http\Controllers\ThemeWebController;
 use App\Http\Controllers\UserLibraryController;
 use App\Http\Controllers\Api\EmailOtpController;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 // Magic link OTP web routes (no auth required — these ARE the auth mechanism)
@@ -45,125 +44,23 @@ Route::post('/auth/otp/request', [EmailOtpController::class, 'request'])
 Route::get('/emergency/books', [App\Http\Controllers\EmergencyBookController::class, 'index'])
     ->name('emergency.books.index');
 
-// --- DEBUG ROUTES (local only) ---
-if (app()->environment('local')) {
-    // Memory test route
-    Route::get('/test-memory', [App\Http\Controllers\TestController::class, 'memoryTest']);
+// --- DEBUG ROUTES (explicit local opt-in only) ---
+if (app()->environment('local') && config('app.enable_debug_routes')) {
+    Route::middleware(['auth', 'admin'])->group(function (): void {
+        Route::get('/test-memory', [App\Http\Controllers\TestController::class, 'memoryTest']);
 
-    // Reset test user password to a known value
-    Route::get('/reset-test-password', function () {
-        $user = \App\Models\User::where('email', 'eric@thelin.org')->first();
+        Route::get('/debug/middleware', [Admin\DebugController::class, 'debugMiddleware']);
+        Route::get('/debug/auth', [Admin\DebugController::class, 'auth']);
+        Route::get('/debug/session', [Admin\DebugController::class, 'session']);
+        Route::get('/debug/sessiondb', [Admin\DebugController::class, 'sessiondb']);
+        Route::get('/debug/document/{collection}/{docId}', [Admin\DebugController::class, 'showDocument']);
 
-        if (!$user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Test user not found',
-            ], 404);
-        }
+        Route::get('/debug/logout', [Admin\DebugController::class, 'logout']);
+        Route::get('/debug/session-write', [Admin\DebugController::class, 'sessionWrite']);
 
-        $newPassword = 'password123';
-        $user->password = \Illuminate\Support\Facades\Hash::make($newPassword);
-        $user->save();
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Test user password has been reset',
-            'email' => $user->email,
-            'new_password' => $newPassword,
-        ]);
+        Route::get('/debug/users-dump', [Admin\DebugController::class, 'usersDump']);
+        Route::get('/debug/books-dump', [Admin\DebugController::class, 'booksDump']);
     });
-
-    // Test authentication with MySQL
-    Route::get('/test-auth', function () {
-        // Test authentication with the test user
-        $user = \App\Models\User::where('email', 'eric@thelin.org')->first();
-
-        if (!$user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Test user not found',
-            ], 404);
-        }
-
-        $password = 'password123'; // This should match the password set in /reset-test-password
-        $credentials = [
-            'email' => 'eric@thelin.org',
-            'password' => $password,
-        ];
-
-        // Direct password check for debugging
-        $directPasswordCheck = $user->password && \Illuminate\Support\Facades\Hash::check($password, $user->password);
-
-        // Debug information
-        $debugInfo = [
-            'user_found' => true,
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-            'password_provided' => $password,
-            'password_hash_in_db' => $user->password,
-            'direct_password_check' => $directPasswordCheck,
-            'auth_driver' => config('auth.defaults.guard'),
-            'auth_provider' => config('auth.guards.web.provider'),
-            'user_provider' => config('auth.providers.users.driver'),
-            'auth_guards' => config('auth.guards'),
-            'auth_providers' => config('auth.providers'),
-            'user_model' => $user::class,
-            'user_attributes' => $user->toArray(),
-        ];
-
-        if (Auth::attempt($credentials)) {
-            $user = Auth::user();
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Authentication successful',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                ],
-                'session' => session()->all(),
-                'debug' => $debugInfo,
-            ]);
-        }
-        // Add more detailed error information
-        $errorInfo = [
-            'auth_check' => Auth::check(),
-            'auth_user' => Auth::user() ? Auth::user()->only(['id', 'name', 'email']) : null,
-            'session_data' => session()->all(),
-            'debug' => $debugInfo,
-        ];
-
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Authentication failed',
-            'error' => 'Invalid credentials',
-            'details' => $errorInfo,
-        ], 401);
-    });
-
-    // Move all /debug/ routes to DebugController
-    Route::get('/debug/middleware', [Admin\DebugController::class, 'debugMiddleware']);
-    Route::get('/debug/auth', [Admin\DebugController::class, 'auth']);
-    Route::get('/debug/session', [Admin\DebugController::class, 'session']);
-    Route::get('/debug/sessiondb', [Admin\DebugController::class, 'sessiondb']);
-    Route::get('/debug/document/{collection}/{docId}', [Admin\DebugController::class, 'showDocument']);
-
-    Route::get('/debug/logout', [Admin\DebugController::class, 'logout']);
-    Route::get('/debug/session-write', [Admin\DebugController::class, 'sessionWrite']);
-
-    // Dump all users/books via DebugController (now MySQL-based)
-    Route::get('/debug/users-dump', [Admin\DebugController::class, 'usersDump']);
-    Route::get('/debug/books-dump', [Admin\DebugController::class, 'booksDump']);
-
-    // Debug database relationships
-    Route::get('/debug/relationships', fn () => [
-        'author_book' => DB::table('author_book')->get(),
-        'book_narrator' => DB::table('book_narrator')->get(),
-        'book_genre' => DB::table('book_genre')->get(),
-        'books' => \App\Models\Book::with(['authors', 'narrators', 'genres'])->limit(5)->get(),
-    ]);
 }
 
 Route::get('/', function () {
