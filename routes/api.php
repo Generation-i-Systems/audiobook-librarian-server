@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\ApiHealthController;
 use App\Http\Controllers\Api\ApiRootController;
@@ -63,14 +65,14 @@ Route::prefix('v1')->group(function () {
 
     // Public Skin Routes (no authentication required)
     Route::get('/skins', [SkinController::class, 'index'])->name('api.v1.skins.index');
-    Route::get('/skins/{id}', [SkinController::class, 'show'])->name('api.v1.skins.show');
-    Route::get('/skins/{id}/download', [SkinController::class, 'download'])->name('api.v1.skins.download');
-    Route::get('/skins/{id}/customizations', [SkinController::class, 'getCustomizations'])->name('api.v1.skins.customizations');
+    Route::get('/skins/{id}', [SkinController::class, 'show'])->whereNumber('id')->name('api.v1.skins.show');
+    Route::get('/skins/{id}/download', [SkinController::class, 'download'])->whereNumber('id')->name('api.v1.skins.download');
+    Route::get('/skins/{id}/customizations', [SkinController::class, 'getCustomizations'])->whereNumber('id')->name('api.v1.skins.customizations');
 
     // Public Theme Routes (no authentication required)
     Route::get('/themes', [ThemeController::class, 'index'])->name('api.v1.themes.index');
-    Route::get('/themes/{id}', [ThemeController::class, 'show'])->name('api.v1.themes.show');
-    Route::get('/themes/{id}/download', [ThemeController::class, 'download'])->name('api.v1.themes.download');
+    Route::get('/themes/{id}', [ThemeController::class, 'show'])->whereNumber('id')->name('api.v1.themes.show');
+    Route::get('/themes/{id}/download', [ThemeController::class, 'download'])->whereNumber('id')->name('api.v1.themes.download');
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
         Route::get('/user', function (Request $request) {
@@ -150,6 +152,11 @@ Route::prefix('v1')->group(function () {
         // Book Routes
         Route::get('/books', [BookApiController::class, 'index']);
         Route::post('/books/batch', [BookApiController::class, 'batch']);
+        Route::get('/books/browse', [BookApiController::class, 'browse']);
+        Route::get('/books/search', [BookApiController::class, 'search']);
+        Route::post('/books/queue/download', [BookDownloadController::class, 'queueDownload']);
+        Route::get('/books/queue/download/{zipId}', [BookDownloadController::class, 'downloadQueuedZip']);
+        Route::post('/books/queue/download/{zipId}/mark-downloaded', [BookDownloadController::class, 'markZipDownloaded']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/tags', [BookTagController::class, 'show']);
         Route::put('/books/{book}/tags', [BookTagController::class, 'update']);
@@ -159,11 +166,6 @@ Route::prefix('v1')->group(function () {
             ->name('api.books.downloadFile');
         Route::get('/books/{book}/download-url', [BookDownloadController::class, 'downloadUrl']);
         Route::get('/download/remote', [BookDownloadController::class, 'remoteDownload'])->name('api.download.remote');
-        Route::get('/books/browse', [BookApiController::class, 'browse']);
-        Route::get('/books/search', [BookApiController::class, 'search']);
-        Route::post('/books/queue/download', [BookDownloadController::class, 'queueDownload']);
-        Route::get('/books/queue/download/{zipId}', [BookDownloadController::class, 'downloadQueuedZip']);
-        Route::post('/books/queue/download/{zipId}/mark-downloaded', [BookDownloadController::class, 'markZipDownloaded']);
 
         // Series Books Route
         Route::get('/series/{seriesId}/books', [BookSeriesGenreController::class, 'booksBySeries']);
