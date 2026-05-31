@@ -47,9 +47,13 @@ class JobWorkflowService
         return $job->update($data);
     }
 
-    public function clearJobs(): bool
+    public function clearJobs(bool $confirmed = false): bool
     {
-        Job::truncate();
+        if (! $confirmed) {
+            throw new \RuntimeException('Refusing to clear jobs without explicit destructive-operation confirmation.');
+        }
+
+        Job::query()->delete();
 
         return true;
     }

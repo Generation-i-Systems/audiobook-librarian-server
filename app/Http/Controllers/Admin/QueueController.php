@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -122,9 +124,16 @@ class QueueController extends Controller
     }
 
 
-    public function clear()
+    public function clear(Request $request)
     {
-        $success = $this->documentStoreService->clearJobs();
+        if (! $request->boolean('confirm')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Confirmation is required to clear jobs.',
+            ], 422);
+        }
+
+        $success = $this->documentStoreService->clearJobs(true);
 
         return response()->json(['success' => $success]);
     }

@@ -55,7 +55,7 @@ class DatabaseSyncServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_syncs_a_table_completely()
+    public function it_refuses_table_sync_without_confirmation()
     {
         $prod = DB::connection('sqlite_prod');
         $devel = DB::connection('sqlite_devel');
@@ -68,7 +68,27 @@ class DatabaseSyncServiceTest extends TestCase
         $prod->table('authors')->insert(['id' => 2, 'name' => 'Orwell']);
 
         // Sync
-        $count = $this->service->syncTable('authors', $prod, $devel);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('explicit destructive-operation confirmation');
+
+        $this->service->syncTable('authors', $prod, $devel);
+    }
+
+    #[Test]
+    public function it_syncs_a_table_completely_when_confirmed()
+    {
+        $prod = DB::connection('sqlite_prod');
+        $devel = DB::connection('sqlite_devel');
+
+        $this->createSchema($prod);
+        $this->createSchema($devel);
+
+        // Seed Prod
+        $prod->table('authors')->insert(['id' => 1, 'name' => 'Tolkien']);
+        $prod->table('authors')->insert(['id' => 2, 'name' => 'Orwell']);
+
+        // Sync
+        $count = $this->service->syncTable('authors', $prod, $devel, true);
 
         $this->assertEquals(2, $count);
         $this->assertEquals(2, $devel->table('authors')->count());

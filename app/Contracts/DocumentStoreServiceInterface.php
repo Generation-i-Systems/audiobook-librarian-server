@@ -604,7 +604,7 @@ interface DocumentStoreServiceInterface
      *
      * @return bool Success status
      */
-    public function clearJobs(): bool;
+    public function clearJobs(bool $confirmed = false): bool;
 
     /**
      * Check if a job exists for a specific directory path.

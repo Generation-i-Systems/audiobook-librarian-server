@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -73,12 +75,27 @@ class QueueControllerTest extends TestCase
     {
         $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockDocumentStore->shouldReceive('isAdmin')->andReturn(true);
-        $mockDocumentStore->shouldReceive('clearJobs')->andReturn(true);
+        $mockDocumentStore->shouldReceive('clearJobs')->with(true)->andReturn(true);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
+
+        $response = $this->post('/admin/queue/clear', ['confirm' => true]);
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+    }
+
+    public function test_clear_requires_confirmation()
+    {
+        $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockDocumentStore->shouldReceive('isAdmin')->andReturn(true);
+        $mockDocumentStore->shouldNotReceive('clearJobs');
         $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
 
         $response = $this->post('/admin/queue/clear');
-        $response->assertStatus(200)
-            ->assertJson(['success' => true]);
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Confirmation is required to clear jobs.',
+            ]);
     }
 
     public function test_bulk_import_books_queues_jobs_and_skips_existing()

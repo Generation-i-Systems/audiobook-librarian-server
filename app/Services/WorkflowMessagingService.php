@@ -198,8 +198,8 @@ class WorkflowMessagingService
         return $this->getJobWorkflowService()->updateJob($jobId, $data);
     }
 
-    public function clearJobs(): bool
+    public function clearJobs(bool $confirmed = false): bool
     {
-        return $this->getJobWorkflowService()->clearJobs();
+        return $this->getJobWorkflowService()->clearJobs($confirmed);
     }
 }

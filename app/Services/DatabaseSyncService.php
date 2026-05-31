@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use Illuminate\Database\Connection;
@@ -29,22 +31,34 @@ class DatabaseSyncService
      * @param Connection $target
      * @return int Number of rows synced
      */
-    public function syncTable(string $table, Connection $source, Connection $target): int
+    public function syncTable(string $table, Connection $source, Connection $target, bool $confirmed = false): int
     {
-        $driver = $target->getDriverName();
-
-        if ($driver === 'sqlite') {
-            $target->statement('PRAGMA foreign_keys = OFF;');
-        } elseif ($driver === 'mysql') {
-            $target->statement('SET FOREIGN_KEY_CHECKS=0;');
+        if (! $confirmed) {
+            throw new \RuntimeException('Refusing to sync table without explicit destructive-operation confirmation.');
         }
 
-        $target->table($table)->truncate();
+        $driver = $target->getDriverName();
 
-        if ($driver === 'sqlite') {
-            $target->statement('PRAGMA foreign_keys = ON;');
-        } elseif ($driver === 'mysql') {
-            $target->statement('SET FOREIGN_KEY_CHECKS=1;');
+        Log::warning('DatabaseSyncService truncating target table for sync', [
+            'table' => $table,
+            'target_connection' => $target->getName(),
+            'target_database' => $target->getDatabaseName(),
+        ]);
+
+        try {
+            if ($driver === 'sqlite') {
+                $target->statement('PRAGMA foreign_keys = OFF;');
+            } elseif ($driver === 'mysql') {
+                $target->statement('SET FOREIGN_KEY_CHECKS=0;');
+            }
+
+            $target->table($table)->truncate();
+        } finally {
+            if ($driver === 'sqlite') {
+                $target->statement('PRAGMA foreign_keys = ON;');
+            } elseif ($driver === 'mysql') {
+                $target->statement('SET FOREIGN_KEY_CHECKS=1;');
+            }
         }
 
         // Chunking to handle large tables

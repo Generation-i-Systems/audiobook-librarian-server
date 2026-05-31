@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
 use App\Services\DatabaseSyncService;
@@ -14,6 +16,7 @@ class SyncDatabaseCommand extends Command
                             {--type=tables : Sync type (full or tables)}
                             {--tables= : Comma-separated list of tables to sync}
                             {--dry-run : Simulate without making changes}
+                            {--force : Required for non-interactive destructive syncs}
                             {--non-interactive : Skip interactive prompts}';
 
     protected $description = 'Synchronize data between production and development databases';
@@ -32,7 +35,9 @@ class SyncDatabaseCommand extends Command
         $type = $this->option('type');
         $tablesList = $this->option('tables');
         $dryRun = $this->option('dry-run');
+        $force = $this->option('force');
         $interactive = !$this->option('non-interactive');
+        $confirmed = false;
 
         if ($direction === 'prod_to_devel') {
             $sourceName = 'mysql_production';
@@ -65,6 +70,13 @@ class SyncDatabaseCommand extends Command
                 $this->info("Operation cancelled.");
                 return 0;
             }
+            $confirmed = true;
+        } elseif (!$dryRun && !$force) {
+            $this->error('Refusing non-interactive destructive sync without --force.');
+
+            return 1;
+        } elseif (!$dryRun) {
+            $confirmed = true;
         }
 
         $tables = [];
@@ -97,7 +109,7 @@ class SyncDatabaseCommand extends Command
 
             if (!$dryRun) {
                 try {
-                    $count = $this->syncService->syncTable($table, $source, $target);
+                    $count = $this->syncService->syncTable($table, $source, $target, $confirmed);
                     $this->info("  -> Synced {$count} rows.");
                 } catch (\Exception $e) {
                     $this->error("  -> Failed: " . $e->getMessage());

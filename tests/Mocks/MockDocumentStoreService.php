@@ -1693,8 +1693,12 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     /**
      * @inheritDoc
      */
-    public function clearJobs(): bool
+    public function clearJobs(bool $confirmed = false): bool
     {
+        if (! $confirmed) {
+            throw new \RuntimeException('Refusing to clear jobs without explicit destructive-operation confirmation.');
+        }
+
         $hadJobs = ! empty($this->jobs);
         $this->jobs = [];
 

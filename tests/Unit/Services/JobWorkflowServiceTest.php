@@ -70,7 +70,25 @@ class JobWorkflowServiceTest extends TestCase
         $this->assertTrue($service->updateJob((string) $job->id, ['status' => 'running']));
         $this->assertSame('running', Job::query()->findOrFail($job->id)->status);
 
-        $this->assertTrue($service->clearJobs());
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('explicit destructive-operation confirmation');
+
+        $service->clearJobs();
+    }
+
+    #[Test]
+    public function clearJobsDeletesRowsWhenConfirmed(): void
+    {
+        $service = new JobWorkflowService();
+
+        Job::query()->create([
+            'type' => 'import',
+            'status' => 'pending',
+            'payload' => ['directoryPath' => 'library/a'],
+            'error_message' => null,
+        ]);
+
+        $this->assertTrue($service->clearJobs(true));
         $this->assertSame(0, Job::query()->count());
     }
 }

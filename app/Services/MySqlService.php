@@ -1872,9 +1872,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $this->getWorkflowMessagingService()->getJobCount();
     }
 
-    public function clearJobs(): bool
+    public function clearJobs(bool $confirmed = false): bool
     {
-        return $this->getWorkflowMessagingService()->clearJobs();
+        return $this->getWorkflowMessagingService()->clearJobs($confirmed);
     }
 
     public function jobExistsByDirectoryPath(string $directoryPath): bool
