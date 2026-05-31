@@ -59,7 +59,7 @@ use Illuminate\Support\Facades\Schema;
  * @property string|null $batch_id
  * @property int|null $series_id
  * @property int|null $publisher_id
- * @property string|null $ai_processed_at
+ * @property \Illuminate\Support\Carbon|null $ai_processed_at
  * @property string|null $ai_suggestions
  * @property array<array-key, mixed>|null $file_tags
  * @property array<array-key, mixed>|null $audible_info
@@ -196,6 +196,7 @@ class Book extends Model
         'hardcover_info' => 'array',
         'audiobook_bay_info' => 'array',
         'librivox_info' => 'array',
+        'ai_processed_at' => 'datetime',
         'directory_exists' => 'boolean',
         'directory_last_checked' => 'datetime',
         'created_at' => 'datetime',

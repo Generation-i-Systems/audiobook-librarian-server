@@ -9,7 +9,7 @@ use App\Models\Book;
 use App\Models\ListeningEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 
 class BookMatchController extends Controller
@@ -120,13 +120,13 @@ class BookMatchController extends Controller
             ], 404);
         }
 
-        DB::beginTransaction();
+        ControllerDatabase::beginTransaction();
         try {
             $updated = ListeningEvent::where('user_id', $user->id)
                 ->where('book_id', $oldBookId)
                 ->update(['book_id' => $newBookId]);
 
-            DB::commit();
+            ControllerDatabase::commit();
 
             Log::info('Reassigned events', [
                 'user_id'        => $user->id,
@@ -140,7 +140,7 @@ class BookMatchController extends Controller
                 'eventsUpdated' => $updated,
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            ControllerDatabase::rollBack();
             Log::error('Failed to reassign events', [
                 'user_id'     => $user->id,
                 'old_book_id' => $oldBookId,

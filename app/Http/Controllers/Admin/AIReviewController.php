@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -9,7 +11,7 @@ use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 
 class AIReviewController extends Controller
@@ -66,7 +68,7 @@ class AIReviewController extends Controller
         $selectedFields = $request->input('fields', []);
 
         try {
-            DB::transaction(function () use ($book, $aiSuggestions, $selectedFields) {
+            ControllerDatabase::transaction(function () use ($book, $aiSuggestions, $selectedFields) {
                 // Apply selected fields
                 if (in_array('title', $selectedFields)) {
                     $book->title = $aiSuggestions['title'];
@@ -212,7 +214,7 @@ class AIReviewController extends Controller
      */
     protected function applyAllSuggestions(Book $book, array $aiSuggestions)
     {
-        DB::transaction(function () use ($book, $aiSuggestions) {
+        ControllerDatabase::transaction(function () use ($book, $aiSuggestions) {
             // Apply basic fields
             $book->title = $aiSuggestions['title'];
 

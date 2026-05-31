@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -7,7 +9,7 @@ use App\Services\AIQueryService;
 use App\Services\AI\AIToolService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 
 class AIQueryController extends Controller
@@ -72,7 +74,7 @@ class AIQueryController extends Controller
     public function results($queryId)
     {
         // Load the conversation root query
-        $rootQuery = DB::table('ai_queries')->where('id', $queryId)->first();
+        $rootQuery = ControllerDatabase::table('ai_queries')->where('id', $queryId)->first();
 
         if (!$rootQuery || $rootQuery->user_id != Auth::id()) {
             Log::warning('Query not found or access denied', ['query_id' => $queryId]);
@@ -81,12 +83,12 @@ class AIQueryController extends Controller
 
         // Load all queries in this conversation (root + all follow-ups)
         // Use simpler approach: get root, then get all follow-ups
-        $rootQueries = DB::table('ai_queries')
+        $rootQueries = ControllerDatabase::table('ai_queries')
             ->where('id', $queryId)
             ->where('user_id', Auth::id())
             ->get();
 
-        $followUpQueries = DB::table('ai_queries')
+        $followUpQueries = ControllerDatabase::table('ai_queries')
             ->where('user_id', Auth::id())
             ->whereJsonContains('results->parent_query_id', $queryId)
             ->orderBy('id', 'asc')
@@ -201,7 +203,7 @@ class AIQueryController extends Controller
         $queries = $request->input('queries');
 
         try {
-            DB::table('ai_queries')
+            ControllerDatabase::table('ai_queries')
                 ->where('id', $queryId)
                 ->where('user_id', Auth::id())
                 ->update([
@@ -253,13 +255,13 @@ class AIQueryController extends Controller
         $customQueries = $request->input('queries');
 
         // Verify ownership
-        $queryRecord = DB::table('ai_queries')->where('id', $queryId)->first();
+        $queryRecord = ControllerDatabase::table('ai_queries')->where('id', $queryId)->first();
         if (!$queryRecord || $queryRecord->user_id != Auth::id()) {
             abort(403);
         }
 
         // Update the query record with custom SQL
-        DB::table('ai_queries')
+        ControllerDatabase::table('ai_queries')
             ->where('id', $queryId)
             ->update([
                 'generated_queries' => json_encode($customQueries),
@@ -292,19 +294,19 @@ class AIQueryController extends Controller
         $newPrompt = $prompt;
 
         // Verify ownership
-        $queryRecord = DB::table('ai_queries')->where('id', $queryId)->first();
+        $queryRecord = ControllerDatabase::table('ai_queries')->where('id', $queryId)->first();
         if (!$queryRecord || $queryRecord->user_id != Auth::id()) {
             abort(403);
         }
 
         // Delete all queries after this one in the conversation
-        DB::table('ai_queries')
+        ControllerDatabase::table('ai_queries')
             ->whereRaw("JSON_EXTRACT(results, '$.parent_query_id') = ?", [$conversationId])
             ->where('id', '>', $queryId)
             ->delete();
 
         // Update the prompt
-        DB::table('ai_queries')
+        ControllerDatabase::table('ai_queries')
             ->where('id', $queryId)
             ->update([
                 'prompt' => $newPrompt,
@@ -362,7 +364,7 @@ class AIQueryController extends Controller
             ], 400);
         }
 
-        $queryRecord = DB::table('ai_tool_queries')->insertGetId([
+        $queryRecord = ControllerDatabase::table('ai_tool_queries')->insertGetId([
             'user_id' => Auth::id(),
             'prompt' => $userQuery,
             'context' => json_encode($context),
@@ -394,7 +396,7 @@ class AIQueryController extends Controller
         $instruction = $request->input('instruction');
 
         // Load Query
-        $queryRecord = DB::table('ai_queries')->where('id', $queryId)->where('user_id', Auth::id())->first();
+        $queryRecord = ControllerDatabase::table('ai_queries')->where('id', $queryId)->where('user_id', Auth::id())->first();
         if (!$queryRecord) {
             return response()->json(['success' => false, 'error' => 'Query not found'], 404);
         }
@@ -461,7 +463,7 @@ class AIQueryController extends Controller
         $results['results']['preview'] = $previewItems;
 
         // Save back to DB
-        DB::table('ai_queries')
+        ControllerDatabase::table('ai_queries')
             ->where('id', $queryId)
             ->update([
                 'results' => json_encode($results),
@@ -482,7 +484,7 @@ class AIQueryController extends Controller
     {
         $limit = $request->input('limit', 20);
 
-        $history = DB::table('ai_tool_queries')
+        $history = ControllerDatabase::table('ai_tool_queries')
             ->where('user_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->limit($limit)
@@ -496,7 +498,7 @@ class AIQueryController extends Controller
 
     public function toolQueryDetails($queryId)
     {
-        $query = DB::table('ai_tool_queries')
+        $query = ControllerDatabase::table('ai_tool_queries')
             ->where('id', $queryId)
             ->where('user_id', Auth::id())
             ->first();

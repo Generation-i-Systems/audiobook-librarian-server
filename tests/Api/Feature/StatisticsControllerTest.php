@@ -686,7 +686,7 @@ class StatisticsControllerTest extends TestCase
             'book_id' => $book1->id,
             'status' => 'completed',
             'order' => 0,
-            'finished_at' => now()->subMonth(),
+            'finished_at' => now()->startOfMonth()->subMonth(),
         ]);
 
         \App\Models\UserBookStatus::create([

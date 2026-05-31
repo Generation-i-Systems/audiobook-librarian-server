@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\Skin;
@@ -7,7 +9,7 @@ use App\Services\BuiltinSkinService;
 use App\Services\SkinValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -182,7 +184,7 @@ class BuiltinSkinController extends Controller
 
             $manifest = $skin['manifest'];
 
-            $newSkin = DB::transaction(function () use ($skin, $name, $zipPath, $manifest) {
+            $newSkin = ControllerDatabase::transaction(function () use ($skin, $name, $zipPath, $manifest) {
                 $dbSkin = Skin::create([
                     'name' => $name,
                     'author' => $skin['author'],

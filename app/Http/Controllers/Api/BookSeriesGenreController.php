@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -7,7 +9,7 @@ use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 
 class BookSeriesGenreController extends Controller
 {
@@ -267,7 +269,7 @@ class BookSeriesGenreController extends Controller
 
         $isFavorite = false;
         if ($userId) {
-            $isFavorite = DB::table('user_series_favorites')
+            $isFavorite = ControllerDatabase::table('user_series_favorites')
                 ->where('user_id', $userId)
                 ->where('series_id', $seriesId)
                 ->exists();

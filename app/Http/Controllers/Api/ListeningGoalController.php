@@ -9,7 +9,7 @@ use App\Models\ListeningGoal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 
 class ListeningGoalController extends Controller
 {
@@ -108,11 +108,11 @@ class ListeningGoalController extends Controller
             default => now()->startOfMonth(),
         };
 
-        $deviceIds = DB::table('devices')
+        $deviceIds = ControllerDatabase::table('devices')
             ->where('user_id', $userId)
             ->pluck('device_id');
 
-        $query = DB::table('listening_statistics')
+        $query = ControllerDatabase::table('listening_statistics')
             ->where(function ($statsQuery) use ($userId, $deviceIds): void {
                 $statsQuery->where('listening_statistics.user_id', $userId);
 

@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\AI\AIAssistantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 
 class AIAssistantController extends Controller
@@ -25,7 +27,7 @@ class AIAssistantController extends Controller
      */
     public function index()
     {
-        $recentSessions = DB::table('ai_assistant_sessions')
+        $recentSessions = ControllerDatabase::table('ai_assistant_sessions')
             ->where('user_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->limit(10)
@@ -51,7 +53,7 @@ class AIAssistantController extends Controller
 
         // Verify session ownership if provided
         if ($sessionId) {
-            $session = DB::table('ai_assistant_sessions')
+            $session = ControllerDatabase::table('ai_assistant_sessions')
                 ->where('id', $sessionId)
                 ->where('user_id', Auth::id())
                 ->first();
@@ -92,7 +94,7 @@ class AIAssistantController extends Controller
      */
     public function session(int $sessionId)
     {
-        $session = DB::table('ai_assistant_sessions')
+        $session = ControllerDatabase::table('ai_assistant_sessions')
             ->where('id', $sessionId)
             ->where('user_id', Auth::id())
             ->first();
@@ -101,9 +103,9 @@ class AIAssistantController extends Controller
             abort(404);
         }
 
-        $conversationHistory = json_decode($session->conversation_history, true) ?? [];
-        $operations = json_decode($session->operations, true) ?? [];
-        $executionResults = json_decode($session->execution_results, true) ?? [];
+        $conversationHistory = json_decode($session->conversation_history ?? '[]', true) ?? [];
+        $operations = json_decode($session->operations ?? '[]', true) ?? [];
+        $executionResults = json_decode($session->execution_results ?? '[]', true) ?? [];
 
         return view('admin.ai-assistant.session', [
             'session' => $session,
@@ -124,7 +126,7 @@ class AIAssistantController extends Controller
         ]);
 
         // Verify session ownership
-        $session = DB::table('ai_assistant_sessions')
+        $session = ControllerDatabase::table('ai_assistant_sessions')
             ->where('id', $sessionId)
             ->where('user_id', Auth::id())
             ->first();
@@ -172,7 +174,7 @@ class AIAssistantController extends Controller
      */
     public function cancel(int $sessionId)
     {
-        $session = DB::table('ai_assistant_sessions')
+        $session = ControllerDatabase::table('ai_assistant_sessions')
             ->where('id', $sessionId)
             ->where('user_id', Auth::id())
             ->first();
@@ -181,7 +183,7 @@ class AIAssistantController extends Controller
             abort(404);
         }
 
-        DB::table('ai_assistant_sessions')
+        ControllerDatabase::table('ai_assistant_sessions')
             ->where('id', $sessionId)
             ->update([
                 'status' => 'cancelled',
@@ -226,7 +228,7 @@ class AIAssistantController extends Controller
         $limit = $request->input('limit', 20);
         $status = $request->input('status');
 
-        $query = DB::table('ai_assistant_sessions')
+        $query = ControllerDatabase::table('ai_assistant_sessions')
             ->where('user_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->limit($limit);

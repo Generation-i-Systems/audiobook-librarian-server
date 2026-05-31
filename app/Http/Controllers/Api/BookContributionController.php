@@ -14,7 +14,7 @@ use App\Models\Series;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 
 class BookContributionController extends Controller
@@ -136,7 +136,7 @@ class BookContributionController extends Controller
             'reviewer_notes' => 'nullable|string|max:1000',
         ]);
 
-        DB::transaction(function () use ($contribution, $data): void {
+        ControllerDatabase::transaction(function () use ($contribution, $data): void {
             $book = $contribution->book;
 
             if (! $book instanceof Book) {

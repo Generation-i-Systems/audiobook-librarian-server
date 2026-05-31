@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -12,7 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
@@ -23,7 +25,7 @@ class StatisticsController extends Controller
         $query = ListeningStatistic::query();
 
         if ($userId !== null) {
-            $userDeviceIds = DB::table('devices')
+            $userDeviceIds = ControllerDatabase::table('devices')
                 ->where('user_id', $userId)
                 ->pluck('device_id')
                 ->push($deviceId)
@@ -146,7 +148,7 @@ class StatisticsController extends Controller
             ->limit($limit);
 
         // Use different aggregation methods based on database driver
-        if (DB::getDriverName() === 'sqlite') {
+        if (ControllerDatabase::getDriverName() === 'sqlite') {
             // SQLite doesn't have JSON_ARRAYAGG, so we'll fetch the data and group it in PHP
             $rawStats = $stats->selectRaw('
                 listening_date as date,
@@ -410,7 +412,7 @@ class StatisticsController extends Controller
 
     private function applyDayFilterConstraint(\Illuminate\Database\Eloquent\Builder $query, string $dayFilter): void
     {
-        $driver = DB::connection()->getDriverName();
+        $driver = ControllerDatabase::connection()->getDriverName();
 
         if ($dayFilter === 'weekday') {
             if ($driver === 'sqlite') {
@@ -442,7 +444,7 @@ class StatisticsController extends Controller
             return;
         }
 
-        $driver = DB::connection()->getDriverName();
+        $driver = ControllerDatabase::connection()->getDriverName();
         $dayList = $normalizedDays->implode(',');
 
         if ($driver === 'sqlite') {
@@ -460,7 +462,7 @@ class StatisticsController extends Controller
 
     private function timelinePeriodSql(string $groupBy): array
     {
-        $driver = DB::connection()->getDriverName();
+        $driver = ControllerDatabase::connection()->getDriverName();
 
         if ($driver === 'sqlite') {
             return match ($groupBy) {
@@ -614,7 +616,7 @@ class StatisticsController extends Controller
             $validated['end_position_seconds'] ?? null,
             $validated['session_type'] ?? 'listening',
             $validated['metadata'] ?? [],
-            Auth::id() ?? $validated['user_id'] ?? null,
+            $this->stringUserId(Auth::id() ?? $validated['user_id'] ?? null),
             0,
             [],
             $validated['title'] ?? null,
@@ -1239,7 +1241,7 @@ class StatisticsController extends Controller
             $query->where('listening_date', '>=', $startDate->toDateString());
         }
 
-        if (DB::getDriverName() === 'sqlite') {
+        if (ControllerDatabase::getDriverName() === 'sqlite') {
             $rawStats = $query->selectRaw('
                 listening_date as date,
                 SUM(seconds_listened) * 1000 as listening_time_ms,
@@ -1306,5 +1308,14 @@ class StatisticsController extends Controller
         }
 
         return sprintf('%d:%02d', $minutes, $secs);
+    }
+
+    private function stringUserId(int|string|null $userId): ?string
+    {
+        if ($userId === null) {
+            return null;
+        }
+
+        return (string) $userId;
     }
 }

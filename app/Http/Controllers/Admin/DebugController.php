@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Session;
 
 class DebugController extends Controller
@@ -90,7 +90,7 @@ class DebugController extends Controller
         $sessionId = session()->getId();
         $row = null;
         try {
-            $row = DB::table('sessions')->where('id', $sessionId)->first();
+            $row = ControllerDatabase::table('sessions')->where('id', $sessionId)->first();
         } catch (\Exception $e) {
             $row = $e->getMessage();
         }

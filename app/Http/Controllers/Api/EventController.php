@@ -11,7 +11,7 @@ use App\Services\BadgeService;
 use App\Services\PositionMaterializer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
 
 class EventController extends Controller
@@ -62,7 +62,7 @@ class EventController extends Controller
         $serverTimestamp = (int) (now()->timestamp * 1000);
         $hasSessionEnd   = false;
 
-        DB::beginTransaction();
+        ControllerDatabase::beginTransaction();
         try {
             foreach ($validated['events'] as $eventData) {
                 if (ListeningEvent::where('id', $eventData['id'])->exists()) {
@@ -163,7 +163,7 @@ class EventController extends Controller
                 ];
             });
 
-            DB::commit();
+            ControllerDatabase::commit();
 
             // Evaluate badges on SESSION_END events (outside transaction)
             $badgesEarned = [];
@@ -204,7 +204,7 @@ class EventController extends Controller
                 'badgesEarned'    => $badgesEarned,
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            ControllerDatabase::rollBack();
             Log::error('Event sync failed', [
                 'user_id'   => $user->id,
                 'device_id' => $deviceId,
