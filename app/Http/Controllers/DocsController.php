@@ -59,6 +59,12 @@ class DocsController extends Controller
             abort(404, 'Documentation file not found');
         }
 
+        $realBase = realpath($this->docsPath);
+        $realPath = realpath($fullPath);
+        if ($realPath === false || $realBase === false || !str_starts_with($realPath, $realBase . DIRECTORY_SEPARATOR)) {
+            abort(404, 'Documentation file not found');
+        }
+
         $content = File::get($fullPath);
 
         // Simple markdown to HTML conversion for basic formatting

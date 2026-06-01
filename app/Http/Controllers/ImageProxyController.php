@@ -34,9 +34,15 @@ class ImageProxyController extends Controller
             abort(404);
         }
 
-        $mime = mime_content_type($fullPath);
+        $realBase = realpath($storagePath);
+        $realPath = realpath($fullPath);
+        if ($realPath === false || $realBase === false || !str_starts_with($realPath, $realBase . DIRECTORY_SEPARATOR)) {
+            abort(404);
+        }
 
-        return response()->file($fullPath, [
+        $mime = mime_content_type($realPath);
+
+        return response()->file($realPath, [
             'Content-Type' => $mime,
         ]);
     }
@@ -66,9 +72,15 @@ class ImageProxyController extends Controller
             abort(404);
         }
 
-        $mime = mime_content_type($fullPath);
+        $realBase = realpath($storagePath);
+        $realPath = realpath($fullPath);
+        if ($realPath === false || $realBase === false || !str_starts_with($realPath, $realBase . DIRECTORY_SEPARATOR)) {
+            abort(404);
+        }
 
-        return response()->file($fullPath, [
+        $mime = mime_content_type($realPath);
+
+        return response()->file($realPath, [
             'Content-Type' => $mime,
         ]);
     }

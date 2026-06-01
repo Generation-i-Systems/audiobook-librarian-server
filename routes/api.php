@@ -376,17 +376,19 @@ Route::prefix('v1')->group(function () {
     });
 
     // Authentication Routes (outside the auth:sanctum middleware)
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/check-status', [AuthController::class, 'checkStatus']);
-    Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
-    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
-    Route::post('/auth/otp/request', [EmailOtpController::class, 'request']);
-    Route::post('/auth/otp/verify', [EmailOtpController::class, 'verify']);
-    Route::post('/auth/google', [AuthController::class, 'googleLogin']);
-    Route::post('/auth/facebook', [AuthController::class, 'facebookLogin']);
-    Route::post('/auth/apple', [AuthController::class, 'appleLogin']);
-    Route::post('/auth/discord', [AuthController::class, 'discordLogin']);
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/register', [AuthController::class, 'register']);
+        Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/check-status', [AuthController::class, 'checkStatus']);
+        Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
+        Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+        Route::post('/auth/otp/request', [EmailOtpController::class, 'request']);
+        Route::post('/auth/otp/verify', [EmailOtpController::class, 'verify']);
+        Route::post('/auth/google', [AuthController::class, 'googleLogin']);
+        Route::post('/auth/facebook', [AuthController::class, 'facebookLogin']);
+        Route::post('/auth/apple', [AuthController::class, 'appleLogin']);
+        Route::post('/auth/discord', [AuthController::class, 'discordLogin']);
+    });
 
     // Backwards compatible auth-prefixed routes (mobile clients expect /auth/* paths)
     Route::prefix('auth')->group(function () {

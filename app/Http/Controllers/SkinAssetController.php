@@ -73,7 +73,11 @@ class SkinAssetController extends Controller
                 if (is_dir($extractedPath)) {
                     $fullPath = $extractedPath . '/' . ltrim($path, '/');
                     if (file_exists($fullPath) && is_file($fullPath)) {
-                        return $this->serveFile($fullPath);
+                        $realExtracted = realpath($extractedPath);
+                        $realFull = realpath($fullPath);
+                        if ($realFull !== false && $realExtracted !== false && str_starts_with($realFull, $realExtracted . DIRECTORY_SEPARATOR)) {
+                            return $this->serveFile($realFull);
+                        }
                     }
                 }
 
