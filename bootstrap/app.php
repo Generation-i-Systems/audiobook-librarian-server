@@ -81,6 +81,11 @@ return Application::configure(basePath: dirname(__DIR__))
             ->monthlyOn(1, '03:30')
             ->appendOutputTo(storage_path('logs/import-queue.log'));
 
+        // Close orphaned listening sessions daily at 3:30 AM
+        $schedule->command('sessions:close-orphaned')
+            ->dailyAt('03:30')
+            ->appendOutputTo(storage_path('logs/orphaned-sessions.log'));
+
         // Sync LibriVox catalog daily at 6:00 AM (delta after first full sync)
         $schedule->command('librivox:sync --language=English')
             ->dailyAt('06:00')

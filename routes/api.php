@@ -280,7 +280,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/statistics/overview', [StatisticsController::class, 'getOverview']);
         Route::get('/statistics/daily', [StatisticsController::class, 'getDailyStatsOpenApi']);
         Route::get('/statistics/timeline', [StatisticsController::class, 'getTimelineStats']);
+        Route::get('/statistics/timeline/day', [StatisticsController::class, 'getDayTimeline']);
         Route::get('/statistics/reading-history', [StatisticsController::class, 'getReadingHistoryStats']);
+        Route::get('/statistics/diagnostics', [StatisticsController::class, 'getDiagnostics']);
         Route::post('/statistics/report', [StatisticsController::class, 'reportSession']);
 
         // Legacy statistics routes

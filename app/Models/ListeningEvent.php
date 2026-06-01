@@ -7,6 +7,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property int $user_id
+ * @property int $book_id
+ * @property string $event_type
+ * @property int $timestamp_ms
+ * @property int $position_ms
+ * @property array<string, mixed>|null $metadata
+ * @property string $device_id
+ * @property string $timezone
+ * @property string $sync_status
+ * @property int $created_at
+ * @property int|null $synced_at
+ * @property string|null $migrated_from
+ * @property string|null $migration_source_id
+ */
 class ListeningEvent extends Model
 {
     /**

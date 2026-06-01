@@ -7,10 +7,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Book;
 use App\Models\BookProgress;
+use App\Models\ListeningEvent;
 use App\Models\ListeningStatistic;
 use App\Models\UserBookStatus;
 use App\Models\User;
 use Carbon\Carbon;
+use DateTimeZone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -277,6 +279,165 @@ class StatisticsController extends Controller
             ],
             'detail' => $detail,
         ]);
+    }
+
+    /**
+     * Get a day-level timeline: listening segments for a specific date.
+     *
+     * Each segment represents a contiguous listening interval derived from raw events.
+     * Book titles are resolved server-side. Events from all devices for the authenticated
+     * user are included and grouped per device to avoid cross-device interference.
+     */
+    public function getDayTimeline(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'date'     => 'required|date_format:Y-m-d',
+            'timezone' => 'nullable|string|max:60',
+        ]);
+
+        $userId   = Auth::id();
+        $timezone = $this->resolveTimezone($validated['timezone'] ?? null);
+        $date     = Carbon::createFromFormat('Y-m-d', $validated['date'], $timezone)->startOfDay();
+        $dayStartMs = $date->copy()->setTimezone('UTC')->getTimestampMs();
+        $dayEndMs   = $date->copy()->addDay()->setTimezone('UTC')->getTimestampMs();
+
+        $events = ListeningEvent::query()
+            ->where('user_id', $userId)
+            ->whereBetween('timestamp_ms', [$dayStartMs, $dayEndMs])
+            ->whereIn('event_type', [
+                'PLAY_START', 'PLAY_RESUME', 'SESSION_START',
+                'PLAY_PAUSE', 'PLAY_STOP', 'SESSION_END', 'CHAPTER_CHANGE',
+            ])
+            ->orderBy('timestamp_ms')
+            ->get();
+
+        // Resolve book titles in a single query
+        $bookIds = $events->pluck('book_id')->unique()->filter()->values();
+        $books   = Book::whereIn('id', $bookIds)->pluck('title', 'id');
+        $bookTitles = fn (int $bookId): string => $books->get($bookId) ?? "Book $bookId";
+
+        $nowMs = (int) (microtime(true) * 1000);
+
+        $segments = $this->buildDaySegments($events->all(), $bookTitles, $dayStartMs, $dayEndMs, $nowMs);
+
+        return response()->json([
+            'date'               => $validated['date'],
+            'timezone'           => $timezone,
+            'total_listening_ms' => array_sum(array_column($segments, 'duration_ms')),
+            'segments'           => $segments,
+        ]);
+    }
+
+    private function resolveTimezone(?string $tz): string
+    {
+        if ($tz === null) {
+            return 'UTC';
+        }
+        try {
+            new DateTimeZone($tz);
+            return $tz;
+        } catch (\Exception) {
+            return 'UTC';
+        }
+    }
+
+    /**
+     * Reconstruct listening segments from raw events, grouped by device.
+     *
+     * @param  \App\Models\ListeningEvent[]  $events     Sorted by timestamp_ms ascending
+     * @param  callable(int): string         $bookTitle  Resolver for book IDs → titles
+     */
+    private function buildDaySegments(
+        array $events,
+        callable $bookTitle,
+        int $dayStartMs,
+        int $dayEndMs,
+        int $nowMs
+    ): array {
+        $openEventTypes  = ['PLAY_START', 'PLAY_RESUME', 'SESSION_START'];
+        $closeEventTypes = ['PLAY_PAUSE', 'PLAY_STOP', 'SESSION_END'];
+        $minSegmentMs    = 5_000;
+
+        $byDevice = [];
+        foreach ($events as $event) {
+            $byDevice[$event->device_id][] = $event;
+        }
+
+        $allSegments = [];
+        foreach ($byDevice as $deviceSegments) {
+            $open = null;
+            foreach ($deviceSegments as $event) {
+                $type     = $event->event_type;
+                $metadata = is_array($event->metadata) ? $event->metadata : [];
+
+                if (in_array($type, $openEventTypes, true)) {
+                    if ($open !== null) {
+                        $seg = $this->makeSegment($open, $event, $dayStartMs, $bookTitle, true);
+                        if ($seg !== null && $seg['duration_ms'] >= $minSegmentMs) {
+                            $allSegments[] = $seg;
+                        }
+                    }
+                    $open = $event;
+                } elseif ($type === 'CHAPTER_CHANGE' && $open !== null) {
+                    $seg = $this->makeSegment($open, $event, $dayStartMs, $bookTitle, false);
+                    if ($seg !== null && $seg['duration_ms'] >= $minSegmentMs) {
+                        $allSegments[] = $seg;
+                    }
+                    // Re-open with new chapter info
+                    $open = clone $event;
+                    $open->event_type = 'PLAY_RESUME';
+                } elseif (in_array($type, $closeEventTypes, true) && $open !== null) {
+                    $seg = $this->makeSegment($open, $event, $dayStartMs, $bookTitle, false);
+                    if ($seg !== null && $seg['duration_ms'] >= $minSegmentMs) {
+                        $allSegments[] = $seg;
+                    }
+                    $open = null;
+                }
+            }
+
+            if ($open !== null) {
+                $effectiveEnd    = (object) ['timestamp_ms' => min($nowMs, $dayEndMs), 'position_ms' => $open->position_ms];
+                $seg = $this->makeSegment($open, $effectiveEnd, $dayStartMs, $bookTitle, true);
+                if ($seg !== null && $seg['duration_ms'] >= $minSegmentMs) {
+                    $allSegments[] = $seg;
+                }
+            }
+        }
+
+        usort($allSegments, fn ($a, $b) => $a['start_ms'] <=> $b['start_ms']);
+
+        return $allSegments;
+    }
+
+    private function makeSegment(
+        object $open,
+        object $close,
+        int $dayStartMs,
+        callable $bookTitle,
+        bool $isOrphaned
+    ): ?array {
+        $startMs = max((int) $open->timestamp_ms, $dayStartMs);
+        $endMs   = (int) $close->timestamp_ms;
+        if ($endMs <= $startMs) {
+            return null;
+        }
+
+        $metadata = is_array($open->metadata ?? null) ? $open->metadata : [];
+
+        return [
+            'book_id'           => (int) $open->book_id,
+            'book_title'        => $bookTitle((int) $open->book_id),
+            'start_ms'          => $startMs,
+            'end_ms'            => $endMs,
+            'duration_ms'       => $endMs - $startMs,
+            'start_position_ms' => (int) $open->position_ms,
+            'end_position_ms'   => (int) $close->position_ms,
+            'chapter_name'      => $metadata['chapterName'] ?? null,
+            'chapter_index'     => isset($metadata['chapterIndex']) ? (int) $metadata['chapterIndex'] : null,
+            'playback_speed'    => (float) ($metadata['playbackSpeed'] ?? 1.0),
+            'device_id'         => $open->device_id,
+            'is_orphaned'       => $isOrphaned,
+        ];
     }
 
     private function getTimelinePeriodDetails(
@@ -1317,5 +1478,45 @@ class StatisticsController extends Controller
         }
 
         return (string) $userId;
+    }
+
+    public function getDiagnostics(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $userId = $user->id;
+
+        $totalEvents = ListeningEvent::where('user_id', $userId)->count();
+        $syncedCount = ListeningEvent::where('user_id', $userId)->where('sync_status', 'SYNCED')->count();
+        $pendingCount = ListeningEvent::where('user_id', $userId)->where('sync_status', 'PENDING_SYNC')->count();
+        $failedCount = ListeningEvent::where('user_id', $userId)->where('sync_status', 'SYNC_FAILED')->count();
+
+        $sessionStarts = ListeningEvent::where('user_id', $userId)
+            ->where('event_type', 'SESSION_START')
+            ->get(['id', 'book_id', 'device_id', 'timestamp_ms']);
+
+        $maxWindowMs = 4 * 3_600_000;
+        $orphanedCount = 0;
+
+        foreach ($sessionStarts as $start) {
+            $windowEnd = $start->timestamp_ms + $maxWindowMs;
+            $hasEnd = ListeningEvent::where('user_id', $userId)
+                ->where('book_id', $start->book_id)
+                ->where('device_id', $start->device_id)
+                ->where('event_type', 'SESSION_END')
+                ->where('timestamp_ms', '>', $start->timestamp_ms)
+                ->where('timestamp_ms', '<=', $windowEnd)
+                ->exists();
+            if (!$hasEnd) {
+                $orphanedCount++;
+            }
+        }
+
+        return response()->json([
+            'orphaned_sessions' => $orphanedCount,
+            'total_events' => $totalEvents,
+            'pending_sync' => $pendingCount,
+            'sync_failed' => $failedCount,
+            'synced' => $syncedCount,
+        ]);
     }
 }
