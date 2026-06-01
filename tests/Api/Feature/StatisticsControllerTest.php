@@ -578,6 +578,11 @@ class StatisticsControllerTest extends TestCase
 
     public function test_get_dashboard_stats_returns_comprehensive_data()
     {
+        // Freeze to a Wednesday mid-month so startOfWeek()+1 (Tuesday) and
+        // startOfMonth()+1 (2nd) never collide — avoids flakiness when the
+        // test runs on the first Monday of a month.
+        $this->travelTo(\Carbon\Carbon::parse('2024-06-12'));
+
         $book = Book::factory()->create();
         $today = now();
         $weekDate = now()->startOfWeek()->copy()->addDays(1);
