@@ -10072,6 +10072,110 @@
                 }
             }
         },
+        "/statistics/timeline/day": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get day-level listening timeline",
+                "description": "Returns listening segments for a specific calendar day, reconstructed from raw play/pause/session events.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        },
+                        "description": "Date in YYYY-MM-DD format."
+                    },
+                    {
+                        "name": "timezone",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "IANA timezone name (e.g. America/New_York). Defaults to UTC."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Day timeline retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "date": { "type": "string", "format": "date" },
+                                        "timezone": { "type": "string" },
+                                        "total_listening_ms": { "type": "integer" },
+                                        "segments": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "book_id": { "type": "integer" },
+                                                    "book_title": { "type": "string" },
+                                                    "start_ms": { "type": "integer" },
+                                                    "end_ms": { "type": "integer" },
+                                                    "duration_ms": { "type": "integer" },
+                                                    "start_position_ms": { "type": "integer" },
+                                                    "end_position_ms": { "type": "integer" },
+                                                    "chapter_name": { "type": "string", "nullable": true },
+                                                    "chapter_index": { "type": "integer", "nullable": true },
+                                                    "playback_speed": { "type": "number" },
+                                                    "device_id": { "type": "string" },
+                                                    "is_orphaned": { "type": "boolean" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "description": "Unauthenticated" },
+                    "422": { "description": "Validation error" }
+                }
+            }
+        },
+        "/statistics/diagnostics": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get session sync diagnostics",
+                "description": "Returns counts of orphaned sessions, sync statuses, and total events for the authenticated user.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Diagnostics retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "orphaned_sessions": { "type": "integer" },
+                                        "total_events": { "type": "integer" },
+                                        "pending_sync": { "type": "integer" },
+                                        "sync_failed": { "type": "integer" },
+                                        "synced": { "type": "integer" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "description": "Unauthenticated" }
+                }
+            }
+        },
         "/reading-progress/{book}": {
             "get": {
                 "tags": ["Progress"],
