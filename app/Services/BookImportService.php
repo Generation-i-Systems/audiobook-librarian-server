@@ -2065,6 +2065,40 @@ class BookImportService
     }
 
     /**
+     * Apply the best default cover source to $metadata based on priority.
+     * When metadata.json is present, the local cover file is preferred (curated).
+     * Otherwise, embedded cover takes priority.
+     */
+    private function applyDefaultCoverSource(array &$metadata, array $coverSources): void
+    {
+        $embedded = null;
+        $localFile = null;
+
+        foreach ($coverSources as $source) {
+            if ($source['type'] === 'embedded' && $embedded === null) {
+                $embedded = $source;
+            } elseif ($source['type'] === 'file' && $localFile === null) {
+                $localFile = $source;
+            }
+        }
+
+        $hasMetadataJson = !empty($metadata['_metadata_json']);
+
+        if ($hasMetadataJson && $localFile !== null) {
+            $metadata['cover_data'] = null;
+            $metadata['cover_path'] = $localFile['path'];
+            unset($metadata['cover_url']);
+        } elseif ($embedded !== null) {
+            $metadata['cover_data'] = $embedded['data'];
+            $metadata['cover_source'] = 'Embedded';
+            $metadata['cover_path'] = null;
+        } elseif ($localFile !== null) {
+            $metadata['cover_data'] = null;
+            $metadata['cover_path'] = $localFile['path'];
+        }
+    }
+
+    /**
      * Find existing cover image in directory
      */
     protected function findExistingCover(string $directoryPath): ?string
@@ -3043,6 +3077,84 @@ class BookImportService
         }
 
         return $nfoData ?: null;
+    }
+
+    /**
+     * Read and parse an AudioBookShelf-style metadata.json file.
+     * Returns a normalized metadata array or null if not found/invalid.
+     */
+    public function readMetadataJson(string $directoryPath): ?array
+    {
+        $path = rtrim($directoryPath, '/') . '/metadata.json';
+        if (!file_exists($path)) {
+            return null;
+        }
+
+        $content = @file_get_contents($path);
+        if ($content === false || $content === '') {
+            return null;
+        }
+
+        $data = json_decode($content, true);
+        if (!is_array($data) || empty($data)) {
+            return null;
+        }
+
+        $result = [];
+
+        if (!empty($data['title'])) {
+            $result['title'] = (string) $data['title'];
+        }
+        if (!empty($data['authors'])) {
+            $authors = is_array($data['authors']) ? $data['authors'] : [(string) $data['authors']];
+            $result['author'] = array_values(array_filter($authors));
+        }
+        if (!empty($data['narrators'])) {
+            $narrators = is_array($data['narrators']) ? $data['narrators'] : [(string) $data['narrators']];
+            $result['narrator'] = array_values(array_filter($narrators));
+        }
+        if (!empty($data['genres'])) {
+            $genres = is_array($data['genres']) ? $data['genres'] : [(string) $data['genres']];
+            $genres = array_values(array_filter($genres));
+            if (!empty($genres)) {
+                $result['genre'] = $genres[0];
+            }
+        }
+        if (!empty($data['series'])) {
+            $seriesList = is_array($data['series']) ? $data['series'] : [(string) $data['series']];
+            $firstSeries = trim((string) ($seriesList[0] ?? ''));
+            if ($firstSeries !== '') {
+                if (preg_match('/^(.+?)\s*#(\d+(?:\.\d+)?)$/', $firstSeries, $m)) {
+                    $result['series'] = trim($m[1]);
+                    $result['series_number'] = $m[2];
+                } else {
+                    $result['series'] = $firstSeries;
+                }
+            }
+        }
+        if (!empty($data['publishedYear'])) {
+            $result['year'] = (string) $data['publishedYear'];
+        }
+        if (!empty($data['description'])) {
+            $result['description'] = (string) $data['description'];
+        }
+        if (!empty($data['isbn'])) {
+            $result['isbn'] = (string) $data['isbn'];
+        }
+        if (!empty($data['asin'])) {
+            $result['asin'] = (string) $data['asin'];
+        }
+        if (!empty($data['publisher'])) {
+            $result['publisher'] = (string) $data['publisher'];
+        }
+        if (!empty($data['language'])) {
+            $result['language'] = (string) $data['language'];
+        }
+        if (isset($data['abridged'])) {
+            $result['abridged'] = (bool) $data['abridged'];
+        }
+
+        return !empty($result) ? $result : null;
     }
 
     /**
@@ -4050,6 +4162,10 @@ class BookImportService
                     $uiMetadata['cover_is_local_file'] = true;
                 }
             }
+        } elseif (!empty($uiMetadata['cover_path'])) {
+            $coverSource = 'Local file';
+            $uiMetadata['cover_url'] = (string) $uiMetadata['cover_path'];
+            $uiMetadata['cover_is_local_file'] = true;
         } elseif (!empty($uiMetadata['cover_url'])) {
             if (isset($uiMetadata['audible_raw'])) {
                 $coverSource = 'Audible';
@@ -4165,20 +4281,48 @@ class BookImportService
                     $aiResult['year'] = $tagMetadata['year'];
                 }
 
-                if (!empty($fileTags) && empty($aiResult['cover_data'])) {
+                // metadata.json is fully authoritative — override AI for all provided fields
+                $metadataJson = $this->readMetadataJson($audiobook['path']);
+                if ($metadataJson !== null) {
+                    $aiResult = array_merge($aiResult, $metadataJson);
+                    $aiResult['confidence'] = 100;
+                    $aiResult['_metadata_json'] = true;
+                }
+
+                // Collect all available cover sources so the user can choose between them
+                $coverSources = [];
+
+                if (!empty($fileTags)) {
                     $firstTags = reset($fileTags);
                     if (!empty($firstTags['picture']['data'])) {
-                        $aiResult['cover_data'] = $firstTags['picture']['data'];
-                        $aiResult['cover_source'] = $firstTags['picture']['type'] ?? 'Embedded';
+                        $coverSources[] = [
+                            'type' => 'embedded',
+                            'data' => $firstTags['picture']['data'],
+                            'label' => 'Embedded (audio file tags)',
+                        ];
                     }
                 }
 
-                // Scan the source directory for a cover image when no embedded/AI cover was found
-                if (empty($aiResult['cover_data']) && empty($aiResult['cover_url']) && empty($aiResult['cover_path'])) {
-                    $sourceCover = $this->findCoverInSourceDirectory($audiobook['path']);
-                    if ($sourceCover !== null) {
-                        $aiResult['cover_path'] = $sourceCover;
-                    }
+                $sourceCover = $this->findCoverInSourceDirectory($audiobook['path']);
+                if ($sourceCover !== null) {
+                    $coverSources[] = [
+                        'type' => 'file',
+                        'path' => $sourceCover,
+                        'label' => 'Local file: ' . basename($sourceCover),
+                    ];
+                }
+
+                if (!empty($aiResult['cover_url'])) {
+                    $coverSources[] = [
+                        'type' => 'url',
+                        'url' => (string) $aiResult['cover_url'],
+                        'label' => 'Remote URL (AI/enrichment)',
+                    ];
+                }
+
+                if (!empty($coverSources)) {
+                    $aiResult['cover_sources'] = $coverSources;
+                    $this->applyDefaultCoverSource($aiResult, $coverSources);
                 }
 
                 $aiResult = $this->postProcessAIResult($aiResult, $audiobook);
@@ -8070,18 +8214,57 @@ class BookImportService
     }
 
     /**
-     * Handle cover selection - analyze current cover and offer alternatives if needed
+     * Handle cover selection - when multiple cover sources exist, prompt the user to pick one.
+     * Also searches for alternatives when the current cover is low quality.
+     *
+     * @param ?callable $getEmbeddedCoverTempPathCallback Converts embedded cover data to a temp file path for preview.
      */
-    public function handleCoverSelection(array &$metadata, callable $isTextOnWhiteCoverCallback, callable $searchAlternativeCoversCallback, callable $warnCallback, callable $lineCallback, callable $infoCallback, callable $commentCallback, callable $displayCoverOptionsCallback, callable $promptForCoverSelectionCallback, bool $isInteractive): void
-    {
+    public function handleCoverSelection(
+        array &$metadata,
+        callable $isTextOnWhiteCoverCallback,
+        callable $searchAlternativeCoversCallback,
+        callable $warnCallback,
+        callable $lineCallback,
+        callable $infoCallback,
+        callable $commentCallback,
+        callable $displayCoverOptionsCallback,
+        callable $promptForCoverSelectionCallback,
+        bool $isInteractive,
+        ?callable $getEmbeddedCoverTempPathCallback = null
+    ): void {
+        $coverOptions = [];
+        $hasValidLocalSource = false;
+
+        // Add embedded cover as an option (convert to temp path for preview)
         if (!empty($metadata['cover_data'])) {
-            return;
+            $embeddedPreviewPath = null;
+            if ($getEmbeddedCoverTempPathCallback) {
+                $embeddedPreviewPath = $getEmbeddedCoverTempPathCallback($metadata['cover_data']);
+            }
+            $coverOptions[] = [
+                'type' => 'embedded',
+                'url' => $embeddedPreviewPath ?? '',
+                'label' => 'Embedded (audio file tags)',
+                'cover_data' => $metadata['cover_data'],
+                'isLocal' => true,
+            ];
+            $hasValidLocalSource = true;
         }
 
-        $currentCoverUrl = $metadata['cover_url'] ?? '';
-        $coverOptions = [];
+        // Add local cover file as an option
+        if (!empty($metadata['cover_path']) && file_exists((string) $metadata['cover_path'])) {
+            $coverOptions[] = [
+                'type' => 'file',
+                'url' => (string) $metadata['cover_path'],
+                'label' => 'Local file: ' . basename((string) $metadata['cover_path']),
+                'isLocal' => true,
+            ];
+            $hasValidLocalSource = true;
+        }
 
-        $hasValidCover = false;
+        // Add URL-based cover as an option (with quality check)
+        $currentCoverUrl = $metadata['cover_url'] ?? '';
+        $hasValidUrlCover = false;
         if (!empty($currentCoverUrl)) {
             $tempCoverPath = null;
             try {
@@ -8089,26 +8272,27 @@ class BookImportService
                 $imageData = @file_get_contents($currentCoverUrl);
                 if ($imageData) {
                     file_put_contents($tempCoverPath, $imageData);
-
                     $isTextOnWhite = $isTextOnWhiteCoverCallback($tempCoverPath);
                     if ($isTextOnWhite) {
-                        $warnCallback('⚠️  Current cover appears to be text-only on white background (low quality)');
+                        $warnCallback('⚠️  Current cover URL appears to be text-only on white background (low quality)');
                         $coverOptions[] = [
+                            'type' => 'url',
                             'url' => $currentCoverUrl,
-                            'label' => 'Current cover (text-only - low quality)',
+                            'label' => 'Remote URL (text-only - low quality)',
                             'isCurrentLowQuality' => true,
                         ];
                     } else {
-                        $hasValidCover = true;
+                        $hasValidUrlCover = true;
                         $coverOptions[] = [
+                            'type' => 'url',
                             'url' => $currentCoverUrl,
-                            'label' => 'Current cover',
+                            'label' => 'Remote URL',
                             'isCurrent' => true,
                         ];
                     }
                 }
             } catch (\Exception $e) {
-                Log::warning('Error analyzing current cover', ['error' => $e->getMessage()]);
+                Log::warning('Error analyzing cover URL', ['error' => $e->getMessage()]);
             } finally {
                 if ($tempCoverPath && file_exists($tempCoverPath)) {
                     @unlink($tempCoverPath);
@@ -8116,6 +8300,8 @@ class BookImportService
             }
         }
 
+        // Search for Google alternatives when no quality local/URL cover is available
+        $hasValidCover = $hasValidLocalSource || $hasValidUrlCover;
         if (!$hasValidCover) {
             $lineCallback('🔍 Searching for alternative book covers...');
             $searchResults = $searchAlternativeCoversCallback($metadata, 3);
@@ -8124,6 +8310,7 @@ class BookImportService
                 $infoCallback('Found ' . count($searchResults['images']) . ' alternative cover(s)');
                 foreach ($searchResults['images'] as $index => $image) {
                     $coverOptions[] = [
+                        'type' => 'url',
                         'url' => $image['url'],
                         'label' => 'Google Image ' . ($index + 1),
                         'isGoogle' => true,
@@ -8137,27 +8324,80 @@ class BookImportService
         }
 
         if (count($coverOptions) === 0) {
-            if (empty($currentCoverUrl)) {
-                $commentCallback('No cover image found');
+            $commentCallback('No cover image found');
+            return;
+        }
+
+        // Single source with no alternatives: apply directly without prompting
+        if (count($coverOptions) === 1 || !$isInteractive) {
+            if (!$isInteractive) {
+                // Auto-mode: prefer local sources; fall back to first Google result
+                $selected = null;
+                foreach ($coverOptions as $opt) {
+                    if (!empty($opt['isLocal'])) {
+                        $selected = $opt;
+                        break;
+                    }
+                }
+                if ($selected === null) {
+                    foreach ($coverOptions as $opt) {
+                        if (!empty($opt['isGoogle'])) {
+                            $infoCallback('🤖 Auto-selecting first Google Image cover');
+                            $selected = $opt;
+                            break;
+                        }
+                    }
+                }
+                if ($selected !== null) {
+                    $this->applyCoverOption($metadata, $selected);
+                }
+            } else {
+                $this->applyCoverOption($metadata, $coverOptions[0]);
             }
             return;
         }
 
-        if ($isInteractive && count($coverOptions) > 1) {
-            $displayCoverOptionsCallback($coverOptions, $metadata);
-            $selectedUrl = $promptForCoverSelectionCallback($coverOptions);
-            if ($selectedUrl) {
+        // Multiple sources: let the user pick with previews
+        $displayCoverOptionsCallback($coverOptions, $metadata);
+        $selectedUrl = $promptForCoverSelectionCallback($coverOptions);
+        if ($selectedUrl !== null && $selectedUrl !== '') {
+            $matched = null;
+            foreach ($coverOptions as $opt) {
+                if (($opt['url'] ?? '') === $selectedUrl) {
+                    $matched = $opt;
+                    break;
+                }
+            }
+            if ($matched !== null) {
+                $this->applyCoverOption($metadata, $matched);
+            } else {
+                // Treat as a custom URL the user typed
                 $metadata['cover_url'] = $selectedUrl;
+                $metadata['cover_data'] = null;
+                $metadata['cover_path'] = null;
             }
-        } elseif (!$isInteractive && !$hasValidCover) {
-            $googleOption = collect($coverOptions)->first(function ($opt) {
-                return $opt['isGoogle'] ?? false;
-            });
+        }
+    }
 
-            if ($googleOption) {
-                $infoCallback('🤖 Auto-selecting first Google Image cover');
-                $metadata['cover_url'] = $googleOption['url'];
-            }
+    /**
+     * Apply a selected cover option to $metadata, setting the appropriate field.
+     */
+    private function applyCoverOption(array &$metadata, array $option): void
+    {
+        $type = $option['type'] ?? 'url';
+
+        if ($type === 'embedded') {
+            $metadata['cover_data'] = $option['cover_data'] ?? null;
+            $metadata['cover_path'] = null;
+            unset($metadata['cover_url']);
+        } elseif ($type === 'file') {
+            $metadata['cover_path'] = $option['url'];
+            $metadata['cover_data'] = null;
+            unset($metadata['cover_url']);
+        } else {
+            $metadata['cover_url'] = $option['url'];
+            $metadata['cover_data'] = null;
+            $metadata['cover_path'] = null;
         }
     }
 

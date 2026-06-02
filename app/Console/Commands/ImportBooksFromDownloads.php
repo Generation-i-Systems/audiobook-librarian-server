@@ -1123,7 +1123,7 @@ class ImportBooksFromDownloads extends Command
             fn ($message) => $this->line($message),
             fn () => $this->newLine(),
             fn ($message) => $this->warn($message),
-            fn ($metadata) => $this->displayEnrichedMetadata($metadata),
+            fn (&$metadata) => $this->displayEnrichedMetadata($metadata),
             fn (&$metadata, $audiobook) => $this->reviewAndApprove($metadata, $audiobook),
             fn ($metadata) => $this->getImportService()->hasEnrichmentData($metadata),
             fn () => $this->getImportService()->getFileOperation(fn () => $this->option('copy-files')),
@@ -1160,10 +1160,16 @@ class ImportBooksFromDownloads extends Command
     /**
      * Display enriched metadata (AI + external data) for review
      */
-    protected function displayEnrichedMetadata(array $metadata): void
+    protected function displayEnrichedMetadata(array &$metadata): void
     {
         if ($this->uiService) {
             $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
+            // Offer cover selection when there are multiple sources to choose from
+            $coverSources = $metadata['cover_sources'] ?? [];
+            if (count($coverSources) > 1) {
+                $this->handleCoverSelectionForUiService($metadata);
+                $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
+            }
             return;
         }
 
@@ -1180,10 +1186,69 @@ class ImportBooksFromDownloads extends Command
                 fn ($message) => $this->comment($message),
                 fn ($coverOptions, $metadata) => $this->displayCoverOptions($coverOptions, $metadata),
                 fn ($coverOptions) => $this->promptForCoverSelection($coverOptions),
-                !$this->option('auto')
+                !$this->option('auto'),
+                fn ($coverData) => $this->getEmbeddedCoverTempPath($coverData)
             ),
             fn ($coverUrl) => $this->displayCoverImage($coverUrl)
         );
+    }
+
+    /**
+     * Run cover source selection using the UIService inline preview.
+     */
+    protected function handleCoverSelectionForUiService(array &$metadata): void
+    {
+        $this->getImportService()->handleCoverSelection(
+            $metadata,
+            fn ($path) => $this->isTextOnWhiteCover($path),
+            fn ($metadata, $limit) => $this->searchAlternativeCovers($metadata, $limit),
+            fn ($message) => $this->warn($message),
+            fn ($message) => $this->line($message),
+            fn ($message) => $this->info($message),
+            fn ($message) => $this->comment($message),
+            fn ($coverOptions, $metadata) => null,
+            fn ($coverOptions) => $this->promptForCoverSelectionWithPreview($coverOptions),
+            true,
+            fn ($coverData) => $this->getEmbeddedCoverTempPath($coverData)
+        );
+    }
+
+    /**
+     * Prompt the user to select a cover source, showing an inline preview of each option
+     * as they navigate using the UIService's selectCoverWithPreview.
+     */
+    protected function promptForCoverSelectionWithPreview(array $coverOptions): ?string
+    {
+        if (empty($coverOptions)) {
+            return null;
+        }
+
+        if ($this->uiService instanceof \App\Services\ImportUIService) {
+            $choices = [];
+            $previewPaths = [];
+            foreach ($coverOptions as $index => $option) {
+                $key = (string) ($index + 1);
+                $choices[$key] = (string) ($option['label'] ?? '');
+                $previewPaths[$key] = ($option['url'] ?? '') !== '' ? (string) $option['url'] : null;
+            }
+            $choices['0'] = 'None - skip cover';
+
+            $result = $this->uiService->selectCoverWithPreview(
+                'Select cover source',
+                $choices,
+                '1',
+                $previewPaths
+            );
+
+            if ($result === '0') {
+                return '';
+            }
+
+            $index = (int) $result - 1;
+            return $coverOptions[$index]['url'] ?? null;
+        }
+
+        return $this->promptForCoverSelection($coverOptions);
     }
 
     /**
@@ -1519,7 +1584,7 @@ class ImportBooksFromDownloads extends Command
             ),
             fn () => $this->getFileOperation(),
             fn ($message) => $this->info($message),
-            fn ($metadata) => $this->displayEnrichedMetadata($metadata),
+            fn (&$metadata) => $this->displayEnrichedMetadata($metadata),
             function (&$metadata, $audiobook = []) {
                 return $this->reviewAndApprove($metadata, $audiobook);
             },

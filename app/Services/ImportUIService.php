@@ -718,7 +718,7 @@ class ImportUIService implements ImportUIInterface
         }
     }
 
-    protected function selectWithArrowKeys(string $question, array $options, string $default = ''): string
+    protected function selectWithArrowKeys(string $question, array $options, string $default = '', ?callable $onSelectionChange = null): string
     {
         $keys = array_keys($options);
         if (count($keys) === 0) {
@@ -728,6 +728,7 @@ class ImportUIService implements ImportUIInterface
         $selectedIndex = self::resolveDefaultSelectionIndex($keys, $default);
 
         $numericBuffer = '';
+        $lastNotifiedKey = null;
         $rawState = $this->enableRawInput();
 
         $stream = $this->getInputStream();
@@ -753,6 +754,11 @@ class ImportUIService implements ImportUIInterface
                 $rows = (int) ceil(count($keys) / $columns);
 
                 $selectedKey = (string) ($keys[$selectedIndex] ?? '');
+
+                if ($onSelectionChange !== null && $selectedKey !== $lastNotifiedKey) {
+                    $lastNotifiedKey = $selectedKey;
+                    $onSelectionChange($selectedKey);
+                }
 
                 $lines = [
                     "\e[1;33m{$question}\e[0m",
@@ -1565,6 +1571,47 @@ class ImportUIService implements ImportUIInterface
                 "\e[31mInvalid option '{$choice}'. Please choose one of the listed keys.\e[0m",
             ], $lines);
         }
+    }
+
+    /**
+     * Like select(), but updates the inline cover preview as the user navigates between options.
+     *
+     * @param array<array-key, string> $options         Key => label map
+     * @param array<array-key, string|null> $coverPathByKey  Key => local file path (or URL) for the cover preview
+     */
+    public function selectCoverWithPreview(string $question, array $options, string $default, array $coverPathByKey): string
+    {
+        if (!$this->terminalSupportsArrowInput()) {
+            return $this->select($question, $options, $default);
+        }
+
+        $savedBook = $this->currentBook;
+
+        $choice = $this->selectWithArrowKeys(
+            $question,
+            $options,
+            $default,
+            function (string $key) use ($coverPathByKey, $savedBook): void {
+                $path = $coverPathByKey[$key] ?? null;
+                $updated = $savedBook;
+                if ($path !== null && $path !== '') {
+                    $updated['cover_url'] = $path;
+                    $updated['cover_is_local_file'] = true;
+                } else {
+                    unset($updated['cover_url']);
+                }
+                // Update inline cover without a full book context reset
+                $this->currentBook = $updated;
+                $this->cacheCoverForCurrentBook();
+                $this->renderedCoverUrl = null;
+            }
+        );
+
+        // Restore original book context (the caller will setCurrentBook once confirmed)
+        $this->currentBook = $savedBook;
+        $this->cleanupCoverTempFile();
+
+        return $choice;
     }
 
     public function render(): void
