@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Author;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Author> */
 class AuthorFactory extends Factory
 {
     protected $model = Author::class;

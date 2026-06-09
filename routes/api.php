@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\UserStatusController;
+use App\Http\Controllers\Api\FeedbackController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -371,6 +372,9 @@ Route::prefix('v1')->group(function () {
 
         // Authenticated: set initial password (used after OTP login when must_change_password=true)
         Route::post('/auth/set-initial-password', [EmailOtpController::class, 'setInitialPassword']);
+
+        // Feedback / Bug Reports
+        Route::post('/feedback', [FeedbackController::class, 'submit']);
 
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);
