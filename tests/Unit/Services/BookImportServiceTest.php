@@ -554,4 +554,18 @@ class BookImportServiceTest extends TestCase
             File::deleteDirectory($sourceDir);
         }
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function removeSeriesFromTitleKeepsTitleWhenStrippingLeavesOnlyNumbers(): void
+    {
+        $result = $this->service->removeSeriesFromTitle('Roverpowered 5', 'Roverpowered');
+        $this->assertSame('Roverpowered 5', $result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function removeSeriesFromTitleStripsSeriesWhenRealTitleRemains(): void
+    {
+        $result = $this->service->removeSeriesFromTitle('Roverpowered The Final Journey', 'Roverpowered');
+        $this->assertSame('The Final Journey', $result);
+    }
 }

@@ -5044,10 +5044,12 @@ class BookImportService
             $options['5'] = 'Merge into Parent Book';
         }
 
-        // Show "Fix previous import" when there is a previous import in this session
+        // Show "Go back" option when there is a previous book in session history
         if ($previousImport !== null) {
             $prevTitle = $previousImport['title'] ?? 'unknown';
-            $options['p'] = "Fix previous import: {$prevTitle}";
+            $prevType = $previousImport['type'] ?? 'imported';
+            $label = $prevType === 'skipped' ? "Retry skipped: {$prevTitle}" : "Fix previous import: {$prevTitle}";
+            $options['p'] = $label;
         }
 
         return $options;
@@ -5991,6 +5993,113 @@ class BookImportService
     }
 
     /**
+     * Resolve a list of genre candidates to a single genre.
+     *
+     * Priority:
+     * 1. Author's DB history – if the author has more books in one candidate genre, use it.
+     * 2. AI targeted prompt – ask the AI to choose between the specific candidates.
+     * 3. First candidate as fallback.
+     */
+    public function disambiguateGenreCandidates(
+        array $candidates,
+        array $metadata,
+        ?object $aiProcessor,
+        ?callable $infoCallback = null,
+        array $genreBySource = []
+    ): string {
+        $weakGenres = ['General Fiction', 'Action', 'Other', 'Unknown', ''];
+        $candidates = array_values(array_unique(array_filter(
+            $candidates,
+            fn ($g) => !in_array($g, $weakGenres, true)
+        )));
+        if (count($candidates) === 0) {
+            return 'Other';
+        }
+        if (count($candidates) === 1) {
+            return $candidates[0];
+        }
+
+        // 1. Other enrichment sources: tally votes from sources whose genre matches a candidate
+        if (!empty($genreBySource)) {
+            $votes = array_fill_keys($candidates, 0);
+            foreach ($genreBySource as $source => $sourceGenre) {
+                if (!$sourceGenre) {
+                    continue;
+                }
+                $sourceParts = array_map('trim', explode(', ', $sourceGenre));
+                foreach ($sourceParts as $part) {
+                    if (isset($votes[$part])) {
+                        $votes[$part]++;
+                    }
+                }
+            }
+            arsort($votes);
+            $topVotes = reset($votes);
+            $topCandidates = array_keys(array_filter($votes, fn ($v) => $v === $topVotes));
+            if ($topVotes > 0 && count($topCandidates) === 1) {
+                $winner = $topCandidates[0];
+                if ($infoCallback) {
+                    $sourceNames = array_keys(array_filter($genreBySource));
+                    $infoCallback("🎯 Genre '{$winner}' selected from candidates [" . implode(', ', $candidates) . "] via enrichment sources (" . implode(', ', $sourceNames) . ")");
+                }
+                return $winner;
+            }
+        }
+
+        // 2. Author DB history: pick the candidate the author writes most
+        $authors = $metadata['author'] ?? [];
+        if (is_string($authors)) {
+            $authors = [$authors];
+        }
+        $preferredGenre = $this->getAuthorPreferredGenre($authors);
+        if ($preferredGenre && in_array($preferredGenre, $candidates, true)) {
+            if ($infoCallback) {
+                $infoCallback("🎯 Genre '{$preferredGenre}' selected from candidates [" . implode(', ', $candidates) . "] via author history");
+            }
+            return $preferredGenre;
+        }
+
+        // 3. AI targeted disambiguation
+        if ($aiProcessor) {
+            try {
+                $title = $metadata['title'] ?? '';
+                $author = is_array($authors) ? implode(', ', $authors) : (string) $authors;
+                $series = $metadata['series'] ?? '';
+                $description = isset($metadata['description']) ? substr($metadata['description'], 0, 300) : '';
+                $candidateList = implode(' or ', $candidates);
+
+                $prompt = "An audiobook needs genre classification. Choose the single best genre.\n\n"
+                    . "Title: {$title}\n"
+                    . "Author: {$author}\n"
+                    . ($series ? "Series: {$series}\n" : '')
+                    . ($description ? "Description (excerpt): {$description}\n" : '')
+                    . "\nCandidates: {$candidateList}\n\n"
+                    . "Reply with ONLY the genre name from the candidates list. No explanation.";
+
+                $response = $aiProcessor->complete($prompt);
+                $aiAnswer = trim($response['data'] ?? $response['text'] ?? '');
+
+                foreach ($candidates as $candidate) {
+                    if (strcasecmp($aiAnswer, $candidate) === 0) {
+                        if ($infoCallback) {
+                            $infoCallback("🎯 Genre '{$candidate}' selected from candidates [" . implode(', ', $candidates) . "] via AI disambiguation");
+                        }
+                        return $candidate;
+                    }
+                }
+            } catch (\Exception $e) {
+                // AI disambiguation failed — fall through to default
+            }
+        }
+
+        // 4. Fallback: return first candidate
+        if ($infoCallback) {
+            $infoCallback("🎯 Genre '{$candidates[0]}' selected (first of ambiguous candidates [" . implode(', ', $candidates) . "])");
+        }
+        return $candidates[0];
+    }
+
+    /**
      * Clean series name by removing author names
      */
     public function cleanSeriesName(string $seriesName, array $authors): string
@@ -6315,7 +6424,12 @@ class BookImportService
             foreach ($startPatterns as $pattern) {
                 $cleaned = preg_replace($pattern, '', $title);
                 if ($cleaned !== $title) {
-                    return trim($cleaned, ' ,-');
+                    $trimmed = trim($cleaned, ' ,-');
+                    // If stripping leaves only numbers, the series name is part of the real title
+                    if (preg_match('/^\d+$/', $trimmed)) {
+                        return $title;
+                    }
+                    return $trimmed;
                 }
             }
 
@@ -8458,7 +8572,8 @@ class BookImportService
         bool $isAutoMode,
         bool $isDryRun,
         bool $skipEnrichment,
-        ?object $uiService = null
+        ?object $uiService = null,
+        ?callable $addToHistoryCallback = null
     ): void {
         if ($uiService) {
             $uiService->setCurrentBook($buildUiMetadataCallback([
@@ -8600,7 +8715,20 @@ class BookImportService
             }
 
             if (count($splitGroups) >= 2) {
-                $infoCallback("🔍 Found individual book files - will split during import");
+                $bookCount = count($splitGroups);
+                $border = str_repeat('═', 60);
+                $infoCallback("\e[1;33m╔{$border}╗\e[0m");
+                $infoCallback("\e[1;33m║\e[0m  📚 \e[1mAUTO-SPLIT: {$bookCount} BOOKS DETECTED\e[0m" . str_repeat(' ', max(0, 55 - mb_strlen("AUTO-SPLIT: {$bookCount} BOOKS DETECTED"))) . "\e[1;33m║\e[0m");
+                $infoCallback("\e[1;33m║\e[0m  Series: \e[1m{$cleanedSeriesName}\e[0m" . str_repeat(' ', max(0, 51 - mb_strlen($cleanedSeriesName))) . "\e[1;33m║\e[0m");
+                $infoCallback("\e[1;33m╠{$border}╣\e[0m");
+                foreach ($splitGroups as $num => $fileInfos) {
+                    $title = $fileInfos[0]['title'] ?? '';
+                    $fileCount = count($fileInfos);
+                    $fileLabel = $fileCount === 1 ? '1 file' : "{$fileCount} files";
+                    $label = "  Book {$num}: {$title} ({$fileLabel})";
+                    $infoCallback("\e[1;33m║\e[0m" . $label . str_repeat(' ', max(0, 61 - mb_strlen($label))) . "\e[1;33m║\e[0m");
+                }
+                $infoCallback("\e[1;33m╚{$border}╝\e[0m");
                 $processMultiBookSplitCallback($audiobook, $multiBookInfo, $splitGroups, $aiMetadata);
                 return;
             } else {
@@ -8834,14 +8962,19 @@ class BookImportService
             }
         }
 
+        $genreBySource = [];
         if (!$skipEnrichment) {
             $infoCallback("🔍 Attempting to enrich with external data...");
             $enrichedData = $enrichWithExternalDataCallback($aiMetadata);
             if ($enrichedData) {
                 $enrichmentService = $getEnrichmentServiceCallback();
                 if ($enrichmentService->isValidEnrichment($aiMetadata, $enrichedData)) {
+                    $genreBySource = $enrichedData['_genre_by_source'] ?? [];
+                    $enrichmentResults = $enrichedData['_enrichment_results'] ?? [];
                     $aiMetadata = array_merge($aiMetadata, $enrichedData);
-                    $infoCallback("✅ Found enrichment data!");
+                    $successSources = array_keys(array_filter($enrichmentResults, fn ($v) => $v === 'success'));
+                    $sourceList = implode(', ', array_map(fn ($s) => ucfirst(str_replace('_', ' ', $s)), $successSources));
+                    $infoCallback("✅ Found enrichment data!" . ($sourceList ? " ({$sourceList})" : ''));
                 } else {
                     $warnCallback("⚠️  Invalid enrichment data - skipping merge.");
                 }
@@ -8854,6 +8987,48 @@ class BookImportService
         // so it overrides anything found externally
         if (!empty($this->config['genre'])) {
             $aiMetadata['genre'] = $this->config['genre'];
+        }
+
+        // Last-resort fallback: if enrichment still left a weak genre, use the author's DB history.
+        // This only applies when enrichment truly couldn't determine a genre — not to override a
+        // real enrichment result. Author history is a weaker signal than any external source.
+        $postEnrichmentGenre = $aiMetadata['genre'] ?? '';
+        if (is_array($postEnrichmentGenre)) {
+            $postEnrichmentGenre = $postEnrichmentGenre[0] ?? '';
+        }
+        $weakGenres = ['General Fiction', 'Action', 'Other', 'Unknown', ''];
+        if (in_array($postEnrichmentGenre, $weakGenres, true)) {
+            $authors = $aiMetadata['author'] ?? [];
+            if (is_string($authors)) {
+                $authors = [$authors];
+            }
+            $preferredGenre = $this->getAuthorPreferredGenre($authors);
+            if ($preferredGenre && !in_array($preferredGenre, $weakGenres, true)) {
+                if (is_array($aiMetadata['genre'])) {
+                    $aiMetadata['genre'] = [$preferredGenre];
+                } else {
+                    $aiMetadata['genre'] = $preferredGenre;
+                }
+                $sourceParts = [];
+                foreach ($genreBySource as $src => $srcGenre) {
+                    $sourceParts[] = ucfirst(str_replace('_', ' ', $src)) . ': ' . ($srcGenre ?? 'no genre');
+                }
+                $sourceDetail = $sourceParts ? implode(', ', $sourceParts) : null;
+                $enrichmentFoundGenre = !empty(array_filter($genreBySource));
+                if (!$enrichmentFoundGenre) {
+                    $detail = $sourceDetail ? "AI returned '{$postEnrichmentGenre}'; enrichment found no genre ({$sourceDetail})" : "AI returned '{$postEnrichmentGenre}'; no enrichment ran";
+                } else {
+                    $detail = "enrichment returned '{$postEnrichmentGenre}'" . ($sourceDetail ? ": {$sourceDetail}" : '');
+                }
+                $infoCallback("🔄 Genre set to '{$preferredGenre}' (author DB history fallback; {$detail})");
+            }
+        }
+
+        // Disambiguate when enrichment returned multiple genre candidates (e.g. ["Science Fiction", "Fantasy"])
+        $genreAfterEnrichment = $aiMetadata['genre'] ?? '';
+        if (is_array($genreAfterEnrichment) && count($genreAfterEnrichment) > 1) {
+            $resolved = $this->disambiguateGenreCandidates($genreAfterEnrichment, $aiMetadata, $aiProcessor, $infoCallback, $genreBySource);
+            $aiMetadata['genre'] = $resolved;
         }
 
         // Clean series name from title after enrichment (enrichment may override with unclean title)
@@ -8896,6 +9071,9 @@ class BookImportService
                     'path' => $audiobook['path'],
                     'reason' => 'Rejected by user',
                 ];
+                if ($addToHistoryCallback) {
+                    $addToHistoryCallback('skipped', $audiobook, $aiMetadata);
+                }
                 return;
             }
         } elseif ($isAutoMode && !$hasEnrichmentDataCallback($aiMetadata)) {
@@ -8934,6 +9112,9 @@ class BookImportService
                     'book_id' => $book->id,
                     'title' => $book->title,
                 ];
+                if ($addToHistoryCallback) {
+                    $addToHistoryCallback('imported', $audiobook, [], $book->id, $book->title);
+                }
             }
         } else {
             $infoCallback("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
@@ -9071,7 +9252,15 @@ class BookImportService
 
             if ($choice === 'p' && $fixPreviousImportCallback !== null && $previousImport !== null) {
                 $fixPreviousImportCallback($previousImport);
-                // After fixing, remain in this review loop for the current book
+                // Restore current book in the details panel and show a clear return banner
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                $border = str_repeat('─', 40);
+                $title = $metadata['title'] ?? 'current book';
+                $uiServiceLogCallback("\e[1;36m┌{$border}┐\e[0m");
+                $uiServiceLogCallback("\e[1;36m│\e[0m  ↩ Back to: \e[1m{$title}\e[0m" . str_repeat(' ', max(0, 37 - mb_strlen($title))) . "\e[1;36m│\e[0m");
+                $uiServiceLogCallback("\e[1;36m└{$border}┘\e[0m");
+                // Force Edit as default so the current book can't be accepted by accident
+                $defaultChoice = '2';
                 continue;
             }
 

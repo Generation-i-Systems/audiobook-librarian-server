@@ -102,6 +102,8 @@ class ImportBooksFromDownloads extends Command
     protected array $processedBooks = [];
     protected array $failedBooks = [];
     protected array $skippedBooks = [];
+    // Unified chronological history of all processed books (imported + skipped), used by fix-previous feature
+    protected array $bookHistory = [];
     // Tracks how far back the user has navigated with "fix previous import" (0 = most recent)
     protected int $fixHistoryIndex = 0;
     protected int $totalFound = 0;
@@ -1153,7 +1155,25 @@ class ImportBooksFromDownloads extends Command
             (bool) $this->option('auto'),
             (bool) $this->option('dry-run'),
             (bool) $this->option('skip-enrichment'),
-            $this->uiService ?? null
+            $this->uiService ?? null,
+            function (string $type, array $audiobook, array $aiMetadata, ?int $bookId = null, ?string $bookTitle = null): void {
+                if ($type === 'imported') {
+                    $this->bookHistory[] = [
+                        'type' => 'imported',
+                        'title' => $bookTitle ?? '',
+                        'book_id' => $bookId,
+                        'path' => $audiobook['path'] ?? '',
+                    ];
+                } else {
+                    $this->bookHistory[] = [
+                        'type' => 'skipped',
+                        'title' => $aiMetadata['title'] ?? ($audiobook['name'] ?? ''),
+                        'path' => $audiobook['path'] ?? '',
+                        'audiobook' => $audiobook,
+                        'aiMetadata' => $aiMetadata,
+                    ];
+                }
+            }
         );
     }
 
@@ -1364,7 +1384,7 @@ class ImportBooksFromDownloads extends Command
             ])),
             $this->inputInterrupted,
             fn ($previousImport) => $this->fixPreviousImport($previousImport),
-            $this->getLastProcessedBook()
+            $this->getLastHistoryEntry()
         );
     }
 
@@ -1390,37 +1410,47 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Return the book to fix based on current history navigation index.
+     * Return the history entry to fix based on current navigation index.
      * Index 0 = most recent, 1 = one before that, etc.
+     * Includes both imported and skipped books.
      */
-    protected function getLastProcessedBook(): ?array
+    protected function getLastHistoryEntry(): ?array
     {
-        $count = count($this->processedBooks);
+        $count = count($this->bookHistory);
         if ($count === 0) {
             return null;
         }
-        // Clamp index to valid range
         $this->fixHistoryIndex = min($this->fixHistoryIndex, $count - 1);
         $targetIndex = $count - 1 - $this->fixHistoryIndex;
-        return $this->processedBooks[$targetIndex] ?? null;
+        return $this->bookHistory[$targetIndex] ?? null;
     }
 
     /**
-     * Re-open an already-imported book for editing using the full review loop,
-     * so current field values are displayed and all edit options are available.
-     * Advances the history index so the next "fix previous" goes one book further back.
+     * Re-open a previously processed book (imported or skipped) for editing or retry.
+     * For imported books: opens the edit/review loop to update saved metadata.
+     * For skipped books: re-runs the full import flow from the review step.
      */
     protected function fixPreviousImport(array $previousImport): void
     {
+        $this->fixHistoryIndex++;
+
+        if (($previousImport['type'] ?? 'imported') === 'skipped') {
+            $this->retrySkippedBook($previousImport);
+            $this->fixHistoryIndex = 0;
+            return;
+        }
+
         $bookId = $previousImport['book_id'] ?? null;
         if (!$bookId) {
             $this->warn("Cannot fix previous import: no book ID available.");
+            $this->fixHistoryIndex = 0;
             return;
         }
 
         $book = \App\Models\Book::find($bookId);
         if (!$book) {
             $this->warn("Cannot fix previous import: book ID {$bookId} not found.");
+            $this->fixHistoryIndex = 0;
             return;
         }
 
@@ -1428,7 +1458,6 @@ class ImportBooksFromDownloads extends Command
 
         $metadata = $this->getImportService()->buildMetadataFromBook($book);
 
-        // Display current metadata so the user sees what is already stored
         $this->getImportService()->displayEnrichedMetadata(
             $metadata,
             fn ($headers, $rows) => $this->table($headers, $rows),
@@ -1437,13 +1466,6 @@ class ImportBooksFromDownloads extends Command
             fn () => false
         );
 
-        // Advance history index so next "fix previous" targets the book before this one
-        $this->fixHistoryIndex++;
-
-        // Run the full review loop — same as the initial import, but without file-move
-        // Accept/skip here means "save changes" / "discard and continue"
-        // Use a local interrupted flag so any interrupt inside fix-previous does not
-        // bleed back into the main import loop via the shared $this->inputInterrupted ref.
         $localInterrupted = false;
         $fakeAudiobook = ['path' => $book->directory_path ?? '', 'files' => [], 'is_multi_book_part' => false];
         $approved = $this->getImportService()->reviewAndApprove(
@@ -1490,7 +1512,7 @@ class ImportBooksFromDownloads extends Command
             ])),
             $localInterrupted,
             fn ($prev) => $this->fixPreviousImport($prev),
-            $this->getLastProcessedBook()
+            $this->getLastHistoryEntry()
         );
 
         if ($approved) {
@@ -1498,18 +1520,31 @@ class ImportBooksFromDownloads extends Command
             $freshTitle = $book->fresh()->title ?? $book->title;
             $this->info("✅ Updated: {$freshTitle}");
 
-            // Sync updated title back into the processedBooks log entry
-            $count = count($this->processedBooks);
+            // Sync updated title back into the history log entry
+            $count = count($this->bookHistory);
             $targetIndex = $count - $this->fixHistoryIndex;
-            if (isset($this->processedBooks[$targetIndex]) && ($this->processedBooks[$targetIndex]['book_id'] ?? null) === $bookId) {
-                $this->processedBooks[$targetIndex]['title'] = $freshTitle;
+            if (isset($this->bookHistory[$targetIndex]) && ($this->bookHistory[$targetIndex]['book_id'] ?? null) === $bookId) {
+                $this->bookHistory[$targetIndex]['title'] = $freshTitle;
             }
         } else {
             $this->info("↩ No changes saved for: {$book->title}");
         }
 
-        // Reset history index when done so "fix previous" from next book starts at most recent
         $this->fixHistoryIndex = 0;
+    }
+
+    /**
+     * Re-run the import review+create flow for a previously skipped book using its saved metadata.
+     */
+    protected function retrySkippedBook(array $historyEntry): void
+    {
+        $title = $historyEntry['title'] ?? 'Unknown';
+        $audiobook = $historyEntry['audiobook'] ?? [];
+        $aiMetadata = $historyEntry['aiMetadata'] ?? [];
+
+        $this->info("🔄 Retrying skipped book: {$title}");
+
+        $this->processSingleBook($audiobook, $aiMetadata);
     }
 
     /**
