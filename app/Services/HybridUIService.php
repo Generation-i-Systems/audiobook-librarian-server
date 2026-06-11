@@ -100,12 +100,24 @@ class HybridUIService extends ImportUIService
         $layout = $this->computeLayout();
         $y = $layout['logY'];
         $h = $layout['logHeight'] + 2;
+        $maxLogs = max(1, $layout['maxLogs'] + 2);
 
-        $this->drawBox(2, $y, $this->width - 2, $h, ' Activity Log ', 'yellow');
+        $totalLogs = count($this->logs);
+        $maxOffset = max(0, $totalLogs - $maxLogs);
+        $this->logScrollOffset = min($this->logScrollOffset, $maxOffset);
+        $offset = $this->logScrollOffset;
+
+        $title = $offset > 0
+            ? " Activity Log [PgDn↓ — {$offset} lines below] "
+            : ' Activity Log ';
+
+        $this->drawBox(2, $y, $this->width - 2, $h, $title, 'yellow');
+
+        $displayLogs = $offset === 0
+            ? array_slice($this->logs, -$maxLogs)
+            : array_slice($this->logs, -($maxLogs + $offset), $maxLogs);
 
         $row = $y + 1;
-        $maxLogs = max(1, $layout['maxLogs'] + 2);
-        $displayLogs = array_slice($this->logs, -$maxLogs);
         foreach ($displayLogs as $log) {
             $clean = mb_convert_encoding($log, 'UTF-8', 'UTF-8');
             $this->screen->write("\e[{$row};4H" . mb_substr($clean, 0, $this->width - 6));

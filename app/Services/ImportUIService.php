@@ -31,6 +31,7 @@ class ImportUIService implements ImportUIInterface
     protected ?string $lastKeyDebug = null;
     protected bool $interrupted = false;
     protected int $bookDetailsEndY = 0;
+    protected int $logScrollOffset = 0;
 
     public function setPlainMode(bool $plainMode): void
     {
@@ -498,6 +499,8 @@ class ImportUIService implements ImportUIInterface
                 '3' => ['delete'],
                 '1', '7' => ['home'],
                 '4', '8' => ['end'],
+                '5' => ['page-up'],
+                '6' => ['page-down'],
                 default => [],
             };
         }
@@ -656,8 +659,22 @@ class ImportUIService implements ImportUIInterface
                     continue;
                 }
 
-                if (($action[0] ?? '') === 'enter') {
+                $actionType = (string) ($action[0] ?? '');
+
+                if ($actionType === 'enter') {
                     return (string) ($state['buffer'] ?? '');
+                }
+
+                if ($actionType === 'page-up') {
+                    $this->scrollLog('up');
+                    $this->renderLineEditorState($cursorY, $cursorX, $state);
+                    continue;
+                }
+
+                if ($actionType === 'page-down') {
+                    $this->scrollLog('down');
+                    $this->renderLineEditorState($cursorY, $cursorX, $state);
+                    continue;
                 }
 
                 $state = self::applyLineEditorAction($state, $action);
@@ -837,6 +854,16 @@ class ImportUIService implements ImportUIInterface
                         count($keys)
                     );
                     $numericBuffer = '';
+                    continue;
+                }
+
+                if ($actionType === 'page-up') {
+                    $this->scrollLog('up');
+                    continue;
+                }
+
+                if ($actionType === 'page-down') {
+                    $this->scrollLog('down');
                     continue;
                 }
 
@@ -1020,16 +1047,43 @@ class ImportUIService implements ImportUIInterface
         $layout = $this->computeLayout();
         $y = $layout['logY'];
         $h = $layout['logHeight'];
+        $maxLogs = $layout['maxLogs'];
 
-        $this->drawBox(2, $y, $this->width - 2, $h, " Activity Log ", "yellow");
+        $totalLogs = count($this->logs);
+        $maxOffset = max(0, $totalLogs - $maxLogs);
+        $this->logScrollOffset = min($this->logScrollOffset, $maxOffset);
+        $offset = $this->logScrollOffset;
+
+        $title = $offset > 0
+            ? " Activity Log [PgDn↓ — {$offset} lines below] "
+            : " Activity Log ";
+
+        $this->drawBox(2, $y, $this->width - 2, $h, $title, "yellow");
+
+        $displayLogs = $offset === 0
+            ? array_slice($this->logs, -$maxLogs)
+            : array_slice($this->logs, -($maxLogs + $offset), $maxLogs);
 
         $row = $y + 1;
-        $maxLogs = $layout['maxLogs'];
-        $displayLogs = array_slice($this->logs, -$maxLogs);
         foreach ($displayLogs as $log) {
             $this->screen->write("\e[{$row};4H" . mb_substr($log, 0, $this->width - 6));
             $row++;
         }
+    }
+
+    protected function scrollLog(string $direction): void
+    {
+        $layout = $this->computeLayout();
+        $maxLogs = $layout['maxLogs'];
+        $maxOffset = max(0, count($this->logs) - $maxLogs);
+
+        if ($direction === 'up') {
+            $this->logScrollOffset = min($maxOffset, $this->logScrollOffset + $maxLogs);
+        } else {
+            $this->logScrollOffset = max(0, $this->logScrollOffset - $maxLogs);
+        }
+
+        $this->renderFull();
     }
 
     protected function drawFooter(): void
@@ -1242,11 +1296,6 @@ class ImportUIService implements ImportUIInterface
             return;
         }
         $this->logs[] = $message;
-        $layout = $this->computeLayout();
-        $maxLogs = $layout['maxLogs'];
-        if (count($this->logs) > $maxLogs) {
-            array_shift($this->logs);
-        }
         $this->renderFull();
     }
 
