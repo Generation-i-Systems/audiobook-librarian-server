@@ -52,8 +52,24 @@ class PromptsUIService implements ImportUIInterface
         $this->height = max(20, $height);
     }
 
+    /**
+     * Strip invalid UTF-8 bytes so soloterm's grapheme splitter never crashes.
+     */
+    protected function clean(string $text): string
+    {
+        return mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+    }
+
+    protected function cleanOptions(array $options): array
+    {
+        return array_map(fn ($v) => is_string($v) ? $this->clean($v) : $v, $options);
+    }
+
     public function ask(string $question, string $default = ''): string
     {
+        $question = $this->clean($question);
+        $default  = $this->clean($default);
+
         if ($this->plainMode) {
             echo "{$question} [{$default}]: ";
             $input = trim((string) fgets(STDIN));
@@ -75,6 +91,9 @@ class PromptsUIService implements ImportUIInterface
 
     public function select(string $question, array $options, string $default = ''): string
     {
+        $question = $this->clean($question);
+        $options  = $this->cleanOptions($options);
+
         if ($this->plainMode) {
             return $this->selectPlain($question, $options, $default);
         }
@@ -118,6 +137,7 @@ class PromptsUIService implements ImportUIInterface
 
     public function confirm(string $question, bool $default = false): bool
     {
+        $question = $this->clean($question);
         if ($this->plainMode) {
             $defaultStr = $default ? 'Y/n' : 'y/N';
             echo "{$question} [{$defaultStr}]: ";
@@ -191,6 +211,9 @@ class PromptsUIService implements ImportUIInterface
 
     public function table(array $headers, array $rows): void
     {
+        $headers = $this->cleanOptions($headers);
+        $rows    = array_map(fn ($row) => is_array($row) ? $this->cleanOptions($row) : $row, $rows);
+
         if ($this->plainMode) {
             $this->tablePlain($headers, $rows);
             return;
@@ -235,6 +258,7 @@ class PromptsUIService implements ImportUIInterface
 
     public function info(string $message): void
     {
+        $message = $this->clean($message);
         if ($this->plainMode) {
             echo "[INFO] {$message}\n";
             return;
@@ -244,6 +268,7 @@ class PromptsUIService implements ImportUIInterface
 
     public function warning(string $message): void
     {
+        $message = $this->clean($message);
         if ($this->plainMode) {
             echo "[WARNING] {$message}\n";
             return;
@@ -253,6 +278,7 @@ class PromptsUIService implements ImportUIInterface
 
     public function error(string $message): void
     {
+        $message = $this->clean($message);
         if ($this->plainMode) {
             echo "[ERROR] {$message}\n";
             return;
@@ -262,6 +288,7 @@ class PromptsUIService implements ImportUIInterface
 
     public function logMessage(string $message): void
     {
+        $message = $this->clean($message);
         if ($this->plainMode) {
             echo "{$message}\n";
             return;
