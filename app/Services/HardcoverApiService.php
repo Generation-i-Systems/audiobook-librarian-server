@@ -13,8 +13,8 @@ class HardcoverApiService
 
     public function __construct(?string $apiKey = null, ?string $apiUrl = null)
     {
-        $this->apiUrl = $apiUrl ?? config('services.hardcover.api_url', 'https://api.hardcover.app/v1/graphql');
-        $this->apiKey = $apiKey ?? config('services.hardcover.api_key');
+        $this->apiUrl = $apiUrl ?? config('hardcover.api_url', 'https://api.hardcover.app/v1/graphql');
+        $this->apiKey = $apiKey ?? config('hardcover.api_token');
     }
 
     public function searchAndMerge(array $book): ?array
@@ -25,23 +25,26 @@ class HardcoverApiService
             return null;
         }
         $limit = 5;
-        $results = $this->searchBooksByTitle($title, $limit);
+        $firstAuthor = !empty($authors) ? $authors[0] : null;
+        $results = $this->searchBooksByTitle($title, $limit, $firstAuthor);
         if (!$results || empty($results)) {
             return null;
         }
-        $bestMatch = null;
+        // Hardcover's search engine already ranks results by relevance, so use the first hit as
+        // the default and only promote a later result if it scores strictly higher.
+        $bestMatch = $results[0];
         $bestScore = 0;
         foreach ($results as $result) {
             $score = 0;
-            if (strcasecmp(trim($result['title']), trim($title)) === 0) {
+            if (strcasecmp(trim($result['title'] ?? ''), trim($title)) === 0) {
                 $score += 2;
-            } elseif (stripos($result['title'], $title) !== false) {
+            } elseif (stripos($result['title'] ?? '', $title) !== false) {
                 $score += 1;
             }
             if (!empty($authors) && !empty($result['authors'])) {
                 foreach ($authors as $inputAuthor) {
                     foreach ($result['authors'] as $authorObj) {
-                        $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
+                        $authorName = is_array($authorObj['author'] ?? null) ? ($authorObj['author']['name'] ?? '') : ($authorObj['author'] ?? '');
                         if ($authorName && stripos($authorName, $inputAuthor) !== false) {
                             $score += 2;
                             break 2;
@@ -54,23 +57,31 @@ class HardcoverApiService
                 $bestMatch = $result;
             }
         }
-        if (!$bestMatch) {
-            return null;
-        }
         $details = null;
         if (!empty($bestMatch['id'])) {
             $details = $this->getBookDetails($bestMatch['id']);
         }
+
+        // Genres: try taggings from details, then book_category, then search document
+        $genreNames = [];
+        if (!empty($details['taggings'])) {
+            $genreNames = array_values(array_filter(array_map(
+                fn ($t) => $t['tag']['tag'] ?? null,
+                $details['taggings']
+            )));
+        }
+        if (empty($genreNames) && !empty($details['book_category']['category'])) {
+            $genreNames = [$details['book_category']['category']];
+        }
+
         $merged = [
             'hardcoverId' => $bestMatch['id'] ?? null,
-            'title' => $bestMatch['title'] ?? null,
+            'title'       => $bestMatch['title'] ?? null,
             'description' => $details['description'] ?? $bestMatch['description'] ?? null,
-            'coverImage' => $details['cover_image_url'] ?? $bestMatch['cover_image_url'] ?? null,
-            'pages' => $details['pages'] ?? $bestMatch['pages'] ?? null,
+            'coverImage'  => $details['image']['url'] ?? $bestMatch['cover_image_url'] ?? null,
+            'pages'       => $details['pages'] ?? $bestMatch['pages'] ?? null,
             'releaseDate' => $details['release_date'] ?? $bestMatch['release_date'] ?? null,
-            'isbn_10' => $details['isbn_10'] ?? $bestMatch['isbn_10'] ?? null,
-            'isbn_13' => $details['isbn_13'] ?? $bestMatch['isbn_13'] ?? null,
-            'publisher' => $details['publisher']['name'] ?? $bestMatch['publisher']['name'] ?? null,
+            'genres'      => $genreNames ?: null,
         ];
 
         return array_filter($merged, fn ($v) => $v !== null);
@@ -94,7 +105,7 @@ class HardcoverApiService
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'x-api-key' => $this->apiKey,
+                'Authorization' => 'Bearer ' . $this->apiKey,
             ])->post($this->apiUrl, [
                         'query' => $query,
                         'variables' => $variables,
@@ -108,7 +119,12 @@ class HardcoverApiService
                 return null;
             }
 
-            return $response->json();
+            $json = $response->json();
+            if (!empty($json['errors'])) {
+                Log::error('Hardcover API GraphQL error', ['errors' => $json['errors']]);
+                return null;
+            }
+            return $json;
         } catch (\Exception $e) {
             Log::error('HardcoverApiService: API request exception', [
                 'query' => substr($query, 0, 200), // Truncate query for logging
@@ -120,78 +136,71 @@ class HardcoverApiService
         }
     }
 
-    public function searchBooksByTitle(string $title, int $limit = 10): ?array
+    public function searchBooksByTitle(string $title, int $limit = 10, ?string $author = null): ?array
     {
         $query = '
-            query SearchBooks($title: String!, $limit: Int!) {
-                books(where: {title: {_ilike: $title}}, limit: $limit) {
-                    id
-                    title
-                    pages
-                    release_date
-                    description
-                    cover_image_url: cover_image_url(size: MEDIUM)
-                    authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
-                        author {
-                            name
-                        }
-                    }
+            query SearchBooks($query: String!, $limit: Int!) {
+                search(query: $query, query_type: "Book", per_page: $limit) {
+                    results
                 }
             }
         ';
+        $searchQuery = $author ? "{$title} {$author}" : $title;
         $result = $this->makeGraphQlRequest($query, [
-            'title' => "%$title%",
+            'query' => $searchQuery,
             'limit' => $limit,
         ]);
 
-        return $result['data']['books'] ?? null;
+        // Response: data.search.results.hits[].document
+        $hits = $result['data']['search']['results']['hits'] ?? [];
+        if (empty($hits)) {
+            return null;
+        }
+
+        $books = [];
+        foreach ($hits as $hit) {
+            $doc = $hit['document'] ?? $hit;
+            $books[] = [
+                'id'             => $doc['id'] ?? null,
+                'title'          => $doc['title'] ?? null,
+                'description'    => $doc['description'] ?? null,
+                'cover_image_url' => $doc['image']['url'] ?? null,
+                'release_date'   => $doc['release_date'] ?? null,
+                'pages'          => $doc['pages'] ?? null,
+                'authors'        => array_map(
+                    fn ($name) => ['author' => ['name' => $name]],
+                    $doc['author_names'] ?? []
+                ),
+                // genres is empty in search index — getBookDetails fills this
+                'genres'         => [],
+            ];
+        }
+
+        return $books;
     }
 
-    public function getBookDetails(string $bookId): ?array
+    public function getBookDetails(string|int $bookId): ?array
     {
         $query = '
-            query GetBookDetails($bookId: uuid!) {
+            query GetBookDetails($bookId: Int!) {
                 books_by_pk(id: $bookId) {
                     id
                     title
-                    subtitle
                     description
                     pages
                     release_date
-                    isbn_10
-                    isbn_13
-                    cover_image_url: cover_image_url(size: LARGE)
-                    publisher {
-                        name
+                    image {
+                        url
                     }
-                    authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
-                        author {
-                            id
-                            name
-                        }
-                    }
-                    narrators: contributions(where: {role: {_eq: "NARRATOR"}}) {
-                        author {
-                            id
-                            name
-                        }
-                    }
-                    editions {
-                        id
-                        title
-                        edition_format
-                        pages
-                        release_date
-                        isbn_10
-                        isbn_13
-                        publisher {
-                            name
+                    taggings {
+                        tag {
+                            tag
                         }
                     }
                 }
             }
         ';
-        $result = $this->makeGraphQlRequest($query, ['bookId' => $bookId]);
+        $result = $this->makeGraphQlRequest($query, ['bookId' => (int) $bookId]);
 
         return $result['data']['books_by_pk'] ?? null;
     }
