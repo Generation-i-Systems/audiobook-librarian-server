@@ -1296,7 +1296,60 @@ class ImportUIService implements ImportUIInterface
             return;
         }
         $this->logs[] = $message;
+        $this->pollScrollKeys();
         $this->renderFull();
+    }
+
+    protected function pollScrollKeys(): void
+    {
+        if (!$this->terminalSupportsArrowInput()) {
+            return;
+        }
+
+        $stream = $this->getInputStream();
+        if (!is_resource($stream)) {
+            return;
+        }
+
+        // Quick non-blocking check — skip entirely if no input is waiting
+        $read = [$stream];
+        $write = $except = [];
+        if (@stream_select($read, $write, $except, 0, 0) <= 0) {
+            return;
+        }
+
+        $rawState = $this->enableRawInput();
+        try {
+            while (true) {
+                $read = [$stream];
+                $write = $except = [];
+                if (@stream_select($read, $write, $except, 0, 0) <= 0) {
+                    break;
+                }
+
+                $char = fgetc($stream);
+                if ($char === false) {
+                    break;
+                }
+
+                $action = $this->parseTerminalKeySequence($char);
+                $actionType = $action[0] ?? '';
+
+                if ($actionType === 'page-up') {
+                    $layout = $this->computeLayout();
+                    $maxLogs = $layout['maxLogs'];
+                    $maxOffset = max(0, count($this->logs) - $maxLogs);
+                    $this->logScrollOffset = min($maxOffset, $this->logScrollOffset + $maxLogs);
+                } elseif ($actionType === 'page-down') {
+                    $maxLogs = $this->computeLayout()['maxLogs'];
+                    $this->logScrollOffset = max(0, $this->logScrollOffset - $maxLogs);
+                }
+                // Other keys consumed here would otherwise accumulate as stale
+                // input that confuses the next prompt.
+            }
+        } finally {
+            $this->restoreRawInput($rawState);
+        }
     }
 
     protected function sanitizeLogMessage(string $message): string
