@@ -119,7 +119,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             'authors' => $source['authors'] ?? null,
             'publisher' => $source['publisher']['name'] ?? $source['publisher_name'] ?? null,
             'releaseDate' => $source['published_date'] ?? $source['release_date'] ?? null,
-            'categories' => $source['categories'] ?? null,
+            'categories' => $this->splitCategories($source['categories'] ?? []),
             'pageCount' => $source['page_count'] ?? null,
             'averageRating' => $source['average_rating'] ?? null,
             'ratingsCount' => $source['ratings_count'] ?? null,
@@ -434,6 +434,25 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     /**
      * Get the best available image URL from the image links
      */
+    /**
+     * Split Google Books hierarchical categories ("Fiction / Fantasy / Epic") on / and :
+     * and return a flat list of unique components.
+     */
+    protected function splitCategories(array $categories): array
+    {
+        $components = [];
+        foreach ($categories as $category) {
+            $parts = preg_split('/\s*[\/\:]\s*/', (string) $category);
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if ($part !== '') {
+                    $components[] = $part;
+                }
+            }
+        }
+        return array_values(array_unique($components));
+    }
+
     protected function getBestImageUrl(array $imageLinks): ?string
     {
         // Try to get the largest available image
