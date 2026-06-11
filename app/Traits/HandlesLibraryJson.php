@@ -103,13 +103,11 @@ trait HandlesLibraryJson
             $bookDir = Storage::disk('books')->path($relativePath);
 
             if (!is_dir($bookDir)) {
-                if (!mkdir($bookDir, 0755, true) && !is_dir($bookDir)) {
-                    Log::warning('Cannot create book directory for librarian.json', [
-                        'book_id' => $book['id'] ?? null,
-                        'directory' => $bookDir,
-                    ]);
-                    return false;
-                }
+                Log::debug('Skipping librarian.json — directory does not exist yet (files not yet moved)', [
+                    'book_id' => $book['id'] ?? null,
+                    'directory' => $bookDir,
+                ]);
+                return false;
             }
 
             // Skip if directory has no audio files - a book should never have only librarian.json

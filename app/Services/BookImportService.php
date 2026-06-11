@@ -671,28 +671,6 @@ class BookImportService
                 }
             }
 
-            // Generate librarian.json after all relationships are set
-            // Include chapters from metadata if available (from OpenAudible)
-            $bookData = $book->load([
-                'authors',
-                'narrators',
-                'genres',
-                'series',
-                'publisher',
-            ])->toArray();
-
-            // Pass through chapters from metadata (not stored in DB)
-            if (!empty($metadata['chapters'])) {
-                $bookData['chapters'] = $metadata['chapters'];
-            }
-
-            // Pass through ASIN from metadata
-            if (!empty($metadata['asin'])) {
-                $bookData['asin'] = $metadata['asin'];
-            }
-
-            $this->updateLibraryJson($bookData);
-
             DB::commit();
             return $book;
         } catch (\Exception $e) {
@@ -5099,9 +5077,6 @@ class BookImportService
         ?callable $tableCallback = null
     ): ?array {
         if ($lineCallback) {
-            $lineCallback("🔍 Debug: displayDirectoryComparison called");
-            $lineCallback("🔍 Debug: Comparison keys: " . implode(', ', array_keys($comparison)));
-            $lineCallback("");
             $lineCallback("📁 Directory Comparison:");
             $lineCallback("   Source:  " . ($comparison['source_path'] ?? 'N/A'));
             $lineCallback("   Target:  " . ($comparison['target_path'] ?? 'N/A'));
@@ -8818,12 +8793,56 @@ class BookImportService
                                 return;
                         }
                     } else {
-                        $warnCallback("📁 {$sourceTypePlural} differ - manual decision needed");
-                        $comparisonExists = is_array($comparison) ? 'YES' : 'NO';
-                        $lineCallback('🔍 Debug: Comparison data structure exists: ' . $comparisonExists);
-                        if (is_array($comparison)) {
-                            $lineCallback("🔍 Debug: Keys present: " . implode(', ', array_keys($comparison)));
+                        // If the target directory has no audio files it is effectively empty —
+                        // treat it the same as the directory-missing path and auto-merge.
+                        $targetAudioCount = $comparison['target']['count'] ?? 0;
+                        if ($targetAudioCount === 0) {
+                            $infoCallback("📋 Existing book directory has no audio files — merging into existing record");
+
+                            $selectCb = $uiService ? fn ($q, $o, $d) => $uiService->select($q, $o, $d) : fn ($q, $o, $d) => $d;
+                            $askCb = $uiService ? fn ($q, $d) => $uiService->ask($q, $d ?? '') : fn ($q, $d) => $d ?? '';
+
+                            $mergedMetadata = $this->buildMergeMetadata(
+                                $existingBook,
+                                $aiMetadata,
+                                $selectCb,
+                                $askCb,
+                                $infoCallback
+                            );
+
+                            if ($mergedMetadata === null) {
+                                $skippedBooks[] = [
+                                    'path' => $audiobook['path'],
+                                    'reason' => 'User cancelled merge into existing book (empty target directory)',
+                                ];
+                                return;
+                            }
+
+                            if (!$isDryRun) {
+                                $operation = $getFileOperationCallback();
+                                $book = $this->mergeIntoExistingBook(
+                                    $existingBook,
+                                    $audiobook,
+                                    $mergedMetadata,
+                                    $warnCallback,
+                                    $infoCallback,
+                                    fn () => $operation
+                                );
+
+                                $infoCallback("✅ Book merged successfully: {$book->title} (ID: {$book->id})");
+                                $processedBooks[] = [
+                                    'path' => $audiobook['path'],
+                                    'book_id' => $book->id,
+                                    'title' => $book->title,
+                                ];
+                            } else {
+                                $infoCallback("🔍 [DRY RUN] Would merge into existing: {$existingBook->title} (ID: {$existingBook->id})");
+                            }
+
+                            return;
                         }
+
+                        $warnCallback("📁 {$sourceTypePlural} differ — manual decision needed");
                         $displayDirectoryComparisonCallback($comparison);
 
                         $options = [
