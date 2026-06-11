@@ -232,6 +232,13 @@ php artisan test tests/Path/To/Module/
 - **Static Analysis**: PHPStan runs on the `app/` directory
 - **Testing**: Relevant tests (Import, Web, Api, Cli) or a smoke test are executed automatically
 
+### Test Failure Policy — CRITICAL
+
+- **ALL commits are blocked by any test failure.** Pre-commit hooks enforce this; never attempt to bypass them.
+- **Pre-existing test failures are a higher priority, not lower.** A failure that predates current work is evidence of a prior process violation — a broken commit was already merged. It must be fixed immediately, before any other work continues.
+- **"It was already failing" is never an acceptable reason to leave a test broken.** Discovering a pre-existing failure means the fix is now your responsibility, regardless of what caused it.
+- **Never describe a failure as "pre-existing" and move on.** That framing is itself a process failure. Stop, diagnose, and fix it.
+
 ### Verification & Reporting
 
 - **MUST double-check all changes stated in message responses** to ensure they actually exist in the current state

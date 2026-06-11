@@ -76,3 +76,10 @@
 - **MUST** Run syntax check (`php -l`) for Laravel on all changed files
 - **MUST** `php artisan test` passes for all modules
 - **MUST** Run `phpcbf` on all changed PHP files
+
+### Test Failure Policy — CRITICAL
+
+- **ALL commits are assumed to be blocked by any test failure.** Pre-commit hooks enforce this; never attempt to bypass them.
+- **Pre-existing test failures are a higher priority, not lower.** A failure that predates current work is evidence of a prior process violation — it means a broken commit was already merged. It must be fixed immediately, before any other work continues.
+- **"It was already failing" is never an acceptable reason to leave a test broken.** Discovering a pre-existing failure means the fix is now your responsibility, regardless of what caused it.
+- **Never describe a failure as "pre-existing" and move on.** That framing is a process failure. Stop, diagnose, and fix it.
