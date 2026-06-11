@@ -107,7 +107,7 @@ class HybridUIService extends ImportUIService
         $maxLogs = max(1, $layout['maxLogs'] + 2);
         $displayLogs = array_slice($this->logs, -$maxLogs);
         foreach ($displayLogs as $log) {
-            $this->screen->write("\e[{$row};4H" . substr($log, 0, $this->width - 6));
+            $this->screen->write("\e[{$row};4H" . substr(mb_convert_encoding($log, 'UTF-8', 'UTF-8'), 0, $this->width - 6));
             $row++;
         }
     }

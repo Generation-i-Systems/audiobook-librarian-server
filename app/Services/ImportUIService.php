@@ -1236,6 +1236,7 @@ class ImportUIService implements ImportUIInterface
 
     public function logMessage(string $message): void
     {
+        $message = mb_convert_encoding($message, 'UTF-8', 'UTF-8');
         if ($this->plainMode) {
             echo $message . PHP_EOL;
             return;
