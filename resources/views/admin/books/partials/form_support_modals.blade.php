@@ -301,6 +301,7 @@
                         <th scope="col">Author</th>
                         <th scope="col">Narrator</th>
                         <th scope="col">Series</th>
+                        <th scope="col">Genre</th>
                         <th scope="col">Year</th>
                         <th scope="col">Source</th>
                       </tr>

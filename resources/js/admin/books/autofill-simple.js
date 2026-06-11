@@ -160,6 +160,35 @@
         return "";
     }
 
+    function getGenreList(result) {
+        // Audible: result.category = ["Science Fiction", "Fantasy"]
+        if (Array.isArray(result.category) && result.category.length) {
+            return result.category.join(", ");
+        }
+        // Google Books: result.categories = ["Fiction / Fantasy"]
+        if (Array.isArray(result.categories) && result.categories.length) {
+            return result.categories.join(", ");
+        }
+        // Hardcover details: result.genre = ["Fantasy"] (plain strings)
+        if (Array.isArray(result.genre) && result.genre.length) {
+            return result.genre.join(", ");
+        }
+        // Hardcover search: result.genres = [{genre:{name:"Fantasy"}}]
+        if (Array.isArray(result.genres) && result.genres.length) {
+            return result.genres
+                .map(function (g) {
+                    return (
+                        (typeof g === "object" && g.genre && g.genre.name) ||
+                        (typeof g === "string" && g) ||
+                        ""
+                    );
+                })
+                .filter(Boolean)
+                .join(", ");
+        }
+        return "";
+    }
+
     function sortAutofillResults(results) {
         return results.slice().sort(function (a, b) {
             return scoreAutofillResult(b) - scoreAutofillResult(a);
@@ -180,7 +209,7 @@
         const $resultsWrapper = $modal.find("#autofill-results-wrapper");
 
         $resultsTable.html(
-            '<tr><td colspan="7" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Searching...</td></tr>',
+            '<tr><td colspan="9" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Searching...</td></tr>',
         );
         $applyBtn.prop("disabled", true);
         if ($resultsWrapper.length > 0) {
@@ -245,12 +274,15 @@
                                 : "");
                         const checkedAttr = idx === 0 ? " checked" : "";
 
+                        const genres = decodeHtmlEntities(getGenreList(item));
                         return `<tr>
                     <td><input type="radio" name="autofill_result_select" value="${idx}"${checkedAttr}></td>
                     <td>${coverUrl ? `<img src="${coverUrl}" alt="Cover" style="height:48px;max-width:40px;">` : ""}</td>
                     <td>${decodeHtmlEntities(item.title || "")}</td>
                     <td>${authors}</td>
                     <td>${narrators}</td>
+                    <td>${decodeHtmlEntities(item.series || "")}</td>
+                    <td>${genres}</td>
                     <td>${publishedYear}</td>
                     <td>${item.source || ""}</td>
                 </tr>`;
@@ -417,6 +449,9 @@
                                         : "");
                                 const checkedAttr = idx === 0 ? " checked" : "";
 
+                                const genres = decodeHtmlEntities(
+                                    getGenreList(item),
+                                );
                                 return `<tr>
                             <td><input type="radio" name="autofill_result_select" value="${idx}"${checkedAttr}></td>
                             <td>${coverUrl ? `<img src="${coverUrl}" alt="Cover" style="height:48px;max-width:40px;">` : ""}</td>
@@ -424,6 +459,7 @@
                             <td>${authors}</td>
                             <td>${narrators}</td>
                             <td>${decodeHtmlEntities(item.series || "")}</td>
+                            <td>${genres}</td>
                             <td>${publishedYear}</td>
                             <td>${item.source || ""}</td>
                         </tr>`;
@@ -683,6 +719,15 @@
                 if (coverPreview.length) {
                     coverPreview.attr("src", coverUrl);
                 }
+            }
+
+            const genreStr = getGenreList(item);
+            if (genreStr && typeof window.BookForm?.addGenreRow === "function") {
+                const genresGroup = $("#genres-group");
+                genresGroup.empty();
+                genreStr.split(", ").filter((g) => g.trim()).forEach(function (genre) {
+                    window.BookForm.addGenreRow($("#book-form"), genre.trim());
+                });
             }
 
             console.log(
