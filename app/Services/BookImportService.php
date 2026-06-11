@@ -2707,8 +2707,13 @@ class BookImportService
             return true;
         }
 
-        $files = File::allFiles($path);
-        $directories = File::directories($path);
+        try {
+            $files = File::allFiles($path);
+            $directories = File::directories($path);
+        } catch (\Exception $e) {
+            // Permission denied or unreadable subdirectory — treat as non-empty to avoid deletion
+            return false;
+        }
 
         return empty($files) && empty($directories);
     }
