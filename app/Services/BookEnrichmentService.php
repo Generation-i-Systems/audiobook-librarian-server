@@ -11,6 +11,7 @@ class BookEnrichmentService
 
     protected ?AudibleService $audibleService = null;
     protected ?GoogleBooksApiService $googleBooksService = null;
+    protected ?HardcoverService $hardcoverService = null;
 
     public function __construct()
     {
@@ -132,6 +133,7 @@ class BookEnrichmentService
 
         $enrichedData = [];
         $enrichmentResults = [];
+        $genreBySource = [];
         $authorName = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
 
         // CRITICAL: Normalize author before sending to enrichment services
@@ -143,13 +145,16 @@ class BookEnrichmentService
         if (empty($authorName)) {
             return [];
         }
-        $sources = $options['sources'] ?? ['audible', 'google_books'];
+        $sources = $options['sources'] ?? ['audible', 'google_books', 'hardcover'];
         $maxRetries = $options['max_retries'] ?? 3;
         $forceEnrichment = $options['force'] ?? false;
 
-        // If we already have all critical fields AND genre, skip enrichment (unless forced)
+        // If we already have all critical fields AND a strong genre, skip enrichment (unless forced)
+        $weakGenres = ['Other', 'Unknown', 'Classic', 'General Fiction', 'Action'];
         $genre = $metadata['genre'] ?? null;
-        $hasGenre = $genre !== null && $genre !== '' && (!is_array($genre) || count($genre) > 0);
+        $genreStr = is_array($genre) ? ($genre[0] ?? '') : (string) ($genre ?? '');
+        $hasGenre = $genre !== null && $genre !== '' && (!is_array($genre) || count($genre) > 0)
+            && !in_array(trim($genreStr), $weakGenres, true);
         if (!$forceEnrichment && $this->hasCriticalMetadata($metadata) && $hasGenre) {
             return [];
         }
@@ -159,14 +164,22 @@ class BookEnrichmentService
             if ($sourceData) {
                 $enrichedData = $this->mergeFillMissing($enrichedData, $sourceData, $metadata, $forceEnrichment);
                 $enrichmentResults[$source] = 'success';
+                $sourceGenre = $sourceData['genre'] ?? null;
+                $genreBySource[$source] = $sourceGenre ? (is_array($sourceGenre) ? implode(', ', $sourceGenre) : $sourceGenre) : null;
             } else {
                 $enrichmentResults[$source] = 'no_data';
+                $genreBySource[$source] = null;
             }
 
-            // After each source, stop if we now have all critical fields (unless forced)
+            // After each source, stop only if we have all critical fields, a strong unambiguous genre
             if (!$forceEnrichment) {
                 $combined = array_merge($metadata, $enrichedData);
-                if ($this->hasCriticalMetadata($combined)) {
+                $currentGenre = $enrichedData['genre'] ?? $metadata['genre'] ?? null;
+                $genreIsAmbiguous = is_array($currentGenre) && count($currentGenre) > 1;
+                $currentGenreStr = is_array($currentGenre) ? ($currentGenre[0] ?? '') : (string) ($currentGenre ?? '');
+                $hasStrongGenre = $currentGenre !== null && $currentGenre !== ''
+                    && !in_array(trim($currentGenreStr), $weakGenres, true);
+                if ($this->hasCriticalMetadata($combined) && $hasStrongGenre && !$genreIsAmbiguous) {
                     break;
                 }
             }
@@ -174,6 +187,9 @@ class BookEnrichmentService
 
         if (!empty($enrichmentResults)) {
             $enrichedData['_enrichment_results'] = $enrichmentResults;
+        }
+        if (!empty($genreBySource)) {
+            $enrichedData['_genre_by_source'] = $genreBySource;
         }
 
         return $enrichedData;
@@ -202,6 +218,8 @@ class BookEnrichmentService
     protected function mergeFillMissing(array $current, array $incoming, array $original, bool $force = false): array
     {
         $result = $current;
+        $weakGenres = ['Other', 'Unknown', 'Classic', 'General Fiction', 'Action'];
+
         foreach ($incoming as $key => $value) {
             if ($value === null) {
                 continue;
@@ -220,6 +238,15 @@ class BookEnrichmentService
             if (is_array($originalValue)) {
                 $hasOriginalValue = count($originalValue) > 0;
             }
+
+            // Weak AI-assigned genres should be overrideable by enrichment sources
+            if ($key === 'genre' && $hasOriginalValue) {
+                $genreStr = is_array($originalValue) ? ($originalValue[0] ?? '') : (string) $originalValue;
+                if (in_array(trim($genreStr), $weakGenres, true)) {
+                    $hasOriginalValue = false;
+                }
+            }
+
             if (array_key_exists($key, $original) && $hasOriginalValue) {
                 continue;
             }
@@ -227,6 +254,20 @@ class BookEnrichmentService
             // Do not override an existing cover if we already have one
             if (in_array($key, ['cover_url', 'cover_image', 'cover_path', 'cover_data'], true) && $this->hasCover($original)) {
                 continue;
+            }
+
+            // For genre: if we already have a multi-value list and an incoming source provides
+            // a more specific single value that is a subset of the current list, prefer it.
+            if ($key === 'genre' && isset($result[$key])) {
+                $currentGenre = is_array($result[$key]) ? $result[$key] : [$result[$key]];
+                $incomingGenre = is_array($value) ? $value : [$value];
+                if (count($currentGenre) > count($incomingGenre)) {
+                    $isSubset = count(array_diff($incomingGenre, $currentGenre)) === 0;
+                    if ($isSubset) {
+                        $result[$key] = $value;
+                        continue;
+                    }
+                }
             }
 
             // Only fill if not already present in result
@@ -269,8 +310,71 @@ class BookEnrichmentService
                 '',
                 $maxRetries
             ),
+            'hardcover' => $this->retryApiCall(
+                fn () => $this->searchHardcover($title, $author),
+                'Hardcover',
+                '',
+                $maxRetries
+            ),
             default => null
         };
+    }
+
+    protected function searchHardcover(string $title, string $author): ?array
+    {
+        try {
+            if (!$this->hardcoverService) {
+                $this->hardcoverService = app(HardcoverService::class);
+            }
+
+            $result = $this->hardcoverService->searchAndMerge([
+                'title' => $title,
+                'authors' => [$author],
+            ]);
+
+            if (!$result) {
+                return null;
+            }
+
+            $enrichedData = [];
+
+            if (!empty($result['description'])) {
+                $enrichedData['description'] = $this->cleanDescription($result['description']);
+            }
+
+            if (!empty($result['coverImage'])) {
+                $enrichedData['cover_url'] = $result['coverImage'];
+            }
+
+            if (!empty($result['releaseDate'])) {
+                $year = date('Y', strtotime($result['releaseDate']));
+                if ($year > 1800) {
+                    $enrichedData['year'] = (int) $year;
+                }
+            }
+
+            if (!empty($result['isbn_13'])) {
+                $enrichedData['isbn'] = $result['isbn_13'];
+            } elseif (!empty($result['isbn_10'])) {
+                $enrichedData['isbn'] = $result['isbn_10'];
+            }
+
+            if (!empty($result['publisher'])) {
+                $enrichedData['publisher'] = $result['publisher'];
+            }
+
+            if (!empty($result['genres']) && is_array($result['genres'])) {
+                $enrichedData['genre'] = $this->mapToValidGenreList(
+                    $this->normalizeGenreList($result['genres'])
+                );
+            }
+
+            return empty($enrichedData) ? null : $enrichedData;
+        } catch (\Exception $e) {
+            Log::warning("Hardcover search failed: " . $e->getMessage());
+        }
+
+        return null;
     }
 
     /**
@@ -318,10 +422,11 @@ class BookEnrichmentService
         }
 
         $genre = $enrichedData['genre'] ?? null;
+        $weakGenres = ['Other', 'Unknown', 'Classic', 'General Fiction', 'Action'];
         $isMissingGenre = $genre === null
             || $genre === ''
             || (is_array($genre) && count($genre) === 0)
-            || (!is_array($genre) && is_string($genre) && in_array(trim($genre), ['Other', 'Unknown', 'Classic'], true));
+            || (!is_array($genre) && is_string($genre) && in_array(trim($genre), $weakGenres, true));
         if ($isMissingGenre) {
             $missing[] = 'genre';
         }
@@ -382,6 +487,12 @@ class BookEnrichmentService
 
     protected function mapToValidGenreList(array $genres): array
     {
+        // Known compound labels that represent two distinct genres
+        $compoundExpansions = [
+            'science fiction & fantasy' => ['Science Fiction', 'Fantasy'],
+            'mystery, thriller & suspense' => ['Action'],
+        ];
+
         $result = [];
         foreach ($genres as $genre) {
             if (!is_string($genre)) {
@@ -390,6 +501,14 @@ class BookEnrichmentService
 
             $trimmed = trim($genre);
             if ($trimmed === '') {
+                continue;
+            }
+
+            $lower = strtolower($trimmed);
+            if (isset($compoundExpansions[$lower])) {
+                foreach ($compoundExpansions[$lower] as $expanded) {
+                    $result[] = $expanded;
+                }
                 continue;
             }
 
@@ -467,19 +586,15 @@ class BookEnrichmentService
                     }
                 }
 
-                // Extract genre/categories if available
-                if (!empty($bookData['genre'])) {
-                    $enrichedData['genre'] = $this->mapToValidGenreList(
-                        $this->normalizeGenreList($bookData['genre'])
-                    );
-                } elseif (!empty($bookData['categories'])) {
-                    $enrichedData['genre'] = $this->mapToValidGenreList(
-                        $this->normalizeGenreList($bookData['categories'])
-                    );
-                } elseif (!empty($bookData['category'])) {
-                    $enrichedData['genre'] = $this->mapToValidGenreList(
-                        $this->normalizeGenreList($bookData['category'])
-                    );
+                // Extract genre/categories if available; discard if everything maps to weak genres
+                $weakGenres = ['General Fiction', 'Action', 'Other', 'Unknown'];
+                $rawCategorySource = $bookData['genre'] ?? $bookData['categories'] ?? $bookData['category'] ?? null;
+                if (!empty($rawCategorySource)) {
+                    $mapped = $this->mapToValidGenreList($this->normalizeGenreList($rawCategorySource));
+                    $strongMapped = array_values(array_filter($mapped, fn ($g) => !in_array($g, $weakGenres, true)));
+                    if (!empty($strongMapped)) {
+                        $enrichedData['genre'] = $mapped;
+                    }
                 }
 
                 return $enrichedData;
@@ -497,57 +612,48 @@ class BookEnrichmentService
     protected function searchGoogleBooks(string $title, string $author): ?array
     {
         try {
-            $query = urlencode($title . ' ' . $author);
-            $url = "https://www.googleapis.com/books/v1/volumes?q={$query}&maxResults=1";
-
-            $response = file_get_contents($url);
-            if (!$response) {
-                return null;
+            if (!$this->googleBooksService) {
+                $this->googleBooksService = app(GoogleBooksApiService::class);
             }
 
-            $data = json_decode($response, true);
-            if (empty($data['items'][0])) {
+            $result = $this->googleBooksService->searchAndMerge([
+                'title' => $title,
+                'author' => $author,
+            ]);
+
+            if (!$result) {
                 return null;
             }
-
-            $book = $data['items'][0];
-            $volumeInfo = $book['volumeInfo'] ?? [];
 
             $enrichedData = [];
-            $enrichedData['google_books_raw'] = $book;
 
-            if (!empty($volumeInfo['description'])) {
-                $enrichedData['description'] = $this->cleanDescription($volumeInfo['description']);
+            if (!empty($result['description'])) {
+                $enrichedData['description'] = $this->cleanDescription($result['description']);
             }
 
-            if (!empty($volumeInfo['imageLinks']['large'])) {
-                $enrichedData['cover_url'] = $volumeInfo['imageLinks']['large'];
-            } elseif (!empty($volumeInfo['imageLinks']['medium'])) {
-                $enrichedData['cover_url'] = $volumeInfo['imageLinks']['medium'];
-            } elseif (!empty($volumeInfo['imageLinks']['thumbnail'])) {
-                $enrichedData['cover_url'] = str_replace(
-                    'zoom=1',
-                    'zoom=2',
-                    $volumeInfo['imageLinks']['thumbnail']
-                );
+            if (!empty($result['coverImageUrl'])) {
+                $enrichedData['cover_url'] = $result['coverImageUrl'];
             }
 
-            if (!empty($volumeInfo['publishedDate'])) {
-                $year = date('Y', strtotime($volumeInfo['publishedDate']));
+            if (!empty($result['releaseDate'])) {
+                $year = date('Y', strtotime($result['releaseDate']));
                 if ($year && $year > 1800) {
                     $enrichedData['year'] = (int) $year;
                 }
             }
 
-            if (!empty($volumeInfo['publisher'])) {
-                $enrichedData['publisher'] = $volumeInfo['publisher'];
+            if (!empty($result['publisher'])) {
+                $enrichedData['publisher'] = $result['publisher'];
             }
 
-            // Extract genre/categories if available
-            if (!empty($volumeInfo['categories'])) {
-                $enrichedData['genre'] = $this->mapToValidGenreList(
-                    $this->normalizeGenreList($volumeInfo['categories'])
-                );
+            // categories are already hierarchically split by GoogleBooksApiService::splitCategories
+            if (!empty($result['categories']) && is_array($result['categories'])) {
+                $weakGenres = ['General Fiction', 'Action', 'Other', 'Unknown'];
+                $mapped = $this->mapToValidGenreList($this->normalizeGenreList($result['categories']));
+                $strongMapped = array_values(array_filter($mapped, fn ($g) => !in_array($g, $weakGenres, true)));
+                if (!empty($strongMapped)) {
+                    $enrichedData['genre'] = $strongMapped;
+                }
             }
 
             return $enrichedData;
