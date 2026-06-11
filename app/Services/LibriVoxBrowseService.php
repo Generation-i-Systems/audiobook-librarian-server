@@ -8,6 +8,7 @@ use App\Models\LibriVox\Author;
 use App\Models\LibriVox\Book;
 use App\Models\LibriVoxSyncLog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class LibriVoxBrowseService
 {
@@ -213,6 +214,117 @@ class LibriVoxBrowseService
             $book['_local_id'] = $existingIds[(string) $book['id']] ?? null;
         }
         unset($book);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listGenres(string $language = 'English'): array
+    {
+        return DB::table('librivox_genres')
+            ->join('librivox_book_genre', 'librivox_genres.id', '=', 'librivox_book_genre.genre_id')
+            ->join('librivox_books', function ($join) use ($language): void {
+                $join->on('librivox_book_genre.book_id', '=', 'librivox_books.id')
+                    ->whereNull('librivox_books.deleted_at');
+                if ($language !== '') {
+                    $join->where('librivox_books.language', $language);
+                }
+            })
+            ->groupBy('librivox_genres.id', 'librivox_genres.name')
+            ->orderBy('librivox_genres.name')
+            ->select(
+                'librivox_genres.id',
+                'librivox_genres.name',
+                DB::raw('COUNT(DISTINCT librivox_books.id) as book_count')
+            )
+            ->get()
+            ->filter(fn ($genre) => (int) $genre->book_count > 0)
+            ->map(fn ($genre) => [
+                'id' => (int) $genre->id,
+                'name' => (string) $genre->name,
+                'book_count' => (int) $genre->book_count,
+                'bookCount' => (int) $genre->book_count,
+                'emoji' => null,
+                'iconPath' => null,
+                'icon_url' => null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array{genre_id?: mixed, genre_name?: mixed, page?: mixed, per_page?: mixed, sort?: mixed, search?: mixed, language?: mixed} $params
+     * @return array{authors: array<int, array<string, mixed>>, pagination: array<string, int>}
+     */
+    public function listAuthors(array $params): array
+    {
+        $genreId = $params['genre_id'] ?? null;
+        $genreName = $params['genre_name'] ?? null;
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $perPage = min(100, max(1, (int) ($params['per_page'] ?? 50)));
+        $sort = $params['sort'] ?? 'name_asc';
+        $search = $params['search'] ?? null;
+        $language = (string) ($params['language'] ?? 'English');
+
+        $query = DB::table('librivox_authors')
+            ->join('librivox_book_author', 'librivox_authors.id', '=', 'librivox_book_author.author_id')
+            ->join('librivox_books', function ($join) use ($language): void {
+                $join->on('librivox_book_author.book_id', '=', 'librivox_books.id')
+                    ->whereNull('librivox_books.deleted_at');
+                if ($language !== '') {
+                    $join->where('librivox_books.language', $language);
+                }
+            });
+
+        if ($genreId || $genreName) {
+            $query->join('librivox_book_genre', 'librivox_books.id', '=', 'librivox_book_genre.book_id')
+                ->join('librivox_genres', 'librivox_book_genre.genre_id', '=', 'librivox_genres.id');
+            if ($genreId) {
+                $query->where('librivox_genres.id', $genreId);
+            } elseif ($genreName) {
+                $query->where('librivox_genres.name', $genreName);
+            }
+        }
+
+        if ($search) {
+            $query->where('librivox_authors.name', 'LIKE', '%' . $search . '%');
+        }
+
+        $query->groupBy('librivox_authors.id', 'librivox_authors.name')
+            ->select(
+                'librivox_authors.id',
+                'librivox_authors.name',
+                DB::raw('COUNT(DISTINCT librivox_books.id) as book_count')
+            );
+
+        match ($sort) {
+            'name_desc' => $query->orderBy('librivox_authors.name', 'desc'),
+            'book_count_asc' => $query->orderBy('book_count', 'asc')->orderBy('librivox_authors.name'),
+            'book_count_desc' => $query->orderBy('book_count', 'desc')->orderBy('librivox_authors.name'),
+            default => $query->orderBy('librivox_authors.name', 'asc'),
+        };
+
+        $total = DB::query()->fromSub(clone $query, 'librivox_author_rows')->count();
+        $authors = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
+        $totalPages = (int) ceil($total / $perPage);
+
+        return [
+            'authors' => $authors->map(fn ($author) => [
+                'id' => (int) $author->id,
+                'name' => (string) $author->name,
+                'biography' => null,
+                'book_count' => (int) $author->book_count,
+                'book_count_in_genre' => (int) $author->book_count,
+                'image_url' => null,
+                'genres' => [],
+                'series' => [],
+                'isFavorite' => false,
+            ])->values()->all(),
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total_pages' => $totalPages,
+                'total_items' => $total,
+            ],
+        ];
     }
 
     /** @param array<int, array<string, mixed>> $books */

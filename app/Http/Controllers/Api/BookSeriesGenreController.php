@@ -7,10 +7,10 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
+use App\Services\LibriVoxBrowseService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class BookSeriesGenreController extends Controller
 {
@@ -18,8 +18,10 @@ class BookSeriesGenreController extends Controller
 
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        private readonly LibriVoxBrowseService $libriVoxBrowseService,
+    ) {
         $this->documentStoreService = $documentStoreService;
     }
 
@@ -401,37 +403,9 @@ class BookSeriesGenreController extends Controller
 
     private function listLibrivoxGenres(Request $request): array
     {
-        $language = (string) $request->input('language', 'English');
-
-        return DB::table('librivox_genres')
-            ->join('librivox_book_genre', 'librivox_genres.id', '=', 'librivox_book_genre.genre_id')
-            ->join('librivox_books', function ($join) use ($language): void {
-                $join->on('librivox_book_genre.book_id', '=', 'librivox_books.id')
-                    ->whereNull('librivox_books.deleted_at');
-                if ($language !== '') {
-                    $join->where('librivox_books.language', $language);
-                }
-            })
-            ->groupBy('librivox_genres.id', 'librivox_genres.name')
-            ->orderBy('librivox_genres.name')
-            ->select(
-                'librivox_genres.id',
-                'librivox_genres.name',
-                DB::raw('COUNT(DISTINCT librivox_books.id) as book_count')
-            )
-            ->get()
-            ->filter(fn ($genre) => (int) $genre->book_count > 0)
-            ->map(fn ($genre) => [
-                'id' => (int) $genre->id,
-                'name' => (string) $genre->name,
-                'book_count' => (int) $genre->book_count,
-                'bookCount' => (int) $genre->book_count,
-                'emoji' => null,
-                'iconPath' => null,
-                'icon_url' => null,
-            ])
-            ->values()
-            ->all();
+        return $this->libriVoxBrowseService->listGenres(
+            (string) $request->input('language', 'English')
+        );
     }
 
     /**

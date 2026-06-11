@@ -7,10 +7,10 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
+use App\Services\ControllerDatabaseService as ControllerDatabase;
+use App\Services\LibriVoxBrowseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use App\Services\ControllerDatabaseService as ControllerDatabase;
 
 class BookAuthorController extends Controller
 {
@@ -18,8 +18,10 @@ class BookAuthorController extends Controller
 
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        private readonly LibriVoxBrowseService $libriVoxBrowseService,
+    ) {
         $this->documentStoreService = $documentStoreService;
     }
 
@@ -282,72 +284,20 @@ class BookAuthorController extends Controller
 
     private function librivoxAuthors(Request $request)
     {
-        $genreId = $request->input('genre_id');
-        $genreName = $request->input('genre_name');
-        $page = max(1, (int) $request->input('page', 1));
-        $perPage = min(100, max(1, (int) $request->input('per_page', 50)));
-        $sort = $request->input('sort', 'name_asc');
-        $search = $request->input('search');
-        $language = (string) $request->input('language', 'English');
+        $result = $this->libriVoxBrowseService->listAuthors($request->only([
+            'genre_id', 'genre_name', 'page', 'per_page', 'sort', 'search', 'language',
+        ]));
 
-        $query = DB::table('librivox_authors')
-            ->join('librivox_book_author', 'librivox_authors.id', '=', 'librivox_book_author.author_id')
-            ->join('librivox_books', function ($join) use ($language): void {
-                $join->on('librivox_book_author.book_id', '=', 'librivox_books.id')
-                    ->whereNull('librivox_books.deleted_at');
-                if ($language !== '') {
-                    $join->where('librivox_books.language', $language);
-                }
-            });
-
-        if ($genreId || $genreName) {
-            $query->join('librivox_book_genre', 'librivox_books.id', '=', 'librivox_book_genre.book_id')
-                ->join('librivox_genres', 'librivox_book_genre.genre_id', '=', 'librivox_genres.id');
-            if ($genreId) {
-                $query->where('librivox_genres.id', $genreId);
-            } elseif ($genreName) {
-                $query->where('librivox_genres.name', $genreName);
-            }
-        }
-
-        if ($search) {
-            $query->where('librivox_authors.name', 'LIKE', '%' . $search . '%');
-        }
-
-        $query->groupBy('librivox_authors.id', 'librivox_authors.name')
-            ->select(
-                'librivox_authors.id',
-                'librivox_authors.name',
-                DB::raw('COUNT(DISTINCT librivox_books.id) as book_count')
-            );
-
-        match ($sort) {
-            'name_desc' => $query->orderBy('librivox_authors.name', 'desc'),
-            'book_count_asc' => $query->orderBy('book_count', 'asc')->orderBy('librivox_authors.name'),
-            'book_count_desc' => $query->orderBy('book_count', 'desc')->orderBy('librivox_authors.name'),
-            default => $query->orderBy('librivox_authors.name', 'asc'),
-        };
-
-        $total = DB::query()->fromSub(clone $query, 'librivox_author_rows')->count();
-        $authors = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
-        $totalPages = (int) ceil($total / $perPage);
+        $pagination = $result['pagination'];
+        $page = $pagination['current_page'];
+        $totalPages = $pagination['total_pages'];
 
         return response()->json([
-            'authors' => $authors->map(fn ($author) => [
-                'id' => (int) $author->id,
-                'name' => (string) $author->name,
-                'biography' => null,
-                'book_count' => (int) $author->book_count,
-                'book_count_in_genre' => (int) $author->book_count,
-                'image_url' => null,
-                'genres' => [],
-                'series' => [],
-                'isFavorite' => false,
-            ])->values(),
+            'authors' => $result['authors'],
             'pagination' => [
                 'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
+                'per_page' => $pagination['per_page'],
+                'total' => $pagination['total_items'],
                 'total_pages' => $totalPages,
                 'has_next' => $page < $totalPages,
                 'has_prev' => $page > 1,
