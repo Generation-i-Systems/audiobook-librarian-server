@@ -1054,15 +1054,11 @@ class ImportUIService implements ImportUIInterface
         $this->logScrollOffset = min($this->logScrollOffset, $maxOffset);
         $offset = $this->logScrollOffset;
 
-        $title = $offset > 0
-            ? " Activity Log [PgDn↓ — {$offset} lines below] "
-            : " Activity Log ";
+        $title = $offset > 0 ? " Activity Log [PgDn↓ — {$offset} lines below] " : " Activity Log ";
 
         $this->drawBox(2, $y, $this->width - 2, $h, $title, "yellow");
 
-        $displayLogs = $offset === 0
-            ? array_slice($this->logs, -$maxLogs)
-            : array_slice($this->logs, -($maxLogs + $offset), $maxLogs);
+        $displayLogs = $offset === 0 ? array_slice($this->logs, -$maxLogs) : array_slice($this->logs, -($maxLogs + $offset), $maxLogs);
 
         $row = $y + 1;
         foreach ($displayLogs as $log) {
@@ -1311,15 +1307,17 @@ class ImportUIService implements ImportUIInterface
             return;
         }
 
-        // Quick non-blocking check — skip entirely if no input is waiting
-        $read = [$stream];
-        $write = $except = [];
-        if (@stream_select($read, $write, $except, 0, 0) <= 0) {
-            return;
-        }
-
+        // Must enable raw mode BEFORE stream_select. In canonical (cooked) mode
+        // the kernel buffers ESC sequences until a newline arrives, so stream_select
+        // would see zero bytes and return immediately — swallowing the PageUp/PageDown.
         $rawState = $this->enableRawInput();
         try {
+            $read = [$stream];
+            $write = $except = [];
+            if (@stream_select($read, $write, $except, 0, 0) <= 0) {
+                return;
+            }
+
             while (true) {
                 $read = [$stream];
                 $write = $except = [];

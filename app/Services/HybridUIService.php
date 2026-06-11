@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
 class HybridUIService extends ImportUIService
@@ -86,13 +85,9 @@ class HybridUIService extends ImportUIService
         // No-op - line and '>' prompt removed as requested
     }
 
-    /**
-     * Override prompt drawing to leave space for Laravel Prompts
-     */
     protected function drawPrompt(): void
     {
-        // No-op: renderFull() already clears the screen with \e[H\e[J.
-        // The area below the outer box is left empty for Laravel Prompts to render into.
+        // No-op: the area below the outer box is left empty for Laravel Prompts to render into.
     }
 
     protected function drawLogs(): void
@@ -107,15 +102,11 @@ class HybridUIService extends ImportUIService
         $this->logScrollOffset = min($this->logScrollOffset, $maxOffset);
         $offset = $this->logScrollOffset;
 
-        $title = $offset > 0
-            ? " Activity Log [PgDn↓ — {$offset} lines below] "
-            : ' Activity Log ';
+        $title = $offset > 0 ? " Activity Log [PgDn↓ — {$offset} lines below] " : ' Activity Log ';
 
         $this->drawBox(2, $y, $this->width - 2, $h, $title, 'yellow');
 
-        $displayLogs = $offset === 0
-            ? array_slice($this->logs, -$maxLogs)
-            : array_slice($this->logs, -($maxLogs + $offset), $maxLogs);
+        $displayLogs = $offset === 0 ? array_slice($this->logs, -$maxLogs) : array_slice($this->logs, -($maxLogs + $offset), $maxLogs);
 
         $row = $y + 1;
         foreach ($displayLogs as $log) {
@@ -162,38 +153,40 @@ class HybridUIService extends ImportUIService
         $this->renderFull();
 
         $cursorY = $this->getPromptCursorY();
-        $cursorX = 1;
-        echo "\e[{$cursorY};{$cursorX}H";
 
         if (empty($options)) {
             return '';
         }
 
-        // Format options for Laravel Prompts
         $formattedOptions = [];
         foreach ($options as $key => $label) {
             $formattedOptions[(string) $key] = $label;
         }
 
-        // Check if default exists
         $defaultKey = (string) array_key_first($formattedOptions);
         if ($default !== '' && isset($formattedOptions[$default])) {
             $defaultKey = $default;
         }
 
-        // Compute scroll from available menu height minus Laravel Prompts rendering overhead
         $layout = $this->computeLayout();
-        $promptOverhead = 4;
-        $scroll = max(5, min(count($formattedOptions), $layout['menuHeight'] - $promptOverhead));
+        $scroll = max(5, min(count($formattedOptions), $layout['menuHeight'] - 4));
 
-        $response = select(
+        $prompt = new ScrollableSelectPrompt(
             label: $question,
             options: $formattedOptions,
             default: $defaultKey,
-            scroll: $scroll
+            scroll: $scroll,
+            cursorRow: $cursorY,
+            onScrollUp: function (): void {
+                $this->scrollLog('up');
+            },
+            onScrollDown: function (): void {
+                $this->scrollLog('down');
+            },
         );
 
-        // Restore layout
+        $response = $prompt->prompt();
+
         $this->renderFull();
 
         return (string) $response;
