@@ -13674,6 +13674,70 @@
                     }
                 }
             }
+        },
+        "/feedback": {
+            "post": {
+                "tags": ["Utility"],
+                "summary": "Submit feedback or bug report",
+                "operationId": "submitFeedback",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["category", "message"],
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": ["bug", "comment", "suggestion"]
+                                    },
+                                    "message": {
+                                        "type": "string",
+                                        "maxLength": 10000
+                                    },
+                                    "relatedData": {
+                                        "type": "object",
+                                        "nullable": true
+                                    },
+                                    "fullData": {
+                                        "type": "object",
+                                        "nullable": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Feedback submitted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
         }
     },
     "tags": [
