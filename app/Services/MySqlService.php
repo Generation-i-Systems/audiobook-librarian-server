@@ -149,8 +149,8 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         $adapter = new LibriVoxBookAdapter();
 
         /** @var \App\Models\LibriVox\Book|null $book */
-        $book = \App\Models\LibriVox\Book::with(['authors', 'genres'])->find($id)
-            ?? \App\Models\LibriVox\Book::with(['authors', 'genres'])->where('librivox_id', $id)->first();
+        $book = \App\Models\LibriVox\Book::with(['authors', 'genres', 'chapters'])->find($id)
+            ?? \App\Models\LibriVox\Book::with(['authors', 'genres', 'chapters'])->where('librivox_id', $id)->first();
 
         if ($book) {
             return $adapter->toDocumentStoreBook($book);
@@ -708,7 +708,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     /** @return \Illuminate\Database\Eloquent\Builder<\App\Models\LibriVox\Book> */
     private function buildLibrivoxQuery(array $filters): \Illuminate\Database\Eloquent\Builder
     {
-        $query = \App\Models\LibriVox\Book::with(['authors', 'genres']);
+        $query = \App\Models\LibriVox\Book::with(['authors', 'genres', 'chapters']);
 
         if (!empty($filters['search'])) {
             $term = $filters['search'];
@@ -723,8 +723,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         if (!empty($filters['genre'])) {
             $query->whereHas('genres', fn ($q) => $q->where('name', $filters['genre']));
         }
+        if (!empty($filters['genre_id'])) {
+            $query->whereHas('genres', fn ($q) => $q->where('librivox_genres.id', $filters['genre_id']));
+        }
         if (!empty($filters['author'])) {
             $query->whereHas('authors', fn ($q) => $q->where('name', 'like', '%' . $filters['author'] . '%'));
+        }
+        if (!empty($filters['author_id'])) {
+            $query->whereHas('authors', fn ($q) => $q->where('librivox_authors.id', $filters['author_id']));
+        }
+        if (!empty($filters['language'])) {
+            $query->where('language', $filters['language']);
         }
 
         return $query;

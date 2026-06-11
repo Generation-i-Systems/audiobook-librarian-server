@@ -143,6 +143,7 @@ class BookApiController extends Controller
             'title'            => $request->input('title'),
             'publication_date' => $request->input('publication_date'),
             'date_added'       => $request->input('date_added'),
+            'language'         => $request->input('language'),
             'status'           => $request->input('status'),
             'is_recommended'   => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
             'is_completed'     => $request->has('is_completed') ? $request->boolean('is_completed') : null,

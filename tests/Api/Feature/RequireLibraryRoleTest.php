@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Tests\Api\Feature;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Author;
+use App\Models\Book;
+use App\Models\Genre;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Mockery;
 use Tests\TestCase;
 
@@ -53,6 +57,43 @@ class RequireLibraryRoleTest extends TestCase
         $this->getMe($headers, 'localhost')->assertStatus(200);
         $this->getMe($headers, 'librivox.test')->assertStatus(200);
         $this->getMe($headers, 'hybrid.test')->assertStatus(200);
+    }
+
+    public function testLibrivoxUserApiGenresUseLibrivoxCatalogOnly(): void
+    {
+        [, $headers] = $this->makeUser('librivox-user');
+        $this->seedMixedLocalAndLibrivoxCatalogs();
+
+        $this->withHeaders($headers)
+            ->getJson('http://localhost/api/v1/genres?language=English')
+            ->assertStatus(200)
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.name', 'Librivox Genre');
+    }
+
+    public function testLibrivoxUserApiAuthorsUseLibrivoxCatalogOnly(): void
+    {
+        [, $headers] = $this->makeUser('librivox-user');
+        $this->seedMixedLocalAndLibrivoxCatalogs();
+
+        $this->withHeaders($headers)
+            ->getJson('http://localhost/api/v1/authors?language=English')
+            ->assertStatus(200)
+            ->assertJsonPath('authors.0.name', 'Librivox Author')
+            ->assertJsonPath('pagination.total', 1);
+    }
+
+    public function testLibrivoxUserApiBooksApplyEnglishLanguageFilter(): void
+    {
+        [, $headers] = $this->makeUser('librivox-user');
+        $this->seedMixedLocalAndLibrivoxCatalogs();
+
+        $this->withHeaders($headers)
+            ->getJson('http://localhost/api/v1/books?enhanced=true&language=English')
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.title', 'English Librivox Book')
+            ->assertJsonPath('data.0.narrator.0', 'Librivox Reader')
+            ->assertJsonPath('pagination.total', 1);
     }
 
     public function testHybridUserCanAccessAnyHost(): void
@@ -146,6 +187,61 @@ class RequireLibraryRoleTest extends TestCase
         ]);
         $mockStore->shouldReceive('getUniqueValues')->andReturn([]);
         $this->app->instance(DocumentStoreServiceInterface::class, $mockStore);
+    }
+
+    private function seedMixedLocalAndLibrivoxCatalogs(): void
+    {
+        $localAuthor = Author::factory()->create(['name' => 'Local Author']);
+        $localGenre = Genre::factory()->create(['name' => 'Local Genre']);
+        $localBook = Book::factory()->create([
+            'title' => 'Local Book',
+            'needs_review' => false,
+        ]);
+        $localBook->authors()->attach($localAuthor->id);
+        $localBook->genres()->attach($localGenre->id);
+
+        $librivoxAuthorId = DB::table('librivox_authors')->insertGetId([
+            'name' => 'Librivox Author',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $librivoxGenreId = DB::table('librivox_genres')->insertGetId([
+            'name' => 'Librivox Genre',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $englishBookId = DB::table('librivox_books')->insertGetId([
+            'librivox_id' => 'lv-en',
+            'title' => 'English Librivox Book',
+            'language' => 'English',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $spanishBookId = DB::table('librivox_books')->insertGetId([
+            'librivox_id' => 'lv-es',
+            'title' => 'Spanish Librivox Book',
+            'language' => 'Spanish',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('librivox_book_author')->insert([
+            ['book_id' => $englishBookId, 'author_id' => $librivoxAuthorId],
+            ['book_id' => $spanishBookId, 'author_id' => $librivoxAuthorId],
+        ]);
+        DB::table('librivox_book_genre')->insert([
+            ['book_id' => $englishBookId, 'genre_id' => $librivoxGenreId],
+            ['book_id' => $spanishBookId, 'genre_id' => $librivoxGenreId],
+        ]);
+        DB::table('librivox_chapters')->insert([
+            'book_id' => $englishBookId,
+            'chapter_number' => 1,
+            'title' => 'Chapter 1',
+            'reader' => 'Librivox Reader',
+            'file_name' => 'chapter-1.mp3',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function testLibrivoxUserWebBooksRequestSetsLibrivoxSourceMode(): void

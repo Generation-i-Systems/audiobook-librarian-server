@@ -8,6 +8,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
 
@@ -30,6 +31,20 @@ class BookSeriesGenreController extends Controller
      */
     public function series(Request $request)
     {
+        if ((string) config('library_profiles.active_source_mode', 'local') === 'librivox') {
+            return response()->json([
+                'series' => [],
+                'pagination' => [
+                    'current_page' => max(1, (int) $request->input('page', 1)),
+                    'per_page' => min(100, max(1, (int) $request->input('per_page', 50))),
+                    'total' => 0,
+                    'total_pages' => 0,
+                    'has_next' => false,
+                    'has_prev' => false,
+                ],
+            ]);
+        }
+
         $authorId = $request->input('author_id');
         $authorName = $request->input('author_name');
         $page = max(1, (int) $request->input('page', 1));
@@ -328,6 +343,10 @@ class BookSeriesGenreController extends Controller
      */
     public function listGenres(Request $request)
     {
+        if ((string) config('library_profiles.active_source_mode', 'local') === 'librivox') {
+            return response()->json($this->listLibrivoxGenres($request));
+        }
+
         $since = $request->input('since') ? (int) $request->input('since') : null;
         $genres = $this->documentStoreService->listGenresWithStats($since);
 
@@ -378,6 +397,41 @@ class BookSeriesGenreController extends Controller
             'Science' => ['emoji' => '🔬', 'icon_path' => '/images/genres/science.svg'],
             'Science Fiction' => ['emoji' => '🚀', 'icon_path' => '/images/genres/science-fiction.svg'],
         ];
+    }
+
+    private function listLibrivoxGenres(Request $request): array
+    {
+        $language = (string) $request->input('language', 'English');
+
+        return DB::table('librivox_genres')
+            ->join('librivox_book_genre', 'librivox_genres.id', '=', 'librivox_book_genre.genre_id')
+            ->join('librivox_books', function ($join) use ($language): void {
+                $join->on('librivox_book_genre.book_id', '=', 'librivox_books.id')
+                    ->whereNull('librivox_books.deleted_at');
+                if ($language !== '') {
+                    $join->where('librivox_books.language', $language);
+                }
+            })
+            ->groupBy('librivox_genres.id', 'librivox_genres.name')
+            ->orderBy('librivox_genres.name')
+            ->select(
+                'librivox_genres.id',
+                'librivox_genres.name',
+                DB::raw('COUNT(DISTINCT librivox_books.id) as book_count')
+            )
+            ->get()
+            ->filter(fn ($genre) => (int) $genre->book_count > 0)
+            ->map(fn ($genre) => [
+                'id' => (int) $genre->id,
+                'name' => (string) $genre->name,
+                'book_count' => (int) $genre->book_count,
+                'bookCount' => (int) $genre->book_count,
+                'emoji' => null,
+                'iconPath' => null,
+                'icon_url' => null,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

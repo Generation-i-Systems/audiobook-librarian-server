@@ -24,6 +24,9 @@ class LibriVoxBookAdapter
         $genres = $book->relationLoaded('genres')
             ? $book->genres->map(fn (Genre $g) => ['id' => $g->id, 'name' => $g->name])->all()
             : $book->genres()->get()->map(fn (Genre $g) => ['id' => $g->id, 'name' => $g->name])->all();
+        $narrators = $book->relationLoaded('chapters')
+            ? $book->chapters->pluck('reader')->filter()->unique()->values()->all()
+            : $book->chapters()->pluck('reader')->filter()->unique()->values()->all();
 
         $info = $book->librivox_info ?? [];
         $coverImage = $book->cover_image ?? $info['cover_url'] ?? null;
@@ -37,9 +40,9 @@ class LibriVoxBookAdapter
             'author'           => $authorNames,
             'authors'          => $authorNames,
             'authors_data'     => $authors,
-            'narrator'         => [],
-            'narrators'        => [],
-            'narrators_data'   => [],
+            'narrator'         => $narrators,
+            'narrators'        => $narrators,
+            'narrators_data'   => array_map(fn (string $name) => ['id' => null, 'name' => $name], $narrators),
             'genre'            => $genreNames,
             'genres'           => $genreNames,
             'genres_data'      => $genres,
@@ -88,6 +91,10 @@ class LibriVoxBookAdapter
 
         $authorNames = array_column($authors, 'name');
         $genreNames = array_column($genres, 'name');
+        $narrators = array_values(array_unique(array_filter(array_map(
+            fn (array $section) => trim((string) ($section['reader'] ?? '')),
+            $apiBook['sections'] ?? []
+        ))));
 
         return [
             'id'               => $librivoxId,
@@ -95,9 +102,9 @@ class LibriVoxBookAdapter
             'author'           => $authorNames,
             'authors'          => $authorNames,
             'authors_data'     => $authors,
-            'narrator'         => [],
-            'narrators'        => [],
-            'narrators_data'   => [],
+            'narrator'         => $narrators,
+            'narrators'        => $narrators,
+            'narrators_data'   => array_map(fn (string $name) => ['id' => null, 'name' => $name], $narrators),
             'genre'            => $genreNames,
             'genres'           => $genreNames,
             'genres_data'      => $genres,
