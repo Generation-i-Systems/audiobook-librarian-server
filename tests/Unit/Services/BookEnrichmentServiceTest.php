@@ -141,7 +141,7 @@ class BookEnrichmentServiceTest extends TestCase
             'author' => ['Mark Waid'],
         ], ['sources' => ['audible']]);
 
-        $this->assertSame(['Science Fiction'], $result['genre']);
+        $this->assertSame(['Science Fiction', 'Fantasy'], $result['genre']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

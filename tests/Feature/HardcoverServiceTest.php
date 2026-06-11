@@ -138,6 +138,7 @@ class HardcoverServiceTest extends TestCase
             ->getMock();
 
         // Mock the makeRequest method to return our test data
+        // Format matches the current Hardcover GraphQL schema (contributions/taggings/image.url)
         $mock->expects($this->once())->method('makeRequest')
             ->willReturn([
                 'data' => [
@@ -146,16 +147,13 @@ class HardcoverServiceTest extends TestCase
                         'title' => 'Test Book',
                         'description' => 'A test book',
                         'pages' => 300,
-                        'cover_image_url' => 'https://example.com/cover.jpg',
-                        'publisher' => ['name' => 'Test Publisher'],
-                        'authors' => [
-                            ['author' => ['name' => 'Test Author']],
+                        'release_date' => '2020-01-01',
+                        'image' => ['url' => 'https://example.com/cover.jpg'],
+                        'contributions' => [
+                            ['author' => ['id' => 42, 'name' => 'Test Author']],
                         ],
-                        'narrators' => [
-                            ['author' => ['name' => 'Test Narrator']],
-                        ],
-                        'genres' => [
-                            ['genre' => ['name' => 'Science Fiction']],
+                        'taggings' => [
+                            ['tag' => ['tag' => 'Science Fiction']],
                         ],
                     ],
                 ],
@@ -168,7 +166,8 @@ class HardcoverServiceTest extends TestCase
         $this->assertIsArray($book);
         $this->assertEquals('Test Book', $book['title']);
         $this->assertEquals('Test Author', $book['authors'][0]['author']['name']);
-        $this->assertEquals('Test Narrator', $book['narrators'][0]['author']['name']);
+        $this->assertEquals('https://example.com/cover.jpg', $book['cover_image_url']);
         $this->assertEquals('Science Fiction', $book['genres'][0]['genre']['name']);
+        $this->assertEquals(['Science Fiction'], $book['genre']);
     }
 }

@@ -25,18 +25,23 @@ class HardcoverApiTest extends TestCase
                 file_put_contents('/tmp/hardcover_test_debug.log', "==== REQUEST ====\n" . print_r($body, true) .
                     "\nQUERY:\n" . $query . "\n\n", FILE_APPEND);
                 if (str_contains($query, 'SearchBooks')) {
+                    // search() Typesense endpoint: data.search.results.hits[].document
                     return Http::response([
                         'data' => [
-                            'books' => [
-                                [
-                                    'id' => '1',
-                                    'title' => 'Test Book',
-                                    'pages' => 300,
-                                    'release_date' => '2024-01-01',
-                                    'description' => 'A test book',
-                                    'cover_image_url' => 'https://example.com/cover.jpg',
-                                    'authors' => [
-                                        ['author' => ['name' => 'Test Author']],
+                            'search' => [
+                                'results' => [
+                                    'hits' => [
+                                        [
+                                            'document' => [
+                                                'id' => '1',
+                                                'title' => 'Test Book',
+                                                'pages' => 300,
+                                                'release_date' => '2024-01-01',
+                                                'description' => 'A test book',
+                                                'image' => ['url' => 'https://example.com/cover.jpg'],
+                                                'author_names' => ['Test Author'],
+                                            ],
+                                        ],
                                     ],
                                 ],
                             ],
@@ -44,24 +49,21 @@ class HardcoverApiTest extends TestCase
                     ]);
                 }
                 if (str_contains($query, 'GetBookDetails')) {
+                    // Current schema: contributions, taggings, image.url (not authors/narrators/cover_image_url)
                     return Http::response([
                         'data' => [
                             'books_by_pk' => [
                                 'id' => '1',
                                 'title' => 'Test Book',
-                                'subtitle' => 'Subtitle',
                                 'description' => 'A test book',
                                 'pages' => 300,
                                 'release_date' => '2024-01-01',
-                                'isbn_10' => '1234567890',
-                                'isbn_13' => '1234567890123',
-                                'cover_image_url' => 'https://example.com/cover.jpg',
-                                'publisher' => ['name' => 'Test Publisher'],
-                                'authors' => [
+                                'image' => ['url' => 'https://example.com/cover.jpg'],
+                                'contributions' => [
                                     ['author' => ['id' => '1', 'name' => 'Test Author']],
                                 ],
-                                'narrators' => [
-                                    ['author' => ['id' => '2', 'name' => 'Test Narrator']],
+                                'taggings' => [
+                                    ['tag' => ['tag' => 'Science Fiction']],
                                 ],
                             ],
                         ],
@@ -118,18 +120,21 @@ class HardcoverApiTest extends TestCase
             'authors' => ['Test Author'],
         ];
         Http::fake([
+            // Same response for both search and getBookDetails calls (both read different keys)
             'https://api.hardcover.app/v1/graphql' => Http::response([
                 'data' => [
-                    'books' => [
-                        [
-                            'id' => '1',
-                            'title' => 'Test Book',
-                            'pages' => 300,
-                            'release_date' => '2024-01-01',
-                            'description' => 'A test book',
-                            'cover_image_url' => 'https://example.com/cover.jpg',
-                            'authors' => [
-                                ['author' => ['name' => 'Test Author']],
+                    'search' => [
+                        'results' => [
+                            'hits' => [
+                                ['document' => [
+                                    'id' => '1',
+                                    'title' => 'Test Book',
+                                    'pages' => 300,
+                                    'release_date' => '2024-01-01',
+                                    'description' => 'A test book',
+                                    'image' => ['url' => 'https://example.com/cover.jpg'],
+                                    'author_names' => ['Test Author'],
+                                ]],
                             ],
                         ],
                     ],
@@ -137,15 +142,11 @@ class HardcoverApiTest extends TestCase
                         'id' => '1',
                         'title' => 'Test Book',
                         'description' => 'A test book',
-                        'cover_image_url' => 'https://example.com/cover.jpg',
                         'pages' => 300,
                         'release_date' => '2024-01-01',
-                        'publisher' => ['name' => 'Test Publisher'],
-                        'authors' => [
-                            ['author' => ['id' => '1', 'name' => 'Test Author']],
-                        ],
-                        'narrators' => [
-                            ['author' => ['id' => '2', 'name' => 'Test Narrator']],
+                        'image' => ['url' => 'https://example.com/cover.jpg'],
+                        'taggings' => [
+                            ['tag' => ['tag' => 'Science Fiction']],
                         ],
                     ],
                 ],
@@ -153,11 +154,9 @@ class HardcoverApiTest extends TestCase
         ]);
         $result = $this->hardcoverApiService->searchAndMerge($book);
         $this->assertIsArray($result);
-        if (!isset($result['authors'])) {
-            $result['authors'] = [['author' => ['name' => 'Test Author']]];
-        }
         $this->assertEquals('Test Book', $result['title']);
-        $this->assertEquals('Test Author', $result['authors'][0]['author']['name']);
+        $this->assertEquals('https://example.com/cover.jpg', $result['coverImage']);
+        $this->assertEquals(['Science Fiction'], $result['genres']);
     }
 
     #[Test]
@@ -169,19 +168,12 @@ class HardcoverApiTest extends TestCase
                     'books_by_pk' => [
                         'id' => '1',
                         'title' => 'Test Book',
-                        'subtitle' => 'Subtitle',
                         'description' => 'A test book',
                         'pages' => 300,
                         'release_date' => '2024-01-01',
-                        'isbn_10' => '1234567890',
-                        'isbn_13' => '1234567890123',
-                        'cover_image_url' => 'https://example.com/cover.jpg',
-                        'publisher' => ['name' => 'Test Publisher'],
-                        'authors' => [
-                            ['author' => ['id' => '1', 'name' => 'Test Author']],
-                        ],
-                        'narrators' => [
-                            ['author' => ['id' => '2', 'name' => 'Test Narrator']],
+                        'image' => ['url' => 'https://example.com/cover.jpg'],
+                        'taggings' => [
+                            ['tag' => ['tag' => 'Science Fiction']],
                         ],
                     ],
                 ],
@@ -192,8 +184,8 @@ class HardcoverApiTest extends TestCase
 
         $this->assertIsArray($book);
         $this->assertEquals('Test Book', $book['title']);
-        $this->assertEquals('Test Author', $book['authors'][0]['author']['name']);
-        $this->assertEquals('Test Narrator', $book['narrators'][0]['author']['name']);
+        $this->assertEquals('https://example.com/cover.jpg', $book['image']['url']);
+        $this->assertEquals('Science Fiction', $book['taggings'][0]['tag']['tag']);
     }
 
     #[Test]
