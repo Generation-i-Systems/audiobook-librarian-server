@@ -197,7 +197,7 @@ class AudibleService extends BaseBookService
 
         $params = [
             'title' => $titleFromQuery,
-            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,media',
+            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,category_ladders,series,contributors,media',
         ];
 
         if (!empty($authorFromOptions)) {
@@ -244,7 +244,7 @@ class AudibleService extends BaseBookService
     {
         $this->apiCallCount++;
         $response = Http::timeout(15)->get($this->baseUrl . '/products/' . $id, [
-            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,media,' .
+            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,category_ladders,series,contributors,media,' .
                 'product_images',
         ]);
 
@@ -453,8 +453,23 @@ class AudibleService extends BaseBookService
         $result['seriesNumber'] = $seriesNumber;
         $result['series'] = $seriesName; // For compatibility with Google Books format
 
-        // Use genre for category field if available
-        if (isset($book['genre'])) {
+        // Extract categories from category_ladders (Audible API format), falling back to genre/categories.
+        // Collect every rung name from every ladder — mapToValidGenreList expands compound labels
+        // like "Science Fiction & Fantasy" into ["Science Fiction", "Fantasy"] and the enrichment
+        // service discards anything that maps to a weak genre.
+        if (!empty($book['category_ladders']) && is_array($book['category_ladders'])) {
+            $categoryNames = [];
+            foreach ($book['category_ladders'] as $ladder) {
+                if (!empty($ladder['ladder']) && is_array($ladder['ladder'])) {
+                    foreach ($ladder['ladder'] as $rung) {
+                        if (!empty($rung['name'])) {
+                            $categoryNames[] = $rung['name'];
+                        }
+                    }
+                }
+            }
+            $result['category'] = array_values(array_unique($categoryNames));
+        } elseif (isset($book['genre'])) {
             if (is_string($book['genre'])) {
                 $result['category'] = [$book['genre']];
             } elseif (is_array($book['genre'])) {
