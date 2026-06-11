@@ -258,32 +258,22 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     protected function performGetBookDetails(string $id): ?array
     {
         $query = '
-            query GetBookDetails($bookId: uuid!) {
+            query GetBookDetails($bookId: Int!) {
                 books_by_pk(id: $bookId) {
                     id
                     title
-                    subtitle
                     description
                     pages
                     release_date
-                    isbn_10
-                    isbn_13
-                    cover_image_url: cover_image_url(size: LARGE)
-                    publisher {
-                        name
+                    image {
+                        url
                     }
-                    genres {
-                        genre {
-                            name
+                    taggings {
+                        tag {
+                            tag
                         }
                     }
-                    authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
-                        author {
-                            id
-                            name
-                        }
-                    }
-                    narrators: contributions(where: {role: {_eq: "NARRATOR"}}) {
+                    contributions(where: {role: {_eq: "Author"}}) {
                         author {
                             id
                             name
@@ -293,7 +283,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             }
         ';
 
-        $result = $this->makeRequest($query, ['bookId' => $id]);
+        $result = $this->makeRequest($query, ['bookId' => (int) $id]);
         $book = $result['data']['books_by_pk'] ?? null;
 
         if (!$book) {
@@ -374,20 +364,23 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
      */
     protected function formatBookDetails(array $item): array
     {
+        // Extract genre names from taggings (confirmed working Hardcover schema)
+        $genreNames = array_values(array_filter(array_map(
+            fn ($t) => $t['tag']['tag'] ?? null,
+            $item['taggings'] ?? []
+        )));
+
         return [
             'id' => $item['id'],
             'title' => $item['title'] ?? 'Unknown Title',
-            'subtitle' => $item['subtitle'] ?? null,
-            'authors' => $this->formatAuthors($item['authors'] ?? []),
-            'narrators' => $this->formatNarrators($item['narrators'] ?? []),
-            'publisher' => $item['publisher'] ?? null,
+            'authors' => $this->formatAuthors($item['contributions'] ?? []),
             'published_date' => $item['release_date'] ?? null,
             'description' => $item['description'] ?? null,
             'page_count' => $item['pages'] ?? null,
-            'isbn_10' => $item['isbn_10'] ?? null,
-            'isbn_13' => $item['isbn_13'] ?? null,
-            'cover_image_url' => $item['cover_image_url'] ?? null,
-            'genres' => $this->formatGenres($item['genres'] ?? []),
+            'cover_image_url' => $item['image']['url'] ?? null,
+            'coverImageUrl' => $item['image']['url'] ?? null,
+            'genres' => array_map(fn ($name) => ['genre' => ['name' => $name]], $genreNames),
+            'genre' => $genreNames,
         ];
     }
 
@@ -441,6 +434,70 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     public function isAvailable(): bool
     {
         return !empty($this->apiToken) && !empty($this->apiUrl);
+    }
+
+    /**
+     * Search for a book by title/author and merge search + detail results into one array.
+     * Returns keys: hardcoverId, title, description, coverImage, pages, releaseDate, genres (string[]).
+     */
+    public function searchAndMerge(array $book): ?array
+    {
+        $title = $book['title'] ?? null;
+        $authors = $book['authors'] ?? [];
+        if (!$title) {
+            return null;
+        }
+
+        $author = !empty($authors) ? (is_array($authors[0]) ? ($authors[0]['author']['name'] ?? $authors[0]) : $authors[0]) : null;
+        $results = $this->searchBooks($title, ['author' => $author, 'limit' => 5]);
+        if (empty($results)) {
+            return null;
+        }
+
+        // Trust Hardcover's search ranking; only promote a later result on a clear title+author win
+        $bestMatch = $results[0];
+        $bestScore = 0;
+        foreach ($results as $result) {
+            $score = 0;
+            if (strcasecmp(trim($result['title'] ?? ''), trim($title)) === 0) {
+                $score += 2;
+            } elseif (stripos($result['title'] ?? '', $title) !== false) {
+                $score += 1;
+            }
+            if ($author && !empty($result['author'])) {
+                foreach ((array) $result['author'] as $authorName) {
+                    if (stripos($authorName, $author) !== false) {
+                        $score += 2;
+                        break;
+                    }
+                }
+            }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestMatch = $result;
+            }
+        }
+
+        $details = null;
+        if (!empty($bestMatch['id'])) {
+            $details = $this->getBookDetails((string) $bestMatch['id']);
+        }
+
+        $genreNames = [];
+        if ($details) {
+            // genre field is pre-extracted in formatBookDetails (plain string array)
+            $genreNames = $details['genre'] ?? [];
+        }
+
+        return array_filter([
+            'hardcoverId' => $bestMatch['id'] ?? null,
+            'title' => $bestMatch['title'] ?? null,
+            'description' => $details['description'] ?? $bestMatch['description'] ?? null,
+            'coverImage' => $details['cover_image_url'] ?? $bestMatch['cover_image_url'] ?? $bestMatch['coverImageUrl'] ?? null,
+            'pages' => $details['page_count'] ?? $bestMatch['page_count'] ?? null,
+            'releaseDate' => $details['published_date'] ?? $bestMatch['published_date'] ?? null,
+            'genres' => !empty($genreNames) ? $genreNames : null,
+        ], fn ($v) => $v !== null);
     }
 
     /**
