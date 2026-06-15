@@ -2493,8 +2493,22 @@ class BookImportService
 
         $log("⚠️  Target directory already exists: " . basename($targetDir));
 
-        // Compare directories
-        $comparison = $compareDirectoriesCallback ? $compareDirectoriesCallback($audiobook['path'], $targetDir) : $this->compareDirectories($audiobook['path'], $targetDir);
+        // For multi-book parts, compare only the files being imported rather than
+        // the full source directory (which contains files for all book parts).
+        $isMultiPart = !empty($audiobook['is_multi_book_part']) && !empty($audiobook['multi_book_files_only']);
+        if ($isMultiPart) {
+            $sourceInfo = $this->getDirectoryInfoFromFiles($audiobook['multi_book_files_only']);
+            $targetInfo = $this->getDirectoryInfo($targetDir);
+            $comparison = [
+                'identical' => $this->areDirectoriesIdentical($sourceInfo, $targetInfo),
+                'source' => $sourceInfo,
+                'target' => $targetInfo,
+                'source_path' => $audiobook['path'],
+                'target_path' => $targetDir,
+            ];
+        } else {
+            $comparison = $compareDirectoriesCallback ? $compareDirectoriesCallback($audiobook['path'], $targetDir) : $this->compareDirectories($audiobook['path'], $targetDir);
+        }
 
         // Display comparison
         if ($displayDirectoryComparisonCallback) {
@@ -6536,6 +6550,41 @@ class BookImportService
     /**
      * Get detailed information about files in a directory
      */
+    public function getDirectoryInfoFromFiles(array $filePaths): array
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $files = [];
+        $totalSize = 0;
+        $fileTypes = [];
+
+        foreach ($filePaths as $filePath) {
+            if (!is_file($filePath)) {
+                continue;
+            }
+            $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            if (!in_array($extension, $audioExtensions)) {
+                continue;
+            }
+            $size = filesize($filePath);
+            $filename = basename($filePath);
+            $files[] = [
+                'name' => $filename,
+                'size' => $size,
+                'extension' => $extension,
+                'hash' => md5($filename . $size),
+            ];
+            $totalSize += $size;
+            $fileTypes[$extension] = ($fileTypes[$extension] ?? 0) + 1;
+        }
+
+        return [
+            'files' => $files,
+            'total_size' => $totalSize,
+            'file_types' => $fileTypes,
+            'count' => count($files),
+        ];
+    }
+
     public function getDirectoryInfo(string $path): array
     {
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
