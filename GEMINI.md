@@ -1,3 +1,23 @@
+## UNTESTABLE REGRESSION LIST — MANDATORY CONSULTATION
+
+`UNTESTABLE_REGRESSIONS.md` catalogues every area of this codebase where automated tests
+cannot catch regressions (external APIs, real audio/image files, browser UI, TTY interactions,
+streaming, email delivery, etc.).
+
+Rules — enforce before every change:
+
+1. Before implementing any change, read `UNTESTABLE_REGRESSIONS.md` and check whether the
+   change touches any listed area.
+2. If it does, explicitly warn the user about the specific untestable risk(s) before
+   proceeding, and think extra hard about the implications.
+3. If the change introduces a new untestable area (new external API, new file-dependent
+   feature, new JS interaction, etc.), add it to `UNTESTABLE_REGRESSIONS.md` in the same
+   commit.
+4. Never mark a task complete without stating which untestable regressions (if any) were
+   in scope and how you mitigated or noted them.
+
+---
+
 ALWAYS verify with php -l that .php files do not have syntax errors after updates
 ALWAYS check that there aren't missing imports after updates
 ALWAYS check that there aren't missing dependencies after updates
