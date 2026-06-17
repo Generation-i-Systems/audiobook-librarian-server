@@ -37,4 +37,28 @@ class BookDownloadControllerUrlEncodingTest extends TestCase
             $url
         );
     }
+
+    public function test_hash_file_chunks_returns_offsets_sizes_and_hashes(): void
+    {
+        $controller = new BookDownloadController($this->createStub(DocumentStoreServiceInterface::class));
+        $method = new \ReflectionMethod(BookDownloadController::class, 'hashFileChunks');
+        $method->setAccessible(true);
+        $path = tempnam(sys_get_temp_dir(), 'chunk-hash-');
+        $content = str_repeat('abc123', 2048);
+        file_put_contents($path, $content);
+
+        try {
+            $chunks = $method->invoke($controller, $path);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame([
+            [
+                'offset' => 0,
+                'size' => strlen($content),
+                'sha256' => hash('sha256', $content),
+            ],
+        ], $chunks);
+    }
 }

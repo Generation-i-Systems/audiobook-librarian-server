@@ -15,6 +15,8 @@ class BookDownloadController extends Controller
 {
     use BookTransformTrait;
 
+    private const DOWNLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
+
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
@@ -29,6 +31,43 @@ class BookDownloadController extends Controller
         'librivox.org',
         'www.librivox.org',
     ];
+
+    /**
+     * Hash a file in fixed-size chunks for client-side range repair.
+     *
+     * @return array<int, array{offset: int, size: int, sha256: string}>
+     */
+    private function hashFileChunks(string $fullPath): array
+    {
+        $handle = fopen($fullPath, 'rb');
+        if ($handle === false) {
+            return [];
+        }
+
+        $chunks = [];
+        $offset = 0;
+
+        try {
+            while (!feof($handle)) {
+                $data = fread($handle, self::DOWNLOAD_CHUNK_SIZE);
+                if ($data === false || $data === '') {
+                    break;
+                }
+
+                $size = strlen($data);
+                $chunks[] = [
+                    'offset' => $offset,
+                    'size' => $size,
+                    'sha256' => hash('sha256', $data),
+                ];
+                $offset += $size;
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        return $chunks;
+    }
 
     /**
      * Build a manifest for a LibriVox book using CDN chapter URLs.
@@ -185,7 +224,7 @@ class BookDownloadController extends Controller
         }
 
         $directoryPath = $book['directoryPath'] ?? null;
-        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
+        if (!$directoryPath || (!Storage::disk('books')->exists($directoryPath) && empty(Storage::disk('books')->allFiles($directoryPath)))) {
             return response()->json([
                 'error' => 'Book directory not found',
                 'message' => 'The book files could not be located',
@@ -204,17 +243,27 @@ class BookDownloadController extends Controller
         $audioFiles = [];
         $coverFiles = [];
         $otherFiles = [];
+        $includeChecksums = request()->boolean('include_checksums', request()->boolean('checksums', false));
+        $includeChunks = request()->boolean('include_chunks', request()->boolean('chunks', false));
 
         foreach ($files as $file) {
             $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
             $relativeFile = str_replace($directoryPath . '/', '', $file);
 
+            $fullPath = Storage::disk('books')->path($file);
             $entry = [
                 'filename' => $relativeFile,
                 'path' => $file,
                 'size' => Storage::disk('books')->size($file),
                 'download_url' => $this->buildDownloadFileUrl($id, $relativeFile),
             ];
+            if ($includeChecksums || $includeChunks) {
+                $entry['checksum'] = is_file($fullPath) ? 'sha256:' . hash_file('sha256', $fullPath) : null;
+            }
+            if ($includeChunks) {
+                $entry['chunk_size'] = self::DOWNLOAD_CHUNK_SIZE;
+                $entry['chunks'] = is_file($fullPath) ? $this->hashFileChunks($fullPath) : [];
+            }
 
             if (in_array($extension, ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac', 'm4b'])) {
                 $audioFiles[] = array_merge($entry, ['type' => 'audio']);
