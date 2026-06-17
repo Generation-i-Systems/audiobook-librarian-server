@@ -266,6 +266,16 @@ class BookDownloadController extends Controller
             }
 
             if (in_array($extension, ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac', 'm4b'])) {
+                if (in_array($extension, ['m4b', 'm4a'])) {
+                    $analysis = $this->analyzeMp4File($fullPath);
+                    $entry['is_fast_start_friendly'] = $analysis['is_fast_start'];
+                    if (!$analysis['is_fast_start']) {
+                        $entry['moov_offset'] = $analysis['moov_offset'];
+                        $entry['moov_size'] = $analysis['moov_size'];
+                    }
+                } else {
+                    $entry['is_fast_start_friendly'] = true;
+                }
                 $audioFiles[] = array_merge($entry, ['type' => 'audio']);
             } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
                 $coverFiles[] = array_merge($entry, ['type' => 'cover']);
@@ -850,5 +860,84 @@ class BookDownloadController extends Controller
         \Illuminate\Support\Facades\Cache::put($key, $state, now()->addMinutes(5));
 
         return response()->json(['message' => 'Zip file marked as downloaded']);
+    }
+
+    /**
+     * Parse MP4/M4B file to check if it is fast-start optimized and locate the moov atom.
+     * Returns an array: ['is_fast_start' => bool, 'moov_offset' => int|null, 'moov_size' => int|null]
+     */
+    private function analyzeMp4File(string $filePath): array
+    {
+        if (!is_file($filePath)) {
+            return ['is_fast_start' => false, 'moov_offset' => null, 'moov_size' => null];
+        }
+
+        $handle = fopen($filePath, 'rb');
+        if (!$handle) {
+            return ['is_fast_start' => false, 'moov_offset' => null, 'moov_size' => null];
+        }
+
+        $fileSize = filesize($filePath);
+        $offset = 0;
+        $moovOffset = null;
+        $moovSize = null;
+        $mdatOffset = null;
+
+        while ($offset < $fileSize) {
+            // Seek to the box start
+            if (fseek($handle, $offset) !== 0) {
+                break;
+            }
+
+            // Read size and type
+            $header = fread($handle, 8);
+            if (strlen($header) < 8) {
+                break;
+            }
+
+            $size = unpack('N', substr($header, 0, 4))[1];
+            $type = substr($header, 4, 4);
+
+            $boxSize = $size;
+            $headerSize = 8;
+
+            if ($size === 1) {
+                // 64-bit size
+                $extHeader = fread($handle, 8);
+                if (strlen($extHeader) < 8) {
+                    break;
+                }
+                $boxSize = unpack('J', $extHeader)[1];
+                $headerSize = 16;
+            }
+
+            if ($type === 'moov') {
+                $moovOffset = $offset;
+                $moovSize = $boxSize;
+            } elseif ($type === 'mdat') {
+                $mdatOffset = $offset;
+            }
+
+            if ($boxSize <= 0) {
+                // If box size is 0, it means till end of file (only allowed for last box)
+                break;
+            }
+
+            $offset += $boxSize;
+        }
+
+        fclose($handle);
+
+        $isFastStart = false;
+        if ($moovOffset !== null && $mdatOffset !== null) {
+            // Fast-start means moov appears before mdat
+            $isFastStart = $moovOffset < $mdatOffset;
+        }
+
+        return [
+            'is_fast_start' => $isFastStart,
+            'moov_offset' => $moovOffset,
+            'moov_size' => $moovSize,
+        ];
     }
 }
