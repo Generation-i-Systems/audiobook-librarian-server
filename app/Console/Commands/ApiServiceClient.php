@@ -218,7 +218,7 @@ class ApiServiceClient extends Command
 
         // Extract host and scheme for constructing full URLs
         $host = null;
-        if (isset($parsed['scheme']) && isset($parsed['host'])) {
+        if (isset($parsed['scheme'])) {
             $host = $parsed['scheme'] . '://' . $parsed['host'];
             if (isset($parsed['port'])) {
                 $host .= ':' . $parsed['port'];

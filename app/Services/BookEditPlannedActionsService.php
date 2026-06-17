@@ -17,7 +17,8 @@ class BookEditPlannedActionsService
     {
         $book = $this->documentStoreService->getBook($bookId) ?? [];
 
-        $oldDirectoryPath = (string) ($book['directoryPath'] ?? '');
+        $existingDirectoryPath = $book['directoryPath'] ?? '';
+        $oldDirectoryPath = is_string($existingDirectoryPath) ? trim($existingDirectoryPath) : '';
         $newDirectoryPath = trim($newDirectoryPath);
         $coverUrl = trim($coverUrl);
 
@@ -28,7 +29,7 @@ class BookEditPlannedActionsService
 
         $actions = [];
 
-        if ($newDirectoryPath !== '' && $oldDirectoryPath !== '' && $newDirectoryPath !== $oldDirectoryPath) {
+        if ($newDirectoryPath !== '' && $this->hasDirectoryPath($oldDirectoryPath) && $newDirectoryPath !== $oldDirectoryPath) {
             if ($oldHasFiles && !$newHasFiles) {
                 $actions[] = [
                     'type' => 'move_files',
@@ -50,7 +51,7 @@ class BookEditPlannedActionsService
                     'message' => "Update DB only: directory path will change but no files were detected to move",
                 ];
             }
-        } elseif ($newDirectoryPath !== '' && $oldDirectoryPath === '') {
+        } elseif ($newDirectoryPath !== '' && !$this->hasDirectoryPath($oldDirectoryPath)) {
             if ($newHasFiles) {
                 $actions[] = [
                     'type' => 'db_only',
@@ -90,5 +91,10 @@ class BookEditPlannedActionsService
             'newHasFiles' => $newHasFiles,
             'actions' => $actions,
         ];
+    }
+
+    private function hasDirectoryPath(string $directoryPath): bool
+    {
+        return $directoryPath !== '';
     }
 }

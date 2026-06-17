@@ -36,11 +36,13 @@ class RepairBooks extends Command
 
         $this->info('Starting book repair process...');
 
-        $repairCovers = $this->option('cover') || $this->option('all');
-        $repairSeries = $this->option('series') || $this->option('all');
-        $repairTitles = $this->option('title') || $this->option('all');
+        $repairAll = (bool) $this->option('all');
+        $repairCovers = (bool) $this->option('cover') || $repairAll;
+        $repairSeries = (bool) $this->option('series') || $repairAll;
+        $repairTitles = (bool) $this->option('title') || $repairAll;
+        $repairTitleAndSeries = $repairTitles || $repairSeries;
 
-        if (! $repairCovers && ! $repairSeries && ! $repairTitles) {
+        if (! $repairCovers && ! $repairTitleAndSeries) {
             $this->error('Please specify at least one repair action (--cover, --series, --title, or --all)');
 
             return Command::FAILURE;
@@ -70,7 +72,7 @@ class RepairBooks extends Command
                 }
             }
 
-            if ($repairTitles || $repairSeries) {
+            if ($repairTitleAndSeries) {
                 if ($this->repairTitleAndSeries($book)) {
                     $changesMade = true;
                 }
