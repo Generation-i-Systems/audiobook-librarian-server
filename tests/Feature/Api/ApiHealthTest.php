@@ -87,6 +87,7 @@ class ApiHealthTest extends TestCase
                 'database',
                 'book_format',
                 'series_format',
+                'storage',
             ],
             'api_version',
         ]);
@@ -209,6 +210,24 @@ class ApiHealthTest extends TestCase
      * Test: Health endpoints are accessible without authentication
      */
     #[Test]
+    public function testCapabilitiesEndpointReturnsExpectedStructure(): void
+    {
+        $response = $this->getJson('/api/v1/health/capabilities');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'serverType',
+            'syncApiVersion',
+            'capabilities',
+            'requiresAuth',
+            'authMethods',
+        ]);
+        $response->assertJsonPath('serverType', 'ablibrarian-full');
+        $response->assertJsonPath('syncApiVersion', '1');
+        $response->assertJsonCount(10, 'capabilities');
+    }
+
+    #[Test]
     public function testHealthEndpointsAccessibleWithoutAuth(): void
     {
         // Ping should work without auth
@@ -234,6 +253,10 @@ class ApiHealthTest extends TestCase
 
         // Validate should work without auth
         $response = $this->getJson('/api/v1/health/validate');
+        $response->assertStatus(200);
+
+        // Capabilities should work without auth
+        $response = $this->getJson('/api/v1/health/capabilities');
         $response->assertStatus(200);
     }
 }

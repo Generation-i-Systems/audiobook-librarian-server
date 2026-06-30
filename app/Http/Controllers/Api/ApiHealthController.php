@@ -41,6 +41,7 @@ class ApiHealthController extends Controller
      * - Database connectivity
      * - Book data format compliance
      * - Series, author, narrator, genre array formats
+     * - Storage volume availability and free space
      */
     public function health(): JsonResponse
     {
@@ -62,6 +63,12 @@ class ApiHealthController extends Controller
         // Check 3: OpenAPI spec compliance for series data
         $checks['series_format'] = $this->checkSeriesFormat();
         if (!$checks['series_format']['passed']) {
+            $allPassed = false;
+        }
+
+        // Check 4: Storage volume accessibility and free space
+        $checks['storage'] = $this->checkStorageVolumes();
+        if (!$checks['storage']['passed']) {
             $allPassed = false;
         }
 
@@ -120,6 +127,96 @@ class ApiHealthController extends Controller
             'api_version' => 'v1',
             'openapi_version' => '3.0.3',
         ], $allPassed ? 200 : 422);
+    }
+
+    /**
+     * Capability discovery endpoint — returns what features this server supports.
+     * Clients that receive 404 from this endpoint should assume all capabilities.
+     */
+    public function capabilities(): JsonResponse
+    {
+        return response()->json([
+            'serverType' => 'ablibrarian-full',
+            'syncApiVersion' => '1',
+            'capabilities' => [
+                'BROWSE',
+                'DOWNLOAD',
+                'HISTORY_SYNC',
+                'STATS',
+                'BOOKMARKS_SYNC',
+                'RECOMMENDATIONS',
+                'METADATA_MATCH',
+                'SKINS_GALLERY',
+                'PLAYLISTS',
+                'BADGES',
+            ],
+            'requiresAuth' => true,
+            'authMethods' => [
+                'username_password',
+                'google_oauth',
+                'facebook_oauth',
+                'apple_oauth',
+                'discord_oauth',
+                'email_otp',
+            ],
+        ]);
+    }
+
+    /**
+     * Check all configured storage volumes for accessibility and free space
+     */
+    protected function checkStorageVolumes(): array
+    {
+        $paths = $this->getStoragePaths();
+        $volumes = [];
+        $allHealthy = true;
+
+        foreach ($paths as $name => $path) {
+            $exists = is_dir($path);
+            $readable = $exists && is_readable($path);
+
+            $freeBytes = $readable ? disk_free_space($path) : false;
+            $totalBytes = $readable ? disk_total_space($path) : false;
+
+            $freeBytesInt = $freeBytes !== false ? (int) $freeBytes : null;
+            $totalBytesInt = $totalBytes !== false ? (int) $totalBytes : null;
+            $usedPercent = ($freeBytesInt !== null && $totalBytesInt !== null && $totalBytesInt > 0) ? round((($totalBytesInt - $freeBytesInt) / $totalBytesInt) * 100, 1) : null;
+
+            $passed = $exists && $readable && $freeBytes !== false;
+            if (!$passed) {
+                $allHealthy = false;
+            }
+
+            $volumes[$name] = [
+                'passed' => $passed,
+                'path' => $path,
+                'exists' => $exists,
+                'readable' => $readable,
+                'free_bytes' => $freeBytesInt,
+                'total_bytes' => $totalBytesInt,
+                'used_percent' => $usedPercent,
+                'message' => $passed ? 'Volume accessible' : ($exists ? 'Volume not readable' : 'Directory does not exist'),
+            ];
+        }
+
+        return [
+            'passed' => $allHealthy,
+            'message' => $allHealthy ? 'All storage volumes accessible' : 'One or more storage volumes have issues',
+            'volumes' => $volumes,
+        ];
+    }
+
+    /**
+     * Return the named storage paths to monitor
+     */
+    protected function getStoragePaths(): array
+    {
+        $paths = [
+            'books' => (string) config('filesystems.disks.books.root', ''),
+            'trash' => (string) config('filesystems.disks.trash.root', ''),
+        ];
+
+        return array_filter($paths);
     }
 
     /**

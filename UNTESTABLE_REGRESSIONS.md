@@ -76,6 +76,10 @@ These features require real directory trees and file contents on disk.
   disk.
 - **ZIP file upload and validation** — `SkinController::store()` / `ThemeController` — real
   ZIP bytes required.
+- **`ApiHealthController::checkStorageVolumes()`** — reads real filesystem state via `is_dir()`,
+  `is_readable()`, `disk_free_space()`, `disk_total_space()`. Tests use `/tmp` as a stand-in;
+  they cannot verify that the actual production mounts (e.g. `/media/audiobooks/books`) are
+  mounted, readable, or have sufficient free space.
 
 ---
 

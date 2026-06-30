@@ -53,6 +53,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/health/ping', [ApiHealthController::class, 'ping']);
     Route::get('/health', [ApiHealthController::class, 'health']);
     Route::get('/health/validate', [ApiHealthController::class, 'validateSpec']);
+    Route::get('/health/capabilities', [ApiHealthController::class, 'capabilities']);
 
     Route::get('/openapi.json', function () {
         $path = base_path('docs/openapi.json');
