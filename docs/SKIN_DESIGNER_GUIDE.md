@@ -185,6 +185,26 @@ The `manifest.json` is the heart of your skin. Here's a minimal example:
 | `layout`           | object | ✅        | Element layouts                           |
 | `fonts`            | array  | ⬜        | Custom font definitions                   |
 | `animations`       | object | ⬜        | Animation definitions                     |
+| `sleepTimer`       | object | ⬜        | Sleep timer bubble configuration          |
+
+### Sleep Timer Bubble Configuration
+
+The `sleepTimer` block allows the skin to customize the styling and behavior of the draggable floating sleep timer bubble (only shown when the sleep timer is active and the layout doesn't natively display the remaining time):
+
+```json
+"sleepTimer": {
+  "bubbleEnabled": true,          // Set false to disable the bubble entirely
+  "bubbleInitialX": 140,         // Initial X coordinate in dp (default: 140)
+  "bubbleInitialY": 80,          // Initial Y coordinate in dp (default: 80)
+  "bubbleBackgroundColor": "surface", // Background color (hex or theme color key)
+  "bubbleTextColor": "text",      // Text color (hex or theme color key)
+  "bubbleFontSize": 14,          // Font size in sp (default: 14)
+  "bubbleCornerRadius": 16,      // Corner radius in dp (default: 16)
+  "bubblePadding": 12,           // Inner padding in dp (default: 12)
+  "bubbleShadowColor": "#000000",// Shadow color (default: black/semi-transparent)
+  "bubbleShadowRadius": 8        // Shadow blur radius in dp (default: 8)
+}
+```
 
 ### Dimensions
 
@@ -1661,6 +1681,8 @@ Tokens are wrapped in `{curly braces}`:
 | `{chapterTimeRemainingHuman}` | "32m 30s" | Chapter time remaining (speed-adjusted, human-readable) |
 | `{bookTitle}` | "The Martian" | Book title |
 | `{bookAuthor}` | "Andy Weir" | Book author |
+| `{sleepTimeRemaining}` | "14:59" | Sleep timer remaining time (M:SS) |
+| `{sleepTimeRemainingHuman}` | "14m 59s" | Sleep timer remaining time (human-readable) |
 
 > **Tip**: Use `{chapterTimeRemainingHuman}` instead of `{chapterTimeRemaining}` for a more readable display like "32m 30s" instead of "0:32:30".
 
@@ -1712,6 +1734,13 @@ elements:
 "dataBinding": "chapter.totalTime"     // "0:45:00"
 "dataBinding": "chapter.timeRemaining" // "0:32:30"
 "dataBinding": "chapter.position"      // 0.0 to 1.0 (for progress bars)
+```
+
+### Sleep Timer Information
+
+```json
+"dataBinding": "sleepTimer.remainingTime"      // "14:59"
+"dataBinding": "sleepTimer.remainingTimeHuman" // "14m 59s"
 ```
 
 ### Example: Complete Time Display
@@ -2941,6 +2970,8 @@ License: CC BY 4.0
 | `chapter.totalTime`    | "0:45:00"       | Chapter total time   |
 | `chapter.timeRemaining`| "0:32:30"       | Chapter time left    |
 | `chapter.position`     | 0.278 (0.0-1.0) | Chapter progress bar |
+| `sleepTimer.remainingTime` | "14:59"      | Sleep timer time left|
+| `sleepTimer.remainingTimeHuman`| "14m 59s"| Human readable sleep time |
 
 ---
 
