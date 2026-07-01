@@ -182,6 +182,10 @@
                                         {{ __('Profile') }}
                                     </a>
 
+                                    <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#appConnectModal">
+                                        {{ __('Connect Mobile App') }}
+                                    </button>
+
                                     @if (Auth::user()->is_admin)
                                         @if(request()->is('admin/*'))
                                             <form id="user-mode-form" action="{{ route('books.index') }}" method="GET"
@@ -226,6 +230,31 @@
             </div>
             @yield('content')
         </main>
+
+        @auth
+            @php
+                $appConnectApiUrl = \App\Support\AppConnectLinks::apiBaseUrl(request());
+                $appConnectUrl = \App\Support\AppConnectLinks::redirectorUrl(request(), $appConnectApiUrl);
+            @endphp
+            <div class="modal fade" id="appConnectModal" tabindex="-1" aria-labelledby="appConnectModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="appConnectModalLabel">{{ __('Connect Mobile App') }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                        </div>
+                        <div class="modal-body">
+                            <x-app-connect-qr
+                                title="This server"
+                                description="Scan this QR code from the app to connect it to this self-hosted server."
+                                :connect-url="$appConnectUrl"
+                                :api-url="$appConnectApiUrl"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endauth
     </div>
 
     @stack('scripts')

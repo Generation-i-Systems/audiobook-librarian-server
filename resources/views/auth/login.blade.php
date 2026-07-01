@@ -64,7 +64,7 @@
                                         {{ __('Login') }}
                                     </button>
 
-                                    @if (Route::has('password.request'))
+                                    @if (\Illuminate\Support\Facades\Route::has('password.request'))
                                         <a class="btn btn-link" href="{{ route('password.request') }}">
                                             {{ __('Forgot Your Password?') }}
                                         </a>
@@ -82,6 +82,15 @@
                             style="width:20px; margin-right:8px; vertical-align:middle;">
                         Sign in with Google
                     </a>
+                </div>
+
+                <div class="mt-4">
+                    <x-app-connect-qr
+                        title="Connect the mobile app"
+                        description="Scan this QR code from the app to connect it to this self-hosted server before signing in."
+                        :connect-url="$appConnectUrl"
+                        :api-url="$appConnectApiUrl"
+                    />
                 </div>
 
                 @if ($otpEnabled)

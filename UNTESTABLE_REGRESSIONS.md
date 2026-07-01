@@ -168,6 +168,9 @@ feature tests without running a real queue worker.
   Android/iOS hardware; cannot be reliably simulated.
 - **Audio playback progress sync** — position tracking is driven by the mobile client;
   server-side tests only verify storage, not end-to-end accuracy.
+- **Mobile app QR/server-connect redirector** — QR scanning, custom URL scheme dispatch,
+  app-store fallback behavior, and returning after first install depend on real Android/iOS
+  devices, installed app variants, browser behavior, and store availability.
 
 ---
 

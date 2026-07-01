@@ -8,6 +8,7 @@ use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\NewUserRegistrationNotifier;
+use App\Support\AppConnectLinks;
 use App\Support\MailConfiguration;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Support\Facades\Auth;
@@ -46,8 +47,12 @@ class LoginController extends Controller
      */
     public function showLoginForm()
     {
+        $apiUrl = AppConnectLinks::apiBaseUrl(request());
+
         return view('auth.login', [
             'otpEnabled' => MailConfiguration::isMailConfigured(),
+            'appConnectApiUrl' => $apiUrl,
+            'appConnectUrl' => AppConnectLinks::redirectorUrl(request(), $apiUrl),
         ]);
     }
 

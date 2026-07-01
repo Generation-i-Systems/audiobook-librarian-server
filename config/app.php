@@ -180,6 +180,13 @@ return [
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 
+    'mobile_android_store_url' => env(
+        'ABLIBRARIAN_ANDROID_STORE_URL',
+        'https://play.google.com/store/apps/details?id=com.ablibrarian.library'
+    ),
+
+    'mobile_ios_store_url' => env('ABLIBRARIAN_IOS_STORE_URL', '#'),
+
     /*
     |--------------------------------------------------------------------------
     | Encryption Key

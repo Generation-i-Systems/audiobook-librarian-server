@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\BookMetadataSearchController;
 use App\Http\Controllers\Admin\BookPathController;
 use App\Http\Controllers\Admin\BookSeriesController;
 use App\Http\Controllers\AdminNotificationController;
+use App\Http\Controllers\AppConnectController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FollowController;
 use App\Http\Controllers\ImageProxyController;
@@ -89,6 +90,8 @@ Auth::routes();
 
 Route::get('/privacy', fn () => view('privacy'))->name('privacy');
 Route::get('/terms', fn () => view('terms'))->name('terms');
+Route::get('/app/connect/server', [AppConnectController::class, 'server'])
+    ->name('app.connect.server');
 
 Route::get('/password/reset/success', function () {
     return view('auth.password-reset-success');
