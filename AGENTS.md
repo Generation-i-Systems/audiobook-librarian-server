@@ -21,6 +21,63 @@ streaming, email delivery, etc.).
 ---
 
 
+## Platform-Native Development Philosophy
+
+- **"Let the platform do what it does best"** - Leverage platform strengths rather than creating complex abstractions
+- **Avoid over-engineering**: Question whether custom abstractions add value vs. using platform solutions
+- **Prefer**: Essential logging + coordination over complex resource management layers
+
+## Mobile Development Notes
+
+- When you install to a device or emulator, go ahead and launch the app
+
+## Efficiency Guidelines
+
+- **Build Tools**: When running fire-and-forget tasks (builds, tests, installs), use quiet/minimal output flags
+    - **Gradle**: Use `--quiet` and `--console=plain`
+
+## Implementation Best Practices
+
+### Before Coding (Project-Specific Additions)
+
+- **MUST** Follow TDD: scaffold stub -> write failing test -> implement
+- **MUST** Keep the Blueprint updated
+- **MUST** Keep the changelog updated
+- **MUST** Store prompts in a file called prompts.md
+
+### While Coding
+
+- **MUST** Follow Kotlin/PHP null safety conventions
+- **SHOULD** Use data classes for simple data containers; prefer sealed classes for state modeling (Kotlin)
+- **SHOULD NOT** Extract a new function unless it will be reused elsewhere, is the only way to unit-test otherwise untestable logic, or drastically improves readability of an opaque block
+- **MUST** Use null safety features of Kotlin and PHP (`?string` for nullable, never omit nullability)
+- **SHOULD** Keep controllers thin and simple in Laravel
+- **SHOULD** Use Eloquent for database access from Laravel
+- **MUST** Use as little code in Blade templates as possible — prefer controllers, services, or separate JS files
+- **MUST** Use a database abstraction layer for database access from Laravel
+- **MUST** Laravel projects use Laravel 11+ (no Console Kernel.php, use bootstrap/app.php for scheduling)
+- **SHOULD** Split classes over 1000 lines into smaller, focused pieces
+- **MUST** Update openapi.json after any API change
+
+### Testing
+
+- **MUST** For Kotlin: colocate unit tests in `*Test.kt` in test directory matching source package structure
+- **MUST** Unit tests for a function should be grouped under `class FunctionNameTest`
+- **SHOULD** Unit-test complex algorithms thoroughly
+- **SHOULD** Unit-test edge cases
+- **MUST** Use Laravel's testing features
+- **MUST** Use PHPUnit for testing
+- **MUST** Name test methods using camelCase
+- **SHOULD** Test the entire structure in one assertion if possible
+
+### Tooling Gates
+
+- **MUST** Run syntax check (`php -l`) for Laravel on all changed files
+- **MUST** `php artisan test` passes for all modules
+- **MUST** Run `phpcbf` on all changed PHP files
+
+---
+
 This repository is a Laravel 11+ audiobook management application with MySQL database, PHP backend, and jQuery/Vite frontend.
 
 ## TOP PRIORITY SAFETY RULES
