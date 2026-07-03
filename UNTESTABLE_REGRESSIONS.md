@@ -174,6 +174,30 @@ feature tests without running a real queue worker.
 
 ---
 
+## 12. Docker / Container Deployment
+
+The `Dockerfile`, `docker-compose*.yml`, and `docker/entrypoint.sh` orchestrate image build,
+first-boot bootstrap (APP_KEY generation, SQLite file creation or MySQL/PostgreSQL
+readiness wait, `migrate --force`, `storage:link`, config/route/view caching), and
+supervisor-managed nginx + php-fpm + queue worker + scheduler processes inside one
+container. None of this is exercised by PHPUnit/Jest — a passing test suite says nothing
+about whether the image actually builds, boots, serves traffic, or persists data correctly.
+
+- **`docker/entrypoint.sh`** — first-boot logic (SQLite creation, external DB wait loop,
+  migrations, caching) only runs when a container starts; a broken condition here silently
+  produces a container that never becomes healthy, or worse, runs with a stale/empty schema.
+- **`docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays** — switching database
+  backends via compose overlay is untested; a typo in the overlay's `environment:` block
+  fails silently until the app tries to query the database.
+- **Volume/bind-mount book storage** (`HOST_BOOK_STORAGE_PATH`, `HOST_DELETED_BOOKS_PATH`)
+  — see section 4; inside a container, a wrong host path or permission mismatch on the
+  bind mount is invisible until `checkStorageVolumes()` or an import job hits it.
+- **Supervisor process supervision** (`docker/supervisor/supervisord.conf`) — if php-fpm,
+  nginx, the queue worker, or the scheduler crashes inside the container, only supervisor's
+  restart behavior recovers it; no automated check verifies all four stay up.
+
+---
+
 ## Adding New Items
 
 When you introduce a feature that belongs in any category above:

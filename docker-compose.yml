@@ -1,0 +1,39 @@
+# Zero-config demo/deploy stack: one container running nginx + php-fpm +
+# queue worker + scheduler, backed by SQLite. No external database or cache
+# service required.
+#
+# Quick start:
+#   cp .env.docker.example .env.docker
+#   docker compose --env-file .env.docker up -d --build
+#   open http://localhost:8080
+#
+# --env-file is required (not just `--env-file`-less `docker compose up`)
+# because compose only auto-loads a file literally named `.env`; we use
+# `.env.docker` so it doesn't collide with the non-Docker `.env` used for a
+# regular (non-container) install of this app.
+#
+# To use MySQL or PostgreSQL instead of SQLite, see docker/README.md and
+# layer docker-compose.mysql.yml or docker-compose.pgsql.yml on top:
+#   docker compose --env-file .env.docker \
+#     -f docker-compose.yml -f docker-compose.mysql.yml up -d --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: audiobook-librarian-server:latest
+    ports:
+      - "${APP_PORT:-8080}:80"
+    env_file:
+      - .env.docker
+    volumes:
+      - app-storage:/var/www/html/storage
+      - app-database:/var/www/html/database
+      - ${HOST_BOOK_STORAGE_PATH:-./docker-data/books}:/data/books
+      - ${HOST_DELETED_BOOKS_PATH:-./docker-data/trash}:/data/trash
+    restart: unless-stopped
+
+volumes:
+  app-storage:
+  app-database:

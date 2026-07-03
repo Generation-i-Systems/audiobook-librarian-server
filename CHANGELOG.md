@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Added
+
+- Docker deployment support: `Dockerfile` (nginx + php-fpm + queue worker + scheduler in one image, via supervisor) and `docker-compose.yml` for a zero-config demo/deploy stack backed by SQLite, with optional `docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays to swap in MySQL or PostgreSQL. Purely additive — the existing non-Docker install path is unchanged. See `docker/README.md`
+
 ### Security
 
 - Fixed path traversal vulnerability in `ImageProxyController` (`/image-proxy` and `/cover/{path}` routes): user-supplied paths are now confined to the book storage root via `realpath()` before serving files

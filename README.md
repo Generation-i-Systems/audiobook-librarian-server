@@ -563,6 +563,13 @@ php artisan books:process-ai --model=claude-3-5-haiku
 5. Create an admin: `php artisan make:admin`
 6. Start the server: `php artisan serve`
 
+### Docker (demo / easy deploy elsewhere)
+
+Prefer a container? See [docker/README.md](docker/README.md) for a
+zero-config `docker compose up` setup (SQLite by default, MySQL/PostgreSQL
+optional). This is purely additive — it doesn't change the regular install
+steps above.
+
 ---
 
 ## Running Tests

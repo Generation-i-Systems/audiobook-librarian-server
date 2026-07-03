@@ -1,0 +1,35 @@
+# PostgreSQL overlay — layer on top of docker-compose.yml to replace SQLite
+# with a dedicated PostgreSQL container:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.pgsql.yml up -d --build
+
+services:
+  app:
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: pgsql
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_NAME:-ab_librarian}
+      DB_USERNAME: ${DB_USERNAME:-ablibrarian}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.docker}
+    depends_on:
+      pgsql:
+        condition: service_healthy
+
+  pgsql:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ab_librarian}
+      POSTGRES_USER: ${DB_USERNAME:-ablibrarian}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.docker}
+    volumes:
+      - pgsql-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-ablibrarian}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgsql-data:

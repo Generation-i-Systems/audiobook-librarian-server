@@ -1,0 +1,36 @@
+# MySQL overlay — layer on top of docker-compose.yml to replace SQLite with
+# a dedicated MySQL container:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.mysql.yml up -d --build
+
+services:
+  app:
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_NAME:-ab_librarian}
+      DB_USERNAME: ${DB_USERNAME:-ablibrarian}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.docker}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-ab_librarian}
+      MYSQL_USER: ${DB_USERNAME:-ablibrarian}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.docker}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env.docker}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
