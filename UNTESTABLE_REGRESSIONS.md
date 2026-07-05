@@ -113,6 +113,12 @@ rendering or real user interactions.
   wiring on page load.
 - **Inline cover preview during import** — the cover candidate list with inline `<img>` tags
   rendered in the terminal; verifying display requires a human.
+- **Skin designer rendering parity** (`public/js/skin-designer.js` `SkinRenderer.renderElement()`)
+  — must stay in sync with the Android client's renderer (`ElementRenderers.kt`, separate repo
+  `audiobook-librarian-client`) and `tools/preview_skin.py`, both outside this repo and untouched
+  by this repo's test suite. Any new element property (e.g. `foregroundImage`) can silently render
+  correctly here but differently — or not at all — on the other two, with no automated check
+  across repos. Verify new rendering properties manually in all three places.
 
 ---
 

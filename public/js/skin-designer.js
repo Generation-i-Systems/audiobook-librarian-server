@@ -767,7 +767,23 @@ class SkinRenderer {
                 div.style.fontWeight = el.fontWeight || 'normal';
                 break;
             case 'button': {
-                const btnImage = el.image || el.customImage;
+                // foregroundImage is the button's own picture; image/customImage is the legacy
+                // key skins authored before foregroundImage existed use as their sole picture —
+                // kept as a fallback so those skins render unchanged. Once foregroundImage is set,
+                // image/customImage instead becomes a background fill drawn behind it (matches the
+                // Android client's ButtonRenderer semantics).
+                const legacyImage = el.image || el.customImage;
+                const btnImage = el.foregroundImage || legacyImage;
+                if (el.foregroundImage && legacyImage) {
+                    const bgImg = document.createElement('img');
+                    bgImg.src = this.state.resolveAssetUrl(legacyImage);
+                    bgImg.style.position = 'absolute';
+                    bgImg.style.inset = '0';
+                    bgImg.style.width = '100%';
+                    bgImg.style.height = '100%';
+                    bgImg.style.objectFit = 'cover';
+                    div.appendChild(bgImg);
+                }
                 if (btnImage) {
                     const img = document.createElement('img');
                     img.src = this.state.resolveAssetUrl(btnImage);
@@ -799,10 +815,27 @@ class SkinRenderer {
                 break;
             }
             case 'image':
-            case 'cover-image':
-                if (el.image) {
+            case 'cover-image': {
+                // foregroundImage is the element's own picture; image/customImage is the legacy
+                // key skins authored before foregroundImage existed use as their sole picture —
+                // kept as a fallback so those skins render unchanged. Once foregroundImage is set,
+                // image/customImage instead becomes a background fill drawn behind it (matches the
+                // Android client's ImageRenderer semantics).
+                const legacyPicture = el.image || el.customImage;
+                const foregroundPicture = el.foregroundImage || legacyPicture;
+                if (el.foregroundImage && legacyPicture) {
+                    const bgImg = document.createElement('img');
+                    bgImg.src = this.state.resolveAssetUrl(legacyPicture);
+                    bgImg.style.position = 'absolute';
+                    bgImg.style.inset = '0';
+                    bgImg.style.width = '100%';
+                    bgImg.style.height = '100%';
+                    bgImg.style.objectFit = 'cover';
+                    div.appendChild(bgImg);
+                }
+                if (foregroundPicture) {
                      const img = document.createElement('img');
-                     img.src = this.state.resolveAssetUrl(el.image);
+                     img.src = this.state.resolveAssetUrl(foregroundPicture);
                      img.style.width = '100%';
                      img.style.height = '100%';
                      img.style.objectFit = 'cover';
@@ -843,6 +876,7 @@ class SkinRenderer {
                      div.innerText = el.type;
                 }
                 break;
+            }
             case 'progress-bar': {
                 const activeColor = this.resolveThemeColor(el.themeable?.activeColor, '#0d6efd');
                 const inactiveColor = this.resolveThemeColor(el.themeable?.inactiveColor, '#495057');
@@ -1278,11 +1312,13 @@ class PropertyEditor {
         if (el.type === 'button') {
             this.addActionInput('Action', el.action || '', (val) => this.state.updateElement(el.id, { action: val }));
             this.addThemeColorInput('Tint', el.themeable?.tint || '', (val) => this.state.updateElement(el.id, { themeable: { ...el.themeable, tint: val } }));
-            this.addImageInput('Icon Image', el.image, (val) => this.state.updateElement(el.id, { image: val }));
+            this.addImageInput('Foreground Image', el.foregroundImage, (val) => this.state.updateElement(el.id, { foregroundImage: val }), { tooltip: 'The button\'s own picture, drawn on top. Set "Icon Image" below too to use it as a background behind this.' });
+            this.addImageInput('Icon Image', el.image, (val) => this.state.updateElement(el.id, { image: val }), { tooltip: 'Legacy image key. Used as the button\'s picture if Foreground Image is empty; otherwise drawn as a background behind Foreground Image.' });
         }
 
         if (el.type === 'image' || el.type === 'cover-image') {
-             this.addImageInput('Image Source', el.image, (val) => this.state.updateElement(el.id, { image: val }));
+             this.addImageInput('Foreground Image', el.foregroundImage, (val) => this.state.updateElement(el.id, { foregroundImage: val }), { tooltip: 'The element\'s own picture, drawn on top. Set "Image Source" below too to use it as a background behind this.' });
+             this.addImageInput('Image Source', el.image, (val) => this.state.updateElement(el.id, { image: val }), { tooltip: 'Legacy image key. Used as the picture if Foreground Image is empty; otherwise drawn as a background behind Foreground Image.' });
         }
 
         if (el.type === 'progress-bar') {
@@ -1858,7 +1894,7 @@ class PropertyEditor {
         }, { error });
     }
 
-    addImageInput(label, value, onChange) {
+    addImageInput(label, value, onChange, options = {}) {
         this.renderField(label, document.createElement('div'), (container) => {
             container.style.display = 'flex';
             container.style.flexDirection = 'column';
@@ -1945,7 +1981,7 @@ class PropertyEditor {
                 controls.appendChild(select);
             }
             container.appendChild(controls);
-        });
+        }, options);
     }
 
     addSelect(label, value, options, onChange, fieldOptions = {}) {

@@ -684,6 +684,10 @@ Interactive button for playback control.
 - `themeable.tint` - Icon tint color (theme color key)
 - `themeable.backgroundColor` - Button background color (theme color key, optional)
 - `images.default` - Custom button image (optional)
+- `foregroundImage` - The button's own picture, drawn on top of everything else (optional). If
+  `customImage` is also set, it's drawn as a background fill behind `foregroundImage` instead of
+  being used as the button's picture. If `foregroundImage` is omitted, `customImage` is used as the
+  button's sole picture (legacy behavior, kept for skins authored before `foregroundImage` existed).
 - `gestures` - Override default tap behavior
 
 **Built-in Icons**: The app provides Material Icons for common actions. Set `action` to get the
@@ -794,6 +798,10 @@ Static decorative image with advanced background modes, gradient support, and de
 **Properties**:
 
 - `customImage` - Path to main image file in your ZIP
+- `foregroundImage` - The element's own picture, drawn on top of everything else (optional). If
+  `customImage` is also set, it's drawn as a background fill behind `foregroundImage` instead of
+  being used as the main picture. If `foregroundImage` is omitted, `customImage` is used as the
+  sole picture (legacy behavior, kept for skins authored before `foregroundImage` existed).
 - `backgroundMode` - How image fills space (see below)
 - `backgroundColor` - Hex color for padding areas (solid color)
 - `backgroundGradient` - Gradient background (see [Gradient Backgrounds](#gradient-backgrounds))
