@@ -34,6 +34,9 @@
                             <a href="{{ route('admin.skins.edit', $skin['id']) }}" class="btn btn-warning">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
+                            <a href="{{ route('gallery.skins.designer', $skin['id']) }}" class="btn btn-info text-white">
+                                <i class="fas fa-paint-brush"></i> Designer
+                            </a>
                         </div>
                     </div>
 

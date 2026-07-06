@@ -93,6 +93,9 @@
                                             <a href="{{ route('admin.skins.edit', $skin['id']) }}" class="btn btn-outline-secondary" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            <a href="{{ route('gallery.skins.designer', $skin['id']) }}" class="btn btn-outline-info" title="Designer">
+                                                <i class="fas fa-paint-brush"></i>
+                                            </a>
                                             <form action="{{ route('admin.skins.destroy', $skin['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this skin?')">
                                                 @csrf
                                                 @method('DELETE')

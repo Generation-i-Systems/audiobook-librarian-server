@@ -3,6 +3,12 @@
 ### Added
 
 - Docker deployment support: `Dockerfile` (nginx + php-fpm + queue worker + scheduler in one image, via supervisor) and `docker-compose.yml` for a zero-config demo/deploy stack backed by SQLite, with optional `docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays to swap in MySQL or PostgreSQL. Purely additive — the existing non-Docker install path is unchanged. See `docker/README.md`
+- Skin gallery now links to the skin designer everywhere it's logical: a "Design New Skin" button on the community gallery and My Skins page, a per-card "Designer" link on skins you own in the community gallery, unconditional Edit/Designer/Delete actions on the My Skins page, and Designer links in the admin skin list and admin skin detail page
+- Added the previously-missing `gallery.skins.my-skins` view — the "My Skins" route existed but had no Blade template, so visiting it always threw a `ViewNotFoundException`; the page now renders correctly
+
+### Fixed
+
+- Fixed a crash in the skin gallery, skin detail, and My Skins pages when a skin has no preview image: `$skin['previewPath'] ?? $skin['preview_path']` threw `ErrorException: Undefined array key "preview_path"` because the underlying model only ever produces camelCase keys, so the snake_case fallback could never be satisfied once `previewPath` was present but `null`
 
 ### Security
 

@@ -14,8 +14,8 @@
                 </div>
             @endif
 
-            @if(!empty($skin['previewPath'] ?? $skin['preview_path']))
-                <img src="{{ asset('storage/' . ($skin['previewPath'] ?? $skin['preview_path'])) }}"
+            @if(!empty($skin['previewPath']))
+                <img src="{{ asset('storage/' . $skin['previewPath']) }}"
                      class="img-fluid mb-4" alt="{{ $skin['name'] }}">
             @endif
 
