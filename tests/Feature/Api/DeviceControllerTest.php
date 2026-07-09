@@ -241,4 +241,110 @@ class DeviceControllerTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function testUpdatePushTokenSuccessfully()
+    {
+        $device = Device::create([
+            'device_id' => 'test-device',
+            'user_id' => $this->user->id,
+            'name' => 'Device',
+            'last_seen' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
+            ->putJson('/api/v1/devices/test-device/push-token', [
+                'push_token' => 'fcm-token-abc123',
+                'push_platform' => 'fcm',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'device_id' => 'test-device',
+                'push_platform' => 'fcm',
+            ]);
+
+        $this->assertDatabaseHas('devices', [
+            'device_id' => 'test-device',
+            'push_token' => 'fcm-token-abc123',
+            'push_platform' => 'fcm',
+        ]);
+    }
+
+    public function testUpdatePushTokenRequiresPushToken()
+    {
+        $device = Device::create([
+            'device_id' => 'test-device',
+            'user_id' => $this->user->id,
+            'name' => 'Device',
+            'last_seen' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
+            ->putJson('/api/v1/devices/test-device/push-token', [
+                'push_platform' => 'fcm',
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function testUpdatePushTokenRejectsInvalidPlatform()
+    {
+        $device = Device::create([
+            'device_id' => 'test-device',
+            'user_id' => $this->user->id,
+            'name' => 'Device',
+            'last_seen' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
+            ->putJson('/api/v1/devices/test-device/push-token', [
+                'push_token' => 'abc123',
+                'push_platform' => 'apns',
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function testUpdatePushTokenReturns404ForNonExistentDevice()
+    {
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
+            ->putJson('/api/v1/devices/non-existent/push-token', [
+                'push_token' => 'abc123',
+                'push_platform' => 'fcm',
+            ]);
+
+        $response->assertStatus(404)
+            ->assertJson([
+                'error' => 'Device not found',
+            ]);
+    }
+
+    public function testUpdatePushTokenDoesNotAllowAccessToOtherUsersDevice()
+    {
+        $otherUser = User::factory()->create();
+        $device = Device::create([
+            'device_id' => 'other-device',
+            'user_id' => $otherUser->id,
+            'name' => 'Other Device',
+            'last_seen' => now(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
+            ->putJson('/api/v1/devices/other-device/push-token', [
+                'push_token' => 'abc123',
+                'push_platform' => 'fcm',
+            ]);
+
+        $response->assertStatus(404);
+    }
 }

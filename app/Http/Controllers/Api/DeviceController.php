@@ -105,4 +105,33 @@ class DeviceController extends Controller
             'sync_enabled' => $device->sync_enabled,
         ]);
     }
+
+    public function updatePushToken(Request $request, string $deviceId): JsonResponse
+    {
+        $user = auth()->user();
+
+        $device = Device::where('device_id', $deviceId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$device) {
+            return response()->json([
+                'error' => 'Device not found',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'push_token' => 'required|string|max:4096',
+            'push_platform' => 'required|string|in:fcm,adm',
+        ]);
+
+        $device->push_token = $validated['push_token'];
+        $device->push_platform = $validated['push_platform'];
+        $device->save();
+
+        return response()->json([
+            'device_id' => $device->device_id,
+            'push_platform' => $device->push_platform,
+        ]);
+    }
 }

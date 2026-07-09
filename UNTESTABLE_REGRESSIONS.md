@@ -177,6 +177,12 @@ feature tests without running a real queue worker.
 - **Mobile app QR/server-connect redirector** — QR scanning, custom URL scheme dispatch,
   app-store fallback behavior, and returning after first install depend on real Android/iOS
   devices, installed app variants, browser behavior, and store availability.
+- **Push token registration (`DeviceController::updatePushToken`)** — this endpoint only
+  stores the FCM/ADM token; there is no send-side integration (no Firebase Admin SDK / ADM
+  HTTP client wired up anywhere yet). Whether a stored token is actually valid, whether it
+  belongs to the store variant it claims (`fcm` vs `adm`), and whether a push notification
+  built from it would actually reach a device can only be verified against a real Google
+  Play / Amazon Appstore install, not this test suite.
 
 ---
 

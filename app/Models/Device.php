@@ -13,6 +13,8 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property string $name
  * @property \Illuminate\Support\Carbon|null $last_seen
  * @property bool $sync_enabled
+ * @property string|null $push_token
+ * @property string|null $push_platform
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \App\Models\User $user
@@ -33,6 +35,8 @@ class Device extends Model
         'name',
         'last_seen',
         'sync_enabled',
+        'push_token',
+        'push_platform',
     ];
 
     protected $casts = [

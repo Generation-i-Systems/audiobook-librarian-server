@@ -3605,6 +3605,67 @@
                 }
             }
         },
+        "/devices/{deviceId}/push-token": {
+            "put": {
+                "tags": ["Devices"],
+                "summary": "Register a device push token",
+                "description": "Registers (or updates) the FCM/ADM push notification token for a device.",
+                "operationId": "updateDevicePushToken",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "deviceId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["push_token", "push_platform"],
+                                "properties": {
+                                    "push_token": {
+                                        "type": "string"
+                                    },
+                                    "push_platform": {
+                                        "type": "string",
+                                        "enum": ["fcm", "adm"]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "404": {
+                        "description": "Device not found"
+                    }
+                }
+            }
+        },
         "/sync/positions": {
             "get": {
                 "tags": ["Sync"],

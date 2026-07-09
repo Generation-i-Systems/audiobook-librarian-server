@@ -3,6 +3,7 @@
 ### Added
 
 - Docker deployment support: `Dockerfile` (nginx + php-fpm + queue worker + scheduler in one image, via supervisor) and `docker-compose.yml` for a zero-config demo/deploy stack backed by SQLite, with optional `docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays to swap in MySQL or PostgreSQL. Purely additive — the existing non-Docker install path is unchanged. See `docker/README.md`
+- `PUT /devices/{deviceId}/push-token` endpoint so mobile clients can register their FCM/ADM push notification token against a device. Registration only — no send-side (Firebase Admin SDK / ADM) integration yet.
 
 ### Changed
 

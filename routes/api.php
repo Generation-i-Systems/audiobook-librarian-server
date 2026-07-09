@@ -124,6 +124,7 @@ Route::prefix('v1')->group(function () {
             Route::put('/devices/{deviceId}', [DeviceController::class, 'update']);
             Route::delete('/devices/{deviceId}', [DeviceController::class, 'destroy']);
             Route::put('/devices/{deviceId}/sync-enabled', [DeviceController::class, 'updateSyncEnabled']);
+            Route::put('/devices/{deviceId}/push-token', [DeviceController::class, 'updatePushToken']);
 
             // Position Sync Routes
             Route::prefix('sync')->group(function () {
