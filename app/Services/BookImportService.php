@@ -450,24 +450,31 @@ class BookImportService
             }
         }
 
-        $existingBook = $this->findExistingBook((string) ($audiobook['path'] ?? ''), $metadata);
-        if ($existingBook instanceof Book) {
-            $metadataForUpdate = $metadata;
-            if (empty($existingBook->directory_path)) {
-                $metadataForUpdate['custom_directory_path'] = $this->generateDirectoryPath(
-                    $metadata,
-                    ['include_title' => true]
-                );
+        // "Import anyway with new name" means the user explicitly rejected reusing
+        // the matched existing book — this MUST create a brand new Book record,
+        // never fall through to the reuse/update path below.
+        $forceNewBook = !empty($metadata['_force_rename_directory']);
+
+        if (!$forceNewBook) {
+            $existingBook = $this->findExistingBook((string) ($audiobook['path'] ?? ''), $metadata);
+            if ($existingBook instanceof Book) {
+                $metadataForUpdate = $metadata;
+                if (empty($existingBook->directory_path)) {
+                    $metadataForUpdate['custom_directory_path'] = $this->generateDirectoryPath(
+                        $metadata,
+                        ['include_title' => true]
+                    );
+                }
+
+                Log::info('Reusing existing book record before create', [
+                    'existing_book_id' => $existingBook->id,
+                    'existing_directory_path' => $existingBook->directory_path,
+                    'incoming_source_path' => $audiobook['path'] ?? null,
+                    'incoming_title' => $metadata['title'] ?? null,
+                ]);
+
+                return $this->updateBookFromMetadata($existingBook, $metadataForUpdate, $audiobook, $options);
             }
-
-            Log::info('Reusing existing book record before create', [
-                'existing_book_id' => $existingBook->id,
-                'existing_directory_path' => $existingBook->directory_path,
-                'incoming_source_path' => $audiobook['path'] ?? null,
-                'incoming_title' => $metadata['title'] ?? null,
-            ]);
-
-            return $this->updateBookFromMetadata($existingBook, $metadataForUpdate, $audiobook, $options);
         }
 
         try {
@@ -489,6 +496,22 @@ class BookImportService
             // Store directory path for the audiobook files (including title)
             // This must match the actual filesystem path where files will be moved
             $book->directory_path = $this->generateDirectoryPath($metadata, ['include_title' => true]);
+
+            // "Import anyway with new name": the generated path may collide with the
+            // existing book's directory on disk, so find a non-colliding name.
+            if ($forceNewBook) {
+                $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
+                if ($bookStoragePath) {
+                    $fullPath = rtrim((string) $bookStoragePath, '/') . '/' . ltrim($book->directory_path, '/');
+                    if (File::isDirectory($fullPath)) {
+                        $uniqueFullPath = $this->findAvailableDirectoryWithSuffix($fullPath);
+                        $book->directory_path = ltrim(
+                            substr($uniqueFullPath, strlen(rtrim((string) $bookStoragePath, '/'))),
+                            '/'
+                        );
+                    }
+                }
+            }
 
             // CRITICAL: Duration MUST come from actual audio files, NEVER from enrichment
             // Calculate from audio files if available
@@ -9163,6 +9186,15 @@ class BookImportService
                 $uiServiceLogCallback('💾 Creating database record...');
             }
 
+            // Lock in whatever directory path was actually shown/approved (interactive
+            // review sets this on accept; auto mode never went through review, so fall
+            // back to the "Expected directory path" logged above) so the book is
+            // persisted and moved to exactly that path, even if an existing book record
+            // already has a different stored directory_path.
+            if (empty($aiMetadata['custom_directory_path'])) {
+                $aiMetadata['custom_directory_path'] = $expectedPath;
+            }
+
             $book = $this->createBookFromMetadata($aiMetadata, $audiobook);
 
             if ($book) {
@@ -9287,6 +9319,10 @@ class BookImportService
                     $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 2 → Genre)');
                     continue;
                 }
+                // Lock in the exact path shown at approval time so the file is moved
+                // to what the user actually approved, even if this book already
+                // existed with a different stored directory_path.
+                $metadata['custom_directory_path'] = $currentDirectoryPath;
                 return true;
             }
             if (in_array($choice, ['3', 's', 'skip'], true)) {

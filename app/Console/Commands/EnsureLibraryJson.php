@@ -6,6 +6,7 @@ use App\Models\Book;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class EnsureLibraryJson extends Command
 {
@@ -72,7 +73,9 @@ class EnsureLibraryJson extends Command
                     continue;
                 }
 
-                if (!is_dir($book->directory_path)) {
+                $bookDir = Storage::disk('books')->path($book->directory_path);
+
+                if (!is_dir($bookDir)) {
                     $this->line('');
                     $this->warn(sprintf('Skipping book %d (%s): Directory does not exist: %s', $book->id, $book->title, $book->directory_path));
                     $skipped++;
@@ -80,7 +83,7 @@ class EnsureLibraryJson extends Command
                     continue;
                 }
 
-                $jsonPath = rtrim($book->directory_path, '/') . '/librarian.json';
+                $jsonPath = rtrim($bookDir, '/') . '/librarian.json';
 
                 if ($dryRun) {
                     if (!file_exists($jsonPath) || $processAll) {
