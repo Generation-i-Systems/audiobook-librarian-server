@@ -111,35 +111,8 @@ class PathTraversalTest extends TestCase
         $response->assertStatus(404);
     }
 
-    // ── SkinAssetController::show() ─────────────────────────────────────────────
-
-    public function testSkinAssetBlocksPathTraversalInAssetPath(): void
-    {
-        $skinRoot = $this->tempDir . '/skins';
-        $skinDir = $skinRoot . '/myskin';
-        File::makeDirectory($skinDir . '/assets', 0755, true);
-        file_put_contents($skinDir . '/assets/ok.png', 'img');
-        file_put_contents($this->tempDir . '/secret.txt', 'secret');
-
-        Config::set('app.skin_paths', $skinRoot);
-
-        // Attempt to traverse out of the skin directory
-        $response = $this->get('/skin-asset/myskin/../../secret.txt');
-
-        $response->assertStatus(404);
-    }
-
-    public function testSkinAssetServesLegitimateAsset(): void
-    {
-        $skinRoot = $this->tempDir . '/skins';
-        $skinDir = $skinRoot . '/myskin';
-        File::makeDirectory($skinDir . '/assets', 0755, true);
-        file_put_contents($skinDir . '/assets/ok.png', "\x89PNG\r\n\x1a\n");
-
-        Config::set('app.skin_paths', $skinRoot);
-
-        $response = $this->get('/skin-asset/myskin/assets/ok.png');
-
-        $response->assertStatus(200);
-    }
+    // SkinAssetController::show() moved to audiobook-librarian-www as part of
+    // the skin/theme extraction — its path-traversal regression coverage now
+    // lives there (tests/Feature/SkinAssetTest.php), since /skin-asset/* here
+    // is now just a redirect to the identical www route.
 }

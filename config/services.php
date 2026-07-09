@@ -115,4 +115,11 @@ return [
         'default_provider' => env('AI_DEFAULT_PROVIDER', 'gemini'),
     ],
 
+    // Transitional skin/theme API proxy to audiobook-librarian-www. See
+    // app/Services/GalleryProxyClient.php and docs/GALLERY_MIGRATION.md.
+    'gallery_www' => [
+        'base_url' => env('GALLERY_WWW_BASE_URL', ''),
+        'trust_secret' => env('GALLERY_PROXY_SHARED_SECRET', ''),
+    ],
+
 ];

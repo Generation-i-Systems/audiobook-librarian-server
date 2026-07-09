@@ -111,9 +111,18 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withProviders([
         \App\Providers\BookParserServiceProvider::class,
-        \App\Providers\GalleryServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions): void {
+        // audiobook-librarian-www unreachable/timed out while proxying a
+        // skin/theme request — a clean 502, not the raw connection exception.
+        $exceptions->render(function (\App\Exceptions\GalleryProxyUnavailableException $e, $request) {
+            return response()->json([
+                'error' => true,
+                'message' => 'The gallery service is temporarily unavailable. Please try again shortly.',
+                'code' => 502,
+            ], 502);
+        });
+
         // Ensure API routes return JSON errors
         $exceptions->render(function (\Throwable $e, $request) {
             if ($request->is('api/*') || $request->wantsJson()) {

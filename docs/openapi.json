@@ -5107,6 +5107,72 @@
                 }
             }
         },
+        "/health/capabilities": {
+            "get": {
+                "tags": ["Health"],
+                "summary": "Server capability discovery",
+                "description": "Returns which features this server supports, so clients can adapt their UI accordingly. No authentication required. Clients that receive a 404 from this endpoint should assume all capabilities are supported (older server versions predating this endpoint).",
+                "operationId": "healthCapabilities",
+                "responses": {
+                    "200": {
+                        "description": "Server capabilities",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "serverType": {
+                                            "type": "string",
+                                            "example": "ablibrarian-full"
+                                        },
+                                        "syncApiVersion": {
+                                            "type": "string",
+                                            "example": "1"
+                                        },
+                                        "capabilities": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "example": [
+                                                "BROWSE",
+                                                "DOWNLOAD",
+                                                "HISTORY_SYNC",
+                                                "STATS",
+                                                "BOOKMARKS_SYNC",
+                                                "RECOMMENDATIONS",
+                                                "METADATA_MATCH",
+                                                "SKINS_GALLERY",
+                                                "PLAYLISTS",
+                                                "BADGES"
+                                            ]
+                                        },
+                                        "requiresAuth": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "authMethods": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "example": [
+                                                "username_password",
+                                                "google_oauth",
+                                                "facebook_oauth",
+                                                "apple_oauth",
+                                                "discord_oauth",
+                                                "email_otp"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/register": {
             "post": {
                 "tags": ["Authentication"],

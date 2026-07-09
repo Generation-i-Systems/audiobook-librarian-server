@@ -21,13 +21,31 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\ReviewController;
-use App\Http\Controllers\BuiltinSkinController;
-use App\Http\Controllers\SkinWebController;
-use App\Http\Controllers\ThemeWebController;
 use App\Http\Controllers\UserLibraryController;
 use App\Http\Controllers\Api\EmailOtpController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+
+/**
+ * Skin/theme management (gallery pages, designer, admin panels, built-in
+ * skin browsing) has moved entirely to audiobook-librarian-www — see the
+ * extraction plan and docs/GALLERY_MIGRATION.md. Every route below that used
+ * to serve a Blade view now redirects to the identical path on www, since
+ * both apps use the same URL structure for this feature. Route names are
+ * kept unchanged so existing route() calls elsewhere in this app (e.g. the
+ * nav in layouts/app.blade.php) keep working without modification.
+ *
+ * A closure (not a top-level function) so requiring this file more than
+ * once in the same process — which Laravel's test suite does whenever it
+ * boots a fresh application — never triggers a "cannot redeclare" fatal.
+ */
+$redirectToGalleryWww = function (Request $request) {
+    $target = rtrim((string) config('services.gallery_www.base_url'), '/') . '/' . ltrim($request->path(), '/');
+    $query = $request->getQueryString();
+
+    return redirect()->away($target . ($query ? '?' . $query : ''));
+};
 
 // Magic link OTP web routes (no auth required — these ARE the auth mechanism)
 Route::get('/auth/magic/{token}', [EmailOtpController::class, 'magicLanding'])
@@ -210,11 +228,9 @@ Route::get('/google-books-cover/{encodedUrl}', [
     'googleBooksCover',
 ])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
 
-// Skin asset proxy - serves assets from configured skin paths
-Route::get('/skin-asset/{skinId}/{path}', [
-    \App\Http\Controllers\SkinAssetController::class,
-    'show',
-])->where('path', '.*')->name('skin.asset.proxy');
+// Skin asset proxy — moved to audiobook-librarian-www.
+Route::get('/skin-asset/{skinId}/{path}', $redirectToGalleryWww)
+    ->where('path', '.*')->name('skin.asset.proxy');
 
 // Admin series autocomplete endpoint for book form (accessible to admin users)
 Route::get('/admin/series-autocomplete', [BookAutocompleteController::class, 'autocompleteSeries'])
@@ -223,7 +239,7 @@ Route::get('/admin/series-autocomplete', [BookAutocompleteController::class, 'au
 
 
 
-Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function (): void {
+Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () use ($redirectToGalleryWww): void {
     // Admin Social Activity Dashboard
     Route::get('/social-activity', [Admin\SocialController::class, 'index'])->name('social.index');
 
@@ -617,61 +633,77 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::delete('/trash', [Admin\TrashController::class, 'destroyAll'])->name('trash.destroyAll');
     Route::post('/trash/cleanup', [Admin\TrashController::class, 'applyAutoCleanup'])->name('trash.cleanup');
 
-    // Skin & Theme Management
-    Route::resource('skins', Admin\SkinController::class);
-    Route::resource('themes', Admin\ThemeController::class);
+    // Skin & Theme Management — moved to audiobook-librarian-www. Kept behind
+    // this group's existing auth+admin middleware as extra safety, even
+    // though it's a harmless redirect.
+    Route::name('skins.')->prefix('skins')->group(function () use ($redirectToGalleryWww): void {
+        Route::get('/', $redirectToGalleryWww)->name('index');
+        Route::get('/create', $redirectToGalleryWww)->name('create');
+        Route::post('/', $redirectToGalleryWww)->name('store');
+        Route::get('/{skin}', $redirectToGalleryWww)->name('show');
+        Route::get('/{skin}/edit', $redirectToGalleryWww)->name('edit');
+        Route::match(['put', 'patch'], '/{skin}', $redirectToGalleryWww)->name('update');
+        Route::delete('/{skin}', $redirectToGalleryWww)->name('destroy');
+    });
+    Route::name('themes.')->prefix('themes')->group(function () use ($redirectToGalleryWww): void {
+        Route::get('/', $redirectToGalleryWww)->name('index');
+        Route::get('/create', $redirectToGalleryWww)->name('create');
+        Route::post('/', $redirectToGalleryWww)->name('store');
+        Route::get('/{theme}', $redirectToGalleryWww)->name('show');
+        Route::get('/{theme}/edit', $redirectToGalleryWww)->name('edit');
+        Route::match(['put', 'patch'], '/{theme}', $redirectToGalleryWww)->name('update');
+        Route::delete('/{theme}', $redirectToGalleryWww)->name('destroy');
+    });
 });
 
-// Gallery Routes (Skins & Themes)
-Route::name('gallery.')->prefix('gallery')->group(function (): void {
-    // Skin Routes
-    Route::name('skins.')->prefix('skins')->group(function (): void {
-        Route::get('/', [SkinWebController::class, 'index'])->name('index');
-        Route::get('/create', [SkinWebController::class, 'create'])->name('create');
-        Route::get('/design-new', [SkinWebController::class, 'designerNew'])->name('designerNew');
-        Route::post('/', [SkinWebController::class, 'store'])->name('store');
-        Route::get('/my-skins', [SkinWebController::class, 'mySkins'])->name('my-skins');
-        Route::get('/sample-data', [SkinWebController::class, 'getSampleData'])->name('sample-data');
-        Route::get('/{id}', [SkinWebController::class, 'show'])->name('show')->whereNumber('id');
-        Route::get('/{id}/edit', [SkinWebController::class, 'edit'])->name('edit')->whereNumber('id');
-        Route::put('/{id}', [SkinWebController::class, 'update'])->name('update')->whereNumber('id');
-        Route::delete('/{id}', [SkinWebController::class, 'destroy'])->name('destroy')->whereNumber('id');
-        Route::post('/{id}/fork', [SkinWebController::class, 'fork'])->name('fork')->whereNumber('id');
-        Route::post('/{id}/rate', [SkinWebController::class, 'rate'])->name('rate')->whereNumber('id');
+// Gallery Routes (Skins & Themes) — moved to audiobook-librarian-www; every
+// route here just redirects to the identical path there (same URL structure
+// on both apps), see $redirectToGalleryWww above.
+Route::name('gallery.')->prefix('gallery')->group(function () use ($redirectToGalleryWww): void {
+    Route::name('skins.')->prefix('skins')->group(function () use ($redirectToGalleryWww): void {
+        Route::get('/', $redirectToGalleryWww)->name('index');
+        Route::get('/create', $redirectToGalleryWww)->name('create');
+        Route::get('/design-new', $redirectToGalleryWww)->name('designerNew');
+        Route::post('/', $redirectToGalleryWww)->name('store');
+        Route::get('/my-skins', $redirectToGalleryWww)->name('my-skins');
+        Route::get('/sample-data', $redirectToGalleryWww)->name('sample-data');
+        Route::get('/{id}', $redirectToGalleryWww)->name('show')->whereNumber('id');
+        Route::get('/{id}/edit', $redirectToGalleryWww)->name('edit')->whereNumber('id');
+        Route::put('/{id}', $redirectToGalleryWww)->name('update')->whereNumber('id');
+        Route::delete('/{id}', $redirectToGalleryWww)->name('destroy')->whereNumber('id');
+        Route::post('/{id}/fork', $redirectToGalleryWww)->name('fork')->whereNumber('id');
+        Route::post('/{id}/rate', $redirectToGalleryWww)->name('rate')->whereNumber('id');
 
-        // Designer Routes
-        Route::get('/{id}/designer', [SkinWebController::class, 'designer'])->name('designer')->whereNumber('id');
-        Route::post('/{id}/manifest', [SkinWebController::class, 'updateManifest'])->name('updateManifest')->whereNumber('id');
-        Route::post('/{id}/assets', [SkinWebController::class, 'uploadAsset'])->name('uploadAsset')->whereNumber('id');
-        Route::get('/{id}/assets', [SkinWebController::class, 'listAssets'])->name('listAssets')->whereNumber('id');
-        Route::post('/{id}/fork-designer', [SkinWebController::class, 'forkForDesigner'])->name('forkForDesigner')->whereNumber('id');
-        Route::get('/{id}/export', [SkinWebController::class, 'exportZip'])->name('exportZip')->whereNumber('id');
+        Route::get('/{id}/designer', $redirectToGalleryWww)->name('designer')->whereNumber('id');
+        Route::post('/{id}/manifest', $redirectToGalleryWww)->name('updateManifest')->whereNumber('id');
+        Route::post('/{id}/assets', $redirectToGalleryWww)->name('uploadAsset')->whereNumber('id');
+        Route::get('/{id}/assets', $redirectToGalleryWww)->name('listAssets')->whereNumber('id');
+        Route::post('/{id}/fork-designer', $redirectToGalleryWww)->name('forkForDesigner')->whereNumber('id');
+        Route::get('/{id}/export', $redirectToGalleryWww)->name('exportZip')->whereNumber('id');
 
-        // Built-in skins (from client repository)
-        Route::prefix('builtin')->name('builtin.')->group(function (): void {
-            Route::get('/', [BuiltinSkinController::class, 'index'])->name('index');
-            Route::get('/asset/{slug}/{path}', [BuiltinSkinController::class, 'serveAsset'])->name('asset')->where('path', '.*');
-            Route::get('/{slug}', [BuiltinSkinController::class, 'show'])->name('show');
-            Route::get('/{slug}/designer', [BuiltinSkinController::class, 'designer'])->name('designer');
-            Route::post('/{slug}/manifest', [BuiltinSkinController::class, 'updateManifest'])->name('updateManifest');
-            Route::post('/{slug}/assets', [BuiltinSkinController::class, 'uploadAsset'])->name('uploadAsset');
-            Route::get('/{slug}/assets', [BuiltinSkinController::class, 'listAssets'])->name('listAssets');
-            Route::post('/{slug}/fork', [BuiltinSkinController::class, 'fork'])->name('fork');
-            Route::get('/{slug}/download', [BuiltinSkinController::class, 'download'])->name('download');
+        Route::prefix('builtin')->name('builtin.')->group(function () use ($redirectToGalleryWww): void {
+            Route::get('/', $redirectToGalleryWww)->name('index');
+            Route::get('/asset/{slug}/{path}', $redirectToGalleryWww)->name('asset')->where('path', '.*');
+            Route::get('/{slug}', $redirectToGalleryWww)->name('show');
+            Route::get('/{slug}/designer', $redirectToGalleryWww)->name('designer');
+            Route::post('/{slug}/manifest', $redirectToGalleryWww)->name('updateManifest');
+            Route::post('/{slug}/assets', $redirectToGalleryWww)->name('uploadAsset');
+            Route::get('/{slug}/assets', $redirectToGalleryWww)->name('listAssets');
+            Route::post('/{slug}/fork', $redirectToGalleryWww)->name('fork');
+            Route::get('/{slug}/download', $redirectToGalleryWww)->name('download');
         });
     });
 
-    // Theme Routes
-    Route::name('themes.')->prefix('themes')->group(function (): void {
-        Route::get('/', [ThemeWebController::class, 'index'])->name('index');
-        Route::get('/create', [ThemeWebController::class, 'create'])->name('create');
-        Route::post('/', [ThemeWebController::class, 'store'])->name('store');
-        Route::get('/my-themes', [ThemeWebController::class, 'myThemes'])->name('my-themes');
-        Route::get('/{id}', [ThemeWebController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [ThemeWebController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [ThemeWebController::class, 'update'])->name('update');
-        Route::delete('/{id}', [ThemeWebController::class, 'destroy'])->name('destroy');
-        Route::post('/{id}/fork', [ThemeWebController::class, 'fork'])->name('fork');
-        Route::post('/{id}/rate', [ThemeWebController::class, 'rate'])->name('rate');
+    Route::name('themes.')->prefix('themes')->group(function () use ($redirectToGalleryWww): void {
+        Route::get('/', $redirectToGalleryWww)->name('index');
+        Route::get('/create', $redirectToGalleryWww)->name('create');
+        Route::post('/', $redirectToGalleryWww)->name('store');
+        Route::get('/my-themes', $redirectToGalleryWww)->name('my-themes');
+        Route::get('/{id}', $redirectToGalleryWww)->name('show');
+        Route::get('/{id}/edit', $redirectToGalleryWww)->name('edit');
+        Route::put('/{id}', $redirectToGalleryWww)->name('update');
+        Route::delete('/{id}', $redirectToGalleryWww)->name('destroy');
+        Route::post('/{id}/fork', $redirectToGalleryWww)->name('fork');
+        Route::post('/{id}/rate', $redirectToGalleryWww)->name('rate');
     });
 });

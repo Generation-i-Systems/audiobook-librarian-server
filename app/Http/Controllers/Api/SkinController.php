@@ -3,20 +3,26 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Contracts\SkinServiceInterface;
+use App\Services\GalleryProxyClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use ZipArchive;
 
+/**
+ * Proxies skin API requests to audiobook-librarian-www, which is the real
+ * source of truth for this data (see the extraction plan). Request
+ * validation here is kept as a first-pass client-facing 422 responder, in
+ * addition to www's own validation — defense in depth, and avoids sending
+ * obviously-bad multipart uploads over the wire needlessly. Route names and
+ * response shapes are unchanged so existing mobile/web clients see no
+ * difference in behavior.
+ */
 class SkinController extends Controller
 {
     public function __construct(
-        protected SkinServiceInterface $skinService
+        protected GalleryProxyClient $gallery
     ) {
     }
 
@@ -33,136 +39,30 @@ class SkinController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $filters = $request->has('search') ? ['search' => $request->get('search')] : [];
-        $page = $request->get('page', 1);
-        $perPage = $request->get('per_page', 24);
-        $sort = $request->get('sort', 'recent');
+        $response = $this->gallery->get('/api/v1/skins', $request->only(['search', 'sort', 'page', 'per_page']));
 
-        try {
-            $result = $this->skinService->listSkins($filters, $page, $perPage, $sort);
-
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function show(int $id): JsonResponse
     {
-        try {
-            $skin = $this->skinService->getSkin($id);
+        $response = $this->gallery->get("/api/v1/skins/{$id}");
 
-            if (! $skin) {
-                return response()->json(['error' => 'Skin not found'], 404);
-            }
-
-            return response()->json($skin);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
-    public function download(int $id): Response|BinaryFileResponse
+    public function download(int $id): Response
     {
-        try {
-            $skin = $this->skinService->getSkin($id);
+        $response = $this->gallery->get("/api/v1/skins/{$id}/download");
 
-            if (! $skin) {
-                return response('Skin not found', 404);
-            }
-
-            $skinFilePath = $skin['file_path'] ?? $skin['filePath'] ?? null;
-
-            if (! is_string($skinFilePath) || $skinFilePath === '') {
-                return response('File not found', 404);
-            }
-
-            $filePath = Storage::disk('local')->path($skinFilePath);
-
-            if (! file_exists($filePath)) {
-                $legacyFilePath = storage_path('app/' . ltrim($skinFilePath, '/'));
-                if (file_exists($legacyFilePath)) {
-                    $filePath = $legacyFilePath;
-                }
-            }
-
-            if (! file_exists($filePath)) {
-                $filePath = $this->skinService->buildZip($id);
-            }
-
-            if (! file_exists($filePath)) {
-                return response('File not found', 404);
-            }
-
-            $filePath = $this->repairLegacySkinZipIfNeeded($filePath, $id);
-
-            if ($skinModel = \App\Models\Skin::find($id)) {
-                $skinModel->incrementDownloadCount();
-            }
-
-            return response()->download($filePath, ($skin['name'] ?? 'skin') . '.zip');
-        } catch (\Exception $e) {
-            return response($e->getMessage(), 500);
-        }
-    }
-
-    private function repairLegacySkinZipIfNeeded(string $filePath, int $skinId): string
-    {
-        $zip = new ZipArchive();
-        if ($zip->open($filePath) !== true) {
-            return $filePath;
+        if ($response->failed()) {
+            return response($response->body(), $response->status());
         }
 
-        $entries = [];
-        $requiresRepair = false;
-
-        for ($i = 0; $i < $zip->numFiles; $i++) {
-            $originalName = $zip->getNameIndex($i);
-            $repairedName = $this->repairLegacyZipEntryName($originalName);
-            $entries[] = [$originalName, $repairedName, $zip->getFromIndex($i), str_ends_with($originalName, '/')];
-            if ($originalName !== $repairedName) {
-                $requiresRepair = true;
-            }
-        }
-        $zip->close();
-
-        if (! $requiresRepair) {
-            return $filePath;
-        }
-
-        $repairedPath = storage_path("app/skins/{$skinId}/skin_repaired_" . time() . '.zip');
-        if (! is_dir(dirname($repairedPath))) {
-            mkdir(dirname($repairedPath), 0755, true);
-        }
-
-        $repairedZip = new ZipArchive();
-        if ($repairedZip->open($repairedPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            return $filePath;
-        }
-
-        foreach ($entries as [$originalName, $repairedName, $content, $isDirectory]) {
-            if ($isDirectory) {
-                $repairedZip->addEmptyDir(rtrim($repairedName, '/'));
-                continue;
-            }
-
-            $repairedZip->addFromString($repairedName, $content ?: '');
-        }
-
-        $repairedZip->close();
-
-        return $repairedPath;
-    }
-
-    private function repairLegacyZipEntryName(string $entryName): string
-    {
-        return match (true) {
-            $entryName === 'nifest.json' => 'manifest.json',
-            $entryName === 'ADME.md' => 'README.md',
-            str_starts_with($entryName, 'sets/') => 'as' . $entryName,
-            str_starts_with($entryName, 'eview') => 'pr' . $entryName,
-            default => $entryName,
-        };
+        return response($response->body(), 200, [
+            'Content-Type' => $response->header('Content-Type') ?: 'application/zip',
+            'Content-Disposition' => $response->header('Content-Disposition') ?: 'attachment',
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -184,19 +84,14 @@ class SkinController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $skin = $this->skinService->createSkin(
-                Auth::id(),
-                $request->only(['name', 'author', 'version', 'description', 'is_public']),
-                $request->file('file')
-            );
+        $response = $this->gallery->postAsUser(
+            '/api/v1/skins/upload',
+            $request->only(['name', 'author', 'version', 'description', 'is_public']),
+            Auth::user(),
+            ['file' => $request->file('file')]
+        );
 
-            return response()->json($skin, 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -215,21 +110,13 @@ class SkinController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $skin = $this->skinService->updateSkin(
-                $id,
-                Auth::id(),
-                $request->only(['name', 'description', 'is_public'])
-            );
+        $response = $this->gallery->patchAsUser(
+            "/api/v1/skins/{$id}",
+            $request->only(['name', 'description', 'is_public']),
+            Auth::user()
+        );
 
-            return response()->json($skin);
-        } catch (\RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 403);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function destroy(int $id): JsonResponse
@@ -238,17 +125,9 @@ class SkinController extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        try {
-            $this->skinService->deleteSkin($id, Auth::id());
+        $response = $this->gallery->deleteAsUser("/api/v1/skins/{$id}", Auth::user());
 
-            return response()->json(['message' => 'Skin deleted successfully']);
-        } catch (\RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 403);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function fork(Request $request, int $id): JsonResponse
@@ -265,15 +144,13 @@ class SkinController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $skin = $this->skinService->forkSkin($id, Auth::id(), $request->get('name'));
+        $response = $this->gallery->postAsUser(
+            "/api/v1/skins/{$id}/fork",
+            ['name' => $request->get('name')],
+            Auth::user()
+        );
 
-            return response()->json($skin, 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function rate(Request $request, int $id): JsonResponse
@@ -291,20 +168,13 @@ class SkinController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $rating = $this->skinService->rateSkin(
-                $id,
-                Auth::id(),
-                $request->get('rating'),
-                $request->get('comment')
-            );
+        $response = $this->gallery->postAsUser(
+            "/api/v1/skins/{$id}/rate",
+            $request->only(['rating', 'comment']),
+            Auth::user()
+        );
 
-            return response()->json($rating, 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function mySkins(Request $request): JsonResponse
@@ -322,30 +192,20 @@ class SkinController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $page = $request->get('page', 1);
-        $perPage = $request->get('per_page', 24);
+        $response = $this->gallery->getAsUser(
+            '/api/v1/skins/my-skins',
+            $request->only(['page', 'per_page']),
+            Auth::user()
+        );
 
-        try {
-            $result = $this->skinService->getMySkins(Auth::id(), $page, $perPage);
-
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function getCustomizations(int $id): JsonResponse
     {
-        try {
-            $userId = Auth::id() ?? 0;
-            $result = $this->skinService->getCustomizations($id, $userId);
+        $response = $this->gallery->get("/api/v1/skins/{$id}/customizations");
 
-            return response()->json($result);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function uploadCustomization(Request $request, int $id): JsonResponse
@@ -365,18 +225,15 @@ class SkinController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $customization = $this->skinService->addCustomization(
-                $id,
-                Auth::id(),
-                $request->all()
-            );
+        $files = $request->hasFile('image') ? ['image' => $request->file('image')] : [];
 
-            return response()->json($customization, 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        $response = $this->gallery->postAsUser(
+            "/api/v1/skins/{$id}/customizations",
+            $request->only(['type', 'value', 'visibility']),
+            Auth::user(),
+            $files
+        );
+
+        return response()->json($response->json(), $response->status());
     }
 }

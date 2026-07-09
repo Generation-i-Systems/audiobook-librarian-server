@@ -3,16 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Contracts\ThemeServiceInterface;
+use App\Services\GalleryProxyClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
+/**
+ * Proxies theme API requests to audiobook-librarian-www — see
+ * Api\SkinController for the design notes shared by both controllers.
+ */
 class ThemeController extends Controller
 {
     public function __construct(
-        protected ThemeServiceInterface $themeService
+        protected GalleryProxyClient $gallery
     ) {
     }
 
@@ -29,55 +33,23 @@ class ThemeController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $filters = $request->has('search') ? ['search' => $request->get('search')] : [];
-        $page = $request->get('page', 1);
-        $perPage = $request->get('per_page', 24);
-        $sort = $request->get('sort', 'recent');
+        $response = $this->gallery->get('/api/v1/themes', $request->only(['search', 'sort', 'page', 'per_page']));
 
-        try {
-            $result = $this->themeService->listThemes($filters, $page, $perPage, $sort);
-
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function show(int $id): JsonResponse
     {
-        try {
-            $theme = $this->themeService->getTheme($id);
+        $response = $this->gallery->get("/api/v1/themes/{$id}");
 
-            if (! $theme) {
-                return response()->json(['error' => 'Theme not found'], 404);
-            }
-
-            return response()->json($theme);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function download(int $id): JsonResponse
     {
-        try {
-            $theme = $this->themeService->getTheme($id);
+        $response = $this->gallery->get("/api/v1/themes/{$id}/download");
 
-            if (! $theme) {
-                return response()->json(['error' => 'Theme not found'], 404);
-            }
-
-            \App\Models\Theme::find($id)->incrementDownloadCount();
-
-            return response()->json([
-                'theme_data' => $theme['theme_data'],
-                'name' => $theme['name'],
-                'author' => $theme['author'],
-                'version' => $theme['version'],
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function store(Request $request): JsonResponse
@@ -99,18 +71,13 @@ class ThemeController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $theme = $this->themeService->createTheme(
-                Auth::id(),
-                $request->only(['name', 'author', 'version', 'description', 'theme_data', 'is_public'])
-            );
+        $response = $this->gallery->postAsUser(
+            '/api/v1/themes/upload',
+            $request->only(['name', 'author', 'version', 'description', 'theme_data', 'is_public']),
+            Auth::user()
+        );
 
-            return response()->json($theme, 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -130,21 +97,13 @@ class ThemeController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $theme = $this->themeService->updateTheme(
-                $id,
-                Auth::id(),
-                $request->only(['name', 'description', 'theme_data', 'is_public'])
-            );
+        $response = $this->gallery->patchAsUser(
+            "/api/v1/themes/{$id}",
+            $request->only(['name', 'description', 'theme_data', 'is_public']),
+            Auth::user()
+        );
 
-            return response()->json($theme);
-        } catch (\RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 403);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function destroy(int $id): JsonResponse
@@ -153,17 +112,9 @@ class ThemeController extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
-        try {
-            $this->themeService->deleteTheme($id, Auth::id());
+        $response = $this->gallery->deleteAsUser("/api/v1/themes/{$id}", Auth::user());
 
-            return response()->json(['message' => 'Theme deleted successfully']);
-        } catch (\RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 403);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function fork(Request $request, int $id): JsonResponse
@@ -180,15 +131,13 @@ class ThemeController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $theme = $this->themeService->forkTheme($id, Auth::id(), $request->get('name'));
+        $response = $this->gallery->postAsUser(
+            "/api/v1/themes/{$id}/fork",
+            ['name' => $request->get('name')],
+            Auth::user()
+        );
 
-            return response()->json($theme, 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function rate(Request $request, int $id): JsonResponse
@@ -206,20 +155,13 @@ class ThemeController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        try {
-            $rating = $this->themeService->rateTheme(
-                $id,
-                Auth::id(),
-                $request->get('rating'),
-                $request->get('comment')
-            );
+        $response = $this->gallery->postAsUser(
+            "/api/v1/themes/{$id}/rate",
+            $request->only(['rating', 'comment']),
+            Auth::user()
+        );
 
-            return response()->json($rating, 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 
     public function myThemes(Request $request): JsonResponse
@@ -237,15 +179,12 @@ class ThemeController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $page = $request->get('page', 1);
-        $perPage = $request->get('per_page', 24);
+        $response = $this->gallery->getAsUser(
+            '/api/v1/themes/my-themes',
+            $request->only(['page', 'per_page']),
+            Auth::user()
+        );
 
-        try {
-            $result = $this->themeService->getMyThemes(Auth::id(), $page, $perPage);
-
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return response()->json($response->json(), $response->status());
     }
 }
