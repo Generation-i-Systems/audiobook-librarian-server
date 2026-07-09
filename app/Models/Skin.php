@@ -21,7 +21,7 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property string $file_path
  * @property string|null $preview_path
  * @property int $file_size
- * @property array $manifest
+ * @property array|null $manifest
  * @property bool $is_public
  * @property int $download_count
  * @property float $average_rating

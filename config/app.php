@@ -79,6 +79,10 @@ return [
 
     'client_skins_path' => env('CLIENT_SKINS_PATH', ''),
 
+    // Path to audiobook-librarian-www's storage/app directory, used only by
+    // the one-time `gallery:migrate-to-www` command.
+    'www_storage_path' => env('WWW_STORAGE_PATH', ''),
+
     /*
     |--------------------------------------------------------------------------
     | Library Repair Sync Path

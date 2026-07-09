@@ -214,6 +214,23 @@ return [
             'database' => env('MONGODB_DB', 'your_database_name'),
         ],
 
+        // Throwaway connection to the audiobook-librarian-www database, used only
+        // by the one-time `gallery:migrate-to-www` command (see Phase 3 of the
+        // skin/theme extraction plan). Not used anywhere else in the app.
+        'www' => [
+            'driver' => env('WWW_DB_CONNECTION', 'sqlite'),
+            'url' => env('WWW_DB_URL'),
+            'database' => env('WWW_DB_DATABASE', ''),
+            'host' => env('WWW_DB_HOST', '127.0.0.1'),
+            'port' => env('WWW_DB_PORT', '3306'),
+            'username' => env('WWW_DB_USERNAME', ''),
+            'password' => env('WWW_DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ],
+
     ],
 
     /*
