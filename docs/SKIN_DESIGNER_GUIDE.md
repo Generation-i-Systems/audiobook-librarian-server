@@ -798,6 +798,10 @@ Static decorative image with advanced background modes, gradient support, and de
 **Properties**:
 
 - `customImage` - Path to main image file in your ZIP
+- `nightImage` - Optional dark-mode replacement for `customImage`. When the resolved theme is dark
+  (see [Night Mode](#night-mode) below), the renderer/preview tool uses `nightImage` instead of
+  `customImage` for this element, falling back to `customImage` if `nightImage` is unset. Useful
+  for a `background` element that should swap to different artwork at night.
 - `foregroundImage` - The element's own picture, drawn on top of everything else (optional). If
   `customImage` is also set, it's drawn as a background fill behind `foregroundImage` instead of
   being used as the main picture. If `foregroundImage` is omitted, `customImage` is used as the
@@ -2171,6 +2175,36 @@ Offer users variety within your skin:
 ```
 
 Users can switch themes without changing skins!
+
+### Night Mode
+
+A skin can automatically switch to a dark look when the device's system dark mode is on, without
+the user having to pick a different theme:
+
+- Declare an embedded theme keyed exactly `"dark"` in `embeddedThemes`. Whenever the system is in
+  dark mode, the player (and `preview_skin.py --dark`) prefers `embeddedThemes.dark` over whatever
+  `defaultTheme` points to. Skins that don't define a `"dark"` entry are unaffected — they keep
+  using `defaultTheme` regardless of system dark mode, exactly as before this convention existed.
+- For any `image`-type element (most commonly your `background` element), set `nightImage` to a
+  dark-mode replacement picture (see [Image](#5-image)). It's swapped in for `customImage` under
+  the same condition.
+
+```json
+"embeddedThemes": {
+  "light": {/* light colors */},
+  "dark": {/* dark colors, chosen automatically when system dark mode is on */}
+},
+"defaultTheme": "light"
+```
+
+```json
+{
+  "id": "background",
+  "type": "image",
+  "customImage": "assets/images/background-day.jpg",
+  "nightImage": "assets/images/background-night.jpg"
+}
+```
 
 ### Landscape Layout
 
