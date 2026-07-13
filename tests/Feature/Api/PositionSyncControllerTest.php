@@ -159,8 +159,13 @@ class PositionSyncControllerTest extends TestCase
             'device_id' => 'device-1',
             'current_position_seconds' => 1800,
             'progress_percentage' => 25.0,
-            'updated_at' => now()->subHours(2),
         ]);
+
+        BookProgress::withoutTimestamps(function () use ($oldProgress): void {
+            $oldProgress->forceFill([
+                'updated_at' => now()->subHours(2),
+            ])->save();
+        });
 
         $sinceTime = now()->subHour();
 

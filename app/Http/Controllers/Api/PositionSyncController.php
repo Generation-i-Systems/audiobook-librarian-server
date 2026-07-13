@@ -10,6 +10,7 @@ use App\Services\BadgeService;
 use App\Services\PositionMaterializer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class PositionSyncController extends Controller
@@ -50,7 +51,7 @@ class PositionSyncController extends Controller
         });
 
         if ($request->has('since')) {
-            $query->where('book_positions.updated_at', '>', $request->input('since'));
+            $query->where('book_positions.updated_at', '>', $this->parseSince((string) $request->input('since')));
         }
 
         if ($request->has('book_ids')) {
@@ -101,7 +102,7 @@ class PositionSyncController extends Controller
         });
 
         if ($request->has('since')) {
-            $query->where('book_progress.updated_at', '>', $request->input('since'));
+            $query->where('book_progress.updated_at', '>', $this->parseSince((string) $request->input('since')));
         }
 
         if ($request->has('book_ids')) {
@@ -135,6 +136,13 @@ class PositionSyncController extends Controller
                 'updated_at' => $progress->updated_at->toIso8601String(),
             ];
         });
+    }
+
+    private function parseSince(string $value): Carbon
+    {
+        $normalizedValue = preg_replace('/ (?=\d{2}:\d{2}$)/', '+', $value) ?? $value;
+
+        return Carbon::parse($normalizedValue);
     }
 
     public function show(Request $request, int $bookId): JsonResponse

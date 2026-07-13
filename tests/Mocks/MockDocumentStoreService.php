@@ -639,6 +639,11 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return true;
     }
 
+    public function permanentlyDeleteUser(string $id): bool
+    {
+        return $this->deleteUser($id);
+    }
+
     /**
      * Get a user by their Apple ID.
      *

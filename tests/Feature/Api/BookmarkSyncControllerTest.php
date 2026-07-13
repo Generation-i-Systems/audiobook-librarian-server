@@ -53,7 +53,7 @@ class BookmarkSyncControllerTest extends TestCase
     {
         $stringId = Str::uuid()->toString();
 
-        Bookmark::create([
+        $bookmark = Bookmark::create([
             'user_id' => $this->user->id,
             'book_id' => $this->book->id,
             'string_id' => $stringId,
@@ -111,7 +111,7 @@ class BookmarkSyncControllerTest extends TestCase
     {
         $stringId = Str::uuid()->toString();
 
-        Bookmark::create([
+        $bookmark = Bookmark::create([
             'user_id' => $this->user->id,
             'book_id' => $this->book->id,
             'string_id' => $stringId,
@@ -119,9 +119,14 @@ class BookmarkSyncControllerTest extends TestCase
             'device_name' => 'Phone',
             'position_ms' => 1800000,
             'position' => 1800,
-            'created_at' => now()->subHours(2),
-            'updated_at' => now()->subHours(2),
         ]);
+
+        Bookmark::withoutTimestamps(function () use ($bookmark): void {
+            $bookmark->forceFill([
+                'created_at' => now()->subHours(2),
+                'updated_at' => now()->subHours(2),
+            ])->save();
+        });
 
         $sinceTime = now()->subHour();
 

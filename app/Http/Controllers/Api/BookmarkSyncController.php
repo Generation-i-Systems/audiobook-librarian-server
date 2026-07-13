@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bookmark;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -20,10 +21,12 @@ class BookmarkSyncController extends Controller
         }
 
         if ($request->has('since')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('created_at', '>', $request->input('since'))
-                    ->orWhere('updated_at', '>', $request->input('since'))
-                    ->orWhere('deleted_at', '>', $request->input('since'));
+            $since = $this->parseSince((string) $request->input('since'));
+
+            $query->where(function ($q) use ($since) {
+                $q->where('created_at', '>', $since)
+                    ->orWhere('updated_at', '>', $since)
+                    ->orWhere('deleted_at', '>', $since);
             });
         }
 
@@ -92,6 +95,13 @@ class BookmarkSyncController extends Controller
             'server_timestamp' => now()->toIso8601String(),
             'bookmarks' => $formattedBookmarks,
         ]);
+    }
+
+    private function parseSince(string $value): Carbon
+    {
+        $normalizedValue = preg_replace('/ (?=\d{2}:\d{2}$)/', '+', $value) ?? $value;
+
+        return Carbon::parse($normalizedValue);
     }
 
     public function store(Request $request): JsonResponse
