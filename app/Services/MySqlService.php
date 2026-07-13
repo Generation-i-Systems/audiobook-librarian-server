@@ -149,8 +149,13 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         $adapter = new LibriVoxBookAdapter();
 
         /** @var \App\Models\LibriVox\Book|null $book */
-        $book = \App\Models\LibriVox\Book::with(['authors', 'genres', 'chapters'])->find($id)
-            ?? \App\Models\LibriVox\Book::with(['authors', 'genres', 'chapters'])->where('librivox_id', $id)->first();
+        $book = \App\Models\LibriVox\Book::with(['authors', 'genres', 'chapters'])->find($id);
+
+        if (!$book) {
+            $book = \App\Models\LibriVox\Book::with(['authors', 'genres', 'chapters'])
+                ->where('librivox_id', $id)
+                ->first();
+        }
 
         if ($book) {
             return $adapter->toDocumentStoreBook($book);
@@ -772,8 +777,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      * @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
-    private function listLibrivoxBooksFromApi(int $page, int $perPage, array $filters, LibriVoxBookAdapter $adapter): array
-    {
+    private function listLibrivoxBooksFromApi(
+        int $page,
+        int $perPage,
+        array $filters,
+        LibriVoxBookAdapter $adapter,
+    ): array {
         $offset = ($page - 1) * $perPage;
         $search = (string) ($filters['search'] ?? $filters['title'] ?? '');
         $language = (string) ($filters['language'] ?? '');
@@ -1753,6 +1762,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     public function deleteUser(string $id)
     {
         return $this->getUserAccountService()->deleteUser($id);
+    }
+
+    public function permanentlyDeleteUser(string $id): bool
+    {
+        return $this->getUserAccountService()->permanentlyDeleteUser($id);
     }
 
     /**

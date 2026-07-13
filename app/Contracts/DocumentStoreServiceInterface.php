@@ -257,6 +257,8 @@ interface DocumentStoreServiceInterface
 
     public function deleteUser(string $id);
 
+    public function permanentlyDeleteUser(string $id): bool;
+
     public function isAdmin(string $userId): bool;
 
     public function getUsersForMessaging(): array;

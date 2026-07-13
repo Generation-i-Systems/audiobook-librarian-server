@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\ClientEvent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -135,6 +136,23 @@ class UserAccountService
     public function deleteUser(string $id): int
     {
         return User::where('id', $id)->delete();
+    }
+
+    public function permanentlyDeleteUser(string $id): bool
+    {
+        return DB::transaction(function () use ($id): bool {
+            $user = User::withTrashed()->find($id);
+
+            if (!$user) {
+                return false;
+            }
+
+            $user->tokens()->delete();
+            DB::table('api_tokens')->where('user_id', $user->id)->delete();
+            ClientEvent::where('user_id', $user->id)->delete();
+
+            return $user->forceDelete();
+        });
     }
 
     public function getUserByEmail(string $email): ?array

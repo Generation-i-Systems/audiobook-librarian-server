@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
+use App\Models\ClientEvent;
+use App\Services\AccountDeletionService;
+use App\Mail\AccountDeletionScheduledMail;
+use App\Mail\AccountDeletionVerificationMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -295,5 +300,106 @@ class AuthControllerTest extends TestCase
         // Verify token was deleted from DB
         $tokenRow = DB::table('api_tokens')->where('token', $token)->first();
         $this->assertNull($tokenRow);
+    }
+
+    #[Test]
+    public function testAuthenticatedUserCanScheduleAndCancelAccountDeletion(): void
+    {
+        $uniqueSuffix = uniqid('', true);
+        $user = User::create([
+            'name' => 'Delete Me',
+            'username' => 'delete' . $uniqueSuffix,
+            'email' => 'delete' . $uniqueSuffix . '@example.com',
+            'password' => Hash::make('password'),
+            'role' => 'library-user',
+        ]);
+
+        $loginResponse = $this->postJson('/api/v1/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+        $token = $loginResponse->json('token');
+
+        ClientEvent::create([
+            'user_id' => $user->id,
+            'device_id' => 'test-device',
+            'event_type' => 'book_started',
+            'event_timestamp' => now(),
+        ]);
+
+        Mail::fake();
+
+        $verificationResponse = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson('/api/v1/account');
+
+        $verificationResponse->assertOk();
+
+        $verificationCode = null;
+        Mail::assertSent(AccountDeletionVerificationMail::class, function (AccountDeletionVerificationMail $mail) use (&$verificationCode): bool {
+            $verificationCode = $mail->verificationCode;
+
+            return true;
+        });
+
+        $this->assertNotNull($verificationCode);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->deleteJson('/api/v1/account', ['verification_code' => $verificationCode]);
+
+        $response->assertOk()->assertJson([
+            'message' => 'Account deletion scheduled',
+        ]);
+        $deletedUser = User::withTrashed()->findOrFail($user->id);
+        $this->assertNotNull($deletedUser->deleted_at);
+        $this->assertEquals(now()->addDays(30)->toDateString(), $deletedUser->deletion_scheduled_for->toDateString());
+        $this->assertDatabaseMissing('api_tokens', ['user_id' => $user->id]);
+        $this->assertDatabaseHas('client_events', ['user_id' => $user->id]);
+
+        $cancellationUrl = null;
+        Mail::assertSent(AccountDeletionScheduledMail::class, function (AccountDeletionScheduledMail $mail) use (&$cancellationUrl): bool {
+            $cancellationUrl = $mail->cancellationUrl;
+
+            return true;
+        });
+        $this->assertNotNull($cancellationUrl);
+
+        $cancellationToken = basename(parse_url($cancellationUrl, PHP_URL_PATH));
+        $cancelResponse = $this->post('/account-deletion/cancel/' . $cancellationToken);
+
+        $cancelResponse->assertRedirect('/account-deletion/cancelled');
+        $restoredUser = User::findOrFail($user->id);
+        $this->assertNull($restoredUser->deleted_at);
+        $this->assertNull($restoredUser->deletion_scheduled_for);
+    }
+
+    #[Test]
+    public function testScheduledAccountDeletionIsPermanentlyErasedAfterRetentionPeriod(): void
+    {
+        $uniqueSuffix = uniqid('', true);
+        $user = User::create([
+            'name' => 'Purge Me',
+            'username' => 'purge' . $uniqueSuffix,
+            'email' => 'purge' . $uniqueSuffix . '@example.com',
+            'password' => Hash::make('password'),
+            'role' => 'library-user',
+        ]);
+        ClientEvent::create([
+            'user_id' => $user->id,
+            'device_id' => 'purge-test-device',
+            'event_type' => 'book_started',
+            'event_timestamp' => now(),
+        ]);
+
+        $service = app(AccountDeletionService::class);
+        $service->schedule($user);
+        User::withTrashed()->findOrFail($user->id)->forceFill([
+            'deletion_scheduled_for' => now()->subSecond(),
+        ])->save();
+
+        $this->assertSame(1, $service->purgeDueAccounts());
+        $this->assertNull(User::withTrashed()->find($user->id));
+        $this->assertDatabaseMissing('client_events', ['user_id' => $user->id]);
     }
 }

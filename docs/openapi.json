@@ -12088,6 +12088,110 @@
                 }
             }
         },
+        "/account": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Send account deletion verification code",
+                "operationId": "requestAccountDeletionVerification",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Verification code sent"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "429": {
+                        "description": "Too many requests"
+                    }
+                }
+            },
+            "delete": {
+                "tags": ["Authentication"],
+                "summary": "Schedule deletion of the authenticated account",
+                "description": "Requires a current email verification code. Revokes access immediately and permanently deletes the account and associated data after 30 days unless the user cancels using the emailed link.",
+                "operationId": "deleteAccount",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["verification_code"],
+                                "properties": {
+                                    "verification_code": {
+                                        "type": "string",
+                                        "minLength": 6,
+                                        "maxLength": 6
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Account deletion scheduled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Account deletion scheduled"
+                                        },
+                                        "scheduled_for": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/account": {
+            "delete": {
+                "tags": ["Authentication"],
+                "summary": "Permanently delete the authenticated account (alias)",
+                "operationId": "deleteAccountAlias",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Account deleted successfully"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                }
+            }
+        },
         "/auth/refresh": {
             "post": {
                 "tags": ["Authentication"],

@@ -23,6 +23,7 @@ use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\UserLibraryController;
 use App\Http\Controllers\Api\EmailOtpController;
+use App\Http\Controllers\AccountDeletionCancellationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -57,6 +58,12 @@ Route::post('/auth/magic/{token}/continue', [EmailOtpController::class, 'magicCo
     ->name('auth.magic.continue');
 Route::post('/auth/otp/request', [EmailOtpController::class, 'request'])
     ->name('auth.otp.request');
+
+Route::get('/account-deletion/cancel/{token}', [AccountDeletionCancellationController::class, 'show'])
+    ->where('token', '[A-Za-z0-9]{64}');
+Route::post('/account-deletion/cancel/{token}', [AccountDeletionCancellationController::class, 'cancel'])
+    ->where('token', '[A-Za-z0-9]{64}');
+Route::get('/account-deletion/cancelled', fn () => view('account-deletion.cancelled'));
 
 // --- EMERGENCY ROUTES ---
 // Emergency book routes that bypass memory-intensive models

@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -16,3 +17,5 @@ Artisan::command('bkmv {source} {destination} {--dry-run} {--force} {--import}',
         '--import' => $this->option('import'),
     ]);
 })->purpose('Move a book directory (alias for books:move)');
+
+Schedule::command('accounts:purge-scheduled-deletions')->daily();

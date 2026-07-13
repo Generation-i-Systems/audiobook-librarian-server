@@ -6,10 +6,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Mail\AccountDeletionScheduledMail;
+use App\Mail\AccountDeletionVerificationMail;
+use App\Models\EmailOtp;
+use App\Models\User;
+use App\Services\AccountDeletionService;
 use App\Services\NewUserRegistrationNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Sanctum\PersonalAccessToken;
 use Firebase\JWT\JWT;
@@ -21,12 +28,16 @@ class AuthController extends Controller
 
     protected NewUserRegistrationNotifier $registrationNotifier;
 
+    protected AccountDeletionService $accountDeletionService;
+
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
-        NewUserRegistrationNotifier $registrationNotifier
+        NewUserRegistrationNotifier $registrationNotifier,
+        AccountDeletionService $accountDeletionService,
     ) {
         $this->documentStoreService = $documentStoreService;
         $this->registrationNotifier = $registrationNotifier;
+        $this->accountDeletionService = $accountDeletionService;
     }
 
     public function register(Request $request)
@@ -408,6 +419,106 @@ class AuthController extends Controller
         }
 
         return response()->json(['message' => 'Successfully logged out']);
+    }
+
+    public function requestAccountDeletionVerification(Request $request)
+    {
+        $authenticatedUser = $request->user();
+
+        if ($authenticatedUser === null) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $user = User::find($authenticatedUser->getAuthIdentifier());
+
+        if ($user === null) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $throttleKey = 'account-deletion-verification:' . $user->id;
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            return response()->json(['message' => 'Too many verification requests. Please wait a minute.'], 429);
+        }
+        RateLimiter::hit($throttleKey, 60);
+
+        $verificationCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        EmailOtp::where('email', $user->email)
+            ->where('type', 'account_deletion')
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->update(['used_at' => now()]);
+
+        EmailOtp::create([
+            'email' => $user->email,
+            'code_hash' => hash('sha256', $verificationCode),
+            'magic_token_hash' => hash('sha256', bin2hex(random_bytes(32))),
+            'allow_signup' => false,
+            'type' => 'account_deletion',
+            'attempts' => 0,
+            'expires_at' => now()->addMinutes(EmailOtp::TTL_MINUTES),
+            'ip_address' => $request->ip(),
+            'user_agent' => substr((string) $request->userAgent(), 0, 255),
+        ]);
+
+        Mail::to($user->email)->send(new AccountDeletionVerificationMail($verificationCode, $user->name));
+
+        return response()->json([
+            'message' => 'A verification code has been sent to your email address.',
+            'expires_in_seconds' => EmailOtp::TTL_MINUTES * 60,
+        ]);
+    }
+
+    public function deleteAccount(Request $request)
+    {
+        $authenticatedUser = $request->user();
+
+        if ($authenticatedUser === null) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $user = User::find($authenticatedUser->getAuthIdentifier());
+
+        if ($user === null) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'verification_code' => 'required|string|size:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        $otp = EmailOtp::where('email', $user->email)
+            ->where('type', 'account_deletion')
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->latest('id')
+            ->first();
+
+        if ($otp === null || !$otp->isRedeemable() || !hash_equals($otp->code_hash, hash('sha256', (string) $request->input('verification_code')))) {
+            if ($otp !== null) {
+                $otp->increment('attempts');
+            }
+
+            return response()->json(['message' => 'Invalid or expired verification code.'], 400);
+        }
+
+        $otp->forceFill(['used_at' => now()])->save();
+        $cancellationToken = $this->accountDeletionService->schedule($user);
+        $scheduledFor = now()->addDays(AccountDeletionService::RETENTION_DAYS);
+
+        Mail::to($user->email)->send(new AccountDeletionScheduledMail(
+            cancellationUrl: url('/account-deletion/cancel/' . $cancellationToken),
+            recipientName: $user->name,
+            scheduledFor: $scheduledFor->toFormattedDateString(),
+        ));
+
+        return response()->json([
+            'message' => 'Account deletion scheduled',
+            'scheduled_for' => $scheduledFor->toIso8601String(),
+        ]);
     }
 
     public function refresh(Request $request)

@@ -68,13 +68,19 @@ Route::prefix('v1')->group(function () {
     // Public Skin Routes (no authentication required)
     Route::get('/skins', [SkinController::class, 'index'])->name('api.v1.skins.index');
     Route::get('/skins/{id}', [SkinController::class, 'show'])->whereNumber('id')->name('api.v1.skins.show');
-    Route::get('/skins/{id}/download', [SkinController::class, 'download'])->whereNumber('id')->name('api.v1.skins.download');
-    Route::get('/skins/{id}/customizations', [SkinController::class, 'getCustomizations'])->whereNumber('id')->name('api.v1.skins.customizations');
+    Route::get('/skins/{id}/download', [SkinController::class, 'download'])
+        ->whereNumber('id')
+        ->name('api.v1.skins.download');
+    Route::get('/skins/{id}/customizations', [SkinController::class, 'getCustomizations'])
+        ->whereNumber('id')
+        ->name('api.v1.skins.customizations');
 
     // Public Theme Routes (no authentication required)
     Route::get('/themes', [ThemeController::class, 'index'])->name('api.v1.themes.index');
     Route::get('/themes/{id}', [ThemeController::class, 'show'])->whereNumber('id')->name('api.v1.themes.show');
-    Route::get('/themes/{id}/download', [ThemeController::class, 'download'])->whereNumber('id')->name('api.v1.themes.download');
+    Route::get('/themes/{id}/download', [ThemeController::class, 'download'])
+        ->whereNumber('id')
+        ->name('api.v1.themes.download');
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
         Route::get('/user', function (Request $request) {
@@ -159,7 +165,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/search', [BookApiController::class, 'search']);
         Route::post('/books/queue/download', [BookDownloadController::class, 'queueDownload']);
         Route::get('/books/queue/download/{zipId}', [BookDownloadController::class, 'downloadQueuedZip']);
-        Route::post('/books/queue/download/{zipId}/mark-downloaded', [BookDownloadController::class, 'markZipDownloaded']);
+        Route::post('/books/queue/download/{zipId}/mark-downloaded', [
+            BookDownloadController::class,
+            'markZipDownloaded',
+        ]);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/tags', [BookTagController::class, 'show']);
         Route::put('/books/{book}/tags', [BookTagController::class, 'update']);
@@ -204,7 +213,10 @@ Route::prefix('v1')->group(function () {
         // Author Books Route
         Route::get('/authors/{authorId}/books', [BookAuthorController::class, 'booksByAuthor']);
         // Author Books by Genre Route
-        Route::get('/authors/{authorId}/genres/{genreId}/books', [BookAuthorController::class, 'booksByAuthorAndGenre']);
+        Route::get('/authors/{authorId}/genres/{genreId}/books', [
+            BookAuthorController::class,
+            'booksByAuthorAndGenre',
+        ]);
 
         // Author Series Route
         Route::get('/authors/{authorId}/series', [BookAuthorController::class, 'seriesByAuthor']);
@@ -244,7 +256,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/{book}/external-reads', [ExternalReadApiController::class, 'getExternalReads']);
         Route::post('/external-reads', [ExternalReadApiController::class, 'createExternalReadNonLibrary']);
         Route::post('/books/{book}/external-reads', [ExternalReadApiController::class, 'createExternalRead']);
-        Route::get('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'getExternalRead']);
+        Route::get('/books/{book}/external-reads/{externalRead}', [
+            ExternalReadApiController::class,
+            'getExternalRead',
+        ]);
         Route::put('/books/{book}/external-reads/{externalRead}', [
             ExternalReadApiController::class,
             'updateExternalRead',
@@ -267,9 +282,15 @@ Route::prefix('v1')->group(function () {
 
         // OpenAPI spec progress routes - specific routes must come before dynamic ones
         Route::get('/progress/device', [ProgressController::class, 'getDeviceProgress']);
-        Route::get('/progress/device/{deviceId}', [ProgressController::class, 'getDeviceProgressByPath']); // Client compatibility
+        Route::get('/progress/device/{deviceId}', [
+            ProgressController::class,
+            'getDeviceProgressByPath',
+        ]); // Client compatibility
         Route::get('/progress', [ProgressController::class, 'getAllProgress']);
-        Route::post('/progress/{book}/mark-completed', [ProgressController::class, 'markCompletedByPath']); // Client compatibility
+        Route::post('/progress/{book}/mark-completed', [
+            ProgressController::class,
+            'markCompletedByPath',
+        ]); // Client compatibility
         Route::get('/progress/{book}', [ProgressController::class, 'getBookProgress']);
         Route::put('/progress/{book}', [ProgressController::class, 'updateBookProgress'])->middleware('idempotency');
 
@@ -381,6 +402,9 @@ Route::prefix('v1')->group(function () {
         // Logout
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+        Route::post('/account', [AuthController::class, 'requestAccountDeletionVerification']);
+        Route::delete('/account', [AuthController::class, 'deleteAccount']);
+        Route::delete('/auth/account', [AuthController::class, 'deleteAccount']);
     });
 
     // Authentication Routes (outside the auth:sanctum middleware)
