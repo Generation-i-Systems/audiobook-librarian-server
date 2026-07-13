@@ -809,6 +809,7 @@ Static decorative image with advanced background modes, gradient support, and de
 - `backgroundMode` - How image fills space (see below)
 - `backgroundColor` - Hex color for padding areas (solid color)
 - `backgroundGradient` - Gradient background (see [Gradient Backgrounds](#gradient-backgrounds))
+- `backgroundGradientDark` - Dark-mode replacement for `backgroundGradient` (see [Night Mode](#night-mode))
 - `themeable.tint` - Optional color tint overlay
 - `decorativeImages` - Array of positioned decorative images
 
@@ -944,6 +945,7 @@ You can still manually position children if you prefer:
 - `padding` - ⭐ NEW: Padding inside container (default: 0)
 - `backgroundColor` - Solid color background (hex format)
 - `backgroundGradient` - Gradient background (see [Gradient Backgrounds](#gradient-backgrounds))
+- `backgroundGradientDark` - Dark-mode replacement for `backgroundGradient` (see [Night Mode](#night-mode))
 - `customImage` - Background image path
 - `backgroundMode` - How background image fills space
 
@@ -1030,6 +1032,7 @@ A simple filled rectangle for backgrounds, separators, and overlays. Supports so
 
 - `backgroundColor` - Solid color fill (hex format)
 - `backgroundGradient` - Gradient fill (see [Gradient Backgrounds](#gradient-backgrounds))
+- `backgroundGradientDark` - Dark-mode replacement for `backgroundGradient` (see [Night Mode](#night-mode))
 
 **Note**: `backgroundGradient` overrides `backgroundColor` if both are specified.
 
@@ -1179,6 +1182,11 @@ This ensures controls stay at the bottom regardless of screen height!
 ## Gradient Backgrounds
 
 All background-capable elements (containers, rectangles, and images) support gradient backgrounds with extensive customization options.
+
+Any element with `backgroundGradient` can also set `backgroundGradientDark` — a dark-mode
+replacement gradient, swapped in under the same condition as `nightImage` (see
+[Night Mode](#night-mode)). Useful when your light gradient would look washed-out or muddy simply
+recolored, and you'd rather author a second gradient by hand than ship a rasterized night image.
 
 ### Gradient Types
 
@@ -2188,6 +2196,10 @@ the user having to pick a different theme:
 - For any `image`-type element (most commonly your `background` element), set `nightImage` to a
   dark-mode replacement picture (see [Image](#5-image)). It's swapped in for `customImage` under
   the same condition.
+- For any element using `backgroundGradient` (most commonly a `background` element with no
+  `customImage`), set `backgroundGradientDark` to a dark-mode replacement gradient (see
+  [Gradient Backgrounds](#gradient-backgrounds)). It's swapped in for `backgroundGradient` under
+  the same condition — no image asset required.
 
 ```json
 "embeddedThemes": {
@@ -2203,6 +2215,23 @@ the user having to pick a different theme:
   "type": "image",
   "customImage": "assets/images/background-day.jpg",
   "nightImage": "assets/images/background-night.jpg"
+}
+```
+
+```json
+{
+  "id": "background",
+  "type": "image",
+  "backgroundGradient": {
+    "type": "linear",
+    "colors": ["#e7e1e2", "#a6a519"],
+    "angle": 0
+  },
+  "backgroundGradientDark": {
+    "type": "linear",
+    "colors": ["#141412", "#3a3d10"],
+    "angle": 0
+  }
 }
 ```
 

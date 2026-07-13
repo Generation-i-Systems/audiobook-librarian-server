@@ -80,6 +80,11 @@ The client also accepts direct app links:
 
 Environment variables:
 
+- For the official production aliases, set
+  `LIBRARY_PROFILE_MAIN_HOSTS=books.ablibrarian.com,books.audiobooklibrarian.com`.
+  Provision DNS and TLS for both names; the application uses the incoming host when generating
+  links and QR connection URLs.
+
 - `LIBRARY_PROFILE_DEFAULT`
 - `LIBRARY_PROFILE_FALLBACK_TO_DEFAULT`
 - `LIBRARY_PROFILE_MAIN_HOSTS`
@@ -555,6 +560,13 @@ php artisan books:process-ai --model=claude-3-5-haiku
 ---
 
 ## Setup
+
+### HTTPS requirement for mobile clients
+
+Use an HTTPS URL with a valid certificate for every server entered in the mobile app.
+The app intentionally does not support arbitrary cleartext `http://` servers. For
+Docker deployments, keep the application listener on loopback and use a TLS-terminating
+reverse proxy; see [Docker HTTPS guidance](docker/README.md#https-is-required-for-app-connections).
 
 1. Clone the repo
 2. Run `composer install`

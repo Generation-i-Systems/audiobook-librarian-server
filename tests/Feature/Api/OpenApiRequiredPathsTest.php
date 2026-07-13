@@ -25,6 +25,7 @@ class OpenApiRequiredPathsTest extends ApiTestCase
         $requiredPaths = [
             '/auth/google',
             '/auth/logout',
+            '/auth/account',
             '/auth/refresh',
             '/genres',
             '/progress',
