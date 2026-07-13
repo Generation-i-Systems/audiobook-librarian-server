@@ -1,13 +1,13 @@
 <?php
 
+$configuredRoots = array_values(array_filter(array_map(
+    static fn (string $path): string => trim($path),
+    explode(',', (string) env('IMPORT_ROOTS', '')),
+)));
+
 $importConfig = [
     // Root directories allowed for import browsing (absolute paths)
-    'roots' => [
-        '/media/downloads',
-        '/media/downloads/audiobooks',
-        '/media/audiobooks/unsorted/*',
-        '/media/audiobooks/OpenAudible/books',
-    ],
+    'roots' => $configuredRoots,
     // Allowed file extensions for import
     'allowed_extensions' => [
         'mp3',

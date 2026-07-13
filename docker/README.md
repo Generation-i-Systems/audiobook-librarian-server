@@ -23,6 +23,28 @@ this project, because Compose only auto-loads a file literally named `.env`,
 and we deliberately use `.env.docker` so it can't collide with (or be
 confused for) the non-Docker `.env`.
 
+## HTTPS is required for app connections
+
+The Docker service listens only on `127.0.0.1` by default. `http://localhost:8080`
+is suitable only for same-machine development and health checks. Do not expose that
+HTTP listener to the Internet or configure it in the mobile app.
+
+For any device connection, place a TLS-terminating reverse proxy (for example Caddy,
+nginx, or Traefik) in front of the container, set `APP_URL` in `.env.docker` to the
+public `https://` URL, and enter that same `https://` URL in the app. The proxy should
+forward to `http://127.0.0.1:8080` on the Docker host.
+
+This repository includes an optional Caddy profile. Set matching `APP_URL` and `PUBLIC_HOST`
+values in `.env.docker`, point DNS at this host, and run:
+
+```bash
+docker compose --env-file .env.docker --profile https up -d --build
+```
+
+Caddy listens on ports 80 and 443, obtains the certificate, and proxies to the application
+container. See [cross-platform installation](../docs/INSTALLATION.md) for host-specific storage
+guidance.
+
 Data persistence:
 
 - The SQLite database file lives on the `app-database` named volume.

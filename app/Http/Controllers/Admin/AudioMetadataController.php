@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\Process\Process;
 
 class AudioMetadataController extends Controller
 {
@@ -87,10 +88,18 @@ class AudioMetadataController extends Controller
      */
     private function extractWithFfprobe(string $filePath): array
     {
-        $escapedPath = escapeshellarg($filePath);
-        $command = "ffprobe -v quiet -print_format json -show_format -show_streams {$escapedPath} 2>&1";
-
-        $output = shell_exec($command);
+        $process = new Process([
+            'ffprobe',
+            '-v',
+            'quiet',
+            '-print_format',
+            'json',
+            '-show_format',
+            '-show_streams',
+            $filePath,
+        ]);
+        $process->run();
+        $output = $process->getOutput();
 
         if (!$output) {
             return ['error' => 'ffprobe returned no output'];
@@ -151,9 +160,10 @@ class AudioMetadataController extends Controller
      */
     private function commandExists(string $command): bool
     {
-        $test = shell_exec("which {$command} 2>/dev/null");
+        $process = new Process([$command, '-version']);
+        $process->run();
 
-        return !empty($test);
+        return $process->isSuccessful();
     }
 
     /**

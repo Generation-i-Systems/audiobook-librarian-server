@@ -1,5 +1,7 @@
 <?php
 
+$bookStoragePath = (string) env('BOOK_STORAGE_PATH', storage_path('app/books'));
+
 return [
 
     /*
@@ -62,7 +64,9 @@ return [
 
     'name' => env('APP_NAME', 'ab5'),
 
-    'book_root' => env('BOOK_STORAGE_PATH', '/media/lyra_data1/audiobooks/books'),
+    'book_root' => $bookStoragePath,
+
+    'database_backup_path' => (string) env('DATABASE_BACKUP_PATH', storage_path('app/backups')),
 
     /*
     |--------------------------------------------------------------------------
@@ -93,7 +97,7 @@ return [
     |
     */
 
-    'library_repair_sync_path' => env('BOOK_STORAGE_PATH', '/media/lyra_data1/audiobooks/books') . '/sync',
+    'library_repair_sync_path' => env('LIBRARY_REPAIR_SYNC_PATH', $bookStoragePath . '/sync'),
 
     /*
     |--------------------------------------------------------------------------

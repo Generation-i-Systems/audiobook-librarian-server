@@ -26,7 +26,7 @@ return [
                 explode(',', (string) env('LIBRARY_PROFILE_LIBRIVOX_HOSTS', ''))
             ))),
             'database_connection' => env('LIBRARY_PROFILE_LIBRIVOX_DB_CONNECTION'),
-            'book_storage_path' => env('LIBRARY_PROFILE_LIBRIVOX_BOOK_STORAGE_PATH', '/media/audiobooks/librivox'),
+            'book_storage_path' => env('LIBRARY_PROFILE_LIBRIVOX_BOOK_STORAGE_PATH', storage_path('app/librivox')),
             'source_mode' => env('LIBRARY_PROFILE_LIBRIVOX_SOURCE_MODE', 'librivox'),
         ],
 

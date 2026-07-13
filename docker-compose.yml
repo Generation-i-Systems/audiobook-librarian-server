@@ -7,6 +7,10 @@
 #   docker compose --env-file .env.docker up -d --build
 #   open http://localhost:8080
 #
+# This loopback-only listener is for local development and a local TLS reverse
+# proxy. Do not expose it directly to mobile clients; configure HTTPS at the
+# reverse proxy and set APP_URL to its public https:// URL.
+#
 # --env-file is required (not just `--env-file`-less `docker compose up`)
 # because compose only auto-loads a file literally named `.env`; we use
 # `.env.docker` so it doesn't collide with the non-Docker `.env` used for a
@@ -24,7 +28,7 @@ services:
       dockerfile: Dockerfile
     image: audiobook-librarian-server:latest
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "127.0.0.1:${APP_PORT:-8080}:80"
     env_file:
       - .env.docker
     volumes:
@@ -34,6 +38,24 @@ services:
       - ${HOST_DELETED_BOOKS_PATH:-./docker-data/trash}:/data/trash
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST to the public DNS name}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
 volumes:
   app-storage:
   app-database:
+  caddy-data:
+  caddy-config:

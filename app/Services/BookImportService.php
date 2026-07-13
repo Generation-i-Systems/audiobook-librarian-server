@@ -4524,17 +4524,9 @@ class BookImportService
                 }
             }
         } else {
-            // Use default directories
-            $defaultDirs = [
-                '/media/download',
-                '/media/download/audiobooks',
-                '/media/audiobooks/OpenAudible/books',
-            ];
-
-            // Add books_old if requested
-            if ($includeOld) {
-                $defaultDirs[] = '/media/audiobooks/OpenAudible/books_old';
-            }
+            // Import roots are explicitly configured per installation. An empty
+            // configuration is safer than scanning a machine-specific path.
+            $defaultDirs = config('import.roots', []);
 
             foreach ($defaultDirs as $dir) {
                 if (is_dir($dir) && is_readable($dir)) {
@@ -4653,8 +4645,7 @@ class BookImportService
                 $pathsToTry[] = $currentDir . '/' . $path;
                 $pathsToTry[] = $currentDir . '/' . $normalizedPath;
 
-                $commonDirs = ['/media/download/audiobooks', '/media/download'];
-                foreach ($commonDirs as $baseDir) {
+                foreach (config('import.roots', []) as $baseDir) {
                     $pathsToTry[] = $baseDir . '/' . $path;
                     $pathsToTry[] = $baseDir . '/' . $normalizedPath;
                 }

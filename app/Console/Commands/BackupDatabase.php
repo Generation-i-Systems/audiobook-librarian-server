@@ -43,7 +43,7 @@ class BackupDatabase extends Command
         $dbPassword = config('database.connections.mysql.password');
 
         // Create backup directory
-        $backupDir = '/var/lib/mysql/laravel_backup';
+        $backupDir = (string) config('app.database_backup_path');
         if (!is_dir($backupDir)) {
             mkdir($backupDir, 0755, true);
         }
