@@ -126,7 +126,22 @@ rendering or real user interactions.
 
 Real bytes streamed to a client cannot be verified by unit or feature tests.
 
-- **`BookDownloadController::download()`** — 8 MB chunked file streaming.
+- **`BookDownloadController::download()`** — 8 MB chunked file streaming. Also reads every file's
+  size via `freshFileSize()` (`clearstatcache()` then `filesize()`) instead of a bare
+  `Storage::size()`/`filesize()` call. Root-caused a real incident: a client's manifest reported
+  a book's `.m4b` at 368,773,186 bytes while the file on disk was a stable, complete 603,039,422
+  bytes (unchanged mtime, hours old) — not a live write race, but PHP's per-process stat cache
+  serving a size some earlier read in that worker had cached, indefinitely, until the worker
+  recycled. The client trusted that manifest size as authoritative, downloaded exactly that many
+  bytes, and ended up with a file missing its trailing MP4 `moov` atom. `freshFileSize()`'s
+  actual behavior (clearing PHP's real stat cache) is unit-tested directly by growing a real temp
+  file after an initial `filesize()` read; the fix itself needed no live concurrency to reproduce
+  or verify, only two real filesystem reads in one PHP process.
+- **`BookDownloadController::downloadFile()`** — same `freshFileSize()` fix, for the
+  `Content-Length`/Range-header size used by the actual byte-streaming endpoint.
+- **`BookDownloadController::downloadUrl()`** — same `freshFileSize()` fix, for the per-file
+  `size` field in its signed-URL response (unused by the current Android client, which calls
+  `download()` for its manifest, but shares the same bug class).
 - **`BookDownloadController::queueDownload()`** — multi-file ZIP creation from real book files.
 - **`BookDownloadController::remoteDownload()`** — proxy to LibriVox / archive.org CDN.
 - **`librivoxManifest()`** — builds download manifest from live CDN URLs (ia800.archive.org).

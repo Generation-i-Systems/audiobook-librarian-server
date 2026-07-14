@@ -33,6 +33,22 @@ class BookDownloadController extends Controller
     ];
 
     /**
+     * Read a file's current size, first clearing PHP's per-process stat cache for this exact
+     * path. PHP caches stat() results for the life of the worker process; a worker that
+     * happened to stat this file earlier (e.g. while an import/transcode job was still writing
+     * it) would otherwise keep returning that stale, truncated size on every later request for
+     * as long as the worker lives - potentially hours, since nothing else in this codebase ever
+     * calls clearstatcache() for these paths. This manifest is the client's only source of truth
+     * for the file's size, so a stale read here produces a permanently truncated local download.
+     */
+    private function freshFileSize(string $fullPath): ?int
+    {
+        clearstatcache(true, $fullPath);
+
+        return is_file($fullPath) ? filesize($fullPath) : null;
+    }
+
+    /**
      * Hash a file in fixed-size chunks for client-side range repair.
      *
      * @return array<int, array{offset: int, size: int, sha256: string}>
@@ -254,7 +270,7 @@ class BookDownloadController extends Controller
             $entry = [
                 'filename' => $relativeFile,
                 'path' => $file,
-                'size' => Storage::disk('books')->size($file),
+                'size' => $this->freshFileSize($fullPath),
                 'download_url' => $this->buildDownloadFileUrl($id, $relativeFile),
             ];
             if ($includeChecksums || $includeChunks) {
@@ -301,9 +317,7 @@ class BookDownloadController extends Controller
         });
 
         // Calculate total size
-        $totalSize = array_sum(array_column($audioFiles, 'size'))
-            + array_sum(array_column($coverFiles, 'size'))
-            + array_sum(array_column($otherFiles, 'size'));
+        $totalSize = array_sum(array_column($audioFiles, 'size')) + array_sum(array_column($coverFiles, 'size')) + array_sum(array_column($otherFiles, 'size'));
 
         // Build ordered file list (covers first, then audio files alphabetically, then other files)
         $orderedFiles = array_merge($coverFiles, $audioFiles, $otherFiles);
@@ -429,8 +443,8 @@ class BookDownloadController extends Controller
         $contentType = $this->getContentTypeByExtension($extension);
 
         // Get file size for Range header support
-        $fileSize = Storage::disk('books')->size($filePath);
         $fullPath = Storage::disk('books')->path($filePath);
+        $fileSize = $this->freshFileSize($fullPath) ?? 0;
 
         // Log download start with file details
         Log::info('File download starting', [
@@ -654,7 +668,7 @@ class BookDownloadController extends Controller
 
         foreach ($files as $file) {
             $fileName = basename($file);
-            $fileSize = Storage::disk('books')->size($file);
+            $fileSize = $this->freshFileSize(Storage::disk('books')->path($file)) ?? 0;
             $totalSize += $fileSize;
 
             $fileUrls[] = [
