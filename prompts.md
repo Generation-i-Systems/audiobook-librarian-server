@@ -4,6 +4,16 @@ This file contains the text of prompts sent to the AI assistant.
 
 ---
 
+## 2026-07-17
+
+it also seems that series number from enrichment sources is being ignored too
+
+---
+
+something has changed in the import script that has made series number not work very often. For example "/media/lyra_data/download/Magic Eater 5" is not getting a series number even though it is clearly in the directory name
+
+---
+
 ## 2026-07-12
 
 make sure https only is documented in the install instructions and docker for the server and for the lite server

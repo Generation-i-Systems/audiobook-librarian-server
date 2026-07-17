@@ -4,6 +4,8 @@ namespace Tests\Unit\Services;
 
 use App\Services\BookEnrichmentService;
 use App\Services\AudibleService;
+use App\Services\GoogleBooksApiService;
+use App\Services\HardcoverService;
 use Tests\TestCase;
 
 class BookEnrichmentServiceTest extends TestCase
@@ -56,6 +58,65 @@ class BookEnrichmentServiceTest extends TestCase
         $this->assertSame(2025, $result['year']);
         $this->assertSame('https://example.com/cover.jpg', $result['cover_url']);
         $this->assertArrayHasKey('audible_raw', $result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function enrichWithExternalDataKeepsAudibleSeriesNumber(): void
+    {
+        $audibleMock = $this->createStub(AudibleService::class);
+        $audibleMock->method('searchBooksWithFiltering')->willReturn([
+            [
+                'series' => 'Magic Eater',
+                'seriesNumber' => '5',
+            ],
+        ]);
+        $this->app->instance(AudibleService::class, $audibleMock);
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'Magic Eater',
+            'author' => ['K. M. Shea'],
+        ], ['sources' => ['audible']]);
+
+        $this->assertSame('Magic Eater', $result['series']);
+        $this->assertSame(5, $result['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function enrichWithExternalDataKeepsGoogleBooksSeriesNumber(): void
+    {
+        $googleBooksMock = $this->createStub(GoogleBooksApiService::class);
+        $googleBooksMock->method('searchAndMerge')->willReturn([
+            'series' => 'Example Series',
+            'seriesNumber' => '16.5',
+        ]);
+        $this->app->instance(GoogleBooksApiService::class, $googleBooksMock);
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'Example Novella',
+            'author' => ['Example Author'],
+        ], ['sources' => ['google_books']]);
+
+        $this->assertSame('Example Series', $result['series']);
+        $this->assertSame(16.5, $result['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function enrichWithExternalDataKeepsHardcoverSeriesNumber(): void
+    {
+        $hardcoverMock = $this->createStub(HardcoverService::class);
+        $hardcoverMock->method('searchAndMerge')->willReturn([
+            'seriesName' => 'Example Series',
+            'seriesNumber' => '2',
+        ]);
+        $this->app->instance(HardcoverService::class, $hardcoverMock);
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'Example Sequel',
+            'author' => ['Example Author'],
+        ], ['sources' => ['hardcover']]);
+
+        $this->assertSame('Example Series', $result['series']);
+        $this->assertSame(2, $result['series_number']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

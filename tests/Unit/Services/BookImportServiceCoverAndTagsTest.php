@@ -127,6 +127,16 @@ class BookImportServiceCoverAndTagsTest extends TestCase
         $this->assertSame(1, $result['series_number']);
     }
 
+    public function testDirectoryNameWithTrailingSeriesNumberExtractsSeriesNumber(): void
+    {
+        $aiResult = ['title' => 'Magic Eater', 'series' => 'Magic Eater', 'author' => []];
+        $audiobook = ['path' => '/media/lyra_data/download/Magic Eater 5'];
+
+        $result = $this->callPostProcess($aiResult, $audiobook);
+
+        $this->assertSame(5, $result['series_number']);
+    }
+
     public function testDirectoryNameSpaceSeparatorDoesNotMatchNonNumericPrefix(): void
     {
         $aiResult = ['title' => 'Some Title', 'author' => []];

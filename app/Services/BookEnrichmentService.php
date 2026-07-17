@@ -363,6 +363,16 @@ class BookEnrichmentService
                 $enrichedData['publisher'] = $result['publisher'];
             }
 
+            $seriesName = $result['series'] ?? $result['seriesName'] ?? null;
+            if (is_string($seriesName) && trim($seriesName) !== '') {
+                $enrichedData['series'] = trim($seriesName);
+            }
+
+            $seriesNumber = $result['series_number'] ?? $result['seriesNumber'] ?? null;
+            if ($seriesNumber !== null && $seriesNumber !== '') {
+                $enrichedData['series_number'] = $this->parseSeriesNumber((string) $seriesNumber);
+            }
+
             if (!empty($result['genres']) && is_array($result['genres'])) {
                 $enrichedData['genre'] = $this->mapToValidGenreList(
                     $this->normalizeGenreList($result['genres'])
@@ -572,6 +582,11 @@ class BookEnrichmentService
                     $enrichedData['series'] = $bookData['series'];
                 }
 
+                $seriesNumber = $bookData['series_number'] ?? $bookData['seriesNumber'] ?? null;
+                if ($seriesNumber !== null && $seriesNumber !== '') {
+                    $enrichedData['series_number'] = $this->parseSeriesNumber((string) $seriesNumber);
+                }
+
                 if (!empty($bookData['narratorsList'])) {
                     if (is_array($bookData['narratorsList'])) {
                         $enrichedData['narrator'] = $bookData['narratorsList'];
@@ -644,6 +659,16 @@ class BookEnrichmentService
 
             if (!empty($result['publisher'])) {
                 $enrichedData['publisher'] = $result['publisher'];
+            }
+
+            $seriesName = $result['series'] ?? $result['seriesName'] ?? null;
+            if (is_string($seriesName) && trim($seriesName) !== '') {
+                $enrichedData['series'] = trim($seriesName);
+            }
+
+            $seriesNumber = $result['series_number'] ?? $result['seriesNumber'] ?? null;
+            if ($seriesNumber !== null && $seriesNumber !== '') {
+                $enrichedData['series_number'] = $this->parseSeriesNumber((string) $seriesNumber);
             }
 
             // categories are already hierarchically split by GoogleBooksApiService::splitCategories

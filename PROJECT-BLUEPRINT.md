@@ -82,6 +82,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - `BookFilesystemService`: filesystem operations for book directories (rename/list/browse) with document store updates
 - `FirestoreService`: list/search authors/series
 - `LibraryRepairService`: nightly scanner that detects missing/orphan/duplicate/nested/numbered-suffix directories, auto-fixes safe cases, and records issues with minimal metadata
+- `BookImportService`: preserves detected series numbering from enrichment and directory names, including validated trailing-number names such as `Magic Eater 5`
 - `LibraryRepairScanCommand` (`library:repair-scan`): CLI entry point for manual or scheduled scans (JSON mode, selective issue filters, optional auto-fixes)
 - `Admin\LibraryRepairController` + `/admin/library-repair`: paginated UI for reviewing Library Repair Issues, defaulting to pending issues with a “Show resolved” toggle, inline book edit shortcuts, AudiobookBay search links, per-issue rescans, and missing-directory import helpers
 - **Web Routes:**

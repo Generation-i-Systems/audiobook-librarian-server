@@ -6921,6 +6921,18 @@ class BookImportService
             $aiResult['series'] = $seriesName;
             $aiResult['title'] = $bookTitle;
             $aiResult['series_number'] = $bookNumber;
+        } elseif (preg_match('/^(.+\S)\s+(\d{1,3}(?:\.\d+)?)$/', $directoryName, $matches)) {
+            $possibleSeriesName = trim($matches[1]);
+            $bookNumber = $matches[2];
+            $aiTitle = trim((string) ($aiResult['title'] ?? ''));
+            $aiSeries = trim((string) ($aiResult['series'] ?? ''));
+
+            // A trailing number is only a series number when the name before it agrees
+            // with metadata already extracted from the book. This avoids treating any
+            // arbitrary directory ending in a number as a series.
+            if (strcasecmp($possibleSeriesName, $aiTitle) === 0 || strcasecmp($possibleSeriesName, $aiSeries) === 0) {
+                $aiResult['series_number'] = str_contains($bookNumber, '.') ? (float) $bookNumber : (int) $bookNumber;
+            }
         }
 
         if (!empty($aiResult['title'])) {
