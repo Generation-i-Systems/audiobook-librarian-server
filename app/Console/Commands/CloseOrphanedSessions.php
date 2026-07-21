@@ -96,8 +96,13 @@ class CloseOrphanedSessions extends Command
                 ->get();
 
             $hasMatchingEnd = $bookEvents->contains(function ($event) use ($start) {
+                // A real client-side end shares the original device_id; a previously
+                // synthesized end (from an earlier run of this command) always has
+                // device_id = 'server-synthesized', which never matches a real device -
+                // without this branch, every rerun would find the orphan "still open" and
+                // synthesize another duplicate end event for it, forever.
                 return $event->event_type === 'SESSION_END'
-                    && $event->device_id === $start->device_id;
+                    && ($event->device_id === $start->device_id || $event->device_id === 'server-synthesized');
             });
 
             if ($hasMatchingEnd) {
@@ -119,6 +124,11 @@ class CloseOrphanedSessions extends Command
             $endPositionMs = $lastPositionEvent !== null ? $lastPositionEvent->position_ms : $start->position_ms;
 
             if (!$isDryRun) {
+                // Use the same camelCase metadata keys real clients send for SESSION_END
+                // (see EventMetadata.forSessionEnd on the client) so this synthesized event is
+                // read identically to a real one by ListeningActivityService and anything else
+                // that aggregates seconds_listened from metadata.
+                $durationMs = max(0, $endMs - $start->timestamp_ms);
                 ListeningEvent::create([
                     'id' => Str::uuid()->toString(),
                     'user_id' => $userId,
@@ -127,7 +137,10 @@ class CloseOrphanedSessions extends Command
                     'timestamp_ms' => $endMs,
                     'position_ms' => $endPositionMs,
                     'metadata' => [
-                        'session_duration_ms' => max(0, $endMs - $start->timestamp_ms),
+                        'sessionDurationMs' => $durationMs,
+                        'adjustedDurationMs' => $durationMs,
+                        'playbackSpeed' => 1.0,
+                        'pauseCount' => 0,
                     ],
                     'device_id' => 'server-synthesized',
                     'timezone' => $start->timezone,
