@@ -6599,6 +6599,58 @@ class BookImportService
         ];
     }
 
+    /**
+     * Resolve the directory that should actually be compared against for an existing
+     * book's files. The stored `directory_path` column can be stale/truncated (e.g.
+     * missing the book's own title subdirectory, leaving it pointing at an ancestor
+     * such as the author folder). Comparing against an ancestor directory pulls in
+     * audio files belonging to sibling books, so this validates that the resolved
+     * directory directly contains the book's audio files before trusting it, falling
+     * back to a title subdirectory when it doesn't.
+     */
+    public function resolveExistingBookDirectory(Book $existingBook, string $bookStoragePath): ?string
+    {
+        if (empty($existingBook->directory_path)) {
+            return null;
+        }
+
+        $storedDir = rtrim($bookStoragePath, '/') . '/' . ltrim($existingBook->directory_path, '/');
+
+        if (!File::isDirectory($storedDir)) {
+            return null;
+        }
+
+        if ($this->directoryHasDirectAudioFiles($storedDir)) {
+            return $storedDir;
+        }
+
+        $titleSubdir = $storedDir . '/' . $this->sanitizeForPath($existingBook->title);
+        if (File::isDirectory($titleSubdir) && $this->directoryHasDirectAudioFiles($titleSubdir)) {
+            return $titleSubdir;
+        }
+
+        return $storedDir;
+    }
+
+    /**
+     * Whether a directory directly contains at least one audio file (non-recursive).
+     * Used to distinguish a book's own directory from an ancestor directory that
+     * only contains audio files via sibling books' subdirectories.
+     */
+    protected function directoryHasDirectAudioFiles(string $path): bool
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+
+        foreach (File::files($path) as $file) {
+            $extension = strtolower($file->getExtension());
+            if (in_array($extension, $audioExtensions, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function getDirectoryInfo(string $path): array
     {
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
@@ -8818,9 +8870,8 @@ class BookImportService
             $lineCallback("  Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
 
             $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
-            if ($bookStoragePath && $existingBook->directory_path) {
-                $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
-
+            $existingDir = $bookStoragePath ? $this->resolveExistingBookDirectory($existingBook, $bookStoragePath) : null;
+            if ($existingDir) {
                 if (\Illuminate\Support\Facades\File::isDirectory($existingDir)) {
                     $comparison = $compareDirectoriesCallback($audiobook['path'], $existingDir);
 
