@@ -34,6 +34,39 @@ class StatisticsControllerTest extends TestCase
         Sanctum::actingAs($this->user);
     }
 
+    /**
+     * Create a SESSION_END listening_events row - getTimelineStats/getDailyStatsOpenApi read
+     * from listening_events (via ListeningActivityService), not the legacy listening_statistics
+     * table these tests used to seed directly.
+     */
+    protected function createSessionEndEvent(
+        Book $book,
+        string $listeningDate,
+        int $secondsListened,
+        string $deviceId = 'device-a',
+    ): \App\Models\ListeningEvent {
+        $timestampMs = \Carbon\Carbon::parse($listeningDate)->setTime(12, 0)->getTimestampMs();
+
+        return \App\Models\ListeningEvent::create([
+            'id'           => (string) \Illuminate\Support\Str::uuid(),
+            'user_id'      => $this->user->id,
+            'book_id'      => $book->id,
+            'event_type'   => 'SESSION_END',
+            'timestamp_ms' => $timestampMs,
+            'position_ms'  => 0,
+            'metadata'     => [
+                'sessionDurationMs'  => $secondsListened * 1000,
+                'adjustedDurationMs' => $secondsListened * 1000,
+                'playbackSpeed'      => 1.0,
+            ],
+            'device_id'    => $deviceId,
+            'timezone'     => 'UTC',
+            'sync_status'  => 'SYNCED',
+            'created_at'   => $timestampMs,
+            'synced_at'    => $timestampMs,
+        ]);
+    }
+
     public function test_record_session_creates_listening_statistic()
     {
         $book = Book::factory()->create();
@@ -148,27 +181,8 @@ class StatisticsControllerTest extends TestCase
         $book1 = Book::factory()->create();
         $book2 = Book::factory()->create();
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book1->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 600,
-            'session_type' => 'listening',
-            'listening_date' => now()->toDateString(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book2->id,
-            'device_id' => 'device-b',
-            'seconds_listened' => 900,
-            'session_type' => 'listening',
-            'listening_date' => now()->toDateString(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $this->createSessionEndEvent($book1, now()->toDateString(), 600, 'device-a');
+        $this->createSessionEndEvent($book2, now()->toDateString(), 900, 'device-b');
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -187,16 +201,7 @@ class StatisticsControllerTest extends TestCase
     {
         $book = Book::factory()->create();
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 1200,
-            'session_type' => 'listening',
-            'listening_date' => now()->toDateString(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $this->createSessionEndEvent($book, now()->toDateString(), 1200, 'device-a');
 
         BookProgress::create([
             'user_id' => $this->user->id,
@@ -239,23 +244,8 @@ class StatisticsControllerTest extends TestCase
             'sync_enabled' => true,
         ]);
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book1->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 900,
-            'session_type' => 'listening',
-            'listening_date' => $date,
-        ]);
-
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book2->id,
-            'device_id' => 'device-b',
-            'seconds_listened' => 1500,
-            'session_type' => 'listening',
-            'listening_date' => $date,
-        ]);
+        $this->createSessionEndEvent($book1, $date, 900, 'device-a');
+        $this->createSessionEndEvent($book2, $date, 1500, 'device-b');
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -278,23 +268,8 @@ class StatisticsControllerTest extends TestCase
     {
         $book = Book::factory()->create();
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 1800,
-            'session_type' => 'listening',
-            'listening_date' => '2026-01-15',
-        ]);
-
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 2400,
-            'session_type' => 'listening',
-            'listening_date' => '2026-02-10',
-        ]);
+        $this->createSessionEndEvent($book, '2026-01-15', 1800);
+        $this->createSessionEndEvent($book, '2026-02-10', 2400);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -314,23 +289,8 @@ class StatisticsControllerTest extends TestCase
     {
         $book = Book::factory()->create();
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 1200,
-            'session_type' => 'listening',
-            'listening_date' => '2026-04-03',
-        ]);
-
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 1800,
-            'session_type' => 'listening',
-            'listening_date' => '2026-04-04',
-        ]);
+        $this->createSessionEndEvent($book, '2026-04-03', 1200);
+        $this->createSessionEndEvent($book, '2026-04-04', 1800);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -348,23 +308,8 @@ class StatisticsControllerTest extends TestCase
     {
         $book = Book::factory()->create();
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 900,
-            'session_type' => 'listening',
-            'listening_date' => '2026-04-02',
-        ]);
-
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => 'device-a',
-            'seconds_listened' => 600,
-            'session_type' => 'listening',
-            'listening_date' => '2026-04-03',
-        ]);
+        $this->createSessionEndEvent($book, '2026-04-02', 900);
+        $this->createSessionEndEvent($book, '2026-04-03', 600);
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -588,27 +533,10 @@ class StatisticsControllerTest extends TestCase
         $weekDate = now()->startOfWeek()->copy()->addDays(1);
         $monthDate = now()->startOfMonth()->copy()->addDays(1);
 
-        // Create statistics for today, this week, and this month
-        ListeningStatistic::create([
-            'book_id' => $book->id,
-            'device_id' => 'test-device',
-            'listening_date' => $today->toDateString(),
-            'seconds_listened' => 1800,
-        ]);
-
-        ListeningStatistic::create([
-            'book_id' => $book->id,
-            'device_id' => 'test-device',
-            'listening_date' => $weekDate->toDateString(),
-            'seconds_listened' => 3600,
-        ]);
-
-        ListeningStatistic::create([
-            'book_id' => $book->id,
-            'device_id' => 'test-device',
-            'listening_date' => $monthDate->toDateString(),
-            'seconds_listened' => 2400,
-        ]);
+        // Create session-end events for today, this week, and this month
+        $this->createSessionEndEvent($book, $today->toDateString(), 1800, 'test-device');
+        $this->createSessionEndEvent($book, $weekDate->toDateString(), 3600, 'test-device');
+        $this->createSessionEndEvent($book, $monthDate->toDateString(), 2400, 'test-device');
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,

@@ -8,6 +8,7 @@ use App\Models\BookProgress;
 use App\Models\ClientEvent;
 use App\Models\Device;
 use App\Models\Genre;
+use App\Models\ListeningEvent;
 use App\Models\ListeningGoal;
 use App\Models\ListeningStatistic;
 use App\Models\Message;
@@ -59,6 +60,41 @@ class BadgeSyncIntegrationTest extends TestCase
             'X-Device-ID'   => $this->deviceId,
             'X-Device-Name' => 'Test Device',
         ];
+    }
+
+    /**
+     * Create a SESSION_END listening_events row - the event-sourced data BadgeService's
+     * listening-based criteria (session_count, speed_variety, monthly_goal_streak, etc.) read
+     * from. Badge evaluation no longer reads listening_statistics, which no current client
+     * writes to.
+     */
+    protected function createSessionEndEvent(
+        ?int $bookId = null,
+        int $secondsListened = 1800,
+        float $playbackSpeed = 1.0,
+        ?string $listeningDate = null,
+    ): ListeningEvent {
+        $listeningDate ??= now()->toDateString();
+        $timestampMs = \Carbon\Carbon::parse($listeningDate)->setTime(12, 0)->getTimestampMs();
+
+        return ListeningEvent::create([
+            'id'           => (string) Str::uuid(),
+            'user_id'      => $this->user->id,
+            'book_id'      => $bookId ?? Book::factory()->create()->id,
+            'event_type'   => 'SESSION_END',
+            'timestamp_ms' => $timestampMs,
+            'position_ms'  => 0,
+            'metadata'     => [
+                'sessionDurationMs'  => $secondsListened * 1000,
+                'adjustedDurationMs' => $secondsListened * 1000,
+                'playbackSpeed'      => $playbackSpeed,
+            ],
+            'device_id'    => $this->deviceId,
+            'timezone'     => 'UTC',
+            'sync_status'  => 'SYNCED',
+            'created_at'   => $timestampMs,
+            'synced_at'    => $timestampMs,
+        ]);
     }
 
     protected function createTestBadge(array $criteria, string $category = 'listening'): Badge
@@ -139,6 +175,10 @@ class BadgeSyncIntegrationTest extends TestCase
         // Create a badge that requires 1 session
         $badge = $this->createTestBadge(['session_count' => 1]);
 
+        // session_count is evaluated from listening_events, not the listening_statistics row
+        // this endpoint itself creates - seed the event-sourced side directly.
+        $this->createSessionEndEvent(bookId: $book->id);
+
         $response = $this->withHeaders($this->authHeaders())
             ->postJson('/api/v1/statistics/report', [
                 'book_id'            => $book->id,
@@ -210,14 +250,7 @@ class BadgeSyncIntegrationTest extends TestCase
         $badge = $this->createTestBadge(['session_count' => 1]);
 
         // Create listening data so criteria is met
-        ListeningStatistic::create([
-            'book_id'          => null,
-            'user_id'          => $this->user->id,
-            'device_id'        => $this->deviceId,
-            'listening_date'   => now()->toDateString(),
-            'seconds_listened' => 1800,
-            'session_type'     => 'listening',
-        ]);
+        $this->createSessionEndEvent();
 
         // Evaluate badges directly via service
         $badgeService = app(BadgeService::class);
@@ -378,33 +411,17 @@ class BadgeSyncIntegrationTest extends TestCase
         $badge = $this->createTestBadge(['speed_variety' => 3], 'speed');
 
         foreach ([1.1, 1.25, 1.5] as $speed) {
-            ListeningStatistic::create([
-                'book_id' => null,
-                'user_id' => $this->user->id,
-                'device_id' => $this->deviceId,
-                'listening_date' => now()->toDateString(),
-                'seconds_listened' => 600,
-                'session_type' => 'listening',
-                'metadata' => ['playback_speed' => $speed],
-            ]);
+            $this->createSessionEndEvent(secondsListened: 600, playbackSpeed: $speed);
         }
 
         $badgeService = app(BadgeService::class);
         $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
 
-        ListeningStatistic::query()->delete();
+        ListeningEvent::query()->delete();
         Cache::flush();
 
         foreach ([1.1, 1.25, 1.5] as $speed) {
-            ListeningStatistic::create([
-                'book_id' => null,
-                'user_id' => $this->user->id,
-                'device_id' => $this->deviceId,
-                'listening_date' => now()->toDateString(),
-                'seconds_listened' => 1800,
-                'session_type' => 'listening',
-                'metadata' => ['playback_speed' => $speed],
-            ]);
+            $this->createSessionEndEvent(secondsListened: 1800, playbackSpeed: $speed);
         }
 
         $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
@@ -422,14 +439,7 @@ class BadgeSyncIntegrationTest extends TestCase
 
         $badge = $this->createTestBadge(['monthly_goal_streak' => 1], 'dedication');
 
-        ListeningStatistic::create([
-            'book_id' => null,
-            'user_id' => $this->user->id,
-            'device_id' => $this->deviceId,
-            'listening_date' => now()->toDateString(),
-            'seconds_listened' => 7200,
-            'session_type' => 'listening',
-        ]);
+        $this->createSessionEndEvent(secondsListened: 7200);
 
         $badgeService = app(BadgeService::class);
         $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
@@ -492,14 +502,7 @@ class BadgeSyncIntegrationTest extends TestCase
         $badgeService = app(BadgeService::class);
         $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => $this->deviceId,
-            'listening_date' => now()->toDateString(),
-            'seconds_listened' => 1200,
-            'session_type' => 'listening',
-        ]);
+        $this->createSessionEndEvent(bookId: $book->id, secondsListened: 1200);
 
         Cache::flush();
         $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
@@ -594,28 +597,14 @@ class BadgeSyncIntegrationTest extends TestCase
         $badge = $this->createTestBadge(['genres_explored' => 1], 'variety');
         $badgeService = app(BadgeService::class);
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => $this->deviceId,
-            'listening_date' => now()->toDateString(),
-            'seconds_listened' => 300,
-            'session_type' => 'listening',
-        ]);
+        $this->createSessionEndEvent(bookId: $book->id, secondsListened: 300);
 
         $this->assertSame([], $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId));
 
-        ListeningStatistic::query()->delete();
+        ListeningEvent::query()->delete();
         Cache::flush();
 
-        ListeningStatistic::create([
-            'user_id' => $this->user->id,
-            'book_id' => $book->id,
-            'device_id' => $this->deviceId,
-            'listening_date' => now()->toDateString(),
-            'seconds_listened' => 600,
-            'session_type' => 'listening',
-        ]);
+        $this->createSessionEndEvent(bookId: $book->id, secondsListened: 600);
 
         $newBadges = $badgeService->evaluateUserBadges((string) $this->user->id, $this->deviceId);
 

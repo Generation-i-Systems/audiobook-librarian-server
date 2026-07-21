@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Badge;
+use App\Models\BookPosition;
 use App\Models\BookProgress;
 use App\Models\ClientEvent;
 use App\Models\ListeningGoal;
-use App\Models\ListeningStatistic;
 use App\Models\Message;
 use App\Models\Playlist;
 use App\Models\Review;
@@ -23,6 +23,10 @@ use Illuminate\Support\Facades\Log;
 
 class BadgeService
 {
+    public function __construct(private readonly ListeningActivityService $listeningActivityService)
+    {
+    }
+
     /**
      * Evaluate and award badges for a given User model.
      */
@@ -71,17 +75,19 @@ class BadgeService
     }
 
     /**
-     * Build a base query for ListeningStatistic matching a user by user_id, device_id, or deviceId.
+     * Session-shaped listening activity rows for a user, matching by user_id, device_id, or
+     * a device-passed-as-userId (for unauthenticated/device-only evaluation). Backed by
+     * ListeningActivityService, which derives these from the event-sourced listening_events
+     * table - the legacy listening_statistics table this used to query is no longer written
+     * to by any current client.
+     *
+     * @return Collection<int, (object{book_id: int, user_id: int, device_id: string,
+     *   listening_date: string, seconds_listened: int, session_start: \Carbon\Carbon,
+     *   metadata: array{playback_speed: mixed}}&\stdClass)>
      */
-    protected function userStatsQuery(string $userId, ?string $deviceId = null): Builder
+    protected function userSessions(string $userId, ?string $deviceId = null): Collection
     {
-        return ListeningStatistic::where(function ($q) use ($userId, $deviceId) {
-            $q->where('device_id', $userId)
-                ->orWhere('user_id', $userId);
-            if ($deviceId) {
-                $q->orWhere('device_id', $deviceId);
-            }
-        });
+        return $this->listeningActivityService->getSessions($userId, $deviceId);
     }
 
     /**
@@ -92,17 +98,19 @@ class BadgeService
         $cacheKey = "user_stats_{$userId}" . ($deviceId ? "_{$deviceId}" : '');
 
         return Cache::remember($cacheKey, 300, function () use ($userId, $deviceId) {
-            $query = $this->userStatsQuery($userId, $deviceId);
+            $sessions = $this->userSessions($userId, $deviceId);
 
-            $allTimeStats = $query->selectRaw('
-                SUM(seconds_listened) as total_listening_time,
-                COUNT(*) as session_count,
-                COUNT(DISTINCT book_id) as books_started,
-                COUNT(DISTINCT listening_date) as total_listening_days,
-                MIN(listening_date) as first_listening_date,
-                MAX(listening_date) as last_listening_date,
-                MAX(seconds_listened) as longest_session
-            ')->first();
+            $sortedDates = $sessions->pluck('listening_date')->sort()->values();
+
+            $allTimeStats = (object) [
+                'total_listening_time' => $sessions->sum('seconds_listened'),
+                'session_count' => $sessions->count(),
+                'books_started' => $sessions->pluck('book_id')->filter()->unique()->count(),
+                'total_listening_days' => $sessions->pluck('listening_date')->unique()->count(),
+                'first_listening_date' => $sortedDates->first(),
+                'last_listening_date' => $sortedDates->last(),
+                'longest_session' => (int) $sessions->max('seconds_listened'),
+            ];
 
             $completedBooks = $this->getCompletedBookProgressRecords($userId, $deviceId);
 
@@ -144,7 +152,11 @@ class BadgeService
             $recommendationsRead = $this->getRecommendationsRead($userId);
             $playlistCount       = $this->getPlaylistCount($userId);
             $timeOfDayStats      = $this->getTimeOfDayStatistics($userId, $deviceId);
-            $seasonalStats       = $this->getSeasonalStatistics($userId, $deviceId, $allTimeStats->getAttribute('first_listening_date'));
+            $seasonalStats       = $this->getSeasonalStatistics(
+                $userId,
+                $deviceId,
+                $allTimeStats->first_listening_date
+            );
             $speedStats          = $this->getPlaybackSpeedStatistics($userId, $deviceId);
             $goalStats           = $this->getGoalStatistics($userId);
 
@@ -184,8 +196,8 @@ class BadgeService
                 'recommendations_sent'       => $recommendationsSent,
                 'discovery_rate'             => $recommendationsRead,
                 'playlist_count'             => $playlistCount,
-                'first_listening_date'       => $allTimeStats->getAttribute('first_listening_date'),
-                'last_listening_date'        => $allTimeStats->getAttribute('last_listening_date'),
+                'first_listening_date'       => $allTimeStats->first_listening_date,
+                'last_listening_date'        => $allTimeStats->last_listening_date,
             ] + $timeOfDayStats + $seasonalStats + $speedStats + $goalStats + $actionCounts;
         });
     }
@@ -195,27 +207,7 @@ class BadgeService
      */
     protected function calculateCurrentStreak(string $userId, ?string $deviceId = null): int
     {
-        $streak      = 0;
-        $currentDate = Carbon::now();
-
-        while (true) {
-            $hasActivity = $this->userStatsQuery($userId, $deviceId)
-                ->where('listening_date', $currentDate->toDateString())->exists();
-
-            if (! $hasActivity) {
-                break;
-            }
-
-            $streak++;
-            $currentDate->subDay();
-
-            // Prevent infinite loops
-            if ($streak > 365) {
-                break;
-            }
-        }
-
-        return $streak;
+        return $this->listeningActivityService->getCurrentStreak($userId, $deviceId);
     }
 
     /**
@@ -223,30 +215,7 @@ class BadgeService
      */
     protected function calculateLongestStreak(string $userId, ?string $deviceId = null): int
     {
-        $dates = $this->userStatsQuery($userId, $deviceId)->select('listening_date')
-            ->distinct()
-            ->orderBy('listening_date')
-            ->pluck('listening_date')
-            ->map(fn ($date) => Carbon::parse($date))
-            ->toArray();
-
-        if (empty($dates)) {
-            return 0;
-        }
-
-        $longestStreak = 1;
-        $currentStreak = 1;
-
-        for ($i = 1; $i < count($dates); $i++) {
-            if ($dates[$i]->diffInDays($dates[$i - 1]) === 1) {
-                $currentStreak++;
-                $longestStreak = max($longestStreak, $currentStreak);
-            } else {
-                $currentStreak = 1;
-            }
-        }
-
-        return $longestStreak;
+        return $this->listeningActivityService->getLongestStreak($userId, $deviceId);
     }
 
     /**
@@ -302,13 +271,11 @@ class BadgeService
 
     protected function getMeaningfullyEngagedBookIds(string $userId, ?string $deviceId = null, int $minimumSeconds = 600): Collection
     {
-        $listenedBookIds = $this->userStatsQuery($userId, $deviceId)
+        $listenedBookIds = $this->userSessions($userId, $deviceId)
             ->whereNotNull('book_id')
-            ->selectRaw('book_id, SUM(seconds_listened) as total_seconds')
             ->groupBy('book_id')
-            ->get()
-            ->filter(static fn ($row): bool => (int) $row->getAttribute('total_seconds') >= $minimumSeconds)
-            ->pluck('book_id');
+            ->filter(static fn (Collection $sessions): bool => $sessions->sum('seconds_listened') >= $minimumSeconds)
+            ->keys();
 
         return $listenedBookIds
             ->merge($this->getCompletedBookIds($userId, $deviceId))
@@ -323,30 +290,18 @@ class BadgeService
      */
     protected function getWeekendSessions(string $userId, ?string $deviceId = null): int
     {
-        $query = $this->userStatsQuery($userId, $deviceId);
-
-        $driver = DB::connection()->getDriverName();
-        if ($driver === 'sqlite') {
-            return $query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN (0, 6)")
-                ->count();
-        }
-
-        return $query->whereRaw('DAYOFWEEK(listening_date) IN (1, 7)')
-            ->count();
+        return $this->weekendSessions($userId, $deviceId)->count();
     }
 
     protected function getWeekendListeningTime(string $userId, ?string $deviceId = null): int
     {
-        $query = $this->userStatsQuery($userId, $deviceId);
+        return (int) $this->weekendSessions($userId, $deviceId)->sum('seconds_listened');
+    }
 
-        $driver = DB::connection()->getDriverName();
-        if ($driver === 'sqlite') {
-            return (int) ($query->whereRaw("CAST(strftime('%w', listening_date) AS INTEGER) IN (0, 6)")
-                ->sum('seconds_listened'));
-        }
-
-        return (int) ($query->whereRaw('DAYOFWEEK(listening_date) IN (1, 7)')
-            ->sum('seconds_listened'));
+    private function weekendSessions(string $userId, ?string $deviceId = null): Collection
+    {
+        return $this->userSessions($userId, $deviceId)
+            ->filter(static fn (object $session): bool => Carbon::parse($session->listening_date)->isWeekend());
     }
 
     /**
@@ -357,7 +312,7 @@ class BadgeService
         $startDate = Carbon::now()->subDays($days);
 
         return $this->getCompletedBookProgressRecords($userId, $deviceId)
-            ->filter(fn (BookProgress $progress): bool => $progress->completed_at !== null && $progress->completed_at->gte($startDate))
+            ->filter(fn (object $record): bool => $record->completed_at->gte($startDate))
             ->count();
     }
 
@@ -425,6 +380,17 @@ class BadgeService
     /**
      * Get user's library size (books they own/have access to)
      */
+    /**
+     * Get user's library size (distinct books they own/have engaged with).
+     *
+     * Note: this counts books the server has a record of - explicit status tags
+     * (queue/wishlist/completed/etc. in user_book_status) or any playback interaction
+     * (book_positions, written for virtually every listening event). It cannot see
+     * books that exist only in a user's local folder scan and have never been played or
+     * explicitly statused - the server has no sync signal for "this book exists in my
+     * local library" independent of interaction, so a large purely-local, unplayed
+     * collection will still undercount here.
+     */
     protected function getLibrarySize(string $userId, ?string $deviceId = null): int
     {
         if (! is_numeric($userId)) {
@@ -440,8 +406,15 @@ class BadgeService
             ->whereNotNull('book_id')
             ->pluck('book_id');
 
+        $positionBookIds = BookPosition::query()
+            ->where('user_id', (int) $userId)
+            ->whereNotNull('book_id')
+            ->distinct()
+            ->pluck('book_id');
+
         return $legacyLibraryBookIds
             ->merge($statusBookIds)
+            ->merge($positionBookIds)
             ->filter()
             ->unique()
             ->count();
@@ -452,9 +425,7 @@ class BadgeService
      */
     protected function getCompletionRate(string $userId, ?string $deviceId = null): int
     {
-        $query = $this->userStatsQuery($userId, $deviceId);
-
-        $totalBooks     = $query->distinct('book_id')->count();
+        $totalBooks     = $this->userSessions($userId, $deviceId)->pluck('book_id')->filter()->unique()->count();
         $completedBooks = $this->getCompletedBookIds($userId, $deviceId)->count();
 
         if ($totalBooks === 0) {
@@ -471,10 +442,8 @@ class BadgeService
     {
         // This would require chapter tracking in your system
         // For now, estimate based on sessions (simplified)
-        $query = $this->userStatsQuery($userId, $deviceId);
-
         // Rough estimate: assume average session covers 1-2 chapters
-        return (int) ($query->count() * 1.5);
+        return (int) ($this->userSessions($userId, $deviceId)->count() * 1.5);
     }
 
     protected function getLanguageVariety(string $userId, ?string $deviceId = null): int
@@ -514,22 +483,16 @@ class BadgeService
      */
     protected function getRepeatListening(string $userId, ?string $deviceId = null): int
     {
-        $query = $this->userStatsQuery($userId, $deviceId);
-
         // Count books that have been "completed" more than once
         return 0;
     }
 
     protected function getBooksCompletedOnWeekend(string $userId, ?string $deviceId = null): int
     {
-        return $this->getCompletedBookProgressRecords($userId, $deviceId)
-            ->filter(function (BookProgress $progress): bool {
-                if ($progress->completed_at === null) {
-                    return false;
-                }
+        $weekendDays = [Carbon::SATURDAY, Carbon::SUNDAY];
 
-                return in_array($progress->completed_at->dayOfWeek, [Carbon::SATURDAY, Carbon::SUNDAY], true);
-            })
+        return $this->getCompletedBookProgressRecords($userId, $deviceId)
+            ->filter(fn (object $record): bool => in_array($record->completed_at->dayOfWeek, $weekendDays, true))
             ->count();
     }
 
@@ -538,21 +501,19 @@ class BadgeService
         $completedDates = $this->getCompletedBookProgressRecords($userId, $deviceId)
             ->pluck('completed_at', 'book_id');
 
-        $bookTimelines = $this->userStatsQuery($userId, $deviceId)
+        $bookFirstDates = $this->userSessions($userId, $deviceId)
             ->whereNotNull('book_id')
-            ->selectRaw('book_id, MIN(listening_date) as first_date')
             ->groupBy('book_id')
-            ->get();
+            ->map(static fn (Collection $sessions): string => $sessions->pluck('listening_date')->sort()->first());
 
-        return $bookTimelines->filter(function ($timeline) use ($completedDates): bool {
-            $firstDate = $timeline->getAttribute('first_date');
-            $completedDate = $completedDates->get((int) $timeline->getAttribute('book_id'));
+        return $bookFirstDates->filter(function (string $firstDate, int $bookId) use ($completedDates): bool {
+            $completedDate = $completedDates->get($bookId);
 
-            if ($firstDate === null || $completedDate === null) {
+            if ($completedDate === null) {
                 return false;
             }
 
-            return Carbon::parse($firstDate)->diffInDays($completedDate) <= 7;
+            return Carbon::parse($firstDate)->diffInDays($completedDate, true) <= 7;
         })->count();
     }
 
@@ -566,14 +527,51 @@ class BadgeService
             ->values();
     }
 
+    /**
+     * Completed-book records, keyed by book_id to the latest known completion date.
+     *
+     * Unions two data sources: the legacy BookProgress table (still written by
+     * ProgressController) and BookPosition (written by PositionMaterializer for the modern
+     * event-sourced BOOK_FINISH path used by current clients). Neither source alone reflects
+     * all real completions.
+     *
+     * @return Collection<int, (object{book_id: int, completed_at: Carbon}&\stdClass)>
+     */
     protected function getCompletedBookProgressRecords(string $userId, ?string $deviceId = null): Collection
+    {
+        /** @var array<int, Carbon> $completions */
+        $completions = [];
+
+        foreach ($this->completedBookProgressQuery($userId, $deviceId)->get(['book_id', 'completed_at']) as $progress) {
+            /** @var BookProgress $progress */
+            if ($progress->completed_at !== null) {
+                $completions[$progress->book_id] = Carbon::parse($progress->completed_at);
+            }
+        }
+
+        $positions = $this->completedBookPositionQuery($userId, $deviceId)->get(['book_id', 'last_event_timestamp_ms']);
+        foreach ($positions as $position) {
+            /** @var BookPosition $position */
+            $date = Carbon::createFromTimestampMs((int) $position->last_event_timestamp_ms);
+            $existing = $completions[$position->book_id] ?? null;
+            if ($existing === null || $date->gt($existing)) {
+                $completions[$position->book_id] = $date;
+            }
+        }
+
+        return collect($completions)->map(static fn (Carbon $date, int $bookId): object => (object) [
+            'book_id'      => $bookId,
+            'completed_at' => $date,
+        ])->values();
+    }
+
+    private function completedBookProgressQuery(string $userId, ?string $deviceId = null): Builder
     {
         if (is_numeric($userId)) {
             return BookProgress::query()
                 ->where('user_id', (int) $userId)
                 ->where('completed', true)
-                ->whereNotNull('book_id')
-                ->get(['book_id', 'completed_at']);
+                ->whereNotNull('book_id');
         }
 
         $query = BookProgress::query()
@@ -586,7 +584,29 @@ class BadgeService
             $query->where('device_id', $userId);
         }
 
-        return $query->get(['book_id', 'completed_at']);
+        return $query;
+    }
+
+    private function completedBookPositionQuery(string $userId, ?string $deviceId = null): Builder
+    {
+        if (is_numeric($userId)) {
+            return BookPosition::query()
+                ->where('user_id', (int) $userId)
+                ->where('completed', true)
+                ->whereNotNull('book_id');
+        }
+
+        $query = BookPosition::query()
+            ->where('completed', true)
+            ->whereNotNull('book_id');
+
+        if ($deviceId !== null) {
+            $query->where('device_id', $deviceId);
+        } else {
+            $query->where('device_id', $userId);
+        }
+
+        return $query;
     }
 
     protected function getClassicBooksExplored(string $userId, ?string $deviceId = null): int
@@ -667,16 +687,14 @@ class BadgeService
 
     protected function getTimeOfDayStatistics(string $userId, ?string $deviceId = null): array
     {
-        $sessions = $this->userStatsQuery($userId, $deviceId)
-            ->whereNotNull('session_start')
-            ->get(['session_start']);
+        $sessions = $this->userSessions($userId, $deviceId);
 
         $morningSessions = 0;
         $eveningSessions = 0;
         $commuteSessions = 0;
 
         foreach ($sessions as $session) {
-            $hour = Carbon::parse((string) $session->getAttribute('session_start'))->hour;
+            $hour = $session->session_start->hour;
 
             if ($hour >= 5 && $hour < 12) {
                 $morningSessions++;
@@ -700,10 +718,9 @@ class BadgeService
 
     protected function getSeasonalStatistics(string $userId, ?string $deviceId = null, mixed $firstListeningDate = null): array
     {
-        $dates = $this->userStatsQuery($userId, $deviceId)
-            ->select('listening_date')
-            ->distinct()
+        $dates = $this->userSessions($userId, $deviceId)
             ->pluck('listening_date')
+            ->unique()
             ->map(fn ($date) => Carbon::parse((string) $date));
 
         $stats = [
@@ -715,12 +732,8 @@ class BadgeService
             'anniversary_sessions' => 0,
         ];
 
-        $anniversaryMonthDay = $firstListeningDate !== null
-            ? Carbon::parse((string) $firstListeningDate)->format('m-d')
-            : null;
-        $firstListeningYear = $firstListeningDate !== null
-            ? Carbon::parse((string) $firstListeningDate)->year
-            : null;
+        $anniversaryMonthDay = $firstListeningDate !== null ? Carbon::parse((string) $firstListeningDate)->format('m-d') : null;
+        $firstListeningYear = $firstListeningDate !== null ? Carbon::parse((string) $firstListeningDate)->year : null;
 
         foreach ($dates as $date) {
             $month = $date->month;
@@ -745,10 +758,12 @@ class BadgeService
                 $stats['winter_sessions']++;
             }
 
-            if ($anniversaryMonthDay !== null
+            if (
+                $anniversaryMonthDay !== null
                 && $firstListeningYear !== null
                 && $date->year > $firstListeningYear
-                && $date->format('m-d') === $anniversaryMonthDay) {
+                && $date->format('m-d') === $anniversaryMonthDay
+            ) {
                 $stats['anniversary_sessions'] = 1;
             }
         }
@@ -758,8 +773,7 @@ class BadgeService
 
     protected function getPlaybackSpeedStatistics(string $userId, ?string $deviceId = null): array
     {
-        $sessions = $this->userStatsQuery($userId, $deviceId)
-            ->get(['seconds_listened', 'metadata']);
+        $sessions = $this->userSessions($userId, $deviceId);
 
         $speedThresholds = [
             'speed_time_110' => 1.10,
@@ -774,8 +788,8 @@ class BadgeService
         $speedBuckets = array_fill_keys(array_map(static fn (float $speed): string => number_format($speed, 2, '.', ''), $speedBucketThresholds), 0);
 
         foreach ($sessions as $session) {
-            $speed = (float) data_get($session->getAttribute('metadata'), 'playback_speed', 1.0);
-            $secondsListened = (int) $session->getAttribute('seconds_listened');
+            $speed = (float) data_get($session->metadata, 'playback_speed', 1.0);
+            $secondsListened = (int) $session->seconds_listened;
 
             foreach ($speedThresholds as $key => $threshold) {
                 if ($speed >= $threshold) {
@@ -892,8 +906,9 @@ class BadgeService
     protected function goalProgressMinutes(ListeningGoal $goal, Carbon $start, Carbon $end): int
     {
         $userId = (string) $goal->user_id;
-        $query = $this->userStatsQuery($userId)
-            ->whereBetween('listening_date', [$start->toDateString(), $end->toDateString()]);
+        $sessions = $this->userSessions($userId)
+            ->filter(static fn (object $session): bool => $session->listening_date >= $start->toDateString()
+                && $session->listening_date <= $end->toDateString());
 
         switch ($goal->metric) {
             case 'genre_hours':
@@ -901,35 +916,39 @@ class BadgeService
                     return 0;
                 }
 
-                $query->join('book_genre', 'book_genre.book_id', '=', 'listening_statistics.book_id')
-                    ->where('book_genre.genre_id', $goal->genre_id);
+                $bookIds = DB::table('book_genre')->where('genre_id', $goal->genre_id)->pluck('book_id');
+                $sessions = $sessions->whereIn('book_id', $bookIds);
                 break;
             case 'playlist_hours':
                 if ($goal->playlist_id === null) {
                     return 0;
                 }
 
-                $query->join('user_book_status', function ($join) use ($goal): void {
-                    $join->on('user_book_status.book_id', '=', 'listening_statistics.book_id')
-                        ->where('user_book_status.user_id', '=', $goal->user_id)
-                        ->where('user_book_status.playlist_id', '=', $goal->playlist_id);
-                });
+                $bookIds = DB::table('user_book_status')
+                    ->where('user_id', $goal->user_id)
+                    ->where('playlist_id', $goal->playlist_id)
+                    ->pluck('book_id');
+                $sessions = $sessions->whereIn('book_id', $bookIds);
                 break;
             case 'fiction_hours':
-                $query->join('book_genre', 'book_genre.book_id', '=', 'listening_statistics.book_id')
+                $bookIds = DB::table('book_genre')
                     ->join('genres', 'genres.id', '=', 'book_genre.genre_id')
-                    ->where('genres.is_fiction', true);
+                    ->where('genres.is_fiction', true)
+                    ->pluck('book_genre.book_id');
+                $sessions = $sessions->whereIn('book_id', $bookIds);
                 break;
             case 'nonfiction_hours':
-                $query->join('book_genre', 'book_genre.book_id', '=', 'listening_statistics.book_id')
+                $bookIds = DB::table('book_genre')
                     ->join('genres', 'genres.id', '=', 'book_genre.genre_id')
-                    ->where('genres.is_fiction', false);
+                    ->where('genres.is_fiction', false)
+                    ->pluck('book_genre.book_id');
+                $sessions = $sessions->whereIn('book_id', $bookIds);
                 break;
             default:
                 break;
         }
 
-        return (int) floor(((int) $query->sum('seconds_listened')) / 60);
+        return (int) floor($sessions->sum('seconds_listened') / 60);
     }
 
     protected function getBookSeriesIds(Collection $bookIds): Collection
@@ -1168,6 +1187,7 @@ class BadgeService
     protected function clearUserStatsCache(string $userId, ?string $deviceId = null): void
     {
         Cache::forget("user_stats_{$userId}");
+        $this->listeningActivityService->clearCache($userId);
 
         if ($deviceId !== null) {
             Cache::forget("user_stats_{$userId}_{$deviceId}");
