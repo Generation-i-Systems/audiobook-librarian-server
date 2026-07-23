@@ -24,6 +24,7 @@ class BookImportService
     protected ?OpenAudibleParser $openAudibleParser = null;
     protected array $config = [];
     protected array $multiBookSharedOverrides = [];
+    protected array $parentDirectoryManualOverrides = [];
 
     private const AUDIO_EXTENSIONS = [
         'mp3',
@@ -424,6 +425,29 @@ class BookImportService
     }
 
     /**
+     * firstOrCreate() by name that also finds and restores a soft-deleted match. Author,
+     * Narrator, Series, and Genre all use SoftDeletes, so a plain firstOrCreate() excludes
+     * soft-deleted rows from its lookup — if a name was previously soft-deleted, it can never
+     * be found this way, and the subsequent create() then fails the unique constraint on name
+     * (which is not scoped to exclude soft-deleted rows).
+     *
+     * @param class-string<Author|Narrator|Series|Genre> $modelClass
+     * @param array<string, mixed> $extraAttributes
+     */
+    private function firstOrCreateByNameWithTrashed(string $modelClass, string $name, array $extraAttributes = []): Author|Narrator|Series|Genre
+    {
+        $existing = $modelClass::withTrashed()->where('name', $name)->first();
+        if ($existing !== null) {
+            if ($existing->trashed()) {
+                $existing->restore();
+            }
+            return $existing;
+        }
+
+        return $modelClass::create(array_merge(['name' => $name], $extraAttributes));
+    }
+
+    /**
      * Create book from metadata with comprehensive handling
      */
     public function createBookFromMetadata(array $metadata, array $audiobook, array $options = []): ?Book
@@ -587,7 +611,7 @@ class BookImportService
                     // Normalize author name (extract from patterns like "Graphic Audio [Alex Archer]")
                     $authorName = $this->normalizeAuthorName($authorName);
                     if (!empty($authorName)) {
-                        $author = Author::firstOrCreate(['name' => trim($authorName)]);
+                        $author = $this->firstOrCreateByNameWithTrashed(Author::class, trim($authorName));
                         $authorIds[] = $author->id;
                     }
                 }
@@ -604,7 +628,7 @@ class BookImportService
                 $narratorIds = [];
                 foreach ($narrators as $narratorName) {
                     if (!empty($narratorName) && is_string($narratorName)) {
-                        $narrator = Narrator::firstOrCreate(['name' => trim($narratorName)]);
+                        $narrator = $this->firstOrCreateByNameWithTrashed(Narrator::class, trim($narratorName));
                         $narratorIds[] = $narrator->id;
                     }
                 }
@@ -618,8 +642,9 @@ class BookImportService
             if (!empty($metadata['series'])) {
                 $isCollection = !empty($metadata['is_collection']) || !empty($metadata['isCollection']);
 
-                $series = Series::firstOrCreate(
-                    ['name' => trim($metadata['series'])],
+                $series = $this->firstOrCreateByNameWithTrashed(
+                    Series::class,
+                    trim($metadata['series']),
                     ['is_collection' => $isCollection]
                 );
 
@@ -641,8 +666,9 @@ class BookImportService
 
             // Handle collection as a separate series (if present)
             if (!empty($metadata['collection'])) {
-                $collectionSeries = Series::firstOrCreate(
-                    ['name' => trim($metadata['collection'])],
+                $collectionSeries = $this->firstOrCreateByNameWithTrashed(
+                    Series::class,
+                    trim($metadata['collection']),
                     ['is_collection' => true]
                 );
 
@@ -679,7 +705,7 @@ class BookImportService
                         $name = $this->validateAndMapGenre($name);
                     }
 
-                    $genre = Genre::firstOrCreate(['name' => $name]);
+                    $genre = $this->firstOrCreateByNameWithTrashed(Genre::class, $name);
 
                     // Avoid duplicate genres (e.g. if multiple raw genres map to same library genre)
                     if (!isset($genresToAttach[$genre->id])) {
@@ -869,7 +895,7 @@ class BookImportService
                 $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
                 $book->authors()->detach();
                 foreach ($authors as $authorName) {
-                    $author = Author::firstOrCreate(['name' => trim($authorName)]);
+                    $author = $this->firstOrCreateByNameWithTrashed(Author::class, trim($authorName));
                     $book->authors()->attach($author->id);
                 }
             }
@@ -879,7 +905,7 @@ class BookImportService
                 $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
                 $book->narrators()->detach();
                 foreach ($narrators as $narratorName) {
-                    $narrator = Narrator::firstOrCreate(['name' => trim($narratorName)]);
+                    $narrator = $this->firstOrCreateByNameWithTrashed(Narrator::class, trim($narratorName));
                     $book->narrators()->attach($narrator->id);
                 }
             }
@@ -887,7 +913,7 @@ class BookImportService
             // Update series
             if (!empty($metadata['series'])) {
                 $book->series()->detach();
-                $series = Series::firstOrCreate(['name' => $metadata['series']]);
+                $series = $this->firstOrCreateByNameWithTrashed(Series::class, $metadata['series']);
                 $seriesNumber = $metadata['series_number'] ?? null;
                 $book->series()->attach($series->id, [
                     'series_number' => $seriesNumber,
@@ -910,7 +936,7 @@ class BookImportService
                         $name = $this->validateAndMapGenre($name);
                     }
 
-                    $genre = Genre::firstOrCreate(['name' => $name]);
+                    $genre = $this->firstOrCreateByNameWithTrashed(Genre::class, $name);
 
                     // Avoid duplicate genres
                     if (!isset($genresToAttach[$genre->id])) {
@@ -4753,6 +4779,54 @@ class BookImportService
     }
 
     /**
+     * Remember manually-edited author/genre/series for this book's parent directory,
+     * so a later, independently-processed sibling book can reuse them.
+     */
+    protected function recordParentDirectoryManualOverrides(array $metadata, array $audiobook): void
+    {
+        $path = (string) ($audiobook['path'] ?? '');
+        if ($path === '') {
+            return;
+        }
+
+        $parentDir = dirname(rtrim($path, '/'));
+        if ($parentDir === '' || $parentDir === '.') {
+            return;
+        }
+
+        foreach (['author', 'genre', 'series'] as $field) {
+            if (!empty($metadata[$field])) {
+                $this->parentDirectoryManualOverrides[$parentDir][$field] = $metadata[$field];
+            }
+        }
+    }
+
+    /**
+     * Apply manually-edited author/genre/series recorded for this book's parent
+     * directory (from an earlier, independently-processed sibling book), if any.
+     */
+    protected function applyParentDirectoryManualOverrides(array $audiobook, array $aiMetadata, callable $infoCallback): array
+    {
+        $path = (string) ($audiobook['path'] ?? '');
+        if ($path === '') {
+            return $aiMetadata;
+        }
+
+        $parentDir = dirname(rtrim($path, '/'));
+        $overrides = $this->parentDirectoryManualOverrides[$parentDir] ?? [];
+        if (empty($overrides)) {
+            return $aiMetadata;
+        }
+
+        foreach ($overrides as $field => $value) {
+            $aiMetadata[$field] = $value;
+        }
+        $infoCallback('📁 Reusing manually-edited ' . implode(', ', array_keys($overrides)) . ' from a previous book in this directory');
+
+        return $aiMetadata;
+    }
+
+    /**
      * Edit metadata fields interactively
      */
     public function editMetadataFields(
@@ -4841,10 +4915,12 @@ class BookImportService
                     }
                 }
             }
+            $this->recordParentDirectoryManualOverrides($metadata, $audiobook);
 
             return $metadata;
         }
 
+        $titleManuallyEdited = false;
         while (true) {
             $currentTitle = $metadata['title'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']) ?? '';
             $currentAuthor = $metadata['author'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['author', 'authors', 'authorName', 'author_name']) ?? '';
@@ -4896,7 +4972,6 @@ class BookImportService
                 break;
             }
 
-            $titleManuallyEdited = false;
             switch ($choice) {
                 case '1':
                     $metadata['title'] = $askInlineCallback('Title', (string) $currentTitle);
@@ -5013,6 +5088,7 @@ class BookImportService
                 }
             }
         }
+        $this->recordParentDirectoryManualOverrides($metadata, $audiobook);
 
         return $metadata;
     }
@@ -5498,8 +5574,14 @@ class BookImportService
             '/^(.+?)\s+#([\d.]+)$/i',
             '/^(.+?),\s*Part\s+([\d.]+)$/i',
             '/^(.+?)\s+Part\s+([\d.]+)$/i',
-            '/^(.+?)\s+([\d.]+)$/',
         ];
+
+        // Bare "Title Number" (no keyword like Book/Volume/#/Part) is only a reliable
+        // signal once a series is already known — otherwise it wrongly strips numbers
+        // from standalone titles like "Fahrenheit 451" or "1984".
+        if (!empty($metadata['series'])) {
+            $patterns[] = '/^(.+?)\s+([\d.]+)$/';
+        }
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $title, $matches)) {
@@ -8741,6 +8823,7 @@ class BookImportService
         $isInBookRoot = $bookStorageRoot !== '' && str_starts_with($sourcePath, $bookStorageRoot . '/');
 
         $aiMetadata = $processWithAICallback($audiobook);
+        $aiMetadata = $this->applyParentDirectoryManualOverrides($audiobook, $aiMetadata, $infoCallback);
 
         if ($isInBookRoot) {
             $relativeDir = substr($sourcePath, strlen($bookStorageRoot) + 1);

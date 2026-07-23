@@ -93,6 +93,11 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
   confidence prompts, cover selection menu.
 - Any change to callback signatures in `processAudiobook()` (25+ callbacks) may silently
   break the interactive flow.
+- **`ReviewProgressionFantasyDuplicates` command** (`app/Console/Commands/ReviewProgressionFantasyDuplicates.php`)
+  — interactive menu driven by `$this->ask()`, and shells out to the external `mplayer` binary
+  via `passthru()` to play audio for manual A/B comparison. Neither the TTY menu loop nor the
+  mplayer playback can be exercised by PHPUnit; only the pure duplicate-pair-finding logic
+  (`findDuplicatePairs()`/`findBookOccupyingSlot()`) is realistically testable in isolation.
 
 ---
 
