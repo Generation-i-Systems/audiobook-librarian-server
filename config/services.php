@@ -88,6 +88,13 @@ return [
             'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'),
     ],
 
+    'audnex' => [
+        'enabled' => env('AUDNEX_ENABLED', true),
+        'base_url' => env('AUDNEX_BASE_URL', 'https://api.audnex.us'),
+        'region' => env('AUDNEX_REGION', 'us'),
+        'cache_ttl' => env('AUDNEX_CACHE_TTL', 86400),
+    ],
+
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),

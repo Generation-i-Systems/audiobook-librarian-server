@@ -77,9 +77,51 @@ class AudibleService extends BaseBookService
 
     protected string $baseUrl = 'https://api.audible.com/1.0/catalog';
 
+    protected ?AudnexApiService $audnexService = null;
+
     public function getServiceName(): string
     {
         return 'Audible';
+    }
+
+    protected function getAudnexService(): AudnexApiService
+    {
+        if (!$this->audnexService) {
+            $this->audnexService = app(AudnexApiService::class);
+        }
+
+        return $this->audnexService;
+    }
+
+    /**
+     * Enrich already-transformed Audible book data with audnex.us, which
+     * audnex sources from the same Audible catalog but returns cleaner,
+     * more complete fields (e.g. structured series position). Audnex data
+     * wins when present; on any failure the original data is kept as-is.
+     */
+    protected function enrichWithAudnex(array $bookData): array
+    {
+        $asin = $bookData['id'] ?? null;
+        if (empty($asin)) {
+            return $bookData;
+        }
+
+        try {
+            $audnexData = $this->getAudnexService()->getBookByAsin($asin);
+        } catch (\Throwable $e) {
+            Log::warning('AudibleService: Audnex enrichment failed, keeping Audible scrape data.', [
+                'asin' => $asin,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $bookData;
+        }
+
+        if (empty($audnexData)) {
+            return $bookData;
+        }
+
+        return array_merge($bookData, $audnexData);
     }
 
     /**
@@ -262,7 +304,7 @@ class AudibleService extends BaseBookService
             return null;
         }
 
-        return $this->transform($product);
+        return $this->enrichWithAudnex($this->transform($product));
     }
 
     public function downloadCoverImage(string $imageUrl, string $asin, string $subDirectoryPrefix = 'covers'): ?string
@@ -552,7 +594,7 @@ class AudibleService extends BaseBookService
         }
 
         // Use the first result as the best match
-        $bestMatch = $results[0];
+        $bestMatch = $this->enrichWithAudnex($results[0]);
 
         // Download cover image if available
         if (!empty($bestMatch['audibleCoverImageUrl']) && !empty($bestMatch['id'])) {

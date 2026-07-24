@@ -24,6 +24,7 @@ cannot be verified by the test suite — only by live calls.
 | **Google Books API** | `app/Services/GoogleBooksApiService.php` | Search queries, duration-matching tolerance (±15%), result ranking |
 | **Hardcover API (GraphQL)** | `app/Services/HardcoverService.php` | Token expiry email flow; GraphQL schema changes |
 | **Audible API** | `app/Services/AudibleService.php`, `AudibleApiService.php` | Search filtering, cover image download, rate-limiting headers |
+| **Audnex API** | `app/Services/AudnexApiService.php`, used by `AudibleService::enrichWithAudnex()` | Response schema changes (audnex is an unofficial third-party wrapper around Audible); outage-vs-no-data caching split (only confirmed outcomes are cached — see `getBookByAsin()`); `AUDNEX_ENABLED` kill switch |
 | **LibriVox API** | `app/Services/LibriVoxApiService.php` | 24-hour cache TTL logic; chapter metadata structure |
 | **AudioBook Bay scraper** | `app/Services/AudiobookBayApiService.php`, `AudiobookBayCategoryScraperService.php` | XPath selectors break if site HTML changes; login/session |
 | **Google Custom Image Search** | `app/Services/GoogleImageSearchService.php` | API key scopes, result quality filtering |
