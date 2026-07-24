@@ -27,5 +27,6 @@ class AppConnectControllerTest extends TestCase
         $response->assertSee('Connect the mobile app');
         $response->assertSee('https://self-hosted.example.test/api/v1');
         $response->assertSee('/app/connect/server?apiUrl=https%3A%2F%2Fself-hosted.example.test%2Fapi%2Fv1', false);
+        $response->assertDontSee('cdn.jsdelivr.net/npm/qrcode');
     }
 }

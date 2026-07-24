@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- The login-page mobile connection QR code is now generated from the locally bundled application assets instead of an external CDN, so it remains available when third-party scripts are blocked or unreachable.
 - Import now preserves series numbers from Audible, Google Books, and Hardcover enrichment, and recognizes a trailing series number in a matching download directory (for example, `Magic Eater 5`).
 - `/health/capabilities` was missing from `docs/openapi.json` since it was added in a prior change — added its documentation.
 - Listening streak, listening-time, and most `BadgeService` criteria (session count, genre/author/narrator variety, weekend listening, seasonal/time-of-day, playback-speed variety, goal progress) were computed from `listening_statistics`, a table no current client writes to (clients sync via `EventSyncManager` → `listening_events`) — these were silently reading empty/stale data for every user. Added `ListeningActivityService`, which derives session-shaped activity from `listening_events` using each event's own client-reported timestamp and timezone, and migrated `StatisticsController::getOverview()`'s streak calculation and all of `BadgeService`'s listening-based criteria onto it.

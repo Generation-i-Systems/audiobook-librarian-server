@@ -4,6 +4,12 @@ This file contains the text of prompts sent to the AI assistant.
 
 ---
 
+## 2026-07-22
+
+the qr generation on the login page is not working
+
+---
+
 ## 2026-07-17
 
 it also seems that series number from enrichment sources is being ignored too

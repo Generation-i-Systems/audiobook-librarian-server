@@ -42,38 +42,4 @@
         </style>
     @endpush
 
-    @push('scripts')
-        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
-        <script>
-            (function () {
-                "use strict";
-
-                function renderQrCode(container) {
-                    var connectUrl = container.getAttribute('data-connect-url');
-                    if (!connectUrl || !window.QRCode) {
-                        container.textContent = connectUrl || 'No connection link available.';
-                        return;
-                    }
-
-                    container.innerHTML = '';
-                    var canvas = document.createElement('canvas');
-                    container.appendChild(canvas);
-
-                    window.QRCode.toCanvas(canvas, connectUrl, {
-                        width: 200,
-                        margin: 1
-                    }, function (error) {
-                        if (error) {
-                            console.error('[app-connect-qr] Failed to render QR code', error);
-                            container.textContent = connectUrl;
-                        }
-                    });
-                }
-
-                document.addEventListener('DOMContentLoaded', function () {
-                    document.querySelectorAll('.app-connect-qr').forEach(renderQrCode);
-                });
-            })();
-        </script>
-    @endpush
 @endonce

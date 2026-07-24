@@ -28,6 +28,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - Admin/user management
 - Account deletion with email verification, immediate access revocation, a 30-day cancellation period, and scheduled permanent erasure
 - Mobile clients connect to self-hosted servers only through publicly trusted HTTPS endpoints; Docker HTTP listeners remain loopback-only behind a TLS reverse proxy. Storage, import, backup, and Librivox paths are environment-configurable and default to portable application-storage locations.
+- The login page includes a locally bundled QR code generator for the mobile server-connection link, avoiding a runtime dependency on a third-party CDN.
 
 ## 3. Data Structures
 
