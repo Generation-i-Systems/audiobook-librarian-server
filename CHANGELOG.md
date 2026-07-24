@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- Updated `guzzlehttp/guzzle` (7.14.1 → 7.15.1) and dev-only `js-yaml`/`shell-quote` npm overrides to clear newly published security advisories.
 - The login-page mobile connection QR code is now generated from the locally bundled application assets instead of an external CDN, so it remains available when third-party scripts are blocked or unreachable.
 - Import now preserves series numbers from Audible, Google Books, and Hardcover enrichment, and recognizes a trailing series number in a matching download directory (for example, `Magic Eater 5`).
 - `/health/capabilities` was missing from `docs/openapi.json` since it was added in a prior change — added its documentation.
