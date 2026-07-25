@@ -94,6 +94,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
+        $middleware->append(\App\Http\Middleware\DemoMode::class);
 
         $middleware->validateCsrfTokens(except: [
             'admin/adminer*',

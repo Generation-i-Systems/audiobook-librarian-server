@@ -125,6 +125,8 @@ return [
 
     'debug' => (bool) env('APP_DEBUG', false),
 
+    'demo_mode' => (bool) env('DEMO_MODE', false),
+
     /*
     |--------------------------------------------------------------------------
     | Local Debug Routes
