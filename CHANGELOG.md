@@ -2,6 +2,7 @@
 
 ### Added
 
+- Cached manifest chunk hashes for local book files, plus `books:cache-file-chunk-hashes` to pre-generate them by explicit book ids, newest books, all books, or a bounded batch with a system-load threshold for frequent cron runs.
 - Verified, cancellable account deletion: a six-digit email confirmation schedules deletion, revokes access immediately, offers a 30-day cancellation link, and a daily command permanently erases expired accounts.
 - Docker deployment support: `Dockerfile` (nginx + php-fpm + queue worker + scheduler in one image, via supervisor) and `docker-compose.yml` for a zero-config demo/deploy stack backed by SQLite, with optional `docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays to swap in MySQL or PostgreSQL. Purely additive — the existing non-Docker install path is unchanged. See `docker/README.md`
 - `PUT /devices/{deviceId}/push-token` endpoint so mobile clients can register their FCM/ADM push notification token against a device. Registration only — no send-side (Firebase Admin SDK / ADM) integration yet.

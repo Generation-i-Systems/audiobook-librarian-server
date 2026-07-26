@@ -7752,6 +7752,101 @@
                 }
             }
         },
+        "/books/{book}/download/{file}/chunks": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "Get book file chunk hashes",
+                "description": "Returns cached or newly generated per-chunk SHA-256 hashes for a specific local book file. Used by clients to verify and repair range downloads.",
+                "operationId": "getBookFileChunkHashes",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "book",
+                        "in": "path",
+                        "description": "Book ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "file",
+                        "in": "path",
+                        "description": "URL-encoded filename to hash",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "01%20-%20Chapter%201.mp3"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Chunk hashes returned successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["chunk_size", "chunks"],
+                                    "properties": {
+                                        "chunk_size": {
+                                            "type": "integer",
+                                            "example": 8388608
+                                        },
+                                        "chunks": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "required": ["offset", "size", "sha256"],
+                                                "properties": {
+                                                    "offset": {
+                                                        "type": "integer",
+                                                        "example": 0
+                                                    },
+                                                    "size": {
+                                                        "type": "integer",
+                                                        "example": 8388608
+                                                    },
+                                                    "sha256": {
+                                                        "type": "string",
+                                                        "example": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Book, file, directory, or chunk hashes not available",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/books/{book}/download/{file}": {
             "get": {
                 "tags": ["Books"],

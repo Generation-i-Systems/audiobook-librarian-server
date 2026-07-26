@@ -233,3 +233,12 @@ add the ability to scan a QR code on the api selection page that will be the pri
 Allow running both "instances" from the same codebase gated on the uri requesting the data. so the same .env can support both variants and swap the data sources based on the incoming address
 
 proceed on a branch
+
+---
+
+## 2026-07-26
+
+Cache the file chunk hashes that are optionally sent in download manifests after first generation.
+Add an Artisan command to pre-generate them for specific books, newest books, all books, or a list
+of books, with a system-load threshold so it can run frequently from cron and only work when the
+server is not busy.

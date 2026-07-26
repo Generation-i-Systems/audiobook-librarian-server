@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
+use App\Services\BookFileChunkHashService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -15,13 +16,17 @@ class BookDownloadController extends Controller
 {
     use BookTransformTrait;
 
-    private const DOWNLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
+    private const DOWNLOAD_CHUNK_SIZE = BookFileChunkHashService::DOWNLOAD_CHUNK_SIZE;
 
     protected DocumentStoreServiceInterface $documentStoreService;
+    private BookFileChunkHashService $chunkHashService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        ?BookFileChunkHashService $chunkHashService = null
+    ) {
         $this->documentStoreService = $documentStoreService;
+        $this->chunkHashService = $chunkHashService ?? app(BookFileChunkHashService::class);
     }
 
     private const TRUSTED_CDN_HOSTS = [
@@ -46,43 +51,6 @@ class BookDownloadController extends Controller
         clearstatcache(true, $fullPath);
 
         return is_file($fullPath) ? filesize($fullPath) : null;
-    }
-
-    /**
-     * Hash a file in fixed-size chunks for client-side range repair.
-     *
-     * @return array<int, array{offset: int, size: int, sha256: string}>
-     */
-    private function hashFileChunks(string $fullPath): array
-    {
-        $handle = fopen($fullPath, 'rb');
-        if ($handle === false) {
-            return [];
-        }
-
-        $chunks = [];
-        $offset = 0;
-
-        try {
-            while (!feof($handle)) {
-                $data = fread($handle, self::DOWNLOAD_CHUNK_SIZE);
-                if ($data === false || $data === '') {
-                    break;
-                }
-
-                $size = strlen($data);
-                $chunks[] = [
-                    'offset' => $offset,
-                    'size' => $size,
-                    'sha256' => hash('sha256', $data),
-                ];
-                $offset += $size;
-            }
-        } finally {
-            fclose($handle);
-        }
-
-        return $chunks;
     }
 
     /**
@@ -273,12 +241,14 @@ class BookDownloadController extends Controller
                 'size' => $this->freshFileSize($fullPath),
                 'download_url' => $this->buildDownloadFileUrl($id, $relativeFile),
             ];
-            if ($includeChecksums || $includeChunks) {
-                $entry['checksum'] = is_file($fullPath) ? 'sha256:' . hash_file('sha256', $fullPath) : null;
-            }
             if ($includeChunks) {
+                $hashResult = $this->chunkHashService->getOrGenerate((int) $id, $file, $fullPath);
+                $hashRecord = $hashResult['record'] ?? null;
+                $entry['checksum'] = $hashRecord !== null ? 'sha256:' . $hashRecord->sha256 : null;
                 $entry['chunk_size'] = self::DOWNLOAD_CHUNK_SIZE;
-                $entry['chunks'] = is_file($fullPath) ? $this->hashFileChunks($fullPath) : [];
+                $entry['chunks'] = $hashRecord !== null ? $hashRecord->chunks : [];
+            } elseif ($includeChecksums) {
+                $entry['checksum'] = is_file($fullPath) ? 'sha256:' . hash_file('sha256', $fullPath) : null;
             }
 
             if (in_array($extension, ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac', 'm4b'])) {
@@ -420,9 +390,12 @@ class BookDownloadController extends Controller
             'ip' => request()->ip(),
         ]);
 
+        $hashResult = $this->chunkHashService->getOrGenerate((int) $id, $filePath, $fullPath);
+        $hashRecord = $hashResult['record'] ?? null;
+
         return response()->json([
             'chunk_size' => self::DOWNLOAD_CHUNK_SIZE,
-            'chunks' => $this->hashFileChunks($fullPath),
+            'chunks' => $hashRecord !== null ? $hashRecord->chunks : [],
         ]);
     }
 

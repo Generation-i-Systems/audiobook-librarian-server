@@ -73,6 +73,9 @@ These features require real directory trees and file contents on disk.
 - **`CoverImageAnalysisService::isTextOnWhiteCover()`** — reads real image pixels via
   Intervention\Image; cannot determine cover quality from a mock.
 - **`ValidateAudioFilesCommand`, `ValidateBookDirectoriesCommand`** — walk real filesystem.
+- **`CacheBookFileChunkHashes`** (`books:cache-file-chunk-hashes`) — walks real book
+  directories and reads full file bytes to pre-generate manifest chunk hashes; fake-disk tests
+  cannot prove production mount permissions, I/O contention, or hash throughput on real files.
 - **`GenerateLibraryJson`, `ListMissingBookDirectories`** — check actual `directory_path` on
   disk.
 - **ZIP file upload and validation** — `SkinController::store()` / `ThemeController` — real

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Api\Feature;
 
 use App\Models\Book;
+use App\Models\BookFileChunkHash;
 use Illuminate\Support\Facades\Storage;
 
 class BookDownloadTest extends ApiTestCase
@@ -73,6 +74,33 @@ class BookDownloadTest extends ApiTestCase
         $response = $this->getJson('/api/v1/books/99999/download');
 
         $response->assertStatus(404);
+    }
+
+    public function test_download_manifest_with_chunks_uses_cached_chunk_hashes(): void
+    {
+        $book = Book::factory()->create([
+            'source' => 'test',
+            'directory_path' => 'Author/Book',
+        ]);
+        Storage::disk('books')->put('Author/Book/chapter.mp3', 'chapter bytes');
+        config(['library_profiles.profiles.main.book_storage_path' => rtrim(Storage::disk('books')->path(''), '/')]);
+
+        $first = $this->getJson('/api/v1/books/' . $book->id . '/download?include_chunks=1');
+        $second = $this->getJson('/api/v1/books/' . $book->id . '/download?include_chunks=1');
+
+        $first->assertStatus(200)
+            ->assertJsonPath('files.0.checksum', 'sha256:' . hash('sha256', 'chapter bytes'))
+            ->assertJsonPath('files.0.chunk_size', 8 * 1024 * 1024)
+            ->assertJsonPath('files.0.chunks.0', [
+                'offset' => 0,
+                'size' => strlen('chapter bytes'),
+                'sha256' => hash('sha256', 'chapter bytes'),
+            ]);
+
+        $second->assertStatus(200)
+            ->assertJsonPath('files.0.chunks.0.sha256', hash('sha256', 'chapter bytes'));
+
+        $this->assertSame(1, BookFileChunkHash::count());
     }
 
     public function test_queue_download_endpoint_validates_book_ids()
