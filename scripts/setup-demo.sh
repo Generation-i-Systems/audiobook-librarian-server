@@ -109,7 +109,8 @@ echo ""
 # ---------------------------------------------------------------------------
 
 echo "--- Importing 30 demo books ---"
-echo "(Downloads metadata from LibriVox API + cover images — may take a minute)"
+echo "(Downloads metadata from LibriVox API, cover images, and MP3 audio files)"
+echo "(Audio download may take a while depending on connection speed)"
 echo ""
 
 python3 "$SCRIPT_DIR/import-demo-books.py"
@@ -117,7 +118,16 @@ python3 "$SCRIPT_DIR/import-demo-books.py"
 echo ""
 
 # ---------------------------------------------------------------------------
-# 6. Clear caches
+# 6. Pre-generate chunk hashes for download manifests
+# ---------------------------------------------------------------------------
+
+echo "--- Pre-generating file chunk hashes ---"
+php artisan books:cache-file-chunk-hashes --all
+
+echo ""
+
+# ---------------------------------------------------------------------------
+# 7. Clear caches
 # ---------------------------------------------------------------------------
 
 echo "--- Clearing application cache ---"

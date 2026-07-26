@@ -279,6 +279,20 @@ def sync_series(c, book_id, series_name, series_number):
               (book_id, series_id, series_number))
 
 
+def download_file(url, dest_path, timeout=300):
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'AudiobookLibrarian-DemoSetup/1.0 (contact demo@audiobooklibrarian.com)'
+    })
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with open(dest_path, 'wb') as f:
+            while True:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
+    return os.path.getsize(dest_path)
+
+
 def download_cover(url, dest_path):
     data = http_get(url, timeout=30)
     with open(dest_path, 'wb') as f:
@@ -405,6 +419,27 @@ def main():
             series_name, series_number, year, description, language, rel_dir,
         )
         print(f'  librarian.json written')
+
+        # Download audio chapters
+        audio_ok = audio_skip = audio_fail = 0
+        for section in sections:
+            listen_url = section.get('listen_url', '')
+            if not listen_url:
+                continue
+            filename = os.path.basename(listen_url)
+            dest = os.path.join(abs_dir, filename)
+            if os.path.exists(dest) and os.path.getsize(dest) > 0:
+                audio_skip += 1
+                continue
+            try:
+                size = download_file(listen_url, dest)
+                audio_ok += 1
+            except Exception as e:
+                print(f'    WARN: audio download failed ({filename}): {e}')
+                audio_fail += 1
+            time.sleep(0.1)  # polite rate-limit
+
+        print(f'  audio: {audio_ok} downloaded, {audio_skip} skipped, {audio_fail} failed')
 
         conn.commit()
         ok += 1

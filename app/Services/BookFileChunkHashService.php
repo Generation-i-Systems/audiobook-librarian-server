@@ -38,6 +38,10 @@ class BookFileChunkHashService
         }
 
         foreach (Storage::disk('books')->allFiles($directoryPath) as $filePath) {
+            if (! $this->isAudioFile($filePath)) {
+                continue;
+            }
+
             $result = $this->getOrGenerate((int) $book->id, $filePath, Storage::disk('books')->path($filePath), $force);
             if ($result === null) {
                 $stats['missing']++;
