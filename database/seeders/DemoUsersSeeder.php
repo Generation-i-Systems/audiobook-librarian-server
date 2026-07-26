@@ -29,7 +29,7 @@ class DemoUsersSeeder extends Seeder
                 'username'          => 'user',
                 'password'          => Hash::make('user'),
                 'email_verified_at' => now(),
-                'role'              => 'user',
+                'role'              => 'library-user',
                 'is_admin'          => false,
             ]
         );

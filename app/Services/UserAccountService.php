@@ -86,7 +86,7 @@ class UserAccountService
         }
 
         if (Hash::check($credentials['password'], $user->getAuthPassword())) {
-            return $user->toArray();
+            return $user->makeVisible(['password'])->toArray();
         }
 
         return null;

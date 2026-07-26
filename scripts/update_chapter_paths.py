@@ -15,6 +15,15 @@ import re
 DB = os.path.join(os.path.dirname(__file__), '../database/database.sqlite')
 DRY_RUN = '--dry-run' in sys.argv
 
+# Read BOOK_STORAGE_PATH from .env (directory_path is stored relative to this)
+BOOK_ROOT = '/media/archive/demo-books'
+env_file = os.path.join(os.path.dirname(__file__), '../.env')
+if os.path.exists(env_file):
+    for line in open(env_file):
+        if line.startswith('BOOK_STORAGE_PATH='):
+            BOOK_ROOT = line.strip().split('=', 1)[1].strip().strip('"').strip("'")
+            break
+
 conn = sqlite3.connect(DB)
 c = conn.cursor()
 
@@ -27,6 +36,9 @@ books = c.execute("""
 updated = skipped = missing = 0
 
 for book_id, title, dir_path in books:
+    # directory_path may be relative to BOOK_ROOT or already absolute
+    if dir_path and not os.path.isabs(dir_path):
+        dir_path = os.path.join(BOOK_ROOT, dir_path)
     if not dir_path or not os.path.isdir(dir_path):
         print(f"  SKIP (no dir): [{book_id}] {title}")
         skipped += 1

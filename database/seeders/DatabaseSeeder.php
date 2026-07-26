@@ -11,12 +11,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([
-            DemoUsersSeeder::class,
+        $seeders = [
             GenreSeeder::class,
             CanonicalBadgeSeeder::class,
             ActionBadgeSeeder::class,
-        ]);
+        ];
+
+        if (env('DEMO_MODE', false)) {
+            $seeders[] = DemoUsersSeeder::class;
+        }
+
+        $this->call($seeders);
         // \App\Models\User::factory(10)->create();
 
         // \App\Models\User::factory()->create([
