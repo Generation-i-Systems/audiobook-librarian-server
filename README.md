@@ -35,7 +35,9 @@ See [Import Book Documentation](docs/import-book.md) for detailed usage.
 - Issues detected on books automatically flag them for review; staff can clear or retain reasons from the book edit form.
 - Use `php artisan library:repair-scan --help` for all options (issue filters, JSON output, disabling auto-fixes). Running the scan also clears stale issues where books have been removed.
 - Database setup: run `php artisan migrate` to create the `library_repair_issues` table (book_id, issue_type, status, directory_path, metadata JSON, auto_resolved flag, resolved_at, resolution_notes). The table is required for both the CLI command and the admin UI.
-- When adding Library Repair to an existing install, also schedule `library:repair-scan` inside `bootstrap/app.php` (example entry included) so nightly scans populate the table.
+- For production and self-hosted installs, configure the scheduler and queue worker described in
+  [Cross-platform installation](docs/INSTALLATION.md#required-background-processes). That section
+  also documents the scheduled Library Repair scan and other required or optional maintenance jobs.
 
 ## Service Architecture
 

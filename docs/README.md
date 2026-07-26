@@ -11,6 +11,7 @@ The Audiobook Librarian API provides endpoints for managing audiobook collection
 This documentation is organized into the following sections:
 
 - [API Documentation](./API.md) - Details about the API, including endpoints, authentication, and usage
+- [Installation](./INSTALLATION.md) - Cross-platform setup, HTTPS, storage paths, scheduler/cron, queue workers, and maintenance jobs
 - [Development Guidelines](./DEVELOPMENT.md) - Information for developers contributing to the API documentation
 - [Changelog](./CHANGELOG.md) - History of changes to the API and documentation
 - [Reading Progress & Statistics Requirements](./requirements/reading-progress-and-stats.md)

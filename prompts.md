@@ -242,3 +242,10 @@ Cache the file chunk hashes that are optionally sent in download manifests after
 Add an Artisan command to pre-generate them for specific books, newest books, all books, or a list
 of books, with a system-load threshold so it can run frequently from cron and only work when the
 server is not busy.
+
+## 2026-07-26
+
+Update installation documentation for all users so required server cron/scheduler scripts and
+optional maintenance jobs are covered. Include Docker vs native behavior, required scheduler and
+queue worker setup, scheduled maintenance commands, and optional low-load chunk-hash precompute
+cron examples.
