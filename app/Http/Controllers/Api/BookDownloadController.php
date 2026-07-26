@@ -372,6 +372,61 @@ class BookDownloadController extends Controller
     }
 
     /**
+     * Return per-chunk SHA-256 hashes for a single book file, for on-demand range repair.
+     * Scoped to one file so a client repairing a single corrupted file doesn't have to pay
+     * for re-hashing every other file in the book via the full manifest endpoint.
+     */
+    public function downloadFileChunks($id, $fileName)
+    {
+        $book = $this->documentStoreService->getBook($id);
+        if (!$book) {
+            return response()->json([
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found',
+            ], 404);
+        }
+
+        if (($book['source'] ?? null) === 'librivox') {
+            return response()->json([
+                'error' => 'Chunks not available',
+                'message' => 'LibriVox files are served from an external CDN and have no chunk hashes',
+            ], 404);
+        }
+
+        $directoryPath = $book['directoryPath'] ?? null;
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
+            return response()->json([
+                'error' => 'Book directory not found',
+                'message' => 'The book files could not be located',
+            ], 404);
+        }
+
+        $fileName = urldecode($fileName);
+        $filePath = $directoryPath . '/' . $fileName;
+
+        if (!Storage::disk('books')->exists($filePath)) {
+            return response()->json([
+                'error' => 'File not found',
+                'message' => 'The requested file could not be found',
+            ], 404);
+        }
+
+        $fullPath = Storage::disk('books')->path($filePath);
+
+        Log::info('Book file chunk hashes requested', [
+            'book_id' => $id,
+            'file_name' => $fileName,
+            'user_id' => Auth::id(),
+            'ip' => request()->ip(),
+        ]);
+
+        return response()->json([
+            'chunk_size' => self::DOWNLOAD_CHUNK_SIZE,
+            'chunks' => $this->hashFileChunks($fullPath),
+        ]);
+    }
+
+    /**
      * Download individual file from a book
      */
     public function downloadFile($id, $fileName)

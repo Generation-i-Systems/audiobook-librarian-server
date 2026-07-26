@@ -173,6 +173,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/{book}/tags', [BookTagController::class, 'show']);
         Route::put('/books/{book}/tags', [BookTagController::class, 'update']);
         Route::get('/books/{book}/download', [BookDownloadController::class, 'download']);
+        Route::get('/books/{book}/download/{file}/chunks', [BookDownloadController::class, 'downloadFileChunks'])
+            ->where('file', '.*')
+            ->name('api.books.downloadFileChunks');
         Route::get('/books/{book}/download/{file}', [BookDownloadController::class, 'downloadFile'])
             ->where('file', '.*')
             ->name('api.books.downloadFile');
