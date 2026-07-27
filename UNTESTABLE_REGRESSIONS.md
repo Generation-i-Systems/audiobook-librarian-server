@@ -124,6 +124,9 @@ rendering or real user interactions.
   narrator / series autocomplete dropdowns.
 - **Book form initialization** (`resources/js/admin/books/init-book-form.js`) — jQuery DOM
   wiring on page load.
+- **Related books modal** (`resources/js/admin/books/related-books-modal.js`) — Bootstrap modal
+  open/close, AJAX-loaded book list rendering; only the backend `relatedBooksAjax` JSON endpoint
+  is covered by Feature tests.
 - **Inline cover preview during import** — the cover candidate list with inline `<img>` tags
   rendered in the terminal; verifying display requires a human.
 - **Skin designer rendering parity** (`public/js/skin-designer.js` `SkinRenderer.renderElement()`)

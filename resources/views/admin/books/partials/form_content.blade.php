@@ -228,8 +228,12 @@
     if (empty($seriesList)) {
         $seriesList[] = ['seriesName' => '', 'number' => ''];
     }
+    $seriesDataByName = collect(isset($book) ? ($book['series_data'] ?? []) : [])->keyBy('name');
                                     @endphp
                                     @foreach($seriesList as $idx => $series)
+                                        @php
+    $seriesId = $seriesDataByName[$series['seriesName'] ?? '']['id'] ?? null;
+                                        @endphp
                                         <div class="d-flex align-items-start mb-2 series-row">
                                             <input type="number" name="series[{{ $idx }}][number]" class="form-control width-80 form-control-height-32 flex-shrink-0"
                                                 placeholder="#"
@@ -244,6 +248,19 @@
                                                 <label class="form-check-label ms-1 small">Collection</label>
                                             </div>
                                             <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
+                                            @if($seriesId)
+                                                <a href="{{ route('admin.books.index', ['search' => 'seriesId:' . $seriesId]) }}"
+                                                    target="_blank" rel="noopener"
+                                                    class="btn btn-sm btn-outline-secondary ms-2 btn-size-32 flex-shrink-0 d-flex align-items-center justify-content-center"
+                                                    title="View series in book list" aria-label="View series in book list">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2 view-related-books-btn btn-size-32 flex-shrink-0"
+                                                    data-type="series" data-id="{{ $seriesId }}" data-name="{{ $series['seriesName'] }}"
+                                                    title="Show other books in this series" aria-label="Show other books in this series">
+                                                    <i class="fas fa-book-open"></i>
+                                                </button>
+                                            @endif
                                             @if(!empty($series['seriesName']))
                                                 <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn btn-size-32 flex-shrink-0"
                                                     data-series-name="{{ $series['seriesName'] }}"
@@ -305,12 +322,29 @@
         $authors = [''];
     }
     $authorsCount = count($authors);
+    $authorsDataByName = collect(isset($book) ? ($book['authors_data'] ?? []) : [])->keyBy('name');
 @endphp
 
 @foreach($authors as $idx => $author)
+    @php
+        $authorId = $authorsDataByName[$author]['id'] ?? null;
+    @endphp
     <div class="d-flex align-items-start mb-2 author-row">
         <input type="text" name="author[]" class="form-control author-autocomplete form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="Author Name" required>
         <datalist id="author-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
+        @if($authorId)
+            <a href="{{ route('admin.books.index', ['search' => 'authorId:' . $authorId]) }}"
+                target="_blank" rel="noopener"
+                class="btn btn-sm btn-outline-secondary ms-2 btn-size-32 flex-shrink-0 d-flex align-items-center justify-content-center"
+                title="View author's books in book list" aria-label="View author's books in book list">
+                <i class="fas fa-external-link-alt"></i>
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-2 view-related-books-btn btn-size-32 flex-shrink-0"
+                data-type="author" data-id="{{ $authorId }}" data-name="{{ $author }}"
+                title="Show other books by this author" aria-label="Show other books by this author">
+                <i class="fas fa-book-open"></i>
+            </button>
+        @endif
         <div class="d-flex flex-column ms-2" style="gap:2px;">
             <button type="button" class="btn btn-outline-danger btn-sm remove-author"
                 style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>

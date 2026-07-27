@@ -14,6 +14,7 @@ export default defineConfig({
                 "resources/js/admin/books/planned-actions.js",
                 "resources/js/admin/books/directory-browser.js",
                 "resources/js/admin/books/series-rename.js",
+                "resources/js/admin/books/related-books-modal.js",
                 "resources/js/admin/books/directory-conflict.js",
                 "resources/js/admin/books/import_file.js",
                 "resources/js/admin/books/autofill-simple.js",

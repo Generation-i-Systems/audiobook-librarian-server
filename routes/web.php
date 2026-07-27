@@ -393,6 +393,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // AJAX: List files in book directory
     Route::get('books/files-ajax', [Admin\BookFilesystemController::class, 'filesAjax'])->name('books.filesAjax');
 
+    // AJAX: List other books by the same author or in the same series
+    Route::get('books/related-ajax', [Admin\BookController::class, 'relatedBooksAjax'])->name('books.relatedAjax');
+
     // AJAX: Extract embedded cover from audio files
     Route::post('books/extract-embedded-cover', [BookCoverAdminController::class, 'extractEmbeddedCover'])
         ->name('books.extract-embedded-cover');

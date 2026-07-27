@@ -229,6 +229,55 @@ class BookController extends Controller
     }
 
     /**
+     * AJAX: List other books by the same author or in the same series.
+     */
+    public function relatedBooksAjax(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $type = (string) $request->input('type');
+        $id = (int) $request->input('id');
+
+        if (!in_array($type, ['author', 'series'], true) || $id <= 0) {
+            return response()->json(['error' => 'Invalid request.'], 422);
+        }
+
+        $excludeId = $request->input('exclude');
+        $filters = ['include_needs_review' => true];
+
+        if ($type === 'author') {
+            $filters['author_id'] = $id;
+            $sort = 'title';
+        } else {
+            $filters['series_id'] = $id;
+            $sort = 'series';
+        }
+
+        $result = $this->documentStoreService->listBooks(1, 100, $filters, true, $sort, 'asc', true);
+
+        $books = collect($result['data'] ?? [])
+            ->reject(fn (array $book) => $excludeId !== null
+                && $excludeId !== ''
+                && (string) ($book['id'] ?? '') === (string) $excludeId)
+            ->map(function (array $book) use ($type, $id) {
+                $seriesNumber = null;
+                if ($type === 'series') {
+                    $seriesEntry = collect($book['series_data'] ?? [])->firstWhere('id', $id);
+                    $seriesNumber = $seriesEntry['pivot']['series_number'] ?? null;
+                }
+
+                return [
+                    'id' => $book['id'] ?? null,
+                    'title' => $book['title'] ?? '',
+                    'coverUrl' => $book['cover_url'] ?? null,
+                    'seriesNumber' => $seriesNumber,
+                    'editUrl' => route('admin.books.edit', ['book' => $book['id'] ?? null]),
+                ];
+            })
+            ->values();
+
+        return response()->json(['books' => $books]);
+    }
+
+    /**
      * Display the specified book.
      *
      * @param  string  $book

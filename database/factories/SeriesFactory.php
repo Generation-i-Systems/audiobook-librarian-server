@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Series;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/** @extends Factory<Series> */
 class SeriesFactory extends Factory
 {
     protected $model = Series::class;

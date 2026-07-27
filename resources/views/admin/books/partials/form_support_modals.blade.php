@@ -29,6 +29,30 @@
             </div>
         </div>
 
+        {{-- Related Books Modal (other books by an author / in a series) --}}
+        <div class="modal fade" id="relatedBooksModal" tabindex="-1" aria-labelledby="relatedBooksModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="relatedBooksModalLabel">Other Books</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="related-books-list">
+                            <div class="text-center p-4">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- Directory Browser Modal --}}
         <div class="modal fade" id="directoryBrowserModal" tabindex="-1" aria-labelledby="directoryBrowserModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
@@ -143,7 +167,8 @@
                     authorsAutocomplete: "{{ route('admin.books.autocomplete.authors') }}",
                     seriesAutocomplete: "{{ route('admin.books.autocomplete.series') }}",
                     narratorsAutocomplete: "{{ route('admin.books.autocomplete.narrators') }}",
-                    renameSeries: "{{ route('admin.books.renameSeries') }}"
+                    renameSeries: "{{ route('admin.books.renameSeries') }}",
+                    relatedBooks: "{{ route('admin.books.relatedAjax') }}"
                 };
 
                 // Set other global variables
@@ -177,7 +202,8 @@
                 'resources/js/admin/books/planned-actions.js',
                 'resources/js/admin/books/directory-browser.js',
                 'resources/js/admin/books/series-rename.js',
-                'resources/js/admin/books/directory-conflict.js'
+                'resources/js/admin/books/directory-conflict.js',
+                'resources/js/admin/books/related-books-modal.js'
             ])
             <script type="text/javascript">
             $(function() {
