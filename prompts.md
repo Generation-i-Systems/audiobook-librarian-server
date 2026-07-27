@@ -298,3 +298,7 @@ into the database.
 
 Make sure both `books:cache-file-chunk-hashes` and `books:detect-chapters` support inclusive
 book-id ranges with `--book`, while preserving repeated single-book selections.
+
+## 2026-07-27
+
+Address the npm audit issues reported by the pre-push hook for `brace-expansion` and `postcss`.
