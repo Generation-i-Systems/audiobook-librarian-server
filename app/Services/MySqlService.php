@@ -522,7 +522,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
                 // A purely numeric search also matches the book's internal id
                 if (ctype_digit((string) $searchTerm)) {
-                    $q->orWhere('id', (int) $searchTerm);
+                    $q->orWhere('books.id', (int) $searchTerm);
                 }
             });
         }
@@ -532,7 +532,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
 
         if (!empty($filters['book_id'])) {
-            $query->where('id', $filters['book_id']);
+            $query->where('books.id', $filters['book_id']);
         }
 
         if (!empty($filters['genre_id'])) {

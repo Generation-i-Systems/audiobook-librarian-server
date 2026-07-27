@@ -1245,9 +1245,14 @@ class BookController extends Controller
         ]);
         $documentStore->updateBook($id, $validated);
 
-        // Recalculate duration from audio files on disk
+        // Recalculate duration from audio files on disk. This re-parses every audio file with
+        // getID3 and is slow for books with many files, so only do it when the files could
+        // plausibly have changed (directory moved) or the stored duration is missing/zero —
+        // not on every routine metadata edit.
         $directoryPath = $validated['directoryPath'] ?? ($book['directoryPath'] ?? null);
-        if ($directoryPath) {
+        $directoryChanged = $oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath;
+        $durationMissing = empty($book['duration']);
+        if ($directoryPath && ($directoryChanged || $durationMissing)) {
             $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
             $absolutePath = $bookRoot . '/' . ltrim($directoryPath, '/');
             if (is_dir($absolutePath)) {

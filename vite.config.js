@@ -16,6 +16,7 @@ export default defineConfig({
                 "resources/js/admin/books/series-rename.js",
                 "resources/js/admin/books/related-books-modal.js",
                 "resources/js/admin/books/directory-conflict.js",
+                "resources/js/admin/books/save-button-spinner.js",
                 "resources/js/admin/books/import_file.js",
                 "resources/js/admin/books/autofill-simple.js",
                 "resources/js/admin/books/form-helpers.js",

@@ -203,6 +203,7 @@
                 'resources/js/admin/books/directory-browser.js',
                 'resources/js/admin/books/series-rename.js',
                 'resources/js/admin/books/directory-conflict.js',
+                'resources/js/admin/books/save-button-spinner.js',
                 'resources/js/admin/books/related-books-modal.js'
             ])
             <script type="text/javascript">

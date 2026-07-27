@@ -127,6 +127,11 @@ rendering or real user interactions.
 - **Related books modal** (`resources/js/admin/books/related-books-modal.js`) — Bootstrap modal
   open/close, AJAX-loaded book list rendering; only the backend `relatedBooksAjax` JSON endpoint
   is covered by Feature tests.
+- **Save button spinner** (`resources/js/admin/books/save-button-spinner.js`) — depends on script
+  load order relative to `directory-conflict.js` (registers its `submit` handler after it, so
+  `e.isDefaultPrevented()` correctly reflects an in-progress async directory-conflict check); a
+  reordering of the `@vite([...])` list in `form_support_modals.blade.php` or `vite.config.js`
+  could silently break this without any test catching it.
 - **Inline cover preview during import** — the cover candidate list with inline `<img>` tags
   rendered in the terminal; verifying display requires a human.
 - **Skin designer rendering parity** (`public/js/skin-designer.js` `SkinRenderer.renderElement()`)
