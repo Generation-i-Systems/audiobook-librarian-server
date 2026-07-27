@@ -166,7 +166,7 @@ echo ""
 echo "--- Clearing application cache ---"
 php artisan config:cache
 # Cache files may be owned by www-data from prior web requests; clear with sudo if needed
-if ! php artisan cache:clear 2>/dev/null; then
+if ! php artisan cache:clear >/dev/null 2>&1; then
     sudo find "$SERVER_ROOT/storage/framework/cache" -mindepth 1 -delete
     echo "Cache cleared (required sudo for www-data owned files)"
 fi
