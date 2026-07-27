@@ -32,7 +32,7 @@ class GenreSeeder extends Seeder
         ];
 
         foreach ($genres as $genreName) {
-            Genre::create(['name' => $genreName]);
+            Genre::firstOrCreate(['name' => $genreName]);
         }
     }
 }
