@@ -249,3 +249,41 @@ Update installation documentation for all users so required server cron/schedule
 optional maintenance jobs are covered. Include Docker vs native behavior, required scheduler and
 queue worker setup, scheduled maintenance commands, and optional low-load chunk-hash precompute
 cron examples.
+
+## 2026-07-26
+
+Update the chunk hash script to show the author and title along with book_id.
+
+## 2026-07-26
+
+Update the chunk hash script so it only processes books that do not already have fresh file hashes.
+Repeated `--newest=10` runs should eventually advance through all hashable books instead of
+staying on the newest already-cached books.
+
+## 2026-07-26
+
+Update normal chunk-hash command runs to use a DB-only missing-cache filter so already-cached books
+do not require filesystem operations before the batch starts. Add `--refresh` for the slower path
+that lists files and compares size/mtime against cached rows. Do not print per-book lines for
+skipped or missing candidates.
+
+## 2026-07-26
+
+Print the processing time for each book in the chunk-hash command output. Reduce startup latency by
+streaming candidate books and loading authors only for processed books that are actually printed.
+
+## 2026-07-26
+
+Simplify chunk-hash command output by removing cached/missing/skipped counts unless they are
+nonzero for the processed book.
+
+---
+
+## 2026-07-26
+
+implement an app:refresh command ported from /home/devel/src/school-bus-dashboard
+
+## 2026-07-26
+
+Create server-side audiobook chapter autodetection similar to chunk metadata handling so
+`librarian.json` includes chapters when embedded chapter metadata is available.

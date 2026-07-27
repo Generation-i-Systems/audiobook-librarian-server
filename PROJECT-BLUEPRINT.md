@@ -30,7 +30,8 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - Mobile clients connect to self-hosted servers only through publicly trusted HTTPS endpoints; Docker HTTP listeners remain loopback-only behind a TLS reverse proxy. Storage, import, backup, and Librivox paths are environment-configurable and default to portable application-storage locations.
 - Production installs require the Laravel scheduler plus a queue worker. Docker runs both under supervisor; native installs must configure `schedule:work` or a one-minute `schedule:run` cron and a managed `queue:work` service. `docs/INSTALLATION.md` documents required and optional scheduled jobs, including low-load chunk-hash precomputation.
 - The login page includes a locally bundled QR code generator for the mobile server-connection link, avoiding a runtime dependency on a third-party CDN.
-- Download manifests can optionally include per-chunk SHA-256 hashes for local files; those hashes are cached in `book_file_chunk_hashes` after first generation and can be precomputed with `books:cache-file-chunk-hashes` during low system load.
+- Download manifests can optionally include per-chunk SHA-256 hashes for local files; those hashes are cached in `book_file_chunk_hashes` after first generation and can be precomputed with `books:cache-file-chunk-hashes` during low system load. The precompute command reports book id, author, title, and elapsed processing time for each processed book. Normal bounded runs use a DB-only missing-cache filter; `--refresh` opts into filesystem size/mtime checks for stale or partially missing hashes.
+- `librarian.json` includes chapter metadata when available. Import-supplied and previously written chapters are preserved during normal JSON generation; embedded audio chapter detection is an explicit `books:detect-chapters` command so UI-triggered JSON regeneration does not run slow `ffprobe` work.
 
 ## 3. Data Structures
 
@@ -87,6 +88,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - `LibraryRepairService`: nightly scanner that detects missing/orphan/duplicate/nested/numbered-suffix directories, auto-fixes safe cases, and records issues with minimal metadata
 - `BookImportService`: preserves detected series numbering from enrichment and directory names, including validated trailing-number names such as `Magic Eater 5`
 - `LibraryRepairScanCommand` (`library:repair-scan`): CLI entry point for manual or scheduled scans (JSON mode, selective issue filters, optional auto-fixes)
+- `AppRefreshCommand` (`app:refresh`): Clear caches, run migrations, restart queue workers, reset OPcache, reload PHP-FPM, and build frontend assets when changes are detected.
 - `Admin\LibraryRepairController` + `/admin/library-repair`: paginated UI for reviewing Library Repair Issues, defaulting to pending issues with a “Show resolved” toggle, inline book edit shortcuts, AudiobookBay search links, per-issue rescans, and missing-directory import helpers
 - **Web Routes:**
     - `/admin/books` (CRUD)

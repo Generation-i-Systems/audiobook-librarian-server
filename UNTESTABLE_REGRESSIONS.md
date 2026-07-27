@@ -56,6 +56,9 @@ metadata or shell-invokes `ffprobe`.
   the ±15% tolerance check uses the actual audio duration from disk.
 - **Embedded ID3 tag / cover art extraction** — import pipeline reads artist, title, and
   embedded cover images directly from audio file headers.
+- **Embedded chapter extraction for `librarian.json`** — `ChapterDetectionService` shells out to
+  `ffprobe -show_chapters`; fixtures can verify normalization, but only real audiobook files can
+  prove chapter availability across container formats and encoders.
 - **OpenAI Whisper transcription** — real audio bytes required; mock responses cannot
   validate accuracy or API contract.
 
@@ -84,6 +87,7 @@ These features require real directory trees and file contents on disk.
   `is_readable()`, `disk_free_space()`, `disk_total_space()`. Tests use `/tmp` as a stand-in;
   they cannot verify that the actual production mounts (e.g. `/media/audiobooks/books`) are
   mounted, readable, or have sufficient free space.
+- **`AppRefreshCommand`** (`app:refresh`) — recursively updates filesystem permissions of all storage/cache directories on disk, runs database migrations, restarts queue workers, resets SAPI/CLI OPcaches, and reloads SAPI `php-fpm` via systemd (`systemctl reload`). Automated tests run in an isolated sandbox where real system privileges, group ownerships, SAPI process state, and systemctl commands are stubbed/skipped, so tests cannot verify SAPI reload or permissions updates in production.
 
 ---
 

@@ -2,7 +2,13 @@
 
 ### Added
 
+- Ported the `app:refresh` command from the school-bus-dashboard codebase. This command clears application caches, repairs directory permissions in writable storage/cache locations, runs pending database migrations, restarts queue workers, resets the PHP OPcache, reloads the PHP-FPM service, and optionally builds frontend assets when changes are detected.
 - Cached manifest chunk hashes for local book files, plus `books:cache-file-chunk-hashes` to pre-generate them by explicit book ids, newest books, all books, or a bounded batch with a system-load threshold for frequent cron runs.
+- `books:cache-file-chunk-hashes` now prints each processed book's id, author, and title alongside generated/cached/missing/skipped counts.
+- `books:cache-file-chunk-hashes` now uses a DB-only missing-cache filter in normal mode, so `--newest` and `--limit` do not stat files for books that already have chunk-hash rows. Use `--refresh` to scan current file sizes and mtimes for stale or partially missing hashes.
+- `books:cache-file-chunk-hashes` now prints elapsed processing time for each listed book and streams candidate books without eager-loading authors before the first processed item.
+- `books:cache-file-chunk-hashes` now keeps per-book output concise, showing cached/missing/skipped counts only when those values are nonzero.
+- Added `books:detect-chapters` to detect embedded audio chapters with `ffprobe` and write them into `librarian.json`; normal JSON regeneration preserves existing chapters but does not run detection.
 - Installation documentation now covers required scheduler/queue-worker setup, the cron-style maintenance jobs run by the server, and optional low-load chunk-hash precompute cron examples for self-hosted installs.
 - Verified, cancellable account deletion: a six-digit email confirmation schedules deletion, revokes access immediately, offers a 30-day cancellation link, and a daily command permanently erases expired accounts.
 - Docker deployment support: `Dockerfile` (nginx + php-fpm + queue worker + scheduler in one image, via supervisor) and `docker-compose.yml` for a zero-config demo/deploy stack backed by SQLite, with optional `docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays to swap in MySQL or PostgreSQL. Purely additive — the existing non-Docker install path is unchanged. See `docker/README.md`
