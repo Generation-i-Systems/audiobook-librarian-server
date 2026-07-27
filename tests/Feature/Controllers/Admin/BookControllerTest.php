@@ -89,6 +89,36 @@ class BookControllerTest extends TestCase
     }
 
     #[Test]
+    public function indexSearchesByBookIdToken(): void
+    {
+        $this->documentStoreServiceMock
+            ->shouldReceive('listBooks')
+            ->withArgs(function ($page, $perPage, $filters) {
+                return ($filters['book_id'] ?? null) === 42 && !isset($filters['search']);
+            })
+            ->andReturn(['data' => [], 'total' => 0]);
+
+        $response = $this->get(route('admin.books.index', ['search' => 'bookId:42']));
+
+        $response->assertStatus(200);
+    }
+
+    #[Test]
+    public function indexDefaultsToSeriesSortWhenSeriesIdTokenUsed(): void
+    {
+        $this->documentStoreServiceMock
+            ->shouldReceive('listBooks')
+            ->withArgs(function ($page, $perPage, $filters, $includeMissing, $sort, $order) {
+                return ($filters['series_id'] ?? null) === 7 && $sort === 'series';
+            })
+            ->andReturn(['data' => [], 'total' => 0]);
+
+        $response = $this->get(route('admin.books.index', ['search' => 'seriesId:7']));
+
+        $response->assertStatus(200);
+    }
+
+    #[Test]
     public function storeCreatesBook(): void
     {
         $this->withoutExceptionHandling();

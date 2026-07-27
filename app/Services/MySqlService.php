@@ -519,11 +519,20 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     ->orWhereHas('series', function ($seriesQuery) use ($searchTerm): void {
                         $seriesQuery->where('name', 'like', '%' . $searchTerm . '%');
                     });
+
+                // A purely numeric search also matches the book's internal id
+                if (ctype_digit((string) $searchTerm)) {
+                    $q->orWhere('id', (int) $searchTerm);
+                }
             });
         }
 
         if (!empty($filters['title'])) {
             $query->where('title', 'like', '%' . $filters['title'] . '%');
+        }
+
+        if (!empty($filters['book_id'])) {
+            $query->where('id', $filters['book_id']);
         }
 
         if (!empty($filters['genre_id'])) {

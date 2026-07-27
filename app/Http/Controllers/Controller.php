@@ -12,10 +12,10 @@ class Controller extends BaseController
     use ValidatesRequests;
 
     /**
-     * Parse id-based tokens (authorId:N, genreId:N, seriesId:N) out of a raw search string.
+     * Parse id-based tokens (authorId:N, genreId:N, seriesId:N, bookId:N) out of a raw search string.
      *
      * Returns an array with keys:
-     *   - 'author_id', 'genre_id', 'series_id' (int|null)
+     *   - 'author_id', 'genre_id', 'series_id', 'book_id' (int|null)
      *   - 'search' (remaining free-text, trimmed)
      *
      * Example: "genreId:12 Mistborn" → ['genre_id' => 12, 'search' => 'Mistborn', ...]
@@ -23,13 +23,24 @@ class Controller extends BaseController
      */
     protected function parseSearchTokens(?string $raw): array
     {
-        $result = ['author_id' => null, 'genre_id' => null, 'series_id' => null, 'search' => ''];
+        $result = [
+            'author_id' => null,
+            'genre_id' => null,
+            'series_id' => null,
+            'book_id' => null,
+            'search' => '',
+        ];
 
-        $tokenMap = ['authorId' => 'author_id', 'genreId' => 'genre_id', 'seriesId' => 'series_id'];
+        $tokenMap = [
+            'authorId' => 'author_id',
+            'genreId' => 'genre_id',
+            'seriesId' => 'series_id',
+            'bookId' => 'book_id',
+        ];
         $raw = $raw ?? '';
 
         $remaining = preg_replace_callback(
-            '/\b(authorId|genreId|seriesId):(\d+)\b/',
+            '/\b(authorId|genreId|seriesId|bookId):(\d+)\b/',
             function (array $m) use (&$result, $tokenMap): string {
                 $result[$tokenMap[$m[1]]] = (int) $m[2];
                 return '';

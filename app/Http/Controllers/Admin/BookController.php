@@ -96,6 +96,9 @@ class BookController extends Controller
                 $filters['series_id'] = $tokens['series_id'];
                 unset($filters['series']);
             }
+            if ($tokens['book_id']) {
+                $filters['book_id'] = $tokens['book_id'];
+            }
             if ($tokens['search'] !== '') {
                 $filters['search'] = $tokens['search'];
             }
@@ -106,8 +109,8 @@ class BookController extends Controller
             // Get sorting parameters
             $sortParam = $request->input('sort', 'recent_desc');
 
-            // Default to series name sorting when series filter is applied
-            if ($request->filled('series') && !$request->has('sort')) {
+            // Default to series (number) sorting when a series filter is applied
+            if (($request->filled('series') || $tokens['series_id']) && !$request->has('sort')) {
                 $sortParam = 'series_asc';
             }
 
@@ -1356,8 +1359,7 @@ class BookController extends Controller
         }
 
         usort($fallbackCandidates, function (array $left, array $right) use ($title, $author): int {
-            return $this->scoreAutofillCandidate($right['result'], $title, $author)
-                <=> $this->scoreAutofillCandidate($left['result'], $title, $author);
+            return $this->scoreAutofillCandidate($right['result'], $title, $author) <=> $this->scoreAutofillCandidate($left['result'], $title, $author);
         });
 
         return $fallbackCandidates[0];
@@ -1633,11 +1635,7 @@ class BookController extends Controller
 
     private function extractCoverUrlFromResult(array $result): ?string
     {
-        $coverUrl = $result['audibleCoverImageUrl']
-            ?? $result['coverImageUrl']
-            ?? $result['cover_image_url']
-            ?? $result['cover']
-            ?? null;
+        $coverUrl = $result['audibleCoverImageUrl'] ?? $result['coverImageUrl'] ?? $result['cover_image_url'] ?? $result['cover'] ?? null;
 
         if (!is_string($coverUrl)) {
             return null;
