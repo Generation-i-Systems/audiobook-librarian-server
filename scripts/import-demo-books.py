@@ -300,7 +300,21 @@ def download_cover(url, dest_path):
     return len(data)
 
 
-def write_librarian_json(path, title, authors, genres, series_name, series_number, year, description, language, dir_path):
+def sections_to_chapters(sections):
+    chapters = []
+    for s in sections:
+        listen_url = s.get('listen_url', '')
+        filename = os.path.basename(listen_url) if listen_url else ''
+        chapters.append({
+            'title':    s.get('title', ''),
+            'file':     filename,
+            'start':    None,
+            'duration': int(s.get('playtime', 0) or 0),
+        })
+    return chapters
+
+
+def write_librarian_json(path, title, authors, genres, series_name, series_number, year, description, language, dir_path, chapters=None):
     metadata = {
         'title':         title,
         'author':        authors,
@@ -317,6 +331,7 @@ def write_librarian_json(path, title, authors, genres, series_name, series_numbe
         'cover_url':     '',
         'confidence':    100,
         'source_path':   dir_path,
+        'chapters':      chapters or [],
     }
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
@@ -399,8 +414,10 @@ def main():
         # Download cover
         cover_url = COVER_URLS.get(librivox_id)
         cover_dest = os.path.join(abs_dir, 'cover.jpg')
-        cover_ok = False
-        if cover_url:
+        cover_ok = os.path.exists(cover_dest) and os.path.getsize(cover_dest) > 0
+        if cover_ok:
+            print(f'  cover: skipped (already exists)')
+        elif cover_url:
             try:
                 size = download_cover(cover_url, cover_dest)
                 print(f'  cover: {size // 1024}KB')
@@ -411,14 +428,15 @@ def main():
         if cover_ok:
             c.execute("UPDATE books SET cover_image = 'cover.jpg' WHERE id = ?", (book_id,))
 
-        # Write librarian.json
+        # Write librarian.json (includes chapters)
         series_name, series_number = BOOK_SERIES.get(librivox_id, (None, None))
         write_librarian_json(
             os.path.join(abs_dir, 'librarian.json'),
             title, [author_name], genre_names,
             series_name, series_number, year, description, language, rel_dir,
+            chapters=sections_to_chapters(sections),
         )
-        print(f'  librarian.json written')
+        print(f'  librarian.json written ({len(sections)} chapters)')
 
         # Download audio chapters
         audio_ok = audio_skip = audio_fail = 0

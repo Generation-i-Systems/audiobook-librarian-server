@@ -19,6 +19,7 @@ storage/framework/sessions/*
 storage/framework/views/*
 storage/logs/*
 bootstrap/cache/*.php
+scripts/fix_perms
 *.md
 *.log
 *.sqlite

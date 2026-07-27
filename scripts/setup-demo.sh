@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 SERVER_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="$SERVER_ROOT/.env"
 
@@ -90,7 +90,40 @@ if [[ ! -d "$BOOK_ROOT" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Artisan: migrate + seed
+# 4. Compile and install fix_perms SUID binary
+# ---------------------------------------------------------------------------
+
+echo "--- Compiling fix_perms SUID binary ---"
+echo "(Locks binary to BOOK_STORAGE_PATH=$BOOK_ROOT, user=eric, group=audio)"
+
+if ! command -v gcc &>/dev/null; then
+    echo "WARNING: gcc not found — skipping fix_perms compile."
+    echo "         Install gcc and re-run, or follow scripts/FIX-PERMS-INSTALL.md"
+elif gcc -O2 \
+        -DALLOWED_ROOT_PATH="\"$BOOK_ROOT\"" \
+        -DTARGET_USER='"eric"' \
+        -DTARGET_GROUP='"audio"' \
+        "$SCRIPT_DIR/fix_perms.c" -o "$SCRIPT_DIR/fix_perms.new"; then
+    FIX_PERMS_BIN="$SCRIPT_DIR/fix_perms"
+    if sudo chown root:audio "$SCRIPT_DIR/fix_perms.new" && \
+       sudo chmod 4750 "$SCRIPT_DIR/fix_perms.new" && \
+       sudo mv "$SCRIPT_DIR/fix_perms.new" "$FIX_PERMS_BIN"; then
+        echo "fix_perms installed: $FIX_PERMS_BIN"
+    else
+        echo "WARNING: sudo install failed — run manually:"
+        echo "  sudo chown root:audio $SCRIPT_DIR/fix_perms.new"
+        echo "  sudo chmod 4750 $SCRIPT_DIR/fix_perms.new"
+        echo "  sudo mv $SCRIPT_DIR/fix_perms.new $FIX_PERMS_BIN"
+    fi
+else
+    echo "WARNING: fix_perms compile failed — file ownership will not be corrected automatically."
+    echo "         See scripts/FIX-PERMS-INSTALL.md for manual install and Docker alternatives."
+fi
+
+echo ""
+
+# ---------------------------------------------------------------------------
+# 5. Artisan: migrate + seed
 # ---------------------------------------------------------------------------
 
 cd "$SERVER_ROOT"
@@ -105,7 +138,7 @@ php artisan db:seed --force
 echo ""
 
 # ---------------------------------------------------------------------------
-# 5. Import demo books
+# 6. Import demo books
 # ---------------------------------------------------------------------------
 
 echo "--- Importing 30 demo books ---"
@@ -118,7 +151,7 @@ python3 "$SCRIPT_DIR/import-demo-books.py"
 echo ""
 
 # ---------------------------------------------------------------------------
-# 6. Pre-generate chunk hashes for download manifests
+# 7. Pre-generate chunk hashes for download manifests
 # ---------------------------------------------------------------------------
 
 echo "--- Pre-generating file chunk hashes ---"
@@ -127,7 +160,7 @@ php artisan books:cache-file-chunk-hashes --all
 echo ""
 
 # ---------------------------------------------------------------------------
-# 7. Clear caches
+# 8. Clear caches
 # ---------------------------------------------------------------------------
 
 echo "--- Clearing application cache ---"

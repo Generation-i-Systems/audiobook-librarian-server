@@ -1,5 +1,6 @@
 /.phpunit.cache
 /scripts/__pycache__
+/scripts/fix_perms
 /node_modules
 /public/build
 /public/hot
