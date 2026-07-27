@@ -32,12 +32,13 @@ class BookFileChunkHashService
         }
 
         $directoryPath = $book->directory_path;
-        if (! Storage::disk('books')->exists($directoryPath) && empty(Storage::disk('books')->allFiles($directoryPath))) {
+        $filePaths = Storage::disk('books')->allFiles($directoryPath);
+        if (! Storage::disk('books')->exists($directoryPath) && $filePaths === []) {
             $stats['missing']++;
             return $stats;
         }
 
-        foreach (Storage::disk('books')->allFiles($directoryPath) as $filePath) {
+        foreach ($filePaths as $filePath) {
             if (! $this->isAudioFile($filePath)) {
                 continue;
             }
@@ -108,6 +109,47 @@ class BookFileChunkHashService
     public function isAudioFile(string $filePath): bool
     {
         return in_array(strtolower(pathinfo($filePath, PATHINFO_EXTENSION)), self::AUDIO_EXTENSIONS, true);
+    }
+
+    public function bookNeedsCaching(Book $book, bool $force = false): bool
+    {
+        if ($force) {
+            return true;
+        }
+
+        if ($book->source === 'librivox' || $book->directory_path === null || $book->directory_path === '') {
+            return false;
+        }
+
+        $directoryPath = $book->directory_path;
+        $filePaths = Storage::disk('books')->allFiles($directoryPath);
+        if (! Storage::disk('books')->exists($directoryPath) && $filePaths === []) {
+            return false;
+        }
+
+        $cachedHashes = BookFileChunkHash::query()
+            ->where('book_id', (int) $book->id)
+            ->where('chunk_size', self::DOWNLOAD_CHUNK_SIZE)
+            ->get()
+            ->keyBy('file_path_hash');
+
+        foreach ($filePaths as $filePath) {
+            if (! $this->isAudioFile($filePath)) {
+                continue;
+            }
+
+            $metadata = $this->fileMetadata(Storage::disk('books')->path($filePath));
+            if ($metadata === null) {
+                return true;
+            }
+
+            $record = $cachedHashes->get(hash('sha256', $filePath));
+            if (! $record instanceof BookFileChunkHash || ! $this->isFresh($record, $filePath, $metadata)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

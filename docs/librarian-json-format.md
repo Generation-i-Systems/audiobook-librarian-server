@@ -24,6 +24,7 @@ The JSON document is an object with the following keys. Unless marked as optiona
 | `genres` | array<object> | Array of genre records (see below). |
 | `series` | object\|null | Series metadata when the book belongs to a series. |
 | `publisher` | object\|null | Publisher metadata. |
+| `chapters` | array<object> | Chapter metadata loaded from the database, imported from an existing file when DB rows are missing, or written by the chapter detection command (see below). |
 | `created_at` | string\|null | Database creation timestamp (ISO-8601). |
 | `updated_at` | string\|null | Database update timestamp (ISO-8601). |
 | `metadata` | object | Generation metadata (see below). |
@@ -76,6 +77,24 @@ The JSON document is an object with the following keys. Unless marked as optiona
 ```
 
 * Entire object is `null` if no publisher is linked.
+
+### Chapter Object
+
+```
+{
+  "title": "Chapter 1",
+  "start": 0,
+  "duration": 742.5,
+  "file": "book.m4b"
+}
+```
+
+* `chapters` is always present and may be empty.
+* `title`, `start`, `duration`, and `file` are persisted in the `chapters` table so this file can be regenerated from the database.
+* If an existing `librarian.json` has chapters but the database has none, normal regeneration imports those chapters into the database before preserving them in the JSON output.
+* Normal `librarian.json` regeneration does not shell out to detect chapters. Run `php artisan books:detect-chapters` to detect embedded chapters with `ffprobe`, store them in the database, and write them into this file. Targeted runs accept repeated `--book` values and inclusive ranges such as `--book=100-150`.
+* `start` and `duration` are seconds relative to the chapter's source file. `duration` may be `null` when the audio metadata does not include an end time.
+* `file` is the audio file path relative to the book directory, and is included for server-detected chapters so multi-file books are unambiguous.
 
 ### Metadata Object
 
@@ -137,6 +156,14 @@ The JSON document is an object with the following keys. Unless marked as optiona
     "id": 51,
     "name": "Docs Unlimited"
   },
+  "chapters": [
+    {
+      "title": "Opening",
+      "start": 0,
+      "duration": 742.5,
+      "file": "book.m4b"
+    }
+  ],
   "created_at": "2025-10-05T12:00:00Z",
   "updated_at": "2025-10-06T08:30:00Z",
   "metadata": {

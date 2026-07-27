@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Models\Book;
+use App\Services\BookChapterService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -87,6 +88,7 @@ trait HandlesLibraryJson
                     'genres',
                     'series',
                     'publisher',
+                    'chapters',
                 ])->toArray();
             }
 
@@ -290,8 +292,27 @@ trait HandlesLibraryJson
         $createdAt = $book['created_at'] ?? $book['createdAt'] ?? null;
         $updatedAt = $book['updated_at'] ?? $book['updatedAt'] ?? null;
 
-        // Handle chapters (from OpenAudible or other sources)
+        // Handle chapters from DB first, then supplied metadata, then cached librarian.json.
+        $chapterService = app(BookChapterService::class);
         $chapters = $book['chapters'] ?? [];
+        if (!is_array($chapters)) {
+            $chapters = [];
+        }
+
+        if (! empty($chapters)) {
+            $chapters = $chapterService->toJsonChapters($chapters);
+        }
+
+        if (empty($chapters) && is_string($relativePath) && $relativePath !== '') {
+            $chapters = $this->existingLibraryJsonChapters($relativePath);
+
+            if (! empty($chapters) && isset($book['id'])) {
+                $model = Book::find($book['id']);
+                if ($model instanceof Book) {
+                    $chapterService->importJsonChaptersIfMissing($model, $chapters);
+                }
+            }
+        }
 
         return [
             'id' => $book['id'] ?? null,
@@ -345,5 +366,23 @@ trait HandlesLibraryJson
                 'updated_at' => $updatedAt,
             ],
         ];
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function existingLibraryJsonChapters(string $relativePath): array
+    {
+        $jsonPath = Storage::disk('books')->path(trim($relativePath, '/') . '/librarian.json');
+        if (! is_file($jsonPath)) {
+            return [];
+        }
+
+        $decoded = json_decode((string) file_get_contents($jsonPath), true);
+        if (! is_array($decoded) || empty($decoded['chapters']) || ! is_array($decoded['chapters'])) {
+            return [];
+        }
+
+        return $decoded['chapters'];
     }
 }

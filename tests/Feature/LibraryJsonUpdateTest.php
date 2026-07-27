@@ -274,6 +274,95 @@ class LibraryJsonUpdateTest extends TestCase
         $this->assertFileExists($jsonPath);
     }
 
+    public function testLibraryJsonPreservesExistingChaptersWhenBookHasNone(): void
+    {
+        $bookDir = 'test-author/book-with-detected-chapters';
+        $this->createBookDirectory($bookDir);
+        Storage::disk('books')->put($bookDir . '/librarian.json', json_encode([
+            'title' => 'Book With Detected Chapters',
+            'chapters' => [
+                [
+                    'title' => 'Existing Chapter',
+                    'start' => 0,
+                    'duration' => 120,
+                    'file' => 'dummy.mp3',
+                ],
+            ],
+        ]));
+
+        /** @var Book $book */
+        $book = Book::factory()->create([
+            'title' => 'Book With Detected Chapters',
+            'directory_path' => $bookDir,
+        ]);
+
+        $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+
+        $documentStore->updateBook((string) $book->id, [
+            'title' => 'Book With Detected Chapters',
+        ]);
+
+        $jsonPath = Storage::disk('books')->path($bookDir . '/librarian.json');
+        $jsonContent = json_decode(file_get_contents($jsonPath), true);
+        $book->refresh()->load('chapters');
+
+        $this->assertSame([
+            [
+                'title' => 'Existing Chapter',
+                'start' => 0,
+                'duration' => 120,
+                'file' => 'dummy.mp3',
+            ],
+        ], $jsonContent['chapters']);
+        $this->assertSame('Existing Chapter', $book->chapters->first()->title);
+        $this->assertSame(0.0, $book->chapters->first()->start_seconds);
+        $this->assertSame('dummy.mp3', $book->chapters->first()->file_name);
+        $this->assertSame(120, $book->chapters->first()->duration);
+        $this->assertSame('librarian_json', $book->chapters->first()->source);
+    }
+
+    public function testLibraryJsonRegeneratesChaptersFromDatabase(): void
+    {
+        $bookDir = 'test-author/book-with-db-chapters';
+        $this->createBookDirectory($bookDir);
+
+        /** @var Book $book */
+        $book = Book::factory()->create([
+            'title' => 'Book With DB Chapters',
+            'directory_path' => $bookDir,
+        ]);
+
+        $book->chapters()->updateOrCreate(
+            ['chapter_number' => 1],
+            [
+                'title' => 'DB Chapter',
+                'start_seconds' => 5.5,
+                'file_name' => 'dummy.mp3',
+                'format' => 'mp3',
+                'duration' => 120,
+                'source' => 'embedded',
+            ]
+        );
+
+        $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+
+        $documentStore->updateBook((string) $book->id, [
+            'title' => 'Book With DB Chapters',
+        ]);
+
+        $jsonPath = Storage::disk('books')->path($bookDir . '/librarian.json');
+        $jsonContent = json_decode(file_get_contents($jsonPath), true);
+
+        $this->assertSame([
+            [
+                'title' => 'DB Chapter',
+                'start' => 5.5,
+                'duration' => 120,
+                'file' => 'dummy.mp3',
+            ],
+        ], $jsonContent['chapters']);
+    }
+
     public function testLibraryJsonContainsAllNonUserSpecificData()
     {
         /** @var Author $author */

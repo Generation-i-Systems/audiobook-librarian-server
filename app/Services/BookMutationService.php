@@ -12,6 +12,10 @@ use App\Models\Series;
 
 class BookMutationService
 {
+    public function __construct(private readonly ?BookChapterService $bookChapterService = null)
+    {
+    }
+
     public function createBook(array $data): Book
     {
         $bookId = $data['id'] ?? null;
@@ -256,12 +260,16 @@ class BookMutationService
         }
 
         if ($replaceExisting) {
-            $book->chapters()->delete();
+            $this->chapterService()->replaceBookChapters($book, $data['chapters'], 'document_store');
+            return;
         }
 
-        foreach ($data['chapters'] as $chapterData) {
-            $book->chapters()->create($chapterData);
-        }
+        $this->chapterService()->importJsonChaptersIfMissing($book, $data['chapters'], 'document_store');
+    }
+
+    private function chapterService(): BookChapterService
+    {
+        return $this->bookChapterService ?? app(BookChapterService::class);
     }
 
     private function normalizeCoverImageValue(?string $coverImage): ?string

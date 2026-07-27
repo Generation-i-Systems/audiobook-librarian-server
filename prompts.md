@@ -287,3 +287,14 @@ implement an app:refresh command ported from /home/devel/src/school-bus-dashboar
 
 Create server-side audiobook chapter autodetection similar to chunk metadata handling so
 `librarian.json` includes chapters when embedded chapter metadata is available.
+
+## 2026-07-26
+
+Store detected chapters in the database so `librarian.json` can be regenerated from DB rows.
+If existing `librarian.json` chapters are found and the database has none, import those chapters
+into the database.
+
+## 2026-07-26
+
+Make sure both `books:cache-file-chunk-hashes` and `books:detect-chapters` support inclusive
+book-id ranges with `--book`, while preserving repeated single-book selections.

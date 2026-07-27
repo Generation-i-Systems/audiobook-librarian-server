@@ -12,11 +12,13 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property int $chapter_number
  * @property string|null $title
  * @property string|null $reader
+ * @property float|null $start_seconds
  * @property string $file_name
  * @property string $format
- * @property int $duration
- * @property int $size_bytes
+ * @property int|null $duration
+ * @property int|null $size_bytes
  * @property string|null $listen_url
+ * @property string|null $source
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
@@ -32,6 +34,8 @@ use App\Traits\CamelCaseAttributeAccess;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Chapter whereFormat($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Chapter whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Chapter whereSizeBytes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Chapter whereSource($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Chapter whereStartSeconds($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Chapter whereUpdatedAt($value)
  * @mixin \Eloquent
  */
@@ -45,11 +49,20 @@ class Chapter extends Model
         'chapter_number',
         'title',
         'reader',
+        'start_seconds',
         'file_name',
         'format',
         'duration',
         'size_bytes',
         'listen_url',
+        'source',
+    ];
+
+    protected $casts = [
+        'chapter_number' => 'integer',
+        'start_seconds' => 'float',
+        'duration' => 'integer',
+        'size_bytes' => 'integer',
     ];
 
     public function book()

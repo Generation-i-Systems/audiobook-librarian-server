@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\BookFileChunkHash;
 use App\Services\BookFileChunkHashService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -77,6 +78,65 @@ class BookFileChunkHashServiceTest extends TestCase
             'second_generated' => $second['generated'],
             'record_count' => BookFileChunkHash::count(),
             'checksum' => $second['record']->sha256,
+        ]);
+    }
+
+    public function testBookNeedsCachingTracksFreshAndStaleFileCache(): void
+    {
+        $book = Book::factory()->create(['directory_path' => 'Author/Book']);
+        Storage::disk('books')->put('Author/Book/chapter.mp3', 'chapter bytes');
+        $fullPath = Storage::disk('books')->path('Author/Book/chapter.mp3');
+
+        $needsInitialCache = $this->service->bookNeedsCaching($book);
+        $this->service->getOrGenerate($book->id, 'Author/Book/chapter.mp3', $fullPath);
+        $needsAfterCache = $this->service->bookNeedsCaching($book);
+
+        sleep(1);
+        Storage::disk('books')->put('Author/Book/chapter.mp3', 'changed bytes');
+        $needsAfterFileChange = $this->service->bookNeedsCaching($book);
+
+        $this->assertSame([
+            'initial' => true,
+            'fresh' => false,
+            'stale' => true,
+        ], [
+            'initial' => $needsInitialCache,
+            'fresh' => $needsAfterCache,
+            'stale' => $needsAfterFileChange,
+        ]);
+    }
+
+    public function testBookNeedsCachingLoadsCachedHashRowsOnceForAllFiles(): void
+    {
+        $book = Book::factory()->create(['directory_path' => 'Author/Book']);
+        $files = [
+            'Author/Book/one.mp3' => 'one bytes',
+            'Author/Book/two.mp3' => 'two bytes',
+            'Author/Book/three.mp3' => 'three bytes',
+        ];
+
+        foreach ($files as $filePath => $contents) {
+            Storage::disk('books')->put($filePath, $contents);
+            $this->service->getOrGenerate($book->id, $filePath, Storage::disk('books')->path($filePath));
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $needsCaching = $this->service->bookNeedsCaching($book);
+
+        $chunkHashQueries = array_filter(
+            DB::getQueryLog(),
+            static fn (array $query): bool => str_contains((string) $query['query'], 'book_file_chunk_hashes')
+        );
+        DB::disableQueryLog();
+
+        $this->assertSame([
+            'needs_caching' => false,
+            'chunk_hash_queries' => 1,
+        ], [
+            'needs_caching' => $needsCaching,
+            'chunk_hash_queries' => count($chunkHashQueries),
         ]);
     }
 

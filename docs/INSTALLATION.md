@@ -149,6 +149,9 @@ Examples for the optional chunk-hash precompute job:
 0 * * * * cd /path/to/audiobook-librarian-server && php artisan books:cache-file-chunk-hashes --newest=50 --max-load=2 >> storage/logs/chunk-hash-cache.log 2>&1
 ```
 
+For one-time targeted batches, both `books:cache-file-chunk-hashes` and `books:detect-chapters`
+accept repeated `--book` values and inclusive id ranges, for example `--book=120-160 --book=220`.
+
 Check the active schedule after configuration:
 
 ```bash
