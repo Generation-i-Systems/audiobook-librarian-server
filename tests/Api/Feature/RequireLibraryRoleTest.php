@@ -138,6 +138,15 @@ class RequireLibraryRoleTest extends TestCase
         $this->getJson('http://localhost/api/v1/me')->assertStatus(401);
     }
 
+    // Regression: enforcement must be decided by route (api/*), not by a
+    // client-controllable Accept header, since a plain get() without an explicit
+    // JSON accept header must not bypass the role check on an API route.
+    public function testDisallowedRoleIsBlockedOnApiRouteEvenWithoutJsonAcceptHeader(): void
+    {
+        [, $headers] = $this->makeUser('user');
+        $this->withHeaders($headers)->get('http://localhost/api/v1/me')->assertStatus(403);
+    }
+
     // X-Library-Profile header selects a profile without changing the host
     public function testXLibraryProfileHeaderSelectsProfile(): void
     {

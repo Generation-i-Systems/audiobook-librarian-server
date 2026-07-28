@@ -32,12 +32,18 @@ class RequireLibraryRole
     {
         $user = Auth::user();
 
+        // Whether to enforce must be decided from the route the client actually hit
+        // (the 'standard' API alias vs. the 'library' web alias share this class), never
+        // from a client-controllable header like Accept — a request can trivially omit
+        // Accept: application/json to impersonate a "web" request otherwise.
+        $isApiRequest = $request->is('api/*');
+
         if (!$user || !isset($user->role)) {
             Log::warning('Library role access denied: not authenticated', [
                 'uri' => $request->getRequestUri(),
                 'reason' => !$user ? 'not_authenticated' : 'role_not_set',
             ]);
-            if (!$request->expectsJson()) {
+            if (!$isApiRequest) {
                 return $next($request);
             }
             return response()->json(['message' => 'Forbidden'], 403);
@@ -51,7 +57,7 @@ class RequireLibraryRole
                 'user_id' => $user->id,
                 'user_role' => $role,
             ]);
-            if (!$request->expectsJson()) {
+            if (!$isApiRequest) {
                 return $next($request);
             }
             return response()->json(['message' => 'Forbidden'], 403);
