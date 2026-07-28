@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class JobController extends Controller
@@ -93,27 +92,12 @@ class JobController extends Controller
             abort(404);
         }
 
-        // Update job status to queued
-        $this->documentStoreService->updateJob(
-            $id,
-            [
-                'status' => 'queued',
-                'message' => 'Job requeued for retry',
-                'log' => array_merge($job['log'] ?? [], [
-                    [
-                        'timestamp' => now()->toDateTimeString(),
-                        'level' => 'info',
-                        'message' => 'Job requeued for retry by ' . (Auth::check() ? Auth::user()->name : 'System'),
-                    ],
-                ]),
-            ]
-        );
-
-        // TODO: Dispatch the job based on its type
-
+        // Retry is not implemented: there is no dispatch-by-job-type mechanism yet, so
+        // this must not claim success or mutate the job's stored status — doing so
+        // would falsely mark a job "queued" when nothing was actually requeued.
         return redirect()
             ->route('admin.jobs.show', $id)
-            ->with('status', 'Job has been requeued for processing.');
+            ->with('error', 'Retry is not yet implemented for this job.');
     }
 
 
@@ -138,27 +122,13 @@ class JobController extends Controller
                 ->with('error', 'Only queued or processing jobs can be cancelled.');
         }
 
-        // Update job status to cancelled
-        $this->documentStoreService->updateJob(
-            $id,
-            [
-                'status' => 'cancelled',
-                'message' => 'Job was cancelled by ' . (Auth::check() ? Auth::user()->name : 'System'),
-                'log' => array_merge($job['log'] ?? [], [
-                    [
-                        'timestamp' => now()->toDateTimeString(),
-                        'level' => 'warning',
-                        'message' => 'Job was cancelled by ' . (Auth::check() ? Auth::user()->name : 'System'),
-                    ],
-                ]),
-            ]
-        );
-
-        // TODO: Cancel the actual job if it's still running
-
+        // Cancel is not implemented: there is no way to actually stop a running job
+        // yet, so this must not claim success or mutate the job's stored status —
+        // a job marked "cancelled" here while still genuinely processing would keep
+        // running and later overwrite this fake status itself.
         return redirect()
             ->route('admin.jobs.show', $id)
-            ->with('status', 'Job has been cancelled.');
+            ->with('error', 'Cancel is not yet implemented for this job.');
     }
 
 
