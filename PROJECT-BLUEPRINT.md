@@ -22,7 +22,8 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 - Book CRUD (admin)
 - Book form: multiple authors/series (autocomplete), Google Books autofill, genre selection, file uploads
-- Book form metadata search/autofill supports Audible, Google Books, AudiobookBay, and Hardcover
+- Book form metadata search/autofill supports Audible, Google Books, AudiobookBay, and Hardcover.
+  Metadata autofill must preserve any existing selected genre, including genres inferred from the directory path, and may only apply provider genres that match configured genre options when no genre is selected.
 - Authors/series autocomplete via jQuery UI, server-side filtering
 - Google Books API integration for autofill
 - Admin/user management

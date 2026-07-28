@@ -302,3 +302,8 @@ book-id ranges with `--book`, while preserving repeated single-book selections.
 ## 2026-07-27
 
 Address the npm audit issues reported by the pre-push hook for `brace-expansion` and `postcss`.
+
+## 2026-07-27
+
+When editing a book and running metadata update, genres are being added with many blank entries
+and the genre already set from the directory path is being changed. Neither should happen.
