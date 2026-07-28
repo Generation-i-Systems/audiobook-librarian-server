@@ -105,6 +105,7 @@ class EventSyncTest extends TestCase
         $response->assertJson([
             'success' => true,
             'received' => 0,  // Should be 0 because event already exists
+            'skipped' => 1,
         ]);
     }
 
@@ -140,6 +141,36 @@ class EventSyncTest extends TestCase
             ->assertJson(['success' => true])
             ->assertJsonPath('remoteEvents.0.id', 'remote-event-1')
             ->assertJsonPath('remoteEvents.0.deviceId', 'other-device');
+    }
+
+    public function testSyncDoesNotReturnEventsJustPushedByTheSameDevice(): void
+    {
+        $user = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create();
+        $this->actingAs($user, 'api');
+
+        $response = $this->postJson('/api/v1/sync/events', [
+            'events' => [
+                [
+                    'id' => 'own-event-1',
+                    'bookId' => $book->id,
+                    'eventType' => 'SESSION_END',
+                    'timestampMs' => 1707945600000,
+                    'positionMs' => 1234567,
+                    'deviceId' => 'requesting-device',
+                    'timezone' => 'UTC',
+                    'createdAt' => 1707945600000,
+                ],
+            ],
+            'lastSyncTimestamp' => 0,
+        ], [
+            'X-Device-ID' => 'requesting-device',
+            'X-Acting-As-Test' => 'true',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true, 'received' => 1])
+            ->assertJsonCount(0, 'remoteEvents');
     }
 
     public function testSyncAlwaysReturnsNextSyncAfter(): void
@@ -195,6 +226,7 @@ class EventSyncTest extends TestCase
         $response->assertJson([
             'success' => true,
             'received' => 0,  // Should be 0 because migrated events are skipped
+            'skipped' => 1,
         ]);
 
         $this->assertDatabaseMissing('listening_events', [

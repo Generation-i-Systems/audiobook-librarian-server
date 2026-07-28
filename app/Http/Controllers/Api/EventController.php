@@ -66,10 +66,12 @@ class EventController extends Controller
         try {
             foreach ($validated['events'] as $eventData) {
                 if (ListeningEvent::where('id', $eventData['id'])->exists()) {
+                    $skippedCount++;
                     continue;
                 }
 
                 if (! empty($eventData['migratedFrom'])) {
+                    $skippedCount++;
                     continue;
                 }
 
@@ -124,6 +126,7 @@ class EventController extends Controller
 
             $remoteQuery = ListeningEvent::where('user_id', $user->id)
                 ->where('synced_at', '>=', $syncAfter)
+                ->where('device_id', '!=', $deviceId)
                 ->whereNull('migrated_from')
                 ->orderBy('synced_at', 'asc')
                 ->limit(101);
