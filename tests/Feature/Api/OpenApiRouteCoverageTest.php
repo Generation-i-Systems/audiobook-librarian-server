@@ -113,21 +113,6 @@ class OpenApiRouteCoverageTest extends TestCase
             // Web-only AJAX routes (not part of v1 API)
             '/^\/books\/json$/',
             '/^\/books\/recent\/json$/',
-            // TODO: Document these routes in openapi.json and remove from skip list
-            '/^\\/book-requests/',
-            '/^\\/follow/',
-            '/^\\/unfollow/',
-            '/^\\/recommendations/',
-            '/^\\/books\\/.*\\/recommend/',
-            '/^\\/badges/',
-            '/^\\/download\\/remote/',
-            '/^\\/books\\/.*\\/contributions/',
-            '/^\\/contributions/',
-            '/^\\/admin\\/contributions/',
-            '/^\\/admin\\/users/',
-            '/^\\/auth\\/set-initial-password/',
-            '/^\\/auth\\/otp\/request/',
-            '/^\\/auth\\/otp\/verify/',
         ];
 
         foreach ($skipPatterns as $pattern) {

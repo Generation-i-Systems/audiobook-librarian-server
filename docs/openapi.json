@@ -14064,6 +14064,761 @@
                     }
                 }
             }
+        },
+        "/download/remote": {
+            "get": {
+                "tags": [
+                    "Downloads"
+                ],
+                "summary": "Redirect to a trusted remote download URL",
+                "description": "Validates that the given url host is on the trusted CDN allowlist (LibriVox/archive.org) and redirects to it. Used to proxy remote LibriVox audio downloads through the API.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "url",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The remote file URL to validate and redirect to."
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to the trusted remote URL."
+                    },
+                    "400": {
+                        "description": "Missing url parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "URL host is not on the trusted CDN allowlist",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/{book}/contributions": {
+            "post": {
+                "tags": [
+                    "Contributions"
+                ],
+                "summary": "Submit a metadata correction for a book",
+                "description": "Submits a proposed set of field changes (original vs. new values) for editorial review.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "book",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "changes": {
+                                        "type": "object",
+                                        "description": "Map of field name to {original, new} value pairs.",
+                                        "additionalProperties": {
+                                            "type": "object",
+                                            "properties": {
+                                                "original": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "new": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "changes"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Contribution submitted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "created_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No changes detected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/contributions": {
+            "get": {
+                "tags": [
+                    "Contributions"
+                ],
+                "summary": "List the authenticated user's contributions",
+                "description": "Returns all metadata-correction contributions submitted by the current user, most recent first.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of contributions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/contributions/{contribution}": {
+            "delete": {
+                "tags": [
+                    "Contributions"
+                ],
+                "summary": "Retract a pending contribution",
+                "description": "Cancels the caller's own submission. Only pending contributions (not yet reviewed) can be retracted.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "contribution",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Contribution retracted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the submitting user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Contribution is not pending",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/contributions": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List pending contributions for editorial review",
+                "description": "Admin-only. Paginated list of all pending metadata-correction contributions across all users.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of pending contributions"
+                    }
+                }
+            }
+        },
+        "/admin/contributions/{contribution}/approve": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Approve a contribution and apply it to the book",
+                "description": "Admin-only. Applies the proposed changes to the book and marks the contribution approved.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "contribution",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reviewer_notes": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 1000
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contribution approved and applied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Contribution is not pending",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/contributions/{contribution}/reject": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Reject a contribution",
+                "description": "Admin-only. Marks the contribution rejected without applying any changes.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "contribution",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reviewer_notes": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 1000
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contribution rejected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Contribution is not pending",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List/search users",
+                "description": "Admin-only. Paginated, optionally search-filtered list of all users (matches name, email, or username).",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Case-insensitive substring match against name/email/username."
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Max 100."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of users"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create a user",
+                "description": "Admin-only. Creates a new user account, optionally sending a sign-in OTP email immediately.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "user",
+                                            "admin",
+                                            "unverified"
+                                        ]
+                                    },
+                                    "send_otp_email": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "username"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "User created"
+                    },
+                    "422": {
+                        "description": "Validation failed or email already exists"
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/send-otp": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Send a sign-in OTP email to a user",
+                "description": "Admin-only. Generates and emails a one-time sign-in code/magic link to the specified user.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OTP email sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "User has no email address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/set-initial-password": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Set the authenticated user's initial password",
+                "description": "Used after an OTP-based sign-in when the account's must_change_password flag is set, to establish a real password for future logins.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "password": {
+                                        "type": "string",
+                                        "minLength": 8
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string",
+                                        "minLength": 8
+                                    }
+                                },
+                                "required": [
+                                    "password",
+                                    "password_confirmation"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Password set"
+                    },
+                    "400": {
+                        "description": "Validation failed"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "429": {
+                        "description": "Too many attempts"
+                    }
+                }
+            }
+        },
+        "/auth/otp/request": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Request a one-time sign-in code",
+                "description": "Sends a 6-digit code and magic-link token to the given email for passwordless sign-in or password reset.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "allow_signup": {
+                                        "type": "boolean"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "login",
+                                            "password_reset"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "email"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OTP sent (or silently accepted for an unknown email, to avoid account enumeration)"
+                    },
+                    "400": {
+                        "description": "Validation failed"
+                    },
+                    "429": {
+                        "description": "Too many requests"
+                    }
+                }
+            }
+        },
+        "/auth/otp/verify": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Verify a one-time sign-in code or magic-link token",
+                "description": "Verifies either an email+code pair or a magic-link token, and on success returns an authenticated session.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "maxLength": 255
+                                    },
+                                    "code": {
+                                        "type": "string",
+                                        "minLength": 6,
+                                        "maxLength": 6
+                                    },
+                                    "token": {
+                                        "type": "string",
+                                        "maxLength": 128
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Verified, session established"
+                    },
+                    "400": {
+                        "description": "Validation failed"
+                    },
+                    "401": {
+                        "description": "Invalid or expired code/token"
+                    },
+                    "429": {
+                        "description": "Too many attempts"
+                    }
+                }
+            }
         }
     },
     "tags": [
@@ -14146,6 +14901,14 @@
         {
             "name": "Analytics",
             "description": "App analytics and event recording endpoints"
+        },
+        {
+            "name": "Contributions",
+            "description": "Community-submitted book metadata corrections"
+        },
+        {
+            "name": "Admin",
+            "description": "Admin-only management endpoints"
         }
     ]
 }
