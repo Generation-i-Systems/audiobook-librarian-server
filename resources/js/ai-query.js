@@ -3,6 +3,32 @@ let currentOperationType = null;
 let currentQueries = [];
 let selectedBookIds = new Set();
 
+// Model-generated and book-metadata fields displayed below are untrusted and must never
+// be interpolated into innerHTML unescaped — a malicious/compromised model response or
+// book field could otherwise execute script.
+function escapeHtml(value) {
+    if (value === null || value === undefined) {
+        return "";
+    }
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Only allow relative or http(s) URLs in href attributes, to block javascript: URIs.
+function sanitizeHref(url) {
+    if (typeof url !== "string") {
+        return "#";
+    }
+    if (/^(\/|https?:\/\/)/i.test(url)) {
+        return escapeHtml(url);
+    }
+    return "#";
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     const toggleBtn = document.getElementById("toggle-ai-prompt");
     const promptBody = document.getElementById("ai-prompt-body");
@@ -272,16 +298,37 @@ function displayQueryInfo(data) {
     queriesContainer.innerHTML = "";
 
     data.queries.forEach((query, index) => {
+        // query.type/purpose/query come from the model response — assign as text/value,
+        // never interpolate into innerHTML, since a malicious/compromised model response
+        // could otherwise execute script (including breaking out of the <textarea> below).
         const queryDiv = document.createElement("div");
         queryDiv.className = "query-item";
-        queryDiv.innerHTML = `
-            <div class="mb-2">
-                <strong>Query ${index + 1}:</strong>
-                <span class="badge bg-secondary">${query.type}</span>
-            </div>
-            <div class="mb-2 query-purpose"><small>${query.purpose}</small></div>
-            <textarea class="form-control" rows="3">${query.query}</textarea>
-        `;
+
+        const headerDiv = document.createElement("div");
+        headerDiv.className = "mb-2";
+        const strong = document.createElement("strong");
+        strong.textContent = `Query ${index + 1}:`;
+        const badge = document.createElement("span");
+        badge.className = "badge bg-secondary";
+        badge.textContent = query.type;
+        headerDiv.appendChild(strong);
+        headerDiv.appendChild(document.createTextNode(" "));
+        headerDiv.appendChild(badge);
+
+        const purposeDiv = document.createElement("div");
+        purposeDiv.className = "mb-2 query-purpose";
+        const small = document.createElement("small");
+        small.textContent = query.purpose;
+        purposeDiv.appendChild(small);
+
+        const textarea = document.createElement("textarea");
+        textarea.className = "form-control";
+        textarea.rows = 3;
+        textarea.value = query.query;
+
+        queryDiv.appendChild(headerDiv);
+        queryDiv.appendChild(purposeDiv);
+        queryDiv.appendChild(textarea);
         queriesContainer.appendChild(queryDiv);
     });
 
@@ -317,12 +364,12 @@ function displayResearchResults(data, container) {
                     .map(
                         (stat) => `
                     <div class="mb-3">
-                        <h6>${stat.purpose}</h6>
+                        <h6>${escapeHtml(stat.purpose)}</h6>
                         ${
                             stat.error
-                                ? `<div class="alert alert-danger">${stat.error}</div>`
+                                ? `<div class="alert alert-danger">${escapeHtml(stat.error)}</div>`
                                 : `
-                            <pre class="bg-light p-3 rounded">${JSON.stringify(stat.result, null, 2)}</pre>
+                            <pre class="bg-light p-3 rounded">${escapeHtml(JSON.stringify(stat.result, null, 2))}</pre>
                         `
                         }
                     </div>
@@ -359,12 +406,12 @@ function displayListResults(data, container) {
                                 .map(
                                     (book) => `
                                 <tr>
-                                    <td>${book.title}</td>
-                                    <td>${Array.isArray(book.authors) ? book.authors.join(", ") : book.authors}</td>
-                                    <td>${Array.isArray(book.genres) ? book.genres.join(", ") : book.genres}</td>
-                                    <td>${book.series || "-"}</td>
+                                    <td>${escapeHtml(book.title)}</td>
+                                    <td>${escapeHtml(Array.isArray(book.authors) ? book.authors.join(", ") : book.authors)}</td>
+                                    <td>${escapeHtml(Array.isArray(book.genres) ? book.genres.join(", ") : book.genres)}</td>
+                                    <td>${escapeHtml(book.series || "-")}</td>
                                     <td>
-                                        <a href="${book.edit_url}" class="btn btn-sm btn-primary">
+                                        <a href="${sanitizeHref(book.edit_url)}" class="btn btn-sm btn-primary">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
                                     </td>
@@ -417,7 +464,7 @@ function displayBulkUpdateResults(data, container) {
                                     onchange="toggleBookSelection(${item.id})"
                                 >
                                 <label class="form-check-label fw-bold" for="book-${item.id}">
-                                    ${item.before.title}
+                                    ${escapeHtml(item.before.title)}
                                 </label>
                             </div>
 
@@ -429,13 +476,13 @@ function displayBulkUpdateResults(data, container) {
                                         .map(
                                             ([field, change]) => `
                                         <div class="mb-2">
-                                            <strong>${field}:</strong><br>
+                                            <strong>${escapeHtml(field)}:</strong><br>
                                             <span class="change-badge change-from">
-                                                From: ${Array.isArray(change.from) ? change.from.join(", ") : change.from}
+                                                From: ${escapeHtml(Array.isArray(change.from) ? change.from.join(", ") : change.from)}
                                             </span>
                                             <i class="fas fa-arrow-right"></i>
                                             <span class="change-badge change-to">
-                                                To: ${Array.isArray(change.to) ? change.to.join(", ") : change.to}
+                                                To: ${escapeHtml(Array.isArray(change.to) ? change.to.join(", ") : change.to)}
                                             </span>
                                         </div>
                                     `,
@@ -515,7 +562,10 @@ function showSuccess(message) {
     const overlay = document.getElementById("ai-results-overlay");
     const successDiv = document.createElement("div");
     successDiv.className = "alert alert-success";
-    successDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+    const icon = document.createElement("i");
+    icon.className = "fas fa-check-circle";
+    successDiv.appendChild(icon);
+    successDiv.appendChild(document.createTextNode(" " + message));
     resultsDiv.innerHTML = "";
     resultsDiv.appendChild(successDiv);
     overlay.style.display = "block";

@@ -239,41 +239,62 @@ import {
                     return;
                 }
 
-                const rows = results
-                    .map(function (item, idx) {
-                        const authors = decodeHtmlEntities(
-                            Array.isArray(item.author)
-                                ? item.author.join(", ")
-                                : item.author || "",
-                        );
-                        const narrators = decodeHtmlEntities(
-                            getNarratorList(item),
-                        );
-                        const coverUrl =
-                            item.coverImageUrl || item.cover_image_url || "";
-                        const publishedYear =
-                            item.publishedYear ||
-                            (item.published_date
-                                ? item.published_date.substring(0, 4)
-                                : "");
-                        const checkedAttr = idx === 0 ? " checked" : "";
+                // Provider-controlled fields (title, author, series, cover URL, etc.) must
+                // never be injected as raw HTML — decodeHtmlEntities() only normalizes
+                // entity-encoded text, it does not sanitize markup, so a malicious/
+                // compromised provider response could otherwise execute script here.
+                // Build each row as real DOM nodes and assign text via .text() instead.
+                $resultsTable.empty();
+                results.forEach(function (item, idx) {
+                    const authors = decodeHtmlEntities(
+                        Array.isArray(item.author)
+                            ? item.author.join(", ")
+                            : item.author || "",
+                    );
+                    const narrators = decodeHtmlEntities(getNarratorList(item));
+                    const coverUrl =
+                        item.coverImageUrl || item.cover_image_url || "";
+                    const publishedYear =
+                        item.publishedYear ||
+                        (item.published_date
+                            ? item.published_date.substring(0, 4)
+                            : "");
+                    const genres = decodeHtmlEntities(getGenreList(item));
 
-                        const genres = decodeHtmlEntities(getGenreList(item));
-                        return `<tr>
-                    <td><input type="radio" name="autofill_result_select" value="${idx}"${checkedAttr}></td>
-                    <td>${coverUrl ? `<img src="${coverUrl}" alt="Cover" style="height:48px;max-width:40px;">` : ""}</td>
-                    <td>${decodeHtmlEntities(item.title || "")}</td>
-                    <td>${authors}</td>
-                    <td>${narrators}</td>
-                    <td>${decodeHtmlEntities(item.series || "")}</td>
-                    <td>${genres}</td>
-                    <td>${publishedYear}</td>
-                    <td>${item.source || ""}</td>
-                </tr>`;
-                    })
-                    .join("");
+                    const $row = $("<tr>");
+                    const $radioCell = $("<td>").append(
+                        $("<input>", {
+                            type: "radio",
+                            name: "autofill_result_select",
+                            value: idx,
+                        }).prop("checked", idx === 0),
+                    );
+                    const $coverCell = $("<td>");
+                    if (coverUrl && /^https?:\/\//i.test(coverUrl)) {
+                        $coverCell.append(
+                            $("<img>", {
+                                src: coverUrl,
+                                alt: "Cover",
+                                style: "height:48px;max-width:40px;",
+                            }),
+                        );
+                    }
 
-                $resultsTable.html(rows);
+                    $row.append($radioCell);
+                    $row.append($coverCell);
+                    $row.append(
+                        $("<td>").text(decodeHtmlEntities(item.title || "")),
+                    );
+                    $row.append($("<td>").text(authors));
+                    $row.append($("<td>").text(narrators));
+                    $row.append(
+                        $("<td>").text(decodeHtmlEntities(item.series || "")),
+                    );
+                    $row.append($("<td>").text(genres));
+                    $row.append($("<td>").text(publishedYear));
+                    $row.append($("<td>").text(item.source || ""));
+                    $resultsTable.append($row);
+                });
                 window.autofillMatches = results;
 
                 if (results.length > 0) {
@@ -412,51 +433,72 @@ import {
                             return;
                         }
 
-                        const rows = sortedResults
-                            .map(function (item, idx) {
-                                const authors = decodeHtmlEntities(
-                                    Array.isArray(item.author)
-                                        ? item.author.join(", ")
-                                        : item.author || "",
-                                );
-                                const narrators = decodeHtmlEntities(
-                                    getNarratorList(item),
-                                );
-                                const coverUrl =
-                                    item.coverImageUrl ||
-                                    item.cover_image_url ||
-                                    "";
-                                const publishedYear =
-                                    item.publishedYear ||
-                                    (item.published_date
-                                        ? item.published_date.substring(0, 4)
-                                        : "");
-                                const checkedAttr = idx === 0 ? " checked" : "";
+                        // See performAutofillSearch() above for why this must build DOM
+                        // nodes and use .text() rather than injecting provider-controlled
+                        // fields as raw HTML.
+                        $resultsTable.empty();
+                        sortedResults.forEach(function (item, idx) {
+                            const authors = decodeHtmlEntities(
+                                Array.isArray(item.author)
+                                    ? item.author.join(", ")
+                                    : item.author || "",
+                            );
+                            const narrators = decodeHtmlEntities(
+                                getNarratorList(item),
+                            );
+                            const coverUrl =
+                                item.coverImageUrl ||
+                                item.cover_image_url ||
+                                "";
+                            const publishedYear =
+                                item.publishedYear ||
+                                (item.published_date
+                                    ? item.published_date.substring(0, 4)
+                                    : "");
+                            const genres = decodeHtmlEntities(
+                                getGenreList(item),
+                            );
 
-                                const genres = decodeHtmlEntities(
-                                    getGenreList(item),
+                            const $row = $("<tr>");
+                            const $radioCell = $("<td>").append(
+                                $("<input>", {
+                                    type: "radio",
+                                    name: "autofill_result_select",
+                                    value: idx,
+                                }).prop("checked", idx === 0),
+                            );
+                            const $coverCell = $("<td>");
+                            if (coverUrl && /^https?:\/\//i.test(coverUrl)) {
+                                $coverCell.append(
+                                    $("<img>", {
+                                        src: coverUrl,
+                                        alt: "Cover",
+                                        style: "height:48px;max-width:40px;",
+                                    }),
                                 );
-                                return `<tr>
-                            <td><input type="radio" name="autofill_result_select" value="${idx}"${checkedAttr}></td>
-                            <td>${coverUrl ? `<img src="${coverUrl}" alt="Cover" style="height:48px;max-width:40px;">` : ""}</td>
-                            <td>${decodeHtmlEntities(item.title || "")}</td>
-                            <td>${authors}</td>
-                            <td>${narrators}</td>
-                            <td>${decodeHtmlEntities(item.series || "")}</td>
-                            <td>${genres}</td>
-                            <td>${publishedYear}</td>
-                            <td>${item.source || ""}</td>
-                        </tr>`;
-                            })
-                            .join("");
+                            }
 
+                            $row.append($radioCell);
+                            $row.append($coverCell);
+                            $row.append(
+                                $("<td>").text(
+                                    decodeHtmlEntities(item.title || ""),
+                                ),
+                            );
+                            $row.append($("<td>").text(authors));
+                            $row.append($("<td>").text(narrators));
+                            $row.append(
+                                $("<td>").text(
+                                    decodeHtmlEntities(item.series || ""),
+                                ),
+                            );
+                            $row.append($("<td>").text(genres));
+                            $row.append($("<td>").text(publishedYear));
+                            $row.append($("<td>").text(item.source || ""));
+                            $resultsTable.append($row);
+                        });
                         console.log(
-                            "[autofill-simple] Rendering rows, count:",
-                            rows.length,
-                        );
-                        $resultsTable.html(rows);
-                        console.log(
-                            "[autofill-simple] HTML set, table now has",
+                            "[autofill-simple] Rendered rows, table now has",
                             $resultsTable.find("tr").length,
                             "rows",
                         );
