@@ -18,4 +18,11 @@ class DebugRoutesDisabledTest extends TestCase
         $this->get('/debug/books-dump')->assertNotFound();
         $this->get('/debug/relationships')->assertNotFound();
     }
+
+    public function testUnsafeDebugPhpFilesAreNotServed(): void
+    {
+        $this->get('/phpinfo.php')->assertNotFound();
+        $this->get('/debug_memory.php')->assertNotFound();
+        $this->get('/test_db.php')->assertNotFound();
+    }
 }
