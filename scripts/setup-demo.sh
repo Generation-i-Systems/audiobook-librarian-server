@@ -80,6 +80,24 @@ echo "DEMO_MODE=true"
 echo "BOOK_STORAGE_PATH=$BOOK_ROOT"
 echo ""
 
+# Demo data is always isolated in its own sqlite file, regardless of whatever
+# DB_CONNECTION this .env was already configured with (e.g. a shared MySQL
+# database) — a demo instance must never migrate/seed/import into a real
+# database. This path is fixed and reused on re-run, so re-running this
+# script is still idempotent against the same demo data.
+DEMO_DB_PATH="$SERVER_ROOT/database/demo.sqlite"
+if [[ ! -f "$DEMO_DB_PATH" ]]; then
+    echo "--- Creating isolated demo database: $DEMO_DB_PATH ---"
+    touch "$DEMO_DB_PATH"
+else
+    echo "--- Reusing existing isolated demo database: $DEMO_DB_PATH ---"
+fi
+set_env_var "DB_CONNECTION" "sqlite"
+set_env_var "DB_DATABASE" "$DEMO_DB_PATH"
+echo "DB_CONNECTION=sqlite"
+echo "DB_DATABASE=$DEMO_DB_PATH"
+echo ""
+
 # ---------------------------------------------------------------------------
 # 3. Create directory
 # ---------------------------------------------------------------------------
@@ -127,6 +145,11 @@ echo ""
 # ---------------------------------------------------------------------------
 
 cd "$SERVER_ROOT"
+
+# A previous run's `config:cache` (step 8 below) may have cached the old
+# DB_CONNECTION — clear it so the isolated sqlite connection set above
+# actually takes effect.
+php artisan config:clear >/dev/null 2>&1 || true
 
 echo "--- Running database migrations ---"
 php artisan migrate --force

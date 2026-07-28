@@ -31,9 +31,13 @@ from datetime import datetime
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SERVER_ROOT = os.path.dirname(SCRIPT_DIR)
 
-# Read from .env
+# Read from .env. Demo data must always live in its own isolated sqlite file —
+# never in whatever database DB_CONNECTION/DB_DATABASE happen to point at
+# (setup-demo.sh switches .env to an isolated sqlite file before running this
+# script; direct/standalone invocation is checked below).
 DB_PATH = os.path.join(SERVER_ROOT, 'database', 'database.sqlite')
 BOOK_ROOT = '/media/archive/demo-books'
+DB_CONNECTION = 'sqlite'
 
 env_file = os.path.join(SERVER_ROOT, '.env')
 if os.path.exists(env_file):
@@ -43,6 +47,17 @@ if os.path.exists(env_file):
             BOOK_ROOT = line.split('=', 1)[1].strip().strip('"').strip("'")
         elif line.startswith('DB_DATABASE='):
             DB_PATH = line.split('=', 1)[1].strip().strip('"').strip("'")
+        elif line.startswith('DB_CONNECTION='):
+            DB_CONNECTION = line.split('=', 1)[1].strip().strip('"').strip("'")
+
+if DB_CONNECTION != 'sqlite':
+    sys.exit(
+        f"ERROR: DB_CONNECTION={DB_CONNECTION!r} in .env, but this script only ever "
+        f"writes demo data to an isolated sqlite file — it must never run against a "
+        f"real/shared database. Run scripts/setup-demo.sh, which switches .env to the "
+        f"isolated demo sqlite file before invoking this script, instead of running "
+        f"this script directly against a non-sqlite .env."
+    )
 
 LIBRIVOX_API = 'https://librivox.org/api/feed/audiobooks/'
 
