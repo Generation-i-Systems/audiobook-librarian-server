@@ -173,7 +173,9 @@ class BookDownloadController extends Controller
         $tokenPreview = 'none';
         if ($authHeader && preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
             $token = $matches[1];
-            $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4);
+            // A stable, non-reversible fingerprint for correlating log lines — never log
+            // enough of the raw token to reconstruct or narrow down the real value.
+            $tokenPreview = substr(hash('sha256', $token), 0, 12);
         }
 
         Log::info('Book download requested', [
@@ -409,7 +411,9 @@ class BookDownloadController extends Controller
         $tokenPreview = 'none';
         if ($authHeader && preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
             $token = $matches[1];
-            $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4);
+            // A stable, non-reversible fingerprint for correlating log lines — never log
+            // enough of the raw token to reconstruct or narrow down the real value.
+            $tokenPreview = substr(hash('sha256', $token), 0, 12);
         }
 
         Log::info('Book file download requested', [

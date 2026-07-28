@@ -87,7 +87,9 @@ class ApiAuth
                 'cleaned_length' => strlen($token)
             ]);
         }
-        $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4); // Show first 8 and last 4 chars
+        // A stable, non-reversible fingerprint for correlating log lines — never log
+        // enough of the raw token to reconstruct or narrow down the real value.
+        $tokenPreview = substr(hash('sha256', $token), 0, 12);
 
         Log::info('Token details for debugging', [
             'uri' => $requestUri,
