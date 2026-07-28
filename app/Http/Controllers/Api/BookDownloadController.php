@@ -691,10 +691,9 @@ class BookDownloadController extends Controller
             ], 404);
         }
 
-        // Generate signed URLs for individual files with 1 hour expiration
-        $expiresAt = now()->addHour();
-        $signature = hash('sha256', $id . $expiresAt->timestamp . config('app.key'));
-
+        // download_url below always requires the caller's own Bearer token via the
+        // api.auth middleware on the underlying route — these URLs were never actually
+        // usable unauthenticated, so no expires/signature params are generated.
         $fileUrls = [];
         $totalSize = 0;
 
@@ -706,7 +705,7 @@ class BookDownloadController extends Controller
             $fileUrls[] = [
                 'filename' => $fileName,
                 'size' => $fileSize,
-                'download_url' => $this->buildDownloadFileUrl($id, $fileName) . "?expires={$expiresAt->timestamp}&signature={$signature}",
+                'download_url' => $this->buildDownloadFileUrl($id, $fileName),
             ];
         }
 
@@ -735,14 +734,13 @@ class BookDownloadController extends Controller
         return response()->json([
             'book_id' => (int) $id,
             'title' => $book['title'] ?? '',
-            'expires_at' => $expiresAt->toISOString(),
             'total_size' => $totalSize,
             'total_files' => count($fileUrls),
             'files' => $fileUrls,
             'download_instructions' => [
                 'order' => 'Download files in the provided order for best experience',
                 'resume' => 'All URLs support HTTP Range headers for resumable downloads',
-                'authentication' => 'URLs are signed and will expire at the specified time',
+                'authentication' => 'Requires the same Bearer token used for this request.',
             ],
         ]);
     }
