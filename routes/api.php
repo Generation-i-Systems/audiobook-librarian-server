@@ -425,8 +425,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/auth/discord', [AuthController::class, 'discordLogin']);
     });
 
-    // Backwards compatible auth-prefixed routes (mobile clients expect /auth/* paths)
-    Route::prefix('auth')->group(function () {
+    // Backwards compatible auth-prefixed routes (mobile clients expect /auth/* paths).
+    // Must carry the same throttle as the primary routes above — these hit the same
+    // controllers and are just as exploitable for credential guessing/OTP abuse.
+    Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/refresh', [AuthController::class, 'refresh']);
