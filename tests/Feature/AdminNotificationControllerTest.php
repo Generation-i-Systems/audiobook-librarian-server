@@ -60,7 +60,7 @@ class AdminNotificationControllerTest extends TestCase
     }
 
     #[Test]
-    public function send_notification_sends_to_specific_user(): void
+    public function send_notification_to_specific_user_reports_not_implemented(): void
     {
         $response = $this->post(route('admin.send.notification'), [
             'message' => 'Test message',
@@ -68,29 +68,25 @@ class AdminNotificationControllerTest extends TestCase
         ]);
 
         $response->assertStatus(302); // Should redirect back
-        $response->assertSessionHas('success', 'Notification sent to specific user!');
+        $response->assertSessionHasErrors(['message']);
 
-        // Verify the log call was made (only if device token exists)
-        Log::shouldHaveReceived('info')->atLeast()->once()->withArgs(function ($message) {
-            return str_contains($message, 'Sending push notification to user user123') &&
-                   str_contains($message, 'Test message');
+        Log::shouldHaveReceived('info')->atLeast()->once()->withArgs(function ($logMessage) {
+            return str_contains($logMessage, 'push sending is not implemented');
         });
     }
 
     #[Test]
-    public function send_notification_sends_to_all_users(): void
+    public function send_notification_to_all_users_reports_not_implemented(): void
     {
         $response = $this->post(route('admin.send.notification'), [
             'message' => 'Broadcast message',
         ]);
 
         $response->assertStatus(302);
-        $response->assertSessionHas('success', 'Notification sent to all users!');
+        $response->assertSessionHasErrors(['message']);
 
-        // Verify the log call was made for all users with device tokens
-        Log::shouldHaveReceived('info')->atLeast()->once()->withArgs(function ($message) {
-            return str_contains($message, 'Sending push notification to user user123') &&
-                   str_contains($message, 'Broadcast message');
+        Log::shouldHaveReceived('info')->atLeast()->once()->withArgs(function ($logMessage) {
+            return str_contains($logMessage, 'push sending is not implemented');
         });
     }
 

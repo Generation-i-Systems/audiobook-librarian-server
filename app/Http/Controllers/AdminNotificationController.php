@@ -32,50 +32,20 @@ class AdminNotificationController extends Controller
         if ($userId) {
             // Send to a specific user
             $user = $documentStore->getUserById($userId);
-            if ($user) {
-                // Ensure the user array has an 'id' key
-                if (!isset($user['id'])) {
-                    $user['id'] = $userId;
-                }
-                $this->sendPushNotification($user, $message);
-
-                return back()->with('success', 'Notification sent to specific user!');
-            } else {
+            if (!$user) {
                 return back()->withErrors(['user_id' => 'User not found.']);
             }
-        } else {
-            // Send to all users
-            $users = $documentStore->getAllUsers();
-            foreach ($users as $user) {
-                // Ensure each user array has an 'id' key
-                if (!isset($user['id']) && isset($user['_id'])) {
-                    $user['id'] = $user['_id'];
-                }
-                $this->sendPushNotification($user, $message);
-            }
-
-            return back()->with('success', 'Notification sent to all users!');
         }
-    }
 
-    /**
-     * Send a push notification to a user (stub, replace with FCM logic).
-     *
-     * @param  array  $user
-     * @return void
-     */
-    private function sendPushNotification($user, string $message)
-    {
-        // Implement your push notification logic here (Firebase Cloud Messaging)
-        // For example:
-        $deviceToken = isset($user['device_token']) ? $user['device_token'] : null;
-        // TBD: Store device tokens by user
-        if ($deviceToken) {
-            // Send notification
-            // TBD: You'll need to use a library like Firebase Admin SDK to send the notification
-            Log::info(
-                "Sending push notification to user {$user['id']} with message: {$message}"
-            );
-        }
+        // No FCM/ADM send-side integration exists yet (device push tokens are
+        // registered per-device via DeviceController::updatePushToken() into the
+        // devices table, but nothing ever dispatches an actual push from here) -
+        // this must not claim a notification was sent.
+        Log::info('Admin attempted to send a push notification, but push sending is not implemented', [
+            'user_id' => $userId,
+            'message' => $message,
+        ]);
+
+        return back()->withErrors(['message' => 'Sending push notifications is not yet implemented.']);
     }
 }
