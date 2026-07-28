@@ -24,6 +24,7 @@
 ### Fixed
 
 - Book edit metadata autofill now preserves an existing selected genre, including directory-derived genres, and no longer adds blank genre rows from provider categories that are not configured genre options.
+- Book edit metadata autofill genre handling now lives in a focused tested module, keeping the normal Jest coverage gate meaningful while covering the regression directly.
 - Added npm overrides for `brace-expansion` 5.0.8 and `postcss` 8.5.23 to clear the current high-severity npm audit advisories in Jest/Vite transitive dependencies.
 - Updated `guzzlehttp/guzzle` (7.14.1 → 7.15.1) and dev-only `js-yaml`/`shell-quote` npm overrides to clear newly published security advisories.
 - The login-page mobile connection QR code is now generated from the locally bundled application assets instead of an external CDN, so it remains available when third-party scripts are blocked or unreachable.

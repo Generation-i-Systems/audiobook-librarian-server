@@ -1,6 +1,11 @@
 // @jest-environment jsdom
 import $ from "jquery";
 import { jest } from "@jest/globals";
+import {
+    applyAutofillGenres,
+    getAutofillGenreValues,
+    getGenreList,
+} from "@/admin/books/autofill-genres.js";
 
 function bookFormHtml(selectedGenre = "Fantasy") {
     return `
@@ -50,12 +55,6 @@ function bookFormHtml(selectedGenre = "Fantasy") {
     `;
 }
 
-async function loadAutofillModules() {
-    await import("@/admin/books/form-helpers.js");
-    await import("@/admin/books/autofill-simple.js");
-    window.BookForm.initializeTemplates($("#book-form"));
-}
-
 function selectedGenres() {
     return $('#genres-group select[name="genre[]"]')
         .toArray()
@@ -73,6 +72,7 @@ describe("Book metadata autofill genre handling", () => {
         window.BookForm = {};
         window.BOOK_FORM_ROUTES = {};
         window.autofillMatches = [];
+        window.document = document;
         $.fn.autocomplete = jest.fn(function () {
             return this;
         });
@@ -101,11 +101,16 @@ describe("Book metadata autofill genre handling", () => {
                 ],
             },
         ];
+        const addGenreRow = jest.fn();
 
-        await loadAutofillModules();
-        window.BookForm.applyAutofillGenres(window.autofillMatches[0]);
+        applyAutofillGenres(
+            window.autofillMatches[0],
+            $("#book-form"),
+            addGenreRow,
+        );
 
         expect(selectedGenres()).toEqual(["Fantasy"]);
+        expect(addGenreRow).not.toHaveBeenCalled();
     });
 
     test("apply only uses configured nonblank genres when no genre is selected", async () => {
@@ -117,10 +122,72 @@ describe("Book metadata autofill genre handling", () => {
                 genre: ["", "Unknown Provider Genre", "Science Fiction"],
             },
         ];
+        const addGenreRow = jest.fn();
 
-        await loadAutofillModules();
-        window.BookForm.applyAutofillGenres(window.autofillMatches[0]);
+        applyAutofillGenres(
+            window.autofillMatches[0],
+            $("#book-form"),
+            addGenreRow,
+        );
 
         expect(selectedGenres()).toEqual(["Science Fiction"]);
+        expect(addGenreRow).not.toHaveBeenCalled();
+    });
+
+    test("apply appends later configured genres after filling the first blank row", () => {
+        document.body.innerHTML = bookFormHtml("");
+        const addGenreRow = jest.fn();
+
+        applyAutofillGenres(
+            {
+                category: ["Science Fiction", "Fantasy"],
+            },
+            $("#book-form"),
+            addGenreRow,
+        );
+
+        expect(selectedGenres()).toEqual(["Science Fiction"]);
+        expect(addGenreRow).toHaveBeenCalledWith($("#book-form"), "Fantasy");
+    });
+
+    test("genre list handles provider genre field variants", () => {
+        expect([
+            getGenreList({ category: ["Fantasy"] }),
+            getGenreList({ categories: ["Science Fiction"] }),
+            getGenreList({ genre: ["Romance"] }),
+            getGenreList({
+                genres: [
+                    { genre: { name: "Mystery" } },
+                    "Thriller",
+                    { genre: {} },
+                ],
+            }),
+            getGenreList({}),
+        ]).toEqual([
+            "Fantasy",
+            "Science Fiction",
+            "Romance",
+            "Mystery, Thriller",
+            "",
+        ]);
+    });
+
+    test("genre filtering decodes entities and removes duplicates and unknown values", () => {
+        document.body.innerHTML = bookFormHtml("");
+
+        expect(
+            getAutofillGenreValues(
+                {
+                    category: [
+                        "Science &amp; Fiction",
+                        "Science Fiction",
+                        "Science Fiction",
+                        "",
+                        "Unknown",
+                    ],
+                },
+                $("#book-form"),
+            ),
+        ).toEqual(["Science Fiction"]);
     });
 });

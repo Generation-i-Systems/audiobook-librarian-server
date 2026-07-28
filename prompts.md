@@ -307,3 +307,8 @@ Address the npm audit issues reported by the pre-push hook for `brace-expansion`
 
 When editing a book and running metadata update, genres are being added with many blank entries
 and the genre already set from the directory path is being changed. Neither should happen.
+
+## 2026-07-28
+
+Normal Jest hook runs are failing because the new autofill regression test imports large DOM
+wiring files with low coverage, dropping global coverage below the enforced threshold.
