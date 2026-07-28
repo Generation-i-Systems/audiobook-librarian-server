@@ -222,18 +222,23 @@ Route::middleware(['auth', 'library'])->group(function (): void {
 });
 Route::post('/books/set-preference', [BookController::class, 'setPreference'])->name('books.set-preference');
 
-// General image proxy for covers and previews
-Route::get('/image-proxy', [ImageProxyController::class, 'show'])->name('image.proxy');
-// Pretty URL for covers, supports slashes in path
-Route::get('/cover/{path}', [
-    ImageProxyController::class,
-    'cover',
-])->where('path', '.*')->name('cover.proxy');
+// General image proxy for covers and previews. These serve arbitrary files from
+// BOOK_STORAGE_PATH (the /cover/{path} route is also reused by the admin library-repair
+// tool to stream non-image files for comparison), so they require authentication —
+// unauthenticated requests must not be able to read any file in the book root.
+Route::middleware(['auth'])->group(function (): void {
+    Route::get('/image-proxy', [ImageProxyController::class, 'show'])->name('image.proxy');
+    // Pretty URL for covers, supports slashes in path
+    Route::get('/cover/{path}', [
+        ImageProxyController::class,
+        'cover',
+    ])->where('path', '.*')->name('cover.proxy');
 
-Route::get('/google-books-cover/{encodedUrl}', [
-    ImageProxyController::class,
-    'googleBooksCover',
-])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
+    Route::get('/google-books-cover/{encodedUrl}', [
+        ImageProxyController::class,
+        'googleBooksCover',
+    ])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
+});
 
 // Skin asset proxy — moved to audiobook-librarian-www.
 Route::get('/skin-asset/{skinId}/{path}', $redirectToGalleryWww)

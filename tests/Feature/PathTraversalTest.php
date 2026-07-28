@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -14,6 +15,7 @@ class PathTraversalTest extends TestCase
     protected string $tempDir;
     protected string $originalBookRoot;
     protected string $originalSkinPaths;
+    protected User $user;
 
     protected function setUp(): void
     {
@@ -24,6 +26,10 @@ class PathTraversalTest extends TestCase
 
         $this->tempDir = storage_path('framework/testing/path-traversal-' . uniqid());
         File::makeDirectory($this->tempDir, 0755, true);
+
+        // /image-proxy and /cover/{path} now require authentication (they serve
+        // arbitrary files from book_root, previously reachable by anyone).
+        $this->user = User::factory()->create(['role' => 'library-user']);
     }
 
     protected function tearDown(): void
@@ -41,11 +47,20 @@ class PathTraversalTest extends TestCase
         parent::tearDown();
     }
 
+    /** A real, minimal 1x1 PNG — libmagic must sniff it as image/png for the MIME check. */
+    private function validPngBytes(): string
+    {
+        return base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+        );
+    }
+
     private function withStorageRoot(): static
     {
         // Skip the middleware that overrides app.book_root from a library profile,
         // so that Config::set takes effect inside the controller.
-        return $this->withoutMiddleware(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
+        return $this->withoutMiddleware(\App\Http\Middleware\ResolveLibraryProfileFromHost::class)
+            ->actingAs($this->user);
     }
 
     // ── ImageProxyController::show() ────────────────────────────────────────────
@@ -72,7 +87,7 @@ class PathTraversalTest extends TestCase
     {
         Config::set('app.book_root', $this->tempDir);
 
-        file_put_contents($this->tempDir . '/cover.png', "\x89PNG\r\n\x1a\n");
+        file_put_contents($this->tempDir . '/cover.png', $this->validPngBytes());
 
         $response = $this->withStorageRoot()->get('/image-proxy?file=cover.png');
 
@@ -109,6 +124,44 @@ class PathTraversalTest extends TestCase
         $response = $this->withStorageRoot()->get('/cover/../../../etc/passwd');
 
         $response->assertStatus(404);
+    }
+
+    // ── Authentication / MIME restrictions ──────────────────────────────────────
+
+    public function testCoverRejectsUnauthenticatedRequest(): void
+    {
+        Config::set('app.book_root', $this->tempDir);
+        file_put_contents($this->tempDir . '/cover.png', $this->validPngBytes());
+
+        $response = $this
+            ->withoutMiddleware(\App\Http\Middleware\ResolveLibraryProfileFromHost::class)
+            ->get('/cover/cover.png');
+
+        $response->assertRedirect(route('login'));
+    }
+
+    public function testCoverRejectsNonImageFileForNonAdmin(): void
+    {
+        Config::set('app.book_root', $this->tempDir);
+        file_put_contents($this->tempDir . '/chapter1.mp3', str_repeat("\x00", 32));
+
+        $response = $this->withStorageRoot()->get('/cover/chapter1.mp3');
+
+        $response->assertStatus(403);
+    }
+
+    public function testCoverAllowsNonImageFileForAdmin(): void
+    {
+        Config::set('app.book_root', $this->tempDir);
+        file_put_contents($this->tempDir . '/chapter1.mp3', str_repeat("\x00", 32));
+        $admin = User::factory()->create(['role' => 'admin', 'is_admin' => true]);
+
+        $response = $this
+            ->withoutMiddleware(\App\Http\Middleware\ResolveLibraryProfileFromHost::class)
+            ->actingAs($admin)
+            ->get('/cover/chapter1.mp3');
+
+        $response->assertStatus(200);
     }
 
     // SkinAssetController::show() moved to audiobook-librarian-www as part of

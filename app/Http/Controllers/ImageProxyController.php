@@ -4,10 +4,28 @@ namespace App\Http\Controllers;
 
 use GuzzleHttp\Client;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class ImageProxyController extends Controller
 {
+    private const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+    /**
+     * Non-admin callers may only fetch image files. Admins additionally use this proxy
+     * (via the library-repair tool) to stream arbitrary book-root files for comparison.
+     */
+    private function assertServable(string $mime): void
+    {
+        if (Auth::user()?->isAdmin()) {
+            return;
+        }
+
+        if (!in_array($mime, self::ALLOWED_IMAGE_MIME_TYPES, true)) {
+            abort(403, 'Not an image file.');
+        }
+    }
+
     /**
      * Serve an image from BOOK_STORAGE_PATH for preview or display.
      * Usage: /image-proxy?file=...
@@ -41,6 +59,7 @@ class ImageProxyController extends Controller
         }
 
         $mime = mime_content_type($realPath);
+        $this->assertServable($mime);
 
         return response()->file($realPath, [
             'Content-Type' => $mime,
@@ -79,6 +98,7 @@ class ImageProxyController extends Controller
         }
 
         $mime = mime_content_type($realPath);
+        $this->assertServable($mime);
 
         return response()->file($realPath, [
             'Content-Type' => $mime,
@@ -97,7 +117,7 @@ class ImageProxyController extends Controller
         if (!preg_match('#^https?://books\\.google\\.com/#', $url)) {
             abort(403, 'Invalid Google Books cover URL.');
         }
-        $client = new Client(['verify' => false, 'timeout' => 10]);
+        $client = new Client(['timeout' => 10]);
         try {
             $response = $client->get($url, ['stream' => true]);
 
