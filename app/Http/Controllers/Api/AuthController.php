@@ -42,10 +42,11 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        // Log incoming request data
+        // Log incoming request metadata only — never the request body, which
+        // contains the plaintext password.
         Log::debug('Registration request received', [
-            'request_data' => $request->all(),
-            'headers' => $request->headers->all(),
+            'email' => $request->input('email'),
+            'username' => $request->input('username'),
             'content_type' => $request->header('Content-Type'),
             'accept' => $request->header('Accept'),
         ]);
@@ -60,7 +61,8 @@ class AuthController extends Controller
         if ($validator->fails()) {
             Log::error('Registration validation failed', [
                 'errors' => $validator->errors(),
-                'input' => $request->all(),
+                'email' => $request->input('email'),
+                'username' => $request->input('username'),
             ]);
             return response()->json($validator->errors(), 400);
         }
