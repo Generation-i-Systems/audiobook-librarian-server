@@ -1,0 +1,114 @@
+{
+    "version": 1,
+    "title": "Great Expectations",
+    "author": [
+        "Charles Dickens"
+    ],
+    "narrator": [
+        ""
+    ],
+    "series": null,
+    "seriesId": null,
+    "description": "This classic tale tells of an orphan, Pip, who through a series of strange circumstances first finds a trade as a blacksmith's apprentice and then learns that he has \"great expectations\" of a future inheritance from an anonymous benefactor. He soon learns to live the profligate life of a gentleman as he gradually sheds his associations with the gentle souls of his past, Joe (the blacksmith) and Biddy (a level-headed young lady). He throws his money at improving the prospects of his roommate and friend Herbert and his heart at an \"ice princess\" whose heart will never respond. But then an escaped convict from his distant past comes calling, and all Pip's hopes dissolve. (Summary by Mark F. Smith)",
+    "rating": null,
+    "publishedYear": 1867,
+    "notes": [
+        {
+            "id": "note-import-1785191845-1",
+            "content": "📍 Plot Event (Ch. 1): The Churchyard Encounter — Pip meets the escaped convict (Magwitch) while visiting his parents' graves. Forced to promise food and a metal file. Sets the dark, atmospheric tone of the marshes early on.",
+            "isPublic": false,
+            "positionMs": 525000,
+            "colorTag": "blue",
+            "createdAt": 1785191245,
+            "updatedAt": 1785191245
+        },
+        {
+            "id": "note-import-1785191845-2",
+            "content": "📍 Plot Event (Ch. 8): First Visit to Satis House — Pip is invited to play at Miss Havisham's decaying mansion. He meets Estella, who mocks his \"coarse hands\" and \"thick boots,\" sparking his sudden shame over his working-class background.",
+            "isPublic": false,
+            "positionMs": 4350000,
+            "colorTag": "purple",
+            "createdAt": 1785191305,
+            "updatedAt": 1785192490
+        },
+        {
+            "id": "note-import-1785191845-3",
+            "content": "📍 Plot Event (Ch. 18): The \"Great Expectations\" Revealed — Mr. Jaggers arrives at the blacksmith's shop to announce that Pip has come into an immense fortune from a secret benefactor. Condition: Pip must keep his name and leave for London to become a gentleman.",
+            "isPublic": false,
+            "positionMs": 9915000,
+            "colorTag": "blue",
+            "createdAt": 1785191365,
+            "updatedAt": 1785191365
+        },
+        {
+            "id": "note-import-1785191845-4",
+            "content": "📍 Plot Event (Ch. 21): Arrival in London — Pip enters the grimy, overwhelming environment of Little Britain and Jaggers' gloomy office. Moves into Barnard's Inn with Herbert Pocket, realizing being a \"gentleman\" is dirtier and more expensive than expected.",
+            "isPublic": false,
+            "positionMs": 15000000,
+            "colorTag": "blue",
+            "createdAt": 1785191425,
+            "updatedAt": 1785191425
+        },
+        {
+            "id": "note-import-1785191845-5",
+            "content": "📍 Plot Event (Ch. 27): Joe's Painful Visit — Joe Gargery visits Pip in London. Pip feels immense shame and awkwardness toward Joe's working-class manners, marking Pip's emotional estrangement from his roots.",
+            "isPublic": false,
+            "positionMs": 19930000,
+            "colorTag": "blue",
+            "createdAt": 1785191485,
+            "updatedAt": 1785191485
+        }
+    ],
+    "characters": [
+        {
+            "id": "character-import-1785194243-1",
+            "name": "Philip \"Pip\" Pirrip",
+            "summary": "Protagonist / Narrator. Starts as an orphaned, working-class boy raised \"by hand\" by his sister. Highly impressionable and deeply sensitive. His encounter with Estella triggers an intense inferiority complex that makes him reject his simple life at the forge in pursuit of high society.",
+            "isPublic": false,
+            "colorTag": "purple",
+            "bulletPoints": [],
+            "createdAt": 1785193943,
+            "updatedAt": 1785193943
+        },
+        {
+            "id": "character-import-1785194243-2",
+            "name": "Miss Havisham",
+            "summary": "Eccentric wealthy recluse. Lives in the decaying Satis House, permanently wearing her yellowed wedding dress amidst rotting wedding cake. Devastated by being jilted on her wedding day, she raises Estella as a weapon to break men's hearts. Pip mistakenly assumes she is his secret benefactor.",
+            "isPublic": false,
+            "colorTag": "purple",
+            "bulletPoints": [],
+            "createdAt": 1785194003,
+            "updatedAt": 1785194003
+        },
+        {
+            "id": "character-import-1785194243-3",
+            "name": "Estella Havisham",
+            "summary": "Pip's unrequited love interest. Adopted daughter of Miss Havisham. Beautiful, cold, and deliberately trained to be incapable of genuine affection or warmth. She constantly reminds Pip of his low social standing, driving his ambition to become a gentleman.",
+            "isPublic": false,
+            "colorTag": "purple",
+            "bulletPoints": [],
+            "createdAt": 1785194063,
+            "updatedAt": 1785194063
+        },
+        {
+            "id": "character-import-1785194243-4",
+            "name": "Joe Gargery",
+            "summary": "Pip's brother-in-law and village blacksmith. A gentle, kind-hearted man who provides Pip with genuine affection and safety from Mrs. Joe's temper. He represents true moral integrity, loyalty, and contentment, contrasting sharply with Pip's growing vanity in London.",
+            "isPublic": false,
+            "colorTag": "purple",
+            "bulletPoints": [],
+            "createdAt": 1785194123,
+            "updatedAt": 1785194123
+        },
+        {
+            "id": "character-import-1785194243-5",
+            "name": "Mr. Jaggers",
+            "summary": "London lawyer / guardian (full role from Ch. 18, ~02:40:00). A powerful, imposing, and intensely pragmatic criminal defense lawyer in London. He washes his hands obsessively with scented soap after dealing with clients. Serves as the intermediary between Pip and his mystery benefactor.",
+            "isPublic": false,
+            "colorTag": "purple",
+            "bulletPoints": [],
+            "createdAt": 1785194183,
+            "updatedAt": 1785194183
+        }
+    ]
+}

@@ -46,6 +46,16 @@ if os.path.exists(env_file):
 
 LIBRIVOX_API = 'https://librivox.org/api/feed/audiobooks/'
 
+FIXTURES_DIR = os.path.join(SCRIPT_DIR, 'fixtures')
+
+# librivox_id -> fixture filename. A fixture supplies hand-curated enrichment
+# (description, notes, characters) that gets merged into a full LibrarianMetadata-shaped
+# librarian.json, so a fresh demo install already has rich per-book content on first
+# download instead of the bare-bones metadata the other demo books get.
+LIBRARIAN_JSON_FIXTURES = {
+    2591: 'great_expectations_librarian.json',
+}
+
 # ---------------------------------------------------------------------------
 # The 30 demo books: (librivox_id, title, directory_path, author_name)
 # directory_path is relative to BOOK_STORAGE_PATH
@@ -337,6 +347,84 @@ def write_librarian_json(path, title, authors, genres, series_name, series_numbe
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
 
+def load_json_fixture(name):
+    with open(os.path.join(FIXTURES_DIR, name), encoding='utf-8') as f:
+        return json.load(f)
+
+
+def write_enriched_librarian_json(path, book_id, rel_dir, default_title, default_author,
+                                   sections, abs_dir, fixture):
+    """Write a full LibrarianMetadata-shaped librarian.json for a book that has a
+    curated fixture, so the client adopts it as-is on first download instead of
+    generating bare metadata from a fresh scan. audioFiles/chapters are computed from
+    the live LibriVox sections/downloaded files rather than the fixture, so they always
+    match this server's actual directory layout and file set."""
+    audio_files = []
+    chapters = []
+    start_ms = 0
+    for i, section in enumerate(sections):
+        listen_url = section.get('listen_url', '')
+        filename = os.path.basename(listen_url) if listen_url else ''
+        dest = os.path.join(abs_dir, filename)
+        size_bytes = os.path.getsize(dest) if filename and os.path.exists(dest) else 0
+        duration_ms = int(section.get('playtime', 0) or 0) * 1000
+        audio_files.append({
+            'name': filename,
+            'path': f'{rel_dir}/{filename}',
+            'durationMs': duration_ms,
+            'sizeBytes': size_bytes,
+            'trackNumber': i + 1,
+            'format': os.path.splitext(filename)[1].lstrip('.') or 'mp3',
+        })
+        chapters.append({
+            'index': i,
+            'title': section.get('title') or f'Chapter {i + 1}',
+            'startTimeMs': start_ms,
+            'durationMs': duration_ms,
+            'fileIndex': i,
+        })
+        start_ms += duration_ms
+
+    now_ms = int(time.time() * 1000)
+    cover_dest = os.path.join(abs_dir, 'cover.jpg')
+    metadata = {
+        'bookId': book_id,
+        'version': fixture.get('version', 1),
+        'title': fixture.get('title') or default_title,
+        'author': fixture.get('author') or [default_author],
+        'authorId': None,
+        'narrator': fixture.get('narrator', []),
+        'series': fixture.get('series'),
+        'seriesId': fixture.get('seriesId'),
+        'description': fixture.get('description', ''),
+        'rating': fixture.get('rating'),
+        'publishedYear': fixture.get('publishedYear'),
+        'coverUrl': None,
+        'localCoverPath': f'{rel_dir}/cover.jpg' if os.path.exists(cover_dest) else None,
+        'contentPath': rel_dir,
+        'downloadedAt': now_ms,
+        'fileSize': sum(af['sizeBytes'] for af in audio_files),
+        'audioFiles': audio_files,
+        'totalDurationMs': start_ms,
+        'chapters': chapters,
+        'chaptersExtractedAt': now_ms,
+        'progress': None,
+        'bookmarks': [],
+        'listeningHistory': [],
+        'notes': fixture.get('notes', []),
+        'characters': fixture.get('characters', []),
+        'createdAt': now_ms,
+        'lastUpdatedAt': now_ms,
+        'lastScannedAt': now_ms,
+        'apiId': book_id,
+        'isMatchDismissed': False,
+        'backendId': None,
+        'sourceRemoteId': None,
+    }
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=4, ensure_ascii=False)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -428,16 +516,6 @@ def main():
         if cover_ok:
             c.execute("UPDATE books SET cover_image = 'cover.jpg' WHERE id = ?", (book_id,))
 
-        # Write librarian.json (includes chapters)
-        series_name, series_number = BOOK_SERIES.get(librivox_id, (None, None))
-        write_librarian_json(
-            os.path.join(abs_dir, 'librarian.json'),
-            title, [author_name], genre_names,
-            series_name, series_number, year, description, language, rel_dir,
-            chapters=sections_to_chapters(sections),
-        )
-        print(f'  librarian.json written ({len(sections)} chapters)')
-
         # Download audio chapters
         audio_ok = audio_skip = audio_fail = 0
         for section in sections:
@@ -458,6 +536,29 @@ def main():
             time.sleep(0.1)  # polite rate-limit
 
         print(f'  audio: {audio_ok} downloaded, {audio_skip} skipped, {audio_fail} failed')
+
+        # Write librarian.json. Books with a curated fixture get a full, enriched
+        # metadata file (real audioFiles/chapters plus fixture description/notes/
+        # characters); everything else gets the bare-bones hint file.
+        librarian_json_path = os.path.join(abs_dir, 'librarian.json')
+        fixture_name = LIBRARIAN_JSON_FIXTURES.get(librivox_id)
+        if fixture_name:
+            fixture = load_json_fixture(fixture_name)
+            write_enriched_librarian_json(
+                librarian_json_path, book_id, rel_dir, title, author_name,
+                sections, abs_dir, fixture,
+            )
+            print(f'  librarian.json written from fixture ({len(sections)} chapters, '
+                  f'{len(fixture.get("notes", []))} notes, {len(fixture.get("characters", []))} characters)')
+        else:
+            series_name, series_number = BOOK_SERIES.get(librivox_id, (None, None))
+            write_librarian_json(
+                librarian_json_path,
+                title, [author_name], genre_names,
+                series_name, series_number, year, description, language, rel_dir,
+                chapters=sections_to_chapters(sections),
+            )
+            print(f'  librarian.json written ({len(sections)} chapters)')
 
         conn.commit()
         ok += 1
