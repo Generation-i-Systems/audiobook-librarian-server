@@ -127,7 +127,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // Ensure API routes return JSON errors
         $exceptions->render(function (\Throwable $e, $request) {
             if ($request->is('api/*') || $request->wantsJson()) {
-                $statusCode = 500;
                 if ($e instanceof \Illuminate\Validation\ValidationException) {
                     return response()->json([
                         'error' => true,
@@ -136,15 +135,36 @@ return Application::configure(basePath: dirname(__DIR__))
                     ], 422);
                 }
 
+                // Exceptions with getStatusCode() are deliberate HTTP-level responses
+                // (abort($code, $message), explicit HttpException subclasses) — this
+                // codebase's own abort() calls always pass a message safe to show a
+                // client. Anything without it is an unexpected failure (DB error,
+                // null pointer, filesystem/third-party error, etc.) whose message can
+                // contain internal paths, queries, or service details, so return a
+                // generic message with a correlation ID instead and keep the real
+                // message only in the server log.
                 if (method_exists($e, 'getStatusCode')) {
                     $statusCode = $e->getStatusCode();
+
+                    return response()->json([
+                        'error' => true,
+                        'message' => $e->getMessage(),
+                        'code' => $e->getCode() ?: $statusCode,
+                    ], $statusCode);
                 }
+
+                $correlationId = (string) \Illuminate\Support\Str::uuid();
+                \Illuminate\Support\Facades\Log::error($e->getMessage(), [
+                    'correlation_id' => $correlationId,
+                    'exception' => get_class($e),
+                ]);
 
                 return response()->json([
                     'error' => true,
-                    'message' => $e->getMessage(),
-                    'code' => $e->getCode() ?: $statusCode,
-                ], $statusCode);
+                    'message' => 'An unexpected error occurred.',
+                    'correlation_id' => $correlationId,
+                    'code' => 500,
+                ], 500);
             }
         });
 
