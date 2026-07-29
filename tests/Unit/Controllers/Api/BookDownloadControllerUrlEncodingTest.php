@@ -38,41 +38,6 @@ class BookDownloadControllerUrlEncodingTest extends TestCase
         );
     }
 
-    /**
-     * Reproduces the actual bug: PHP caches stat() results per-process. Once something in this
-     * process has called filesize() on a path, a later plain filesize() call on the same path
-     * keeps returning the size from that first call - even though the file has since grown on
-     * disk - until clearstatcache() runs. freshFileSize() must clear the cache before reading,
-     * so it has to see the file's real, current size where a naive filesize() call would not.
-     */
-    public function test_fresh_file_size_sees_growth_that_a_cached_filesize_call_would_miss(): void
-    {
-        $path = tempnam(sys_get_temp_dir(), 'stat-cache-');
-        file_put_contents($path, str_repeat('a', 100));
-
-        try {
-            // Prime PHP's stat cache at the old size, simulating an earlier read in this same
-            // worker process (e.g. while the file was still being written).
-            $staleRead = filesize($path);
-            $this->assertSame(100, $staleRead);
-
-            file_put_contents($path, str_repeat('a', 250));
-
-            // Without clearing the cache, PHP would still report the old size here.
-            $this->assertSame(100, filesize($path), 'Precondition: PHP is indeed serving a stale cached stat');
-
-            $controller = new BookDownloadController($this->createStub(DocumentStoreServiceInterface::class));
-            $method = new \ReflectionMethod(BookDownloadController::class, 'freshFileSize');
-            $method->setAccessible(true);
-
-            $result = $method->invoke($controller, $path);
-
-            $this->assertSame(250, $result);
-        } finally {
-            unlink($path);
-        }
-    }
-
     public function test_fresh_file_size_returns_null_for_a_missing_file(): void
     {
         $controller = new BookDownloadController($this->createStub(DocumentStoreServiceInterface::class));

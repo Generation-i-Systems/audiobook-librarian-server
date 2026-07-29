@@ -155,9 +155,15 @@ Real bytes streamed to a client cannot be verified by unit or feature tests.
   serving a size some earlier read in that worker had cached, indefinitely, until the worker
   recycled. The client trusted that manifest size as authoritative, downloaded exactly that many
   bytes, and ended up with a file missing its trailing MP4 `moov` atom. `freshFileSize()`'s
-  actual behavior (clearing PHP's real stat cache) is unit-tested directly by growing a real temp
-  file after an initial `filesize()` read; the fix itself needed no live concurrency to reproduce
-  or verify, only two real filesystem reads in one PHP process.
+  actual behavior (clearing PHP's real stat cache) is **not** covered by an automated test: an
+  earlier unit test tried to reproduce it by growing a real temp file after an initial
+  `filesize()` read and asserting the stale-vs-fresh precondition, but whether PHP's stat cache
+  actually goes stale for a given path depends on php.ini/OS-level caching behavior that differs
+  between environments — the precondition held on the dev machine but failed on CI (fresh read
+  both times), making the test flaky in a way that couldn't be fixed without mocking `filesize()`/
+  `clearstatcache()` at the PHP-namespace-function level. The test was deleted rather than kept
+  as a false safety net. A regression here (e.g. someone replacing `freshFileSize()` with a bare
+  `filesize()` call) must be caught by code review, not tests.
 - **`BookDownloadController::downloadFile()`** — same `freshFileSize()` fix, for the
   `Content-Length`/Range-header size used by the actual byte-streaming endpoint.
 - **`BookDownloadController::downloadUrl()`** — same `freshFileSize()` fix, for the per-file
