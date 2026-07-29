@@ -34,3 +34,4 @@ tests/coverage
 tmp_old_form.js
 /bootstrap/cache/*.php
 .claude/settings.local.json
+/archive/firestore
