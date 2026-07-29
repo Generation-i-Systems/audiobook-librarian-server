@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ablibrarian.library",
+      "sha256_cert_fingerprints": [
+        "2A:50:71:14:48:B5:AA:8D:59:2F:EE:2C:16:4F:82:74:04:E1:6D:31:04:68:AB:31:73:66:47:63:9E:11:41:EC"
+      ]
+    }
+  }
+]
