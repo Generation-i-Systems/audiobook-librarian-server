@@ -2973,12 +2973,100 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "elapsed_percent": {
+                        "type": "number"
+                    },
                     "is_active": {
                         "type": "boolean"
                     },
                     "created_at": {
                         "type": "string",
                         "format": "date-time"
+                    }
+                }
+            },
+            "ListeningGoalBreakdownEntry": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["book", "day"]
+                    },
+                    "book_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "finished_at": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "date": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "minutes": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "books": {
+                        "type": "array",
+                        "nullable": true,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "book_id": {
+                                    "type": "integer"
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "minutes": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ListeningGoalBreakdown": {
+                "type": "object",
+                "properties": {
+                    "period_start": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "period_end": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "elapsed_percent": {
+                        "type": "number"
+                    },
+                    "progress_percent": {
+                        "type": "number"
+                    },
+                    "metric": {
+                        "type": "string"
+                    },
+                    "entries": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ListeningGoalBreakdownEntry"
+                        }
                     }
                 }
             },
@@ -13746,7 +13834,7 @@
                                 "properties": {
                                     "period_type": {
                                         "type": "string",
-                                        "enum": ["day", "week", "month", "year"]
+                                        "enum": ["day", "week", "month", "year", "custom"]
                                     },
                                     "metric": {
                                         "type": "string",
@@ -13755,7 +13843,8 @@
                                             "genre_hours",
                                             "playlist_hours",
                                             "fiction_hours",
-                                            "nonfiction_hours"
+                                            "nonfiction_hours",
+                                            "books_finished"
                                         ]
                                     },
                                     "target_minutes": {
@@ -13767,6 +13856,16 @@
                                     },
                                     "playlist_id": {
                                         "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "start_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "nullable": true
+                                    },
+                                    "end_date": {
+                                        "type": "string",
+                                        "format": "date",
                                         "nullable": true
                                     }
                                 }
@@ -13902,6 +14001,46 @@
                 "responses": {
                     "204": {
                         "description": "Goal deleted"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/goals/listening/{goal}/breakdown": {
+            "get": {
+                "tags": ["Goals"],
+                "summary": "Get the books/days contributing to a listening goal's progress",
+                "operationId": "getListeningGoalBreakdown",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "goal",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Goal progress breakdown",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListeningGoalBreakdown"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#/components/responses/Unauthorized"
