@@ -117,6 +117,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/', [ListeningGoalController::class, 'store']);
             Route::put('/{goal}', [ListeningGoalController::class, 'update']);
             Route::delete('/{goal}', [ListeningGoalController::class, 'destroy']);
+            Route::get('/{goal}/breakdown', [ListeningGoalController::class, 'breakdown']);
         });
 
         // Sync Routes

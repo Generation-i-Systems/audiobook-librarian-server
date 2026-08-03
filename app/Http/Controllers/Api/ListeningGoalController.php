@@ -6,13 +6,20 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ListeningGoal;
+use App\Models\Playlist;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\BookCompletionService;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
 
 class ListeningGoalController extends Controller
 {
+    public function __construct(private readonly BookCompletionService $bookCompletionService)
+    {
+    }
+
     /** GET /goals/listening — list all active listening goals with current progress */
     public function index(): JsonResponse
     {
@@ -30,21 +37,17 @@ class ListeningGoalController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'period_type'    => 'required|string|in:day,week,month,year',
-            'metric'         => 'required|string|in:total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours',
+            'period_type'    => 'required|string|in:day,week,month,year,custom',
+            'metric'         => 'required|string|in:total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours,books_finished',
             'target_minutes' => 'required|integer|min:1|max:14400',
             'genre_id'       => 'nullable|integer|exists:genres,id',
             'playlist_id'    => 'nullable|integer|exists:playlists,id',
+            'start_date'     => 'required_if:period_type,custom|nullable|date',
+            'end_date'       => 'required_if:period_type,custom|nullable|date|after_or_equal:start_date',
         ]);
 
-        if (!empty($validated['playlist_id'])) {
-            abort_if(
-                \App\Models\Playlist::where('id', $validated['playlist_id'])
-                    ->where('user_id', Auth::id())->doesntExist(),
-                403,
-                'Playlist not found'
-            );
-        }
+        $this->assertCustomRangeConsistency($validated['period_type'], $validated['start_date'] ?? null, $validated['end_date'] ?? null);
+        $this->assertPlaylistOwnership($validated['playlist_id'] ?? null);
 
         $goal = ListeningGoal::create([
             'user_id'        => Auth::id(),
@@ -53,6 +56,8 @@ class ListeningGoalController extends Controller
             'target_minutes' => $validated['target_minutes'],
             'genre_id'       => $validated['genre_id'] ?? null,
             'playlist_id'    => $validated['playlist_id'] ?? null,
+            'start_date'     => $validated['start_date'] ?? null,
+            'end_date'       => $validated['end_date'] ?? null,
             'is_active'      => true,
         ]);
 
@@ -66,22 +71,21 @@ class ListeningGoalController extends Controller
         abort_if($goal->user_id !== Auth::id(), 403);
 
         $validated = $request->validate([
-            'period_type'    => 'sometimes|string|in:day,week,month,year',
-            'metric'         => 'sometimes|string|in:total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours',
+            'period_type'    => 'sometimes|string|in:day,week,month,year,custom',
+            'metric'         => 'sometimes|string|in:total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours,books_finished',
             'target_minutes' => 'sometimes|integer|min:1|max:14400',
             'genre_id'       => 'nullable|integer|exists:genres,id',
             'playlist_id'    => 'nullable|integer|exists:playlists,id',
+            'start_date'     => 'sometimes|nullable|date',
+            'end_date'       => 'sometimes|nullable|date|after_or_equal:start_date',
             'is_active'      => 'sometimes|boolean',
         ]);
 
-        if (!empty($validated['playlist_id'])) {
-            abort_if(
-                \App\Models\Playlist::where('id', $validated['playlist_id'])
-                    ->where('user_id', Auth::id())->doesntExist(),
-                403,
-                'Playlist not found'
-            );
-        }
+        $resolvedPeriodType = $validated['period_type'] ?? $goal->period_type;
+        $resolvedStartDate = array_key_exists('start_date', $validated) ? $validated['start_date'] : $goal->start_date?->toDateString();
+        $resolvedEndDate = array_key_exists('end_date', $validated) ? $validated['end_date'] : $goal->end_date?->toDateString();
+        $this->assertCustomRangeConsistency($resolvedPeriodType, $resolvedStartDate, $resolvedEndDate);
+        $this->assertPlaylistOwnership($validated['playlist_id'] ?? null);
 
         $goal->update($validated);
         $goal->load(['genre', 'playlist']);
@@ -97,17 +101,92 @@ class ListeningGoalController extends Controller
         return response()->json(['message' => 'Goal deleted']);
     }
 
-    private function computeProgressMinutes(ListeningGoal $goal): int
+    /** GET /goals/listening/{goal}/breakdown — which books/days are contributing to progress */
+    public function breakdown(ListeningGoal $goal): JsonResponse
+    {
+        abort_if($goal->user_id !== Auth::id(), 403);
+
+        [$periodStart, $periodEnd] = $this->resolvePeriod($goal);
+        $progressAmount = $this->computeProgressAmount($goal, $periodStart, $periodEnd);
+        $progressPercent = $this->progressPercent($goal, $progressAmount);
+
+        $entries = $goal->metric === 'books_finished'
+            ? $this->booksFinishedEntries($goal, $periodStart, $periodEnd)
+            : $this->hourEntries($goal, $periodStart, $periodEnd);
+
+        return response()->json([
+            'period_start'     => $periodStart->toDateString(),
+            'period_end'       => $periodEnd->toDateString(),
+            'elapsed_percent'  => $this->elapsedPercent($periodStart, $periodEnd),
+            'progress_percent' => $progressPercent,
+            'metric'           => $goal->metric,
+            'entries'          => $entries,
+        ]);
+    }
+
+    private function assertCustomRangeConsistency(string $periodType, ?string $startDate, ?string $endDate): void
+    {
+        if ($periodType === 'custom') {
+            abort_if(empty($startDate) || empty($endDate), 422, 'custom period requires start_date and end_date');
+        } else {
+            abort_if(!empty($startDate) || !empty($endDate), 422, 'start_date/end_date are only allowed when period_type is custom');
+        }
+    }
+
+    private function assertPlaylistOwnership(?int $playlistId): void
+    {
+        if (empty($playlistId)) {
+            return;
+        }
+
+        abort_if(
+            Playlist::where('id', $playlistId)->where('user_id', Auth::id())->doesntExist(),
+            403,
+            'Playlist not found'
+        );
+    }
+
+    /** @return array{0: Carbon, 1: Carbon} */
+    private function resolvePeriod(ListeningGoal $goal): array
+    {
+        return match ($goal->period_type) {
+            'day'    => [now()->startOfDay(), now()->endOfDay()],
+            'week'   => [now()->startOfWeek(Carbon::SUNDAY), now()->endOfWeek(Carbon::SATURDAY)],
+            'month'  => [now()->startOfMonth(), now()->endOfMonth()],
+            'year'   => [now()->startOfYear(), now()->endOfYear()],
+            'custom' => [Carbon::parse($goal->start_date)->startOfDay(), Carbon::parse($goal->end_date)->endOfDay()],
+            default  => [now()->startOfMonth(), now()->endOfMonth()],
+        };
+    }
+
+    private function elapsedPercent(Carbon $periodStart, Carbon $periodEnd): float
+    {
+        $totalSpan = max(1, $periodStart->diffInSeconds($periodEnd));
+        $elapsed = $periodStart->diffInSeconds(now()->lessThan($periodEnd) ? now() : $periodEnd);
+
+        return round(min(100, max(0, ($elapsed / $totalSpan) * 100)), 1);
+    }
+
+    private function computeProgressAmount(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd): int
     {
         $userId = Auth::id();
-        $periodStart = match ($goal->period_type) {
-            'day'   => now()->startOfDay(),
-            'week'  => now()->startOfWeek(\Carbon\Carbon::SUNDAY),
-            'month' => now()->startOfMonth(),
-            'year'  => now()->startOfYear(),
-            default => now()->startOfMonth(),
-        };
 
+        if ($goal->metric === 'books_finished') {
+            return $this->bookCompletionService
+                ->getCompletedBookDatesForUser($userId, $periodStart, $goal->genre_id)
+                ->filter(fn (Carbon $date): bool => $date->lte($periodEnd))
+                ->count();
+        }
+
+        $seconds = $this->scopedListeningQuery($goal, $periodStart, $periodEnd)
+            ->sum('listening_statistics.seconds_listened');
+
+        return (int) round($seconds / 60);
+    }
+
+    private function scopedListeningQuery(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd)
+    {
+        $userId = Auth::id();
         $deviceIds = ControllerDatabase::table('devices')
             ->where('user_id', $userId)
             ->pluck('device_id');
@@ -120,7 +199,8 @@ class ListeningGoalController extends Controller
                     $statsQuery->orWhereIn('listening_statistics.device_id', $deviceIds);
                 }
             })
-            ->where('listening_statistics.listening_date', '>=', $periodStart->toDateString());
+            ->where('listening_statistics.listening_date', '>=', $periodStart->toDateString())
+            ->where('listening_statistics.listening_date', '<=', $periodEnd->toDateString());
 
         switch ($goal->metric) {
             case 'genre_hours':
@@ -159,28 +239,86 @@ class ListeningGoalController extends Controller
                 break;
         }
 
-        $seconds = $query->sum('listening_statistics.seconds_listened');
-        return (int) round($seconds / 60);
+        return $query;
+    }
+
+    /** @return array<int, array{type:string,book_id:int,title:string,finished_at:string}> */
+    private function booksFinishedEntries(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $userId = Auth::id();
+
+        return $this->bookCompletionService
+            ->getCompletedBooksWithTitles($userId, $periodStart, $periodEnd, $goal->genre_id)
+            ->sortByDesc('finished_at')
+            ->map(fn (array $entry): array => [
+                'type'        => 'book',
+                'book_id'     => $entry['book_id'],
+                'title'       => $entry['title'],
+                'finished_at' => $entry['finished_at']->toDateString(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @return array<int, array{type:string,date:string,minutes:int,books:array<int,array{book_id:int,title:string,minutes:int}>}> */
+    private function hourEntries(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd): array
+    {
+        $rows = $this->scopedListeningQuery($goal, $periodStart, $periodEnd)
+            ->join('books', 'books.id', '=', 'listening_statistics.book_id')
+            ->selectRaw(
+                'DATE(listening_statistics.listening_date) as listening_day, ' .
+                'listening_statistics.book_id as book_id, ' .
+                'books.title as title, ' .
+                'SUM(listening_statistics.seconds_listened) as secs'
+            )
+            ->groupBy('listening_day', 'listening_statistics.book_id', 'books.title')
+            ->orderByDesc('listening_day')
+            ->get();
+
+        $byDate = $rows->groupBy('listening_day');
+
+        return $byDate->map(function ($dayRows, $date): array {
+            $books = $dayRows->map(fn ($row): array => [
+                'book_id' => (int) $row->book_id,
+                'title'   => (string) $row->title,
+                'minutes' => (int) round($row->secs / 60),
+            ])->values()->all();
+
+            return [
+                'type'    => 'day',
+                'date'    => (string) $date,
+                'minutes' => array_sum(array_column($books, 'minutes')),
+                'books'   => $books,
+            ];
+        })->sortByDesc('date')->values()->all();
+    }
+
+    private function progressPercent(ListeningGoal $goal, int $progressAmount): float
+    {
+        return $goal->target_minutes > 0
+            ? min(100, round(($progressAmount / $goal->target_minutes) * 100, 1))
+            : 0;
     }
 
     private function formatGoalWithProgress(ListeningGoal $goal): array
     {
-        $progressMinutes = $this->computeProgressMinutes($goal);
-        $percentage = $goal->target_minutes > 0
-            ? min(100, round(($progressMinutes / $goal->target_minutes) * 100, 1))
-            : 0;
+        [$periodStart, $periodEnd] = $this->resolvePeriod($goal);
+        $progressAmount = $this->computeProgressAmount($goal, $periodStart, $periodEnd);
 
         return [
             'id'               => $goal->id,
             'period_type'      => $goal->period_type,
             'metric'           => $goal->metric,
             'target_minutes'   => $goal->target_minutes,
-            'progress_minutes' => $progressMinutes,
-            'progress_percent' => $percentage,
+            'progress_minutes' => $progressAmount,
+            'progress_percent' => $this->progressPercent($goal, $progressAmount),
             'genre_id'         => $goal->genre_id,
             'genre_name'       => $goal->genre?->name,
             'playlist_id'      => $goal->playlist_id,
             'playlist_name'    => $goal->playlist?->name,
+            'start_date'       => $periodStart->toDateString(),
+            'end_date'         => $periodEnd->toDateString(),
+            'elapsed_percent'  => $this->elapsedPercent($periodStart, $periodEnd),
             'is_active'        => $goal->is_active,
             'created_at'       => $goal->created_at?->toIso8601String(),
         ];
