@@ -74,7 +74,7 @@ class UserController extends Controller
 
         if ($userId && $sendOtp) {
             $apiController = app(AdminUserController::class);
-            $apiController->sendOtp(request(), (string) $userId);
+            $apiController->sendWelcome(request(), (string) $userId);
         }
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.' . ($sendOtp ? ' A sign-in email has been sent.' : ''));

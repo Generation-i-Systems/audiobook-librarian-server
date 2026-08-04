@@ -142,6 +142,30 @@ class AdminUserController extends Controller
     }
 
     /**
+     * POST /api/admin/users/{id}/send-welcome
+     *
+     * Send the welcome email (sign-in code plus app/connect links) to an
+     * existing user, as their first usable login. Unlike sendOtp(), which
+     * is for resending a login link to an already-onboarded user.
+     */
+    public function sendWelcome(Request $request, string $id): JsonResponse
+    {
+        $user = $this->documentStoreService->getUserById($id);
+        if ($user === null) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        $email = (string) ($user['email'] ?? '');
+        if (!$email) {
+            return response()->json(['message' => 'User has no email address.'], 422);
+        }
+
+        $this->sendWelcomeEmailToUser($request, $email, $user['name'] ?? null);
+
+        return response()->json(['message' => 'Welcome email sent to ' . $email . '.']);
+    }
+
+    /**
      * POST /api/admin/users/{id}/verify
      *
      * Approve a pending (role=unverified) self-service signup, assigning it

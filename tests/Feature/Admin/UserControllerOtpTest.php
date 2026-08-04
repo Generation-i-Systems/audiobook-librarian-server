@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Admin;
 
 use App\Mail\EmailOtpMail;
+use App\Mail\WelcomeMail;
 use App\Models\EmailOtp;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,7 +75,7 @@ class UserControllerOtpTest extends TestCase
         $this->postJson('/admin/users/' . $user->id . '/login-qr')->assertStatus(403);
     }
 
-    public function test_create_user_defaults_to_sending_otp_email_without_a_password(): void
+    public function test_create_user_defaults_to_sending_welcome_email_without_a_password(): void
     {
         Mail::fake();
         $this->actingAs($this->admin());
@@ -89,9 +90,10 @@ class UserControllerOtpTest extends TestCase
         $response->assertRedirect(route('admin.users.index'));
         $this->assertDatabaseHas('users', ['email' => 'newguy@example.com', 'must_change_password' => true]);
 
-        Mail::assertSent(EmailOtpMail::class, function (EmailOtpMail $mail) {
+        Mail::assertSent(WelcomeMail::class, function (WelcomeMail $mail) {
             return $mail->hasTo('newguy@example.com');
         });
+        Mail::assertNotSent(EmailOtpMail::class);
     }
 
     public function test_create_user_requires_password_when_otp_email_unchecked(): void
