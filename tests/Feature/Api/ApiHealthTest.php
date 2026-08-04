@@ -228,6 +228,33 @@ class ApiHealthTest extends TestCase
     }
 
     #[Test]
+    public function testCapabilitiesOmitsEmailOtpWhenMailIsNotConfigured(): void
+    {
+        config(['mail.default' => 'log']);
+
+        $response = $this->getJson('/api/v1/health/capabilities');
+
+        $response->assertStatus(200);
+        $response->assertJsonMissing(['authMethods' => ['email_otp']]);
+        $this->assertNotContains('email_otp', $response->json('authMethods'));
+    }
+
+    #[Test]
+    public function testCapabilitiesIncludesEmailOtpWhenMailIsConfigured(): void
+    {
+        config([
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.transport' => 'smtp',
+            'mail.mailers.smtp.host' => 'smtp.example.test',
+        ]);
+
+        $response = $this->getJson('/api/v1/health/capabilities');
+
+        $response->assertStatus(200);
+        $this->assertContains('email_otp', $response->json('authMethods'));
+    }
+
+    #[Test]
     public function testHealthEndpointsAccessibleWithoutAuth(): void
     {
         // Ping should work without auth

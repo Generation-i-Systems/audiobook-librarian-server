@@ -14,6 +14,10 @@
 - Verified, cancellable account deletion: a six-digit email confirmation schedules deletion, revokes access immediately, offers a 30-day cancellation link, and a daily command permanently erases expired accounts.
 - Docker deployment support: `Dockerfile` (nginx + php-fpm + queue worker + scheduler in one image, via supervisor) and `docker-compose.yml` for a zero-config demo/deploy stack backed by SQLite, with optional `docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays to swap in MySQL or PostgreSQL. Purely additive — the existing non-Docker install path is unchanged. See `docker/README.md`
 - `PUT /devices/{deviceId}/push-token` endpoint so mobile clients can register their FCM/ADM push notification token against a device. Registration only — no send-side (Firebase Admin SDK / ADM) integration yet.
+- Web login page can now verify a typed 6-digit sign-in code inline (`POST /auth/otp/verify`, web session), alongside the existing "click the emailed magic link" flow.
+- Magic-link login now embeds this server's own API URL in the deep links it offers (`ablibrarian://auth/magic?...&apiUrl=...`, plus a library-app scheme and an Android intent fallback), so a self-hosted install's client can identify which server issued the sign-in link instead of assuming a default server.
+- `GET /health/capabilities` now only advertises `email_otp` in `authMethods` when the server actually has a mail transport configured, instead of unconditionally.
+- Admin user management: "Send login email" and "Show QR code" actions on the edit-user page (`POST /admin/users/{id}/send-otp`, `POST /admin/users/{id}/login-qr` and their `/api/v1/admin/users/{id}/...` equivalents) let an admin re-issue passwordless sign-in for an existing user without knowing their password. The add-user form gained a "send a sign-in email instead of setting a password" checkbox.
 
 ### Changed
 
@@ -23,6 +27,7 @@
 
 ### Fixed
 
+- `UserAccountService::createUser()` silently dropped `must_change_password` (not in `User::$fillable` and not passed to `User::create()`), so every code path that tried to force a newly created account to set its own password on first login (admin-created users, OTP-created pending accounts) had that flag quietly discarded and defaulting to `false`. Found while adding an admin "send sign-in email instead of setting a password" option, which depends on this flag. Now fillable and passed through.
 - Book edit metadata autofill now preserves an existing selected genre, including directory-derived genres, and no longer adds blank genre rows from provider categories that are not configured genre options.
 - Book edit metadata autofill genre handling now lives in a focused tested module, keeping the normal Jest coverage gate meaningful while covering the regression directly.
 - Added npm overrides for `brace-expansion` 5.0.8 and `postcss` 8.5.23 to clear the current high-severity npm audit advisories in Jest/Vite transitive dependencies.

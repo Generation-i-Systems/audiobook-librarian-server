@@ -90,6 +90,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - `BookImportService`: preserves detected series numbering from enrichment and directory names, including validated trailing-number names such as `Magic Eater 5`
 - `LibraryRepairScanCommand` (`library:repair-scan`): CLI entry point for manual or scheduled scans (JSON mode, selective issue filters, optional auto-fixes)
 - `AppRefreshCommand` (`app:refresh`): Clear caches, run migrations, restart queue workers, reset OPcache, reload PHP-FPM, and build frontend assets when changes are detected.
+- `EmailOtpController`: passwordless email OTP/magic-link login — request/verify (API and web-session), magic-link landing page with `apiUrl`-aware deep links (`AppConnectLinks::magicPlayerDeepLink`/`magicLibraryDeepLink`/`androidMagicIntentLink`) so self-hosted installs route back to the issuing server; gated end-to-end by `MailConfiguration::isMailConfigured()`. `Admin\UserController`/`Api\AdminUserController` expose "send login email" and "generate login QR" for existing users from the admin UI.
 - `Admin\LibraryRepairController` + `/admin/library-repair`: paginated UI for reviewing Library Repair Issues, defaulting to pending issues with a “Show resolved” toggle, inline book edit shortcuts, AudiobookBay search links, per-issue rescans, and missing-directory import helpers
 - **Web Routes:**
     - `/admin/books` (CRUD)

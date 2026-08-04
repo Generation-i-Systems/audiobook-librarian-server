@@ -395,6 +395,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/', [AdminUserController::class, 'index']);
             Route::post('/', [AdminUserController::class, 'store']);
             Route::post('/{id}/send-otp', [AdminUserController::class, 'sendOtp']);
+            Route::post('/{id}/login-qr', [AdminUserController::class, 'generateLoginQr']);
+            Route::post('/{id}/verify', [AdminUserController::class, 'verify']);
         });
 
         // Authenticated: set initial password (used after OTP login when must_change_password=true)

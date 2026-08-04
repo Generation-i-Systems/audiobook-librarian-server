@@ -139,6 +139,48 @@
             </div>
         </div>
     </form>
+
+    @if(!empty($user['email']))
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">One-time sign-in</h5>
+            </div>
+            <div class="card-body d-flex gap-2">
+                <form action="{{ route('admin.users.sendOtp', $user['id']) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-envelope me-1"></i> Send login email
+                    </button>
+                </form>
+                <button type="button" id="show-login-qr-btn" class="btn btn-outline-primary"
+                        data-user-id="{{ $user['id'] }}" data-bs-toggle="modal" data-bs-target="#login-qr-modal">
+                    <i class="fas fa-qrcode me-1"></i> Show QR code
+                </button>
+            </div>
+        </div>
+
+        <div class="modal fade" id="login-qr-modal" tabindex="-1" aria-labelledby="login-qr-modal-label" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="login-qr-modal-label">Scan to sign in</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <p class="text-muted small">Scan this code with the app to sign {{ $user['name'] ?? 'this user' }} in without a password. It expires in 10 minutes.</p>
+                        <div id="login-qr-container"
+                             class="d-flex align-items-center justify-content-center border rounded bg-white mx-auto"
+                             style="min-height: 220px; width: 220px;">
+                            <span class="text-muted small">Generating QR code...</span>
+                        </div>
+                        <div id="login-qr-error" class="alert alert-danger mt-3" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @vite(['resources/js/admin/users/login-qr.js'])
+    @endif
     @if(($user['role'] ?? '') === 'unverified')
         <form id="verify-user-form" action="{{ route('admin.users.verify', $user['id']) }}" method="POST" class="d-none">
             @csrf

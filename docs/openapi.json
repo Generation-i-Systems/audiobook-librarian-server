@@ -5260,7 +5260,7 @@
             "get": {
                 "tags": ["Health"],
                 "summary": "Server capability discovery",
-                "description": "Returns which features this server supports, so clients can adapt their UI accordingly. No authentication required. Clients that receive a 404 from this endpoint should assume all capabilities are supported (older server versions predating this endpoint).",
+                "description": "Returns which features this server supports, so clients can adapt their UI accordingly. No authentication required. Clients that receive a 404 from this endpoint should assume all capabilities are supported (older server versions predating this endpoint). authMethods only includes 'email_otp' when the server has a real mail transport configured (not 'log' or 'array').",
                 "operationId": "healthCapabilities",
                 "responses": {
                     "200": {
@@ -14792,6 +14792,164 @@
                     },
                     "422": {
                         "description": "User has no email address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/login-qr": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Generate a one-time sign-in QR code for a user",
+                "description": "Admin-only. Mints a login OTP for the specified user without emailing it, returning the magic-link URL so the admin can render it as a scannable QR code. Expires after the same TTL as an emailed OTP.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login QR URL generated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "url": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "expires_in_seconds": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "User has no email address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/verify": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Verify a pending user",
+                "description": "Admin-only. Approves a self-service signup (role=unverified), assigning it a real role and sending the welcome email. No-op if the user is already verified.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "user",
+                                            "library-user",
+                                            "librivox-user",
+                                            "hybrid-user",
+                                            "admin",
+                                            "super-admin"
+                                        ],
+                                        "description": "Defaults to 'user'."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "User verified (or already verified, no-op)"
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid role selected",
                         "content": {
                             "application/json": {
                                 "schema": {

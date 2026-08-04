@@ -89,6 +89,7 @@ class User extends Authenticatable
         'google_id',
         'facebook_id',
         'apple_id',
+        'must_change_password',
     ];
 
     /**

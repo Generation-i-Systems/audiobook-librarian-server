@@ -7,7 +7,9 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Mail\EmailOtpMail;
+use App\Mail\WelcomeMail;
 use App\Models\EmailOtp;
+use App\Support\AppConnectLinks;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -106,7 +108,7 @@ class AdminUserController extends Controller
 
         $sendOtp = (bool) $request->input('send_otp_email', true);
         if ($sendOtp) {
-            $this->sendOtpEmailToUser($email, $request->input('name'));
+            $this->sendWelcomeEmailToUser($request, $email, $request->input('name'));
         }
 
         $user = $this->documentStoreService->getUserById($userId);
@@ -139,7 +141,79 @@ class AdminUserController extends Controller
         return response()->json(['message' => 'Sign-in email sent to ' . $email . '.']);
     }
 
-    private function sendOtpEmailToUser(string $email, ?string $name): void
+    /**
+     * POST /api/admin/users/{id}/verify
+     *
+     * Approve a pending (role=unverified) self-service signup, assigning it
+     * a real role and sending the welcome email as its first usable login.
+     */
+    public function verify(Request $request, string $id): JsonResponse
+    {
+        $user = $this->documentStoreService->getUserById($id);
+        if ($user === null) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        if (($user['role'] ?? '') !== 'unverified') {
+            return response()->json(['message' => 'User is already verified.']);
+        }
+
+        $role = $request->input('role', 'user');
+        if (!in_array($role, ['user', 'library-user', 'librivox-user', 'hybrid-user', 'admin', 'super-admin'], true)) {
+            return response()->json(['message' => 'Invalid role selected.'], 422);
+        }
+
+        $this->documentStoreService->updateUser($id, [
+            'role' => $role,
+            'email_verified_at' => now(),
+        ]);
+
+        $email = (string) ($user['email'] ?? '');
+        if ($email) {
+            $this->sendWelcomeEmailToUser($request, $email, $user['name'] ?? null);
+        }
+
+        $updatedUser = $this->documentStoreService->getUserById($id);
+
+        return response()->json([
+            'user' => $this->formatUser((array) $updatedUser),
+            'message' => 'User verified successfully.',
+        ]);
+    }
+
+    /**
+     * POST /api/admin/users/{id}/login-qr
+     *
+     * Mint a login OTP for an existing user without emailing it, so the
+     * admin can display it as a scannable QR code instead.
+     */
+    public function generateLoginQr(Request $request, string $id): JsonResponse
+    {
+        $user = $this->documentStoreService->getUserById($id);
+        if ($user === null) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        $email = (string) ($user['email'] ?? '');
+        if (!$email) {
+            return response()->json(['message' => 'User has no email address.'], 422);
+        }
+
+        $otp = $this->createLoginOtp($email);
+
+        return response()->json([
+            'url' => url('/auth/magic/' . $otp['token']),
+            'expires_in_seconds' => EmailOtp::TTL_MINUTES * 60,
+        ]);
+    }
+
+    /**
+     * Create and persist a login OTP record for the given email, returning
+     * the plaintext code and magic token before they're hashed into storage.
+     *
+     * @return array{code: string, token: string}
+     */
+    private function createLoginOtp(string $email): array
     {
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $magicToken = bin2hex(random_bytes(32));
@@ -159,15 +233,45 @@ class AdminUserController extends Controller
             'expires_at' => now()->addMinutes(EmailOtp::TTL_MINUTES),
         ]);
 
+        return ['code' => $code, 'token' => $magicToken];
+    }
+
+    private function sendOtpEmailToUser(string $email, ?string $name): void
+    {
+        $otp = $this->createLoginOtp($email);
+
         try {
             Mail::to($email)->send(new EmailOtpMail(
-                code: $code,
-                magicLinkUrl: url('/auth/magic/' . $magicToken),
+                code: $otp['code'],
+                magicLinkUrl: url('/auth/magic/' . $otp['token']),
                 ttlMinutes: EmailOtp::TTL_MINUTES,
                 recipientName: $name,
             ));
         } catch (\Throwable $e) {
             Log::error('AdminUserController: failed to send OTP mail', [
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function sendWelcomeEmailToUser(Request $request, string $email, ?string $name): void
+    {
+        $otp = $this->createLoginOtp($email);
+        $apiUrl = AppConnectLinks::apiBaseUrl($request);
+
+        try {
+            Mail::to($email)->send(new WelcomeMail(
+                code: $otp['code'],
+                magicLinkUrl: url('/auth/magic/' . $otp['token']),
+                ttlMinutes: EmailOtp::TTL_MINUTES,
+                recipientName: $name,
+                connectUrl: AppConnectLinks::redirectorUrl($request, $apiUrl),
+                androidStoreUrl: (string) config('app.mobile_android_store_url', 'https://play.google.com/store/apps/details?id=com.ablibrarian.library'),
+                iosStoreUrl: (string) config('app.mobile_ios_store_url', '#'),
+            ));
+        } catch (\Throwable $e) {
+            Log::error('AdminUserController: failed to send welcome mail', [
                 'email' => $email,
                 'error' => $e->getMessage(),
             ]);

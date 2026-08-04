@@ -132,6 +132,11 @@ rendering or real user interactions.
   `e.isDefaultPrevented()` correctly reflects an in-progress async directory-conflict check); a
   reordering of the `@vite([...])` list in `form_support_modals.blade.php` or `vite.config.js`
   could silently break this without any test catching it.
+- **Admin login QR modal** (`resources/js/admin/users/login-qr.js`) — Bootstrap modal
+  open, AJAX fetch of a fresh login OTP, and `qrcode` canvas rendering (reusing
+  `renderAppConnectQr()` from `resources/js/app-connect-qr.js`); only the backend
+  `generateLoginQr` JSON response is covered by feature tests, not that a phone camera can
+  actually scan the rendered canvas.
 - **Inline cover preview during import** — the cover candidate list with inline `<img>` tags
   rendered in the terminal; verifying display requires a human.
 - **Skin designer rendering parity** (`public/js/skin-designer.js` `SkinRenderer.renderElement()`)
@@ -183,6 +188,10 @@ Mail is caught by the test fake, but actual SMTP delivery, formatting in real cl
 and OTP arrival timing cannot be verified.
 
 - **OTP email flow** (`EmailOtpController`) — real OTP must arrive in inbox before it expires.
+  The web inline-code-entry path (`EmailOtpController::verifyCodeWeb()`) and the admin
+  "Send login email" / "Show QR code" actions (`AdminUserController::sendOtp()`,
+  `generateLoginQr()`) share this same real-arrival-timing risk — tests can only verify the
+  DB record and mail-fake dispatch, not that a real inbox receives it in time.
 - **Password reset emails** (`PasswordResetController`).
 - **Hardcover token expiry notification** (`HardcoverTokenExpiring` Mailable).
 - **Daily favourite book notifications** (`SendDailyFavoriteNotifications` scheduled command).
@@ -219,6 +228,13 @@ feature tests without running a real queue worker.
 - **Mobile app QR/server-connect redirector** — QR scanning, custom URL scheme dispatch,
   app-store fallback behavior, and returning after first install depend on real Android/iOS
   devices, installed app variants, browser behavior, and store availability.
+- **Magic-link deep links carrying `apiUrl`** (`AppConnectLinks::magicPlayerDeepLink()`,
+  `magicLibraryDeepLink()`, `androidMagicIntentLink()`, used by
+  `EmailOtpController::magicLanding()`) — this repo can only verify the URL string these
+  helpers produce (see `EmailOtpControllerTest::test_magic_landing_page_includes_api_url_in_deep_links_for_self_hosted_server`).
+  Whether the mobile client actually reads the `apiUrl` query param from the deep link and
+  targets that self-hosted server (rather than a default/other server) can only be verified
+  on a real device against the separate client app repo.
 - **Push token registration (`DeviceController::updatePushToken`)** — this endpoint only
   stores the FCM/ADM token; there is no send-side integration (no Firebase Admin SDK / ADM
   HTTP client wired up anywhere yet). Whether a stored token is actually valid, whether it

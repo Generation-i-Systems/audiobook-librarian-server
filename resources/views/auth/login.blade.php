@@ -116,6 +116,23 @@
                                         <span id="otp-status" class="ms-2" style="display:none;"></span>
                                     </div>
                                 </div>
+
+                                <div class="row mb-0 mt-3" id="otp-code-row" style="display:none;">
+                                    <label for="otp-code"
+                                        class="col-md-4 col-form-label text-md-end">{{ __('Sign-in code') }}</label>
+                                    <div class="col-md-6">
+                                        <input id="otp-code" type="text" inputmode="numeric" autocomplete="one-time-code"
+                                            maxlength="6" class="form-control" placeholder="123456">
+                                    </div>
+                                </div>
+                                <div class="row mb-0 mt-2" id="otp-verify-row" style="display:none;">
+                                    <div class="col-md-8 offset-md-4">
+                                        <button type="button" id="verify-otp-btn" class="btn btn-primary">
+                                            Verify code
+                                        </button>
+                                        <span id="otp-verify-status" class="ms-2" style="display:none;"></span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -128,6 +145,11 @@
                                     var $btn = $('#send-otp-btn');
                                     var $email = $('#otp-email');
                                     var $status = $('#otp-status');
+                                    var $codeRow = $('#otp-code-row');
+                                    var $verifyRow = $('#otp-verify-row');
+                                    var $code = $('#otp-code');
+                                    var $verifyBtn = $('#verify-otp-btn');
+                                    var $verifyStatus = $('#otp-verify-status');
 
                                     $btn.on('click', function () {
                                         var email = $email.val().trim();
@@ -147,7 +169,10 @@
                                                 _token: '{{ csrf_token() }}'
                                             },
                                             success: function () {
-                                                $status.text('Check your email for the sign-in code.').removeClass('text-danger').addClass('text-success').show();
+                                                $status.text('Check your email for the sign-in code, or enter it below.').removeClass('text-danger').addClass('text-success').show();
+                                                $codeRow.show();
+                                                $verifyRow.show();
+                                                $code.trigger('focus');
                                             },
                                             error: function (xhr) {
                                                 var msg = 'Failed to send. Please try again.';
@@ -158,6 +183,41 @@
                                             },
                                             complete: function () {
                                                 $btn.prop('disabled', false).text('Send sign-in code');
+                                            }
+                                        });
+                                    });
+
+                                    $verifyBtn.on('click', function () {
+                                        var email = $email.val().trim();
+                                        var code = $code.val().trim();
+                                        if (!code) {
+                                            $verifyStatus.text('Please enter the sign-in code.').removeClass('text-success').addClass('text-danger').show();
+                                            return;
+                                        }
+
+                                        $verifyBtn.prop('disabled', true).text('Verifying...');
+                                        $verifyStatus.hide();
+
+                                        $.ajax({
+                                            url: '{{ route('auth.otp.verify.web') }}',
+                                            method: 'POST',
+                                            data: {
+                                                email: email,
+                                                code: code,
+                                                _token: '{{ csrf_token() }}'
+                                            },
+                                            success: function (data) {
+                                                window.location.href = (data && data.redirect) || '/';
+                                            },
+                                            error: function (xhr) {
+                                                var msg = 'Invalid code. Please try again.';
+                                                if (xhr.responseJSON && xhr.responseJSON.message) {
+                                                    msg = xhr.responseJSON.message;
+                                                }
+                                                $verifyStatus.text(msg).removeClass('text-success').addClass('text-danger').show();
+                                            },
+                                            complete: function () {
+                                                $verifyBtn.prop('disabled', false).text('Verify code');
                                             }
                                         });
                                     });

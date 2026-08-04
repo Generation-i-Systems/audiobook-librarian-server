@@ -17,10 +17,16 @@
         </noscript>
 
         <p style="margin: 24px 0;">
-            <a href="{{ $deepLink }}"
+            <a href="{{ $playerDeepLink }}"
                id="open-in-app"
-               data-deeplink="{{ $deepLink }}"
+               data-deeplink="{{ $playerDeepLink }}"
                style="display:inline-block; background:#3955ff; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:600; font-size:14px;">Open in app</a>
+        </p>
+
+        <p style="margin: 12px 0; font-size: 13px;">
+            <a href="{{ $libraryDeepLink }}" style="color:#3955ff; text-decoration:none;">Open Library app</a>
+            &nbsp;&middot;&nbsp;
+            <a href="{{ $androidLibraryIntent }}" style="color:#3955ff; text-decoration:none;">Open on Android</a>
         </p>
 
         <form method="POST" action="{{ $continueUrl }}" style="margin-top: 16px;">

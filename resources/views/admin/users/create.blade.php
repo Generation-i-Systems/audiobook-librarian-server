@@ -29,16 +29,44 @@
                 <option value="super-admin" {{ old('role') == 'super-admin' ? 'selected' : '' }}>Super Admin</option>
             </select>
         </div>
-        <div class="mb-3">
-            <label for="password" class="form-label">Password</label>
-            <input type="password" name="password" id="password" class="form-control" required>
+        <div class="mb-3 form-check">
+            <input type="hidden" name="send_otp_email" value="0">
+            <input type="checkbox" name="send_otp_email" id="send_otp_email" class="form-check-input" value="1"
+                {{ old('send_otp_email', '1') ? 'checked' : '' }}>
+            <label for="send_otp_email" class="form-check-label">
+                Send a sign-in email instead of setting a password
+            </label>
         </div>
-        <div class="mb-3">
-            <label for="password_confirmation" class="form-label">Confirm Password</label>
-            <input type="password" name="password_confirmation" id="password_confirmation" class="form-control" required>
+        <div id="password-fields">
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" name="password" id="password" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label for="password_confirmation" class="form-label">Confirm Password</label>
+                <input type="password" name="password_confirmation" id="password_confirmation" class="form-control">
+            </div>
         </div>
         <button type="submit" class="btn btn-primary">Add User</button>
         <a href="{{ route('admin.users.index') }}" class="btn btn-secondary">Cancel</a>
     </form>
 </div>
+<script>
+    (function () {
+        var checkbox = document.getElementById('send_otp_email');
+        var password = document.getElementById('password');
+        var passwordConfirmation = document.getElementById('password_confirmation');
+        var fields = document.getElementById('password-fields');
+
+        function sync() {
+            var needsPassword = !checkbox.checked;
+            password.required = needsPassword;
+            passwordConfirmation.required = needsPassword;
+            fields.style.display = needsPassword ? '' : 'none';
+        }
+
+        checkbox.addEventListener('change', sync);
+        sync();
+    })();
+</script>
 @endsection

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Support\MailConfiguration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
@@ -135,6 +136,18 @@ class ApiHealthController extends Controller
      */
     public function capabilities(): JsonResponse
     {
+        $authMethods = [
+            'username_password',
+            'google_oauth',
+            'facebook_oauth',
+            'apple_oauth',
+            'discord_oauth',
+        ];
+
+        if (MailConfiguration::isMailConfigured()) {
+            $authMethods[] = 'email_otp';
+        }
+
         return response()->json([
             'serverType' => 'ablibrarian-full',
             'syncApiVersion' => '1',
@@ -151,14 +164,7 @@ class ApiHealthController extends Controller
                 'BADGES',
             ],
             'requiresAuth' => true,
-            'authMethods' => [
-                'username_password',
-                'google_oauth',
-                'facebook_oauth',
-                'apple_oauth',
-                'discord_oauth',
-                'email_otp',
-            ],
+            'authMethods' => $authMethods,
         ]);
     }
 

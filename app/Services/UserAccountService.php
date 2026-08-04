@@ -120,6 +120,7 @@ class UserAccountService
             'google_id' => $data['google_id'] ?? null,
             'facebook_id' => $data['facebook_id'] ?? null,
             'apple_id' => $data['apple_id'] ?? null,
+            'must_change_password' => $data['must_change_password'] ?? false,
         ]);
 
         return (string) $user->id;

@@ -178,9 +178,7 @@ class EmailOtpController extends Controller
             return response()->json(['message' => 'Code is no longer valid. Please request a new one.'], 400);
         }
 
-        $codeMatched = $request->filled('token')
-            ? hash_equals($otp->magic_token_hash, hash('sha256', (string) $request->input('token')))
-            : hash_equals($otp->code_hash, hash('sha256', (string) $request->input('code')));
+        $codeMatched = $request->filled('token') ? hash_equals($otp->magic_token_hash, hash('sha256', (string) $request->input('token'))) : hash_equals($otp->code_hash, hash('sha256', (string) $request->input('code')));
 
         if (!$codeMatched) {
             $otp->increment('attempts');
@@ -195,6 +193,68 @@ class EmailOtpController extends Controller
         $forcePasswordChange = $otp->type === self::TYPE_PASSWORD_RESET;
 
         return $this->issueAuthResponseForEmail($otp->email, $otp->allow_signup, $forcePasswordChange);
+    }
+
+    /**
+     * POST /auth/otp/verify (web)
+     *
+     * Verifies a manually-typed 6-digit code and establishes a Laravel web
+     * session, mirroring magicContinue()'s login path for the code-entry
+     * alternative to clicking the magic link.
+     */
+    public function verifyCodeWeb(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email|max:255',
+            'code' => 'required|string|size:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        $email = strtolower(trim((string) $request->input('email')));
+
+        $throttleKey = self::VERIFY_THROTTLE_KEY . sha1($email . '|' . $request->ip());
+        if (RateLimiter::tooManyAttempts($throttleKey, self::VERIFY_PER_MINUTE)) {
+            return response()->json(['message' => 'Too many attempts. Please wait a minute.'], 429);
+        }
+        RateLimiter::hit($throttleKey, 60);
+
+        $otp = $this->findActiveOtp($request);
+
+        if ($otp === null || !$otp->isRedeemable()) {
+            return response()->json(['message' => 'Invalid or expired code.'], 400);
+        }
+
+        $codeMatched = hash_equals($otp->code_hash, hash('sha256', (string) $request->input('code')));
+
+        if (!$codeMatched) {
+            $otp->increment('attempts');
+            if ($otp->attempts >= EmailOtp::MAX_ATTEMPTS) {
+                return response()->json(['message' => 'Too many invalid attempts. Please request a new code.'], 400);
+            }
+            return response()->json(['message' => 'Invalid code.'], 400);
+        }
+
+        $otp->forceFill(['used_at' => now()])->save();
+
+        $userArray = $this->documentStoreService->getUserByEmail($email);
+        if ($userArray === null || ($userArray['role'] ?? '') === 'unverified') {
+            return response()->json(['message' => 'No account is associated with that email, or it is pending approval.'], 403);
+        }
+
+        $userId = $userArray['id'] ?? null;
+        /** @var \App\Models\User|null $eloquentUser */
+        $eloquentUser = $userId === null ? null : \App\Models\User::query()->find($userId);
+        if ($eloquentUser === null) {
+            return response()->json(['message' => 'Unable to sign in. Please try again.'], 500);
+        }
+
+        \Illuminate\Support\Facades\Auth::login($eloquentUser, true);
+        $request->session()->regenerate();
+
+        return response()->json(['redirect' => '/']);
     }
 
     /**
@@ -244,10 +304,14 @@ class EmailOtpController extends Controller
 
         $valid = $otp !== null && $otp->isRedeemable();
 
+        $apiUrl = \App\Support\AppConnectLinks::apiBaseUrl($request);
+
         return response()->view('auth.magic-link', [
             'token' => $token,
             'valid' => $valid,
-            'deepLink' => 'ablibrarian://auth/magic?token=' . urlencode($token),
+            'playerDeepLink' => \App\Support\AppConnectLinks::magicPlayerDeepLink($token, $apiUrl),
+            'libraryDeepLink' => \App\Support\AppConnectLinks::magicLibraryDeepLink($token, $apiUrl),
+            'androidLibraryIntent' => \App\Support\AppConnectLinks::androidMagicIntentLink($token, $apiUrl, 'com.ablibrarian.library'),
             'continueUrl' => url('/auth/magic/' . $token . '/continue'),
         ]);
     }

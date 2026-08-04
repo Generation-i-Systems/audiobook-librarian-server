@@ -39,11 +39,13 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        $sendOtpRequested = $request->boolean('send_otp_email', true);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
             'email' => 'required|email',
-            'password' => 'nullable|string|min:6|confirmed',
+            'password' => [$sendOtpRequested ? 'nullable' : 'required', 'string', 'min:6', 'confirmed'],
             'role' => 'required|string',
             'send_otp_email' => 'sometimes|boolean',
         ]);
@@ -56,7 +58,7 @@ class UserController extends Controller
         }
         unset($validated['password_confirmation']);
 
-        $sendOtp = $request->boolean('send_otp_email', true);
+        $sendOtp = $sendOtpRequested;
         $hasPassword = !empty($validated['password']);
 
         $userData = [
@@ -166,6 +168,27 @@ class UserController extends Controller
     }
 
 
+    public function sendOtp(Request $request, $id)
+    {
+        $user = $this->documentStoreService->getUserById($id);
+        if (!$user) {
+            return back()->with('error', 'User not found.');
+        }
+
+        $response = app(AdminUserController::class)->sendOtp($request, (string) $id);
+
+        if ($response->getStatusCode() !== 200) {
+            return back()->with('error', $response->getData()->message ?? 'Failed to send sign-in email.');
+        }
+
+        return back()->with('success', $response->getData()->message);
+    }
+
+    public function generateLoginQr(Request $request, $id)
+    {
+        return app(AdminUserController::class)->generateLoginQr($request, (string) $id);
+    }
+
     public function destroy($id)
     {
         $this->documentStoreService->deleteUser($id);
@@ -181,26 +204,17 @@ class UserController extends Controller
      */
     public function verify(Request $request, $id)
     {
-        $user = $this->documentStoreService->getUserById($id);
+        $response = app(AdminUserController::class)->verify($request, (string) $id);
+        $data = $response->getData();
 
-        if (!$user) {
-            return back()->with('error', 'User not found.');
+        if ($response->getStatusCode() >= 400) {
+            return back()->with('error', $data->message ?? 'Failed to verify user.');
         }
 
-        if (($user['role'] ?? '') !== 'unverified') {
-            return back()->with('info', 'User is already verified.');
+        if (!isset($data->user)) {
+            return back()->with('info', $data->message ?? 'User is already verified.');
         }
 
-        $role = $request->input('role', 'user');
-        if (!in_array($role, ['user', 'library-user', 'librivox-user', 'hybrid-user', 'admin', 'super-admin'], true)) {
-            return back()->with('error', 'Invalid role selected.');
-        }
-
-        $this->documentStoreService->updateUser($id, [
-            'role' => $role,
-            'email_verified_at' => now()
-        ]);
-
-        return back()->with('success', 'User verified successfully.');
+        return back()->with('success', $data->message ?? 'User verified successfully.');
     }
 }

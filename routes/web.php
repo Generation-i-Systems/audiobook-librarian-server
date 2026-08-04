@@ -58,6 +58,8 @@ Route::post('/auth/magic/{token}/continue', [EmailOtpController::class, 'magicCo
     ->name('auth.magic.continue');
 Route::post('/auth/otp/request', [EmailOtpController::class, 'request'])
     ->name('auth.otp.request');
+Route::post('/auth/otp/verify', [EmailOtpController::class, 'verifyCodeWeb'])
+    ->name('auth.otp.verify.web');
 
 Route::get('/account-deletion/cancel/{token}', [AccountDeletionCancellationController::class, 'show'])
     ->where('token', '[A-Za-z0-9]{64}');
@@ -556,6 +558,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
         ->name('users.verify');
+    Route::post('users/{id}/send-otp', [Admin\UserController::class, 'sendOtp'])
+        ->name('users.sendOtp');
+    Route::post('users/{id}/login-qr', [Admin\UserController::class, 'generateLoginQr'])
+        ->name('users.loginQr');
 
     // Event timeline
     Route::get('users/{user}/events', [Admin\EventTimelineController::class, 'index'])
