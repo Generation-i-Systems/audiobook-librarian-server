@@ -14,6 +14,14 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class ApiAuth
 {
+    /**
+     * Minimum gap between last_used_at writes for a given token. Clients use
+     * long-lived tokens and call the API frequently, so writing on every
+     * request would add a DB write to every authenticated call; throttling
+     * keeps "last used" reasonably fresh without that cost.
+     */
+    private const LAST_USED_THROTTLE_MINUTES = 5;
+
     public function handle(Request $request, Closure $next)
     {
         $authHeader = $request->header('Authorization');
@@ -131,6 +139,17 @@ class ApiAuth
                         'token_preview' => $tokenPreview,
                     ]);
 
+                    if ($this->shouldRefreshLastUsedAt($apiTokenRow->last_used_at ?? null)) {
+                        try {
+                            DB::table('api_tokens')->where('token', $token)->update(['last_used_at' => now()]);
+                        } catch (\Exception $e) {
+                            Log::warning('API Auth: failed to record api_tokens last_used_at', [
+                                'user_id' => $user->id,
+                                'exception' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+
                     Auth::setUser($user);
                     $request->setUserResolver(fn () => $user);
                     return $next($request);
@@ -227,6 +246,17 @@ class ApiAuth
             'reason' => 'auth_success'
         ]);
 
+        if ($this->shouldRefreshLastUsedAt($accessToken->last_used_at)) {
+            try {
+                $accessToken->forceFill(['last_used_at' => now()])->save();
+            } catch (\Exception $e) {
+                Log::warning('API Auth: failed to record token last_used_at', [
+                    'token_id' => $accessToken->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        }
+
         // Set the user in the request
         Auth::setUser($user);
         $request->setUserResolver(function () use ($user) {
@@ -234,5 +264,21 @@ class ApiAuth
         });
 
         return $next($request);
+    }
+
+    /**
+     * @param \Carbon\CarbonInterface|string|null $lastUsedAt
+     */
+    private function shouldRefreshLastUsedAt($lastUsedAt): bool
+    {
+        if (!$lastUsedAt) {
+            return true;
+        }
+
+        $lastUsedAt = $lastUsedAt instanceof \Carbon\CarbonInterface
+            ? $lastUsedAt
+            : \Illuminate\Support\Carbon::parse($lastUsedAt);
+
+        return $lastUsedAt->lt(now()->subMinutes(self::LAST_USED_THROTTLE_MINUTES));
     }
 }

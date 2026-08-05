@@ -312,6 +312,7 @@ class AdminUserController extends Controller
             'role' => $user['role'] ?? null,
             'must_change_password' => (bool) ($user['must_change_password'] ?? false),
             'created_at' => isset($user['created_at']) ? (string) $user['created_at'] : null,
+            'last_used_at' => isset($user['last_used_at']) ? (string) $user['last_used_at'] : null,
         ];
     }
 }

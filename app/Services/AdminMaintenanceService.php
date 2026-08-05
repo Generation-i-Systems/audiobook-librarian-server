@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Models\Book;
 use App\Models\Message;
 use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AdminMaintenanceService
@@ -25,25 +27,87 @@ class AdminMaintenanceService
                 'email_verified_at',
                 'created_at',
                 'updated_at',
+                'last_login_at',
             ]);
 
-            return $users->map(fn ($user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'username' => $user->username,
-                'email' => $user->email,
-                'photo_url' => $user->photo_url,
-                'role' => $user->role,
-                'email_verified_at' => $user->email_verified_at,
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
-                'google_id' => $user->google_id ?? null,
-            ])->toArray();
+            $apiLastUsed = $this->getMaxLastUsedByUser();
+
+            $result = [];
+            foreach ($users as $user) {
+                $userId = (string) $user->id;
+                $result[] = [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                    'photo_url' => $user->photo_url,
+                    'role' => $user->role,
+                    'email_verified_at' => $user->email_verified_at,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                    'google_id' => $user->google_id ?? null,
+                    'last_login_at' => $user->last_login_at,
+                    'last_used_at' => $this->maxTimestamp(
+                        $user->last_login_at,
+                        array_key_exists($userId, $apiLastUsed) ? $apiLastUsed[$userId] : null
+                    ),
+                ];
+            }
+
+            return $result;
         } catch (\Exception $e) {
             Log::error('MySqlService getAllUsers failed: ' . $e->getMessage());
 
             return [];
         }
+    }
+
+    /**
+     * Max last-used timestamp per user across Sanctum tokens and legacy api_tokens,
+     * keyed by user id as string.
+     *
+     * @return array<string, string>
+     */
+    private function getMaxLastUsedByUser(): array
+    {
+        $sanctumLastUsed = DB::table('personal_access_tokens')
+            ->where('tokenable_type', User::class)
+            ->whereNotNull('last_used_at')
+            ->selectRaw('tokenable_id as user_id, MAX(last_used_at) as last_used_at')
+            ->groupBy('tokenable_id')
+            ->pluck('last_used_at', 'user_id');
+
+        $legacyLastUsed = DB::table('api_tokens')
+            ->whereNotNull('last_used_at')
+            ->selectRaw('user_id, MAX(last_used_at) as last_used_at')
+            ->groupBy('user_id')
+            ->pluck('last_used_at', 'user_id');
+
+        $combined = [];
+        foreach ($sanctumLastUsed as $userId => $timestamp) {
+            $key = (string) $userId;
+            $existing = array_key_exists($key, $combined) ? $combined[$key] : null;
+            $combined[$key] = $this->maxTimestamp($existing, $timestamp);
+        }
+        foreach ($legacyLastUsed as $userId => $timestamp) {
+            $key = (string) $userId;
+            $existing = array_key_exists($key, $combined) ? $combined[$key] : null;
+            $combined[$key] = $this->maxTimestamp($existing, $timestamp);
+        }
+
+        return $combined;
+    }
+
+    private function maxTimestamp(?string $a, ?string $b): ?string
+    {
+        if (!$a) {
+            return $b;
+        }
+        if (!$b) {
+            return $a;
+        }
+
+        return Carbon::parse($a)->greaterThanOrEqualTo(Carbon::parse($b)) ? $a : $b;
     }
 
     public function deleteMessage(string $messageId): bool

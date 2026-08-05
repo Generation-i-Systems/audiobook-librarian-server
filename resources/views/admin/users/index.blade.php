@@ -34,6 +34,7 @@
                                 <th>Email</th>
                                 <th>Status</th>
                                 <th>Role</th>
+                                <th>Last Used</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -74,6 +75,15 @@
                                     </td>
                                     <td>{{ ucfirst($user['role'] ?? 'user') }}</td>
                                     <td>
+                                        @if(!empty($user['last_used_at']))
+                                            <span title="{{ \Illuminate\Support\Carbon::parse($user['last_used_at'])->toDayDateTimeString() }}">
+                                                {{ \Illuminate\Support\Carbon::parse($user['last_used_at'])->diffForHumans() }}
+                                            </span>
+                                        @else
+                                            <span class="text-muted">Never</span>
+                                        @endif
+                                    </td>
+                                    <td>
                                         <div class="btn-group" role="group">
                                             @if(($user['role'] ?? '') === 'unverified')
                                                 <button type="button" class="btn btn-success btn-sm" title="Verify User"
@@ -113,7 +123,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center">No users found.</td>
+                                    <td colspan="8" class="text-center">No users found.</td>
                                 </tr>
                             @endforelse
                         </tbody>
