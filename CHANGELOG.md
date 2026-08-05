@@ -21,6 +21,7 @@
 
 ### Changed
 
+- New clients now treat `www.ablibrarian.com` as the backend-independent Skin Store. The existing self-hosted skin/theme proxy remains a legacy compatibility path only; Store commerce and entitlements are intentionally outside this server.
 - Server storage, import, backup, and Librivox defaults no longer depend on `/media`; all are portable environment-configurable paths. Added Caddy HTTPS Compose profile, native Linux/macOS/Windows installation guidance, and cross-platform configuration CI coverage.
 
 - **Skin and color-theme management has moved to `audiobook-librarian-www`**, which is now the real source of truth for this data. This repo's `/api/v1/skins/*` and `/api/v1/themes/*` endpoints keep working unchanged for existing clients, but now proxy to www (public reads forwarded anonymously; writes forwarded with a signed, transitional identity-trust header — see `docs/GALLERY_MIGRATION.md`). The skin/theme Blade UI (gallery pages, designer, admin panels, built-in skin browsing) has been removed from this repo entirely; the old routes now redirect to the equivalent page on www. Existing skins/themes/ratings/customizations and their owning users were migrated into www via a new one-time `gallery:migrate-to-www` command.

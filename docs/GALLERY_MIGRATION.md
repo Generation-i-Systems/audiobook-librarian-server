@@ -6,6 +6,16 @@ is now the real source of truth for this data. This repo's `/api/v1/skins/*`
 and `/api/v1/themes/*` endpoints keep working for existing clients, but
 internally proxy to www during the transition.
 
+## Skin Store client boundary
+
+New clients must use `www.ablibrarian.com` as their dedicated Skin Store
+service, independently of whichever library backend the user has selected.
+The proxy endpoints documented below are a legacy compatibility layer for
+older clients only: do not add new Store, purchase, entitlement, or payment
+behavior to this self-hosted server. During the initial Store release, www
+serves free-skin browsing, previews, and downloads; paid skins are previewable
+but deliberately reported as unavailable until the later commerce release.
+
 ## How it works
 
 - **Reads** (`index`, `show`, `download`, `customizations`) are forwarded to

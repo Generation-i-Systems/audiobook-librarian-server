@@ -6,6 +6,10 @@ This file contains the text of prompts sent to the AI assistant.
 
 ## 2026-08-03
 
+build a backend-independent Skin Store at www.ablibrarian.com. Phase 1 must provide remote free-skin browsing, previews, downloads, and skin-packaged rules for every client backend; paid skins remain previewable and clearly unavailable until a later Phase 2 commerce release. Keep the self-hosted server gallery proxy only for legacy compatibility.
+
+---
+
 if an email server is configured add support for logging into the web with a onetime password code or email link similar to what the app does. and create a server capabilities endpoint in the api the will allow the client to request login capabilities from the server. Also add an option in the user management to show a QR code and/or send an email that will allow loging in through a onetime login. make sure it works with the deep links in the client for hosted server installs
 
 ---
