@@ -8,6 +8,7 @@ use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Publisher;
 use App\Models\Series;
+use App\Support\ConfirmedBookMetadata;
 use App\Traits\HandlesLibraryJson;
 use App\Exceptions\MergeIntoParentException;
 use Illuminate\Support\Facades\DB;
@@ -448,20 +449,92 @@ class BookImportService
     }
 
     /**
-     * Create book from metadata with comprehensive handling
+     * Create a book from metadata that has NOT been through interactive review — a
+     * background job, an admin tool, a seed script. This is the only place raw metadata
+     * gets cleaned up (author name normalization, genre-to-canonical mapping, clearing a
+     * series that's really just the author's name) before it becomes a Book row.
+     *
+     * The reviewed import flow never calls this — it calls persistConfirmedBook()
+     * directly with an already-confirmed, already-clean snapshot, so confirmed metadata
+     * never passes through this normalization step a second time.
      */
     public function createBookFromMetadata(array $metadata, array $audiobook, array $options = []): ?Book
     {
-        // Validate that author is not listed as series - clear series if it matches author
+        return $this->persistConfirmedBook(
+            ConfirmedBookMetadata::fromConfirmed(
+                $this->normalizeRawMetadataForPersistence($metadata, mapAllGenres: true, deriveDirectoryPath: true)
+            ),
+            $audiobook,
+            $options
+        );
+    }
+
+    /**
+     * Update an existing book from metadata that has NOT been through interactive
+     * review. See createBookFromMetadata() — same normalization, same rationale.
+     */
+    public function updateBookFromMetadata(Book $book, array $metadata, array $audiobook, array $options = []): Book
+    {
+        return $this->persistConfirmedBookUpdate(
+            $book,
+            ConfirmedBookMetadata::fromConfirmed(
+                $this->normalizeRawMetadataForPersistence($metadata, mapAllGenres: false, deriveDirectoryPath: false)
+            ),
+            $audiobook,
+            $options
+        );
+    }
+
+    /**
+     * Clean up raw, unreviewed metadata: normalize author names, map genre to a
+     * canonical library genre, clear a series that duplicates the author's name. This
+     * exists ONLY for callers that bypass interactive review (background jobs, admin
+     * tools, seed scripts) — the reviewed import flow does this before the review
+     * screen is shown (postProcessAIResult), not here.
+     *
+     * @param bool $mapAllGenres Map every genre entry (createBookFromMetadata's original
+     *     behavior) vs. only the primary/first one (updateBookFromMetadata's original
+     *     behavior) — preserved as-is from before this normalization was consolidated.
+     * @param bool $deriveDirectoryPath Compute a directory when none was given
+     *     (createBookFromMetadata always ends up with one) vs. leave it absent so
+     *     persistConfirmedBookUpdate() leaves the existing book's directory alone
+     *     (updateBookFromMetadata's original behavior — an update that doesn't mention
+     *     a directory shouldn't move the book).
+     */
+    private function normalizeRawMetadataForPersistence(array $metadata, bool $mapAllGenres, bool $deriveDirectoryPath): array
+    {
+        if (!empty($metadata['author'])) {
+            $rawAuthors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+            $metadata['author'] = array_values(array_filter(array_map(
+                fn ($authorName) => $this->normalizeAuthorName((string) $authorName),
+                $rawAuthors
+            ), fn ($authorName) => $authorName !== ''));
+        }
+
+        if (!empty($metadata['genre'])) {
+            $genres = array_values(is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']]);
+            $configGenre = trim((string) ($this->config['genre'] ?? ''));
+
+            foreach ($genres as $index => $genreName) {
+                if (!$mapAllGenres && $index > 0) {
+                    break;
+                }
+                $name = trim((string) $genreName);
+                // If genre is forced via config, skip mapping to ensure user intent.
+                if ($name !== '' && ($configGenre === '' || $name !== $configGenre)) {
+                    $genres[$index] = $this->validateAndMapGenre($name);
+                }
+            }
+            $metadata['genre'] = $genres;
+        }
+
         $authors = $metadata['author'] ?? [];
         $authors = is_array($authors) ? $authors : [$authors];
         $seriesName = $metadata['series'] ?? null;
-
         if ($seriesName && !empty($authors)) {
             $seriesNormalized = strtolower(trim($seriesName));
             foreach ($authors as $authorName) {
-                $authorNormalized = strtolower(trim($authorName));
-                if ($authorNormalized === $seriesNormalized) {
+                if (strtolower(trim($authorName)) === $seriesNormalized) {
                     Log::info('Clearing series that matches author', [
                         'title' => $metadata['title'] ?? 'Unknown',
                         'author' => $authorName,
@@ -474,6 +547,27 @@ class BookImportService
             }
         }
 
+        // A new book always needs a directory; an update that doesn't mention one
+        // shouldn't invent one and move the book as a side effect.
+        if ($deriveDirectoryPath && empty($metadata['custom_directory_path'])) {
+            $metadata['custom_directory_path'] = $this->generateDirectoryPath($metadata, ['include_title' => true]);
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * Persist a book from metadata that has already been confirmed — by the user in
+     * interactive review, or locked in by auto mode. Nothing in this method may
+     * calculate, derive, correct, or otherwise change any field: every value comes
+     * straight from the confirmed snapshot. The only work done here is resolving
+     * foreign keys (author/genre/series name -> id) and writing to the database —
+     * that is persistence mechanics, not a change to what was confirmed.
+     */
+    public function persistConfirmedBook(ConfirmedBookMetadata $confirmed, array $audiobook, array $options = []): ?Book
+    {
+        $metadata = $confirmed->toArray();
+
         // "Import anyway with new name" means the user explicitly rejected reusing
         // the matched existing book — this MUST create a brand new Book record,
         // never fall through to the reuse/update path below.
@@ -482,22 +576,16 @@ class BookImportService
         if (!$forceNewBook) {
             $existingBook = $this->findExistingBook((string) ($audiobook['path'] ?? ''), $metadata);
             if ($existingBook instanceof Book) {
-                $metadataForUpdate = $metadata;
-                if (empty($existingBook->directory_path)) {
-                    $metadataForUpdate['custom_directory_path'] = $this->generateDirectoryPath(
-                        $metadata,
-                        ['include_title' => true]
-                    );
-                }
-
-                Log::info('Reusing existing book record before create', [
+                Log::channel('import')->info('Reusing existing book record before create', [
                     'existing_book_id' => $existingBook->id,
                     'existing_directory_path' => $existingBook->directory_path,
                     'incoming_source_path' => $audiobook['path'] ?? null,
                     'incoming_title' => $metadata['title'] ?? null,
+                    'confirmed_genre' => $metadata['genre'] ?? null,
+                    'confirmed_directory_path' => $metadata['custom_directory_path'] ?? null,
                 ]);
 
-                return $this->updateBookFromMetadata($existingBook, $metadataForUpdate, $audiobook, $options);
+                return $this->persistConfirmedBookUpdate($existingBook, $confirmed, $audiobook, $options);
             }
         }
 
@@ -517,25 +605,10 @@ class BookImportService
             $book->language = $metadata['language'] ?? 'en';
             $book->source = 'import';
 
-            // Store directory path for the audiobook files (including title)
-            // This must match the actual filesystem path where files will be moved
+            // Directory path is used exactly as confirmed — generateDirectoryPath() returns
+            // custom_directory_path verbatim when set, and already resolved any "Import anyway
+            // with new name" collision suffix before this metadata was ever shown for review.
             $book->directory_path = $this->generateDirectoryPath($metadata, ['include_title' => true]);
-
-            // "Import anyway with new name": the generated path may collide with the
-            // existing book's directory on disk, so find a non-colliding name.
-            if ($forceNewBook) {
-                $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
-                if ($bookStoragePath) {
-                    $fullPath = rtrim((string) $bookStoragePath, '/') . '/' . ltrim($book->directory_path, '/');
-                    if (File::isDirectory($fullPath)) {
-                        $uniqueFullPath = $this->findAvailableDirectoryWithSuffix($fullPath);
-                        $book->directory_path = ltrim(
-                            substr($uniqueFullPath, strlen(rtrim((string) $bookStoragePath, '/'))),
-                            '/'
-                        );
-                    }
-                }
-            }
 
             // CRITICAL: Duration MUST come from actual audio files, NEVER from enrichment
             // Calculate from audio files if available
@@ -608,10 +681,10 @@ class BookImportService
                 $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
                 $authorIds = [];
                 foreach ($authors as $authorName) {
-                    // Normalize author name (extract from patterns like "Graphic Audio [Alex Archer]")
-                    $authorName = $this->normalizeAuthorName($authorName);
+                    // Author names are used exactly as confirmed — normalization happens
+                    // before the review screen (postProcessAIResult), never after.
                     if (!empty($authorName)) {
-                        $author = $this->firstOrCreateByNameWithTrashed(Author::class, trim($authorName));
+                        $author = $this->firstOrCreateByNameWithTrashed(Author::class, (string) $authorName);
                         $authorIds[] = $author->id;
                     }
                 }
@@ -693,16 +766,14 @@ class BookImportService
                 $isPrimary = true; // First genre is primary
                 $genresToAttach = [];
 
+                // Genre is used exactly as confirmed — mapping to a canonical library
+                // genre happens before the review screen (postProcessAIResult) and is
+                // enforced there by reviewAndApprove() refusing to accept an invalid
+                // genre, never after confirmation.
                 foreach ($genres as $genreName) {
                     $name = trim((string) $genreName);
                     if ($name === '') {
                         continue;
-                    }
-
-                    // Map the genre to a valid library genre
-                    // If genre is forced via config, we skip mapping to ensure user intent
-                    if (empty($this->config['genre']) || $name !== trim((string) $this->config['genre'])) {
-                        $name = $this->validateAndMapGenre($name);
                     }
 
                     $genre = $this->firstOrCreateByNameWithTrashed(Genre::class, $name);
@@ -826,8 +897,15 @@ class BookImportService
         ];
     }
 
-    public function updateBookFromMetadata(Book $book, array $metadata, array $audiobook, array $options = []): Book
+    /**
+     * Update an existing book from metadata that has already been confirmed. Same
+     * guarantee as persistConfirmedBook(): every value comes straight from the
+     * confirmed snapshot, nothing is calculated, derived, corrected, or changed here.
+     */
+    public function persistConfirmedBookUpdate(Book $book, ConfirmedBookMetadata $confirmed, array $audiobook, array $options = []): Book
     {
+        $metadata = $confirmed->toArray();
+
         try {
             DB::beginTransaction();
 
@@ -920,7 +998,7 @@ class BookImportService
                 ]);
             }
 
-            // Update genres
+            // Update genres — used exactly as confirmed, no mapping after confirmation.
             if (!empty($metadata['genre'])) {
                 $genres = is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']];
                 $isPrimary = true;
@@ -929,11 +1007,6 @@ class BookImportService
                     $name = trim((string) $genreName);
                     if ($name === '') {
                         continue;
-                    }
-
-                    if ($isPrimary) {
-                        // Map the first (primary) genre to a valid library genre
-                        $name = $this->validateAndMapGenre($name);
                     }
 
                     $genre = $this->firstOrCreateByNameWithTrashed(Genre::class, $name);
@@ -1068,6 +1141,21 @@ class BookImportService
             }
 
             $path .= '/' . $title;
+        }
+
+        // "Import anyway with new name": the computed path may collide with an existing
+        // directory, so find a non-colliding suffix now — before the path is ever shown
+        // for review — so what the user confirms is exactly what will be used, with no
+        // further adjustment at persistence time.
+        if (!empty($metadata['_force_rename_directory'])) {
+            $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
+            if ($bookStoragePath) {
+                $fullPath = rtrim((string) $bookStoragePath, '/') . '/' . ltrim($path, '/');
+                if (File::isDirectory($fullPath)) {
+                    $uniqueFullPath = $this->findAvailableDirectoryWithSuffix($fullPath);
+                    $path = ltrim(substr($uniqueFullPath, strlen(rtrim((string) $bookStoragePath, '/'))), '/');
+                }
+            }
         }
 
         return $path;
@@ -1442,6 +1530,10 @@ class BookImportService
 
             if (!$hasExplicitTargetDirectory && File::isDirectory($targetDir)) {
                 if ($handleDirectoryConflictCallback) {
+                    // A caller wired in a conflict handler — this is a NEW confirmation
+                    // for a situation the earlier review screen couldn't have known about
+                    // (the directory didn't exist yet when the path was confirmed). That's
+                    // legitimate; silently picking a different path is not.
                     $conflictResolution = $handleDirectoryConflictCallback($audiobook, $targetDir, $book);
 
                     if ($conflictResolution === 'cancel') {
@@ -1451,27 +1543,35 @@ class BookImportService
                     } elseif (is_string($conflictResolution) && $conflictResolution !== 'replace') {
                         $targetDir = $conflictResolution;
                     }
-                } else {
-                    $targetDir = $this->resolveDirectoryConflictPath($targetDir);
-                }
 
-                // If directory was changed due to conflict, update book's directory_path
-                if ($targetDir !== $originalTargetDir) {
-                    $bookStoragePath = rtrim($bookStoragePath, '/');
-                    if (str_starts_with($targetDir, $bookStoragePath . '/')) {
-                        $relativePath = substr($targetDir, strlen($bookStoragePath) + 1);
-                    } else {
-                        $relativePath = $targetDir;
+                    // If directory was changed due to conflict, update book's directory_path
+                    if ($targetDir !== $originalTargetDir) {
+                        $bookStoragePath = rtrim($bookStoragePath, '/');
+                        if (str_starts_with($targetDir, $bookStoragePath . '/')) {
+                            $relativePath = substr($targetDir, strlen($bookStoragePath) + 1);
+                        } else {
+                            $relativePath = $targetDir;
+                        }
+                        $book->directory_path = $relativePath;
+                        Log::warning("Directory conflict detected - updated path", [
+                            'original' => $originalTargetDir,
+                            'new' => $targetDir,
+                            'book_id' => $book->id,
+                        ]);
+
+                        // Move cover images / librarian.json (non-audio files) into the conflict-resolved directory
+                        $this->moveNonAudioFilesToDirectory($originalTargetDir, $targetDir, $handleFileConflictCallback);
                     }
-                    $book->directory_path = $relativePath;
-                    Log::warning("Directory conflict detected - updated path", [
-                        'original' => $originalTargetDir,
-                        'new' => $targetDir,
-                        'book_id' => $book->id,
-                    ]);
-
-                    // Move cover images / librarian.json (non-audio files) into the conflict-resolved directory
-                    $this->moveNonAudioFilesToDirectory($originalTargetDir, $targetDir, $handleFileConflictCallback);
+                } else {
+                    // No conflict handler wired in — this is the confirmed-review pipeline,
+                    // where the target directory was already shown to and accepted by the
+                    // user. It must never be silently changed to "resolve" a collision;
+                    // reject so the book is skipped and the collision is visible, instead
+                    // of importing to a location no one confirmed.
+                    throw new \Exception(
+                        "Target directory already exists and no conflict handler was provided: {$targetDir}. "
+                        . "Refusing to silently choose a different directory for book ID {$book->id}."
+                    );
                 }
             }
 
@@ -4779,8 +4879,23 @@ class BookImportService
     }
 
     /**
+     * Names of generic/basic download-staging directories that should never be treated
+     * as a meaningful "series" or "author-series" grouping (e.g. a flat /media/downloads
+     * folder containing many unrelated books, as opposed to /media/downloads/author-series).
+     */
+    private const GENERIC_CONTAINER_DIRS = ['download', 'downloads', 'audiobooks', 'audiobook', 'unsorted', 'books', 'media'];
+
+    private function isGenericContainerDirectory(string $path): bool
+    {
+        return in_array(strtolower(basename($path)), self::GENERIC_CONTAINER_DIRS, true);
+    }
+
+    /**
      * Remember manually-edited author/genre/series for this book's parent directory,
      * so a later, independently-processed sibling book can reuse them.
+     *
+     * Skipped for generic container directories (e.g. a flat /media/downloads folder)
+     * since unrelated books placed directly under them must not share metadata.
      */
     protected function recordParentDirectoryManualOverrides(array $metadata, array $audiobook): void
     {
@@ -4791,6 +4906,10 @@ class BookImportService
 
         $parentDir = dirname(rtrim($path, '/'));
         if ($parentDir === '' || $parentDir === '.') {
+            return;
+        }
+
+        if ($this->isGenericContainerDirectory($parentDir)) {
             return;
         }
 
@@ -4813,6 +4932,10 @@ class BookImportService
         }
 
         $parentDir = dirname(rtrim($path, '/'));
+        if ($this->isGenericContainerDirectory($parentDir)) {
+            return $aiMetadata;
+        }
+
         $overrides = $this->parentDirectoryManualOverrides[$parentDir] ?? [];
         if (empty($overrides)) {
             return $aiMetadata;
@@ -5074,7 +5197,11 @@ class BookImportService
                     continue 2;
             }
 
-            if (!$titleManuallyEdited) {
+            // Only re-derive a series number from the title when the field that could make
+            // that derivation newly relevant (or newly wrong) — the series — was just edited.
+            // Running this after every unrelated field edit (narrator, year, genre, ...)
+            // silently rewrote titles the user never touched.
+            if ($choice === '4' && !$titleManuallyEdited) {
                 $extractSeriesNumberFromTitleCallback($metadata);
             }
             $metadata['confidence'] = 100;
@@ -5588,6 +5715,16 @@ class BookImportService
                 $cleanTitle = trim($matches[1]);
                 $raw = $matches[2];
                 $bookNumber = str_contains($raw, '.') ? (float) $raw : (int) $raw;
+
+                // If stripping the number leaves exactly the series name, the number is
+                // part of the title itself (e.g. "Damsels of Distress 3" as its own title),
+                // not trailing series metadata — keep the title intact, still record the number.
+                $seriesName = trim((string) ($metadata['series'] ?? ''));
+                if ($seriesName !== '' && strcasecmp($cleanTitle, $seriesName) === 0) {
+                    $metadata['series_number'] = $bookNumber;
+
+                    return;
+                }
 
                 $metadata['title'] = $cleanTitle;
                 $metadata['series_number'] = $bookNumber;
@@ -7016,6 +7153,49 @@ class BookImportService
 
     public function postProcessAIResult(array $aiResult, array $audiobook): array
     {
+        // Normalize author names (strip "Publisher/Narrator [Actual Author]" patterns,
+        // drop "Graphic Audio"/"Full Cast" placeholders, normalize initials) before the
+        // review screen is ever shown, so the user confirms the already-clean value —
+        // this must never happen after confirmation.
+        if (!empty($aiResult['author'])) {
+            $rawAuthors = is_array($aiResult['author']) ? $aiResult['author'] : [$aiResult['author']];
+            $aiResult['author'] = array_values(array_filter(array_map(
+                fn ($authorName) => $this->normalizeAuthorName((string) $authorName),
+                $rawAuthors
+            ), fn ($authorName) => $authorName !== ''));
+        }
+
+        // Map a raw single genre guess to a canonical library genre before display, so the
+        // default shown on the review screen is already valid where possible. Multi-genre
+        // arrays are left alone here — those are resolved later during disambiguation.
+        if (!empty($aiResult['genre']) && is_string($aiResult['genre'])) {
+            $aiResult['genre'] = $this->validateAndMapGenre($aiResult['genre']);
+        }
+
+        // Clear a series that's really just the author's name — this must happen here,
+        // before the review screen is ever shown, not after the user has confirmed
+        // metadata. Once confirmed, series is used exactly as given.
+        $authors = $aiResult['author'] ?? [];
+        $authors = is_array($authors) ? $authors : [$authors];
+        $seriesName = $aiResult['series'] ?? null;
+
+        if ($seriesName && !empty($authors)) {
+            $seriesNormalized = strtolower(trim($seriesName));
+            foreach ($authors as $authorName) {
+                $authorNormalized = strtolower(trim($authorName));
+                if ($authorNormalized === $seriesNormalized) {
+                    Log::info('Clearing series that matches author', [
+                        'title' => $aiResult['title'] ?? 'Unknown',
+                        'author' => $authorName,
+                        'series' => $seriesName,
+                    ]);
+                    $aiResult['series'] = null;
+                    $aiResult['series_number'] = null;
+                    break;
+                }
+            }
+        }
+
         $directoryName = basename($audiobook['path']);
 
         // Strip part-number markers (e.g. "(2 of 2)") and production markers from the
@@ -7151,8 +7331,7 @@ class BookImportService
             $parentPath = dirname($audiobook['path']);
             // Only use parent if it's not the root import directory
             // (Naive check: assuming we are at least 1 level deep from import root)
-            $nonSeriesDirs = ['download', 'downloads', 'audiobooks', 'audiobook', 'unsorted', 'books', 'media'];
-            if (!in_array(strtolower(basename($parentPath)), $nonSeriesDirs, true)) {
+            if (!$this->isGenericContainerDirectory($parentPath)) {
                 $parentName = basename($parentPath);
 
                 // Clean parent name: Remove Year, Author, Narrator
@@ -8727,6 +8906,28 @@ class BookImportService
 
 
     /**
+     * Guard the write boundary between user confirmation and persistence.
+     *
+     * custom_directory_path must already be set by this point: auto mode locks it in
+     * before review even runs, interactive mode locks it in on accept (reviewAndApprove()).
+     * Once metadata is confirmed, nothing may silently substitute a different directory —
+     * not a pre-review default, not an existing book's stored path, not anything else.
+     * A missing value here means a bug upstream; fail loudly instead of guessing, so the
+     * book is skipped rather than imported to a location the user never saw or approved.
+     */
+    protected function assertDirectoryPathConfirmed(array $metadata, string $sourcePath, bool $isAutoMode): void
+    {
+        if (!empty($metadata['custom_directory_path'])) {
+            return;
+        }
+
+        throw new \RuntimeException(
+            "custom_directory_path was not set after " . ($isAutoMode ? 'auto-mode processing' : 'user confirmation')
+            . " for '{$sourcePath}' — refusing to silently derive a directory path."
+        );
+    }
+
+    /**
      * Process a single audiobook with AI and external enrichment
      */
     public function processAudiobook(
@@ -9277,6 +9478,13 @@ class BookImportService
         $expectedPath = $this->generateDirectoryPath($aiMetadata);
         $infoCallback("📁 Expected directory path: {$expectedPath}");
 
+        // Auto mode never shows a review screen, so there is nothing for the user to
+        // confirm — lock in the computed path now, before the interactive branch below
+        // (which sets its own confirmed value on accept) has any chance to run.
+        if ($isAutoMode) {
+            $aiMetadata['custom_directory_path'] = $expectedPath;
+        }
+
         if (!$isAutoMode && !$isDryRun) {
             $approved = $reviewAndApproveCallback($aiMetadata, $audiobook);
 
@@ -9323,16 +9531,14 @@ class BookImportService
                 $uiServiceLogCallback('💾 Creating database record...');
             }
 
-            // Lock in whatever directory path was actually shown/approved (interactive
-            // review sets this on accept; auto mode never went through review, so fall
-            // back to the "Expected directory path" logged above) so the book is
-            // persisted and moved to exactly that path, even if an existing book record
-            // already has a different stored directory_path.
-            if (empty($aiMetadata['custom_directory_path'])) {
-                $aiMetadata['custom_directory_path'] = $expectedPath;
-            }
+            $this->assertDirectoryPathConfirmed($aiMetadata, $audiobook['path'] ?? '', $isAutoMode);
 
-            $book = $this->createBookFromMetadata($aiMetadata, $audiobook);
+            // From this point on, metadata is read-only. persistConfirmedBook() only
+            // performs DB writes and (via the caller below) a file move — it cannot
+            // calculate, derive, correct, or otherwise change anything: the snapshot
+            // has no setter, so there is nothing here to modify even by accident.
+            $confirmedMetadata = ConfirmedBookMetadata::fromConfirmed($aiMetadata);
+            $book = $this->persistConfirmedBook($confirmedMetadata, $audiobook);
 
             if ($book) {
                 $infoCallback("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
@@ -9349,6 +9555,15 @@ class BookImportService
                 // Process cover image AFTER files are moved (and directory created) to prevent conflict detection
                 $this->processCoverImage($book, $aiMetadata);
 
+                Log::channel('import')->info('Book persisted', [
+                    'source_path' => $audiobook['path'] ?? null,
+                    'book_id' => $book->id,
+                    'title' => $book->title,
+                    'genre' => $book->genres()->pluck('name')->all(),
+                    'directory_path' => $book->directory_path,
+                    'confirmed_directory_path' => $aiMetadata['custom_directory_path'] ?? null,
+                ]);
+
                 $processedBooks[] = [
                     'path' => $audiobook['path'],
                     'book_id' => $book->id,
@@ -9361,6 +9576,42 @@ class BookImportService
         } else {
             $infoCallback("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
         }
+    }
+
+    /**
+     * Does $relativePath already exist on disk with real (non-metadata) content that
+     * isn't this same import's own current location? Checked BEFORE the review screen
+     * lets the user accept, so a directory collision is something they resolve as part
+     * of confirming — never something discovered for the first time at move time.
+     */
+    protected function directoryPathHasRealConflict(string $relativePath, string $ownCurrentPath = ''): bool
+    {
+        $relativePath = trim($relativePath, '/');
+        if ($relativePath === '' || $relativePath === trim($ownCurrentPath, '/')) {
+            return false;
+        }
+
+        $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
+        if (!$bookStoragePath) {
+            return false;
+        }
+
+        $fullPath = rtrim((string) $bookStoragePath, '/') . '/' . $relativePath;
+        if (!File::isDirectory($fullPath)) {
+            return false;
+        }
+
+        $metadataNames = ['librarian.json', 'cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp'];
+        foreach (File::allFiles($fullPath) as $file) {
+            if (in_array(strtolower($file->getExtension()), self::AUDIO_EXTENSIONS, true)) {
+                return true;
+            }
+            if (!in_array(strtolower($file->getFilename()), $metadataNames, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -9447,6 +9698,10 @@ class BookImportService
                 ]);
             }
 
+            if ($this->directoryPathHasRealConflict($currentDirectoryPath, (string) ($audiobook['path'] ?? ''))) {
+                $defaultChoice = '2';
+            }
+
             $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false, count($audiobook['files'] ?? []), $previousImport);
             $choice = $selectWithImmediateInterruptCallback('Choose an option', $options, $defaultChoice);
 
@@ -9456,10 +9711,25 @@ class BookImportService
                     $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 2 → Genre)');
                     continue;
                 }
+                if ($this->directoryPathHasRealConflict($currentDirectoryPath, (string) ($audiobook['path'] ?? ''))) {
+                    $uiServiceLogCallback('⚠️  Cannot accept: target directory already contains files - please choose a different directory (Option 2 → Directory Path)');
+                    continue;
+                }
                 // Lock in the exact path shown at approval time so the file is moved
                 // to what the user actually approved, even if this book already
                 // existed with a different stored directory_path.
                 $metadata['custom_directory_path'] = $currentDirectoryPath;
+
+                Log::channel('import')->info('User confirmed metadata', [
+                    'source_path' => $audiobook['path'] ?? null,
+                    'title' => $metadata['title'] ?? null,
+                    'author' => $metadata['author'] ?? null,
+                    'genre' => $metadata['genre'] ?? null,
+                    'series' => $metadata['series'] ?? null,
+                    'series_number' => $metadata['series_number'] ?? null,
+                    'directory_path' => $currentDirectoryPath,
+                ]);
+
                 return true;
             }
             if (in_array($choice, ['3', 's', 'skip'], true)) {
@@ -9470,6 +9740,16 @@ class BookImportService
                 $metadata = $editMetadataFieldsCallback($metadata, false);
                 if ($inputInterrupted) {
                     return false;
+                }
+
+                // Refresh the displayed/lock-in path from what was just edited — otherwise
+                // a directly-edited directory path would keep showing (and eventually
+                // confirm) the stale pre-edit value.
+                $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? '');
+                if ($currentDirectoryPath === '') {
+                    $currentDirectoryPath = $generateDirectoryPathCallback($metadata, [
+                        'include_title' => true,
+                    ]);
                 }
 
                 $currentGenre = $metadata['genre'] ?? $currentGenre;

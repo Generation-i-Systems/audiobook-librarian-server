@@ -115,4 +115,71 @@ class BookImportServiceParentDirectoryManualOverridesTest extends TestCase
 
         $this->assertSame('Other', $result['genre']);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function editMetadataFieldsDoesNotRecordOverridesForGenericContainerDirectory(): void
+    {
+        $metadata = [
+            'title' => 'Book A',
+            'author' => ['Brandon Sanderson'],
+            'genre' => 'Fantasy',
+            'series' => 'Mistborn',
+        ];
+        $audiobook = ['path' => '/media/downloads/Book A'];
+
+        $this->service->editMetadataFields(
+            $metadata,
+            $audiobook,
+            fn ($question, $default) => $default,
+            fn ($question, $options, $default) => $default,
+            fn ($metadata, $keys) => null,
+            function (array &$metadata): void {
+            },
+            fn () => ['Fantasy'],
+            function (): void {
+            },
+            fn ($metadata) => $metadata,
+            true
+        );
+
+        $reflection = new \ReflectionClass($this->service);
+        $property = $reflection->getProperty('parentDirectoryManualOverrides');
+        $property->setAccessible(true);
+        $overrides = $property->getValue($this->service);
+
+        $this->assertArrayNotHasKey('/media/downloads', $overrides);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function applyParentDirectoryManualOverridesIgnoresRecordedOverridesForGenericContainerDirectory(): void
+    {
+        $reflection = new \ReflectionClass($this->service);
+        $property = $reflection->getProperty('parentDirectoryManualOverrides');
+        $property->setAccessible(true);
+        // Simulate a pre-existing generic-directory entry (e.g. from before this guard existed).
+        $property->setValue($this->service, [
+            '/media/downloads' => [
+                'author' => ['Brandon Sanderson'],
+                'genre' => 'Fantasy',
+                'series' => 'Mistborn',
+            ],
+        ]);
+
+        $method = $reflection->getMethod('applyParentDirectoryManualOverrides');
+        $method->setAccessible(true);
+
+        $audiobook = ['path' => '/media/downloads/Unrelated Book'];
+        $aiMetadata = [
+            'title' => 'Unrelated Book',
+            'author' => ['Unknown Author'],
+            'genre' => 'Other',
+        ];
+
+        $result = $method->invoke($this->service, $audiobook, $aiMetadata, function (): void {
+        });
+
+        $this->assertSame(['Unknown Author'], $result['author']);
+        $this->assertSame('Other', $result['genre']);
+        $this->assertArrayNotHasKey('series', $result);
+    }
 }

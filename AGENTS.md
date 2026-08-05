@@ -88,6 +88,26 @@ This repository is a Laravel 11+ audiobook management application with MySQL dat
 - **MIGRATIONS**: All migrations MUST be non-destructive (`Schema::table` or `Schema::create`). If a migration involves a destructive operation (like dropping a column), it MUST be protected by a manual review flag or an explicit user confirmation, and preferably a safe, non-destructive alternative like soft deletes or renaming should be used.
 - **RESTORE**: If data loss occurs, immediately pause all work and instruct the user on restoration. Do not proceed until data integrity is confirmed by the user.
 
+## Data Confirmation Integrity — CRITICAL
+
+- **Once the user has confirmed/accepted data (e.g. metadata reviewed and approved during
+  import), no code path may silently modify it before it is persisted.** This applies to
+  every field — directory path, genre, author, series, anything else shown for confirmation.
+- **There is no permissible exception.** Not to make a directory path unique, not to reuse
+  an existing database record's stored value, not to fall back to a pre-review computed
+  default, not for any other convenience.
+- **If confirmed data cannot be used as-is, stop and get a new confirmation.** Where no
+  re-prompt loop exists in the current flow, fail loudly (throw/log and skip that item)
+  instead of silently substituting something else — never guess.
+- **Precedent**: `BookImportService::assertDirectoryPathConfirmed()` is the pattern to follow
+  — a single hard check placed immediately before persistence that throws with full context
+  if confirmed data is unexpectedly missing, rather than falling back to a stale or
+  independently-derived value.
+- When reviewing or writing code anywhere between a user-facing confirmation step and the
+  database/file write that follows it, treat any "fallback to a previously computed value"
+  or "reuse an existing record's value" pattern as a bug by default, even if it looks like a
+  reasonable convenience.
+
 ## Essential Commands
 
 ### PHP/Laravel Commands

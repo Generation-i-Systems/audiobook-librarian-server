@@ -115,6 +115,70 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function reviewAndApproveRejectsAcceptWhenTargetDirectoryAlreadyHasAudioFiles(): void
+    {
+        // A directory collision must be caught BEFORE confirmation, not discovered for
+        // the first time when files are actually moved.
+        $bookRoot = $this->createTempDirectory('book_root');
+        config(['app.book_root' => $bookRoot]);
+        config(['filesystems.disks.books.root' => $bookRoot]);
+
+        File::makeDirectory($bookRoot . '/Existing/Book', 0775, true);
+        File::put($bookRoot . '/Existing/Book/track.mp3', 'existing audio');
+
+        $metadata = [
+            'title' => 'New Book',
+            'author' => ['Author'],
+            'genre' => 'Science Fiction',
+            'confidence' => 90,
+        ];
+        Genre::create(['name' => 'Science Fiction']);
+
+        $audiobook = [
+            'path' => '/tmp/source-book',
+            'files' => ['/tmp/source-book/file.m4b'],
+        ];
+
+        $logs = [];
+        // '1' (try accept — should be rejected due to conflict), then '2' (edit) to
+        // change the directory, then '1' again (accept the now-clear path).
+        $selectResponses = ['1', '2', '1'];
+        $inputInterrupted = false;
+
+        $result = $this->service->reviewAndApprove(
+            $metadata,
+            $audiobook,
+            fn ($data) => $data,
+            function ($message, $data = null) use (&$logs) {
+                $logs[] = $message;
+            },
+            function ($question, $options, $default) use (&$selectResponses) {
+                return array_shift($selectResponses) ?? $default;
+            },
+            fn ($question, $default = '') => $default,
+            fn ($cover, $genre, $directory, $isFinal) => [],
+            function ($data, $isAll) {
+                $data['custom_directory_path'] = 'Clear/Book';
+                return $data;
+            },
+            fn ($data, $book, $service) => $data,
+            fn () => null,
+            fn () => $this->service->getValidGenres(),
+            fn ($data) => true,
+            fn ($data, $options) => 'Existing/Book',
+            $inputInterrupted
+        );
+
+        $this->assertTrue($result);
+        $this->assertEquals('Clear/Book', $metadata['custom_directory_path']);
+        $this->assertTrue(
+            collect($logs)->contains(fn ($message) => str_contains($message, 'target directory already contains files'))
+        );
+
+        File::deleteDirectory($bookRoot);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generateDirectoryPathWithoutSeriesNumber(): void
     {
         $metadata = [

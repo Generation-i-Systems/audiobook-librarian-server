@@ -69,8 +69,13 @@ class BookImportServiceUpdateTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function updateBookFromMetadataDoesNotNormalizeAuthor(): void
+    public function updateBookFromMetadataNormalizesAuthorForUnreviewedCallers(): void
     {
+        // updateBookFromMetadata() is the legacy entry point for callers that bypass
+        // interactive review (jobs, admin tools, seed scripts) — it cleans up raw
+        // author names same as createBookFromMetadata(). The reviewed import flow
+        // uses persistConfirmedBookUpdate() instead, which does no normalization at
+        // all — that cleanup happens before review (postProcessAIResult).
         $book = $this->createTestBook();
 
         $metadata = [
@@ -81,7 +86,7 @@ class BookImportServiceUpdateTest extends TestCase
         $updated->refresh();
 
         $authorNames = $updated->authors->pluck('name')->toArray();
-        $this->assertEquals(['Graphic Audio [Alex Archer]'], $authorNames);
+        $this->assertEquals(['Alex Archer'], $authorNames);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -101,8 +106,12 @@ class BookImportServiceUpdateTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function updateBookFromMetadataMapsPrimaryGenre(): void
+    public function updateBookFromMetadataMapsPrimaryGenreForUnreviewedCallers(): void
     {
+        // updateBookFromMetadata() is the legacy entry point for callers that bypass
+        // interactive review — it maps the primary genre to a canonical library genre,
+        // same as before. The reviewed import flow uses persistConfirmedBookUpdate()
+        // instead, which never maps anything (see the test below).
         $book = $this->createTestBook();
 
         $metadata = [
@@ -117,7 +126,7 @@ class BookImportServiceUpdateTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function updateBookFromMetadataSkipsSecondaryGenreMapping(): void
+    public function updateBookFromMetadataSkipsSecondaryGenreMappingForUnreviewedCallers(): void
     {
         $book = $this->createTestBook();
 
@@ -132,6 +141,38 @@ class BookImportServiceUpdateTest extends TestCase
         $this->assertContains('Fantasy', $genreNames);
         $this->assertContains('Fiction', $genreNames);
         $this->assertNotContains('General Fiction', $genreNames);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function persistConfirmedBookUpdateUsesGenreExactlyAsConfirmedWithNoMapping(): void
+    {
+        // Confirmed data is used exactly as given — canonical-genre mapping happens
+        // before the review screen (postProcessAIResult) and is enforced there by
+        // reviewAndApprove() refusing to accept an invalid genre, never after
+        // confirmation.
+        $book = $this->createTestBook();
+
+        $confirmed = \App\Support\ConfirmedBookMetadata::fromConfirmed(['genre' => ['Fiction']]);
+
+        $updated = $this->service->persistConfirmedBookUpdate($book, $confirmed, []);
+        $updated->refresh();
+
+        $genreNames = $updated->genres->pluck('name')->toArray();
+        $this->assertEquals(['Fiction'], $genreNames);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function persistConfirmedBookUpdateUsesAuthorExactlyAsConfirmedWithNoNormalization(): void
+    {
+        $book = $this->createTestBook();
+
+        $confirmed = \App\Support\ConfirmedBookMetadata::fromConfirmed(['author' => ['Graphic Audio [Alex Archer]']]);
+
+        $updated = $this->service->persistConfirmedBookUpdate($book, $confirmed, []);
+        $updated->refresh();
+
+        $authorNames = $updated->authors->pluck('name')->toArray();
+        $this->assertEquals(['Graphic Audio [Alex Archer]'], $authorNames);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

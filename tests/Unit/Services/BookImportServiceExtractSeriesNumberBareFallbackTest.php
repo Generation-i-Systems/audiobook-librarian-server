@@ -31,12 +31,22 @@ class BookImportServiceExtractSeriesNumberBareFallbackTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function bareTrailingNumberIsStrippedWhenSeriesIsAlreadyKnown(): void
+    public function bareTrailingNumberIsStrippedWhenSeriesIsAlreadyKnownAndTitleDiffersFromSeries(): void
+    {
+        $metadata = ['title' => 'The Final Empire 1', 'series' => 'Mistborn'];
+        $this->service->extractSeriesNumberFromTitle($metadata);
+
+        $this->assertSame('The Final Empire', $metadata['title']);
+        $this->assertSame(1, $metadata['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function bareTrailingNumberIsKeptWhenTitleIsJustSeriesNamePlusNumber(): void
     {
         $metadata = ['title' => 'Mistborn 3', 'series' => 'Mistborn'];
         $this->service->extractSeriesNumberFromTitle($metadata);
 
-        $this->assertSame('Mistborn', $metadata['title']);
+        $this->assertSame('Mistborn 3', $metadata['title']);
         $this->assertSame(3, $metadata['series_number']);
     }
 }

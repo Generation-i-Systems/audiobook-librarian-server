@@ -75,8 +75,10 @@ class BookDirectoryMoveServiceMetadataTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function itCreatesSuffixedDirectoryWhenTargetHasAudioFiles(): void
+    public function itRejectsTheMoveWhenTargetHasAudioFilesInsteadOfSuffixing(): void
     {
+        // A directory collision on edit must be rejected, not silently resolved by
+        // appending a suffix — the user confirmed this exact path.
         $disk = Storage::disk('books');
 
         // Create source directory with audio files
@@ -89,16 +91,13 @@ class BookDirectoryMoveServiceMetadataTest extends TestCase
 
         $result = $this->service->moveBookDirectoryContents('old/path', 'new/path');
 
-        $this->assertTrue($result['moved']);
-        $this->assertSame('new/path_01', $result['directoryPath']);
+        $this->assertFalse($result['moved']);
+        $this->assertStringContainsString('new/path', $result['error']);
 
-        // Verify original target is unchanged
-        $this->assertTrue($disk->exists('new/path/track01.mp3'));
+        // Nothing moved — source stays put, target unchanged, no suffixed directory created.
+        $this->assertTrue($disk->exists('old/path/track01.mp3'));
         $this->assertSame('existing audio', $disk->get('new/path/track01.mp3'));
-
-        // Verify source was moved to suffixed directory
-        $this->assertTrue($disk->exists('new/path_01/track01.mp3'));
-        $this->assertSame('source audio', $disk->get('new/path_01/track01.mp3'));
+        $this->assertFalse($disk->exists('new/path_01/track01.mp3'));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -129,7 +128,7 @@ class BookDirectoryMoveServiceMetadataTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function itCreatesSuffixedDirectoryForNonMetadataFiles(): void
+    public function itRejectsTheMoveForNonMetadataFilesInsteadOfSuffixing(): void
     {
         $disk = Storage::disk('books');
 
@@ -143,13 +142,12 @@ class BookDirectoryMoveServiceMetadataTest extends TestCase
 
         $result = $this->service->moveBookDirectoryContents('old/path', 'new/path');
 
-        $this->assertTrue($result['moved']);
-        $this->assertSame('new/path_01', $result['directoryPath']);
+        $this->assertFalse($result['moved']);
+        $this->assertStringContainsString('new/path', $result['error']);
 
-        // Verify original target is unchanged
+        // Nothing moved — source stays put, no suffixed directory created.
+        $this->assertTrue($disk->exists('old/path/track01.mp3'));
         $this->assertTrue($disk->exists('new/path/readme.txt'));
-
-        // Verify source was moved to suffixed directory
-        $this->assertTrue($disk->exists('new/path_01/track01.mp3'));
+        $this->assertFalse($disk->exists('new/path_01/track01.mp3'));
     }
 }

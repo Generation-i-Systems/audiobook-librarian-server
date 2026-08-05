@@ -157,6 +157,16 @@ return [
             'days' => 365, // Keep audit logs for a year
         ],
 
+        // Dedicated, isolated record of every book-import decision point (source path,
+        // AI/enrichment metadata, what the user confirmed, what was actually persisted)
+        // so a bad import can be diagnosed and repaired without grepping the general log.
+        'import' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/import.log'),
+            'level' => 'debug',
+            'days' => 90,
+        ],
+
         // Safe fallback channel that won't cause infinite loops
         'safe_fallback' => [
             'driver' => 'stack',

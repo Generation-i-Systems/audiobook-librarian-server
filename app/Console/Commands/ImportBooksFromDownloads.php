@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Book;
 use App\Models\Narrator;
 use App\Models\Series;
+use App\Support\ConfirmedBookMetadata;
 use App\Services\AIBookProcessor;
 use App\Services\AudioFileAnalyzer;
 use App\Services\AudibleService;
@@ -573,6 +574,13 @@ class ImportBooksFromDownloads extends Command
 
             // Show summary
             $this->displaySummary();
+
+            Log::channel('import')->info('Import run summary', [
+                'total_found' => $this->totalFound,
+                'processed' => $this->processedBooks,
+                'failed' => $this->failedBooks,
+                'skipped' => $this->skippedBooks,
+            ]);
 
             // Save cache before exit and show cache statistics
         } finally {
@@ -1516,7 +1524,11 @@ class ImportBooksFromDownloads extends Command
         );
 
         if ($approved) {
-            $this->getImportService()->updateBookFromMetadata($book, $metadata, $fakeAudiobook);
+            $this->getImportService()->persistConfirmedBookUpdate(
+                $book,
+                ConfirmedBookMetadata::fromConfirmed($metadata),
+                $fakeAudiobook
+            );
             $freshTitle = $book->fresh()->title ?? $book->title;
             $this->info("✅ Updated: {$freshTitle}");
 

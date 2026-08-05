@@ -63,7 +63,18 @@ class BookDirectoryMoveService
             ];
         }
 
-        $newDirectoryPath = $this->resolveNonConflictingDirectoryPath($disk, $newDirectoryPath);
+        // A directory collision on edit must be rejected, not silently resolved by
+        // appending a suffix — the user asked for this exact path; if it's already in
+        // use by real content, that's for them to fix by choosing a different path,
+        // not for this service to work around behind their back.
+        $conflictError = $this->rejectIfDirectoryConflicts($disk, $newDirectoryPath);
+        if ($conflictError !== null) {
+            return [
+                'moved' => false,
+                'coverImage' => $coverImageBasename,
+                'error' => $conflictError,
+            ];
+        }
 
         // Create directory using native PHP mkdir for better control
         $newAbsPath = $disk->path($newDirectoryPath);
@@ -197,52 +208,25 @@ class BookDirectoryMoveService
         return count($disk->allFiles($path)) > 0;
     }
 
-    private function resolveNonConflictingDirectoryPath($disk, string $directoryPath): string
+    /**
+     * Returns an error message if $directoryPath already exists and contains real
+     * content (not just metadata files), or null if it's safe to use as-is. Never
+     * suggests or generates an alternative — that decision belongs to the user.
+     */
+    private function rejectIfDirectoryConflicts($disk, string $directoryPath): ?string
     {
         $directoryPath = trim($directoryPath, '/');
-        if ($directoryPath === '') {
-            return $directoryPath;
+        if ($directoryPath === '' || !$this->directoryExistsOnDisk($disk, $directoryPath)) {
+            return null;
         }
 
-        // Check if directory exists
-        if (method_exists($disk, 'directoryExists')) {
-            $exists = $disk->{'directoryExists'}($directoryPath);
-        } else {
-            $exists = count($disk->allFiles($directoryPath)) > 0;
-        }
-
-        if (!$exists) {
-            return $directoryPath;
-        }
-
-        // Get all files in the directory
         $files = $disk->allFiles($directoryPath);
-        if (empty($files)) {
-            return $directoryPath;
+        if (empty($files) || $this->containsOnlyMetadataFiles($files)) {
+            // Empty, or only stray metadata files (cover/librarian.json) — safe to reuse.
+            return null;
         }
 
-        // Check if directory only contains metadata files
-        if ($this->containsOnlyMetadataFiles($files)) {
-            // Safe to use this directory - metadata files will be overwritten
-            return $directoryPath;
-        }
-
-        // Directory has actual content, find a non-conflicting path
-        $counter = 1;
-        while (true) {
-            $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
-            $candidate = $directoryPath . $suffix;
-
-            if (method_exists($disk, 'directoryExists')) {
-                $candidateExists = $disk->{'directoryExists'}($candidate);
-            } else {
-                $candidateExists = count($disk->allFiles($candidate)) > 0;
-            }
-            if (!$candidateExists) {
-                return $candidate;
-            }
-            $counter++;
-        }
+        return "Target directory already exists and contains files: {$directoryPath}. Choose a different directory path.";
     }
 
     /**

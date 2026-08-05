@@ -37,8 +37,10 @@ class BookDirectoryMoveServiceTest extends TestCase
     }
 
     #[Test]
-    public function itAvoidsOverwritingExistingFilesInDestination(): void
+    public function itRejectsAConflictingDestinationInsteadOfSilentlyRenamingIt(): void
     {
+        // A directory collision on edit must be rejected, not silently resolved by
+        // appending a suffix — the user confirmed this exact path.
         Storage::fake('books');
 
         $disk = Storage::disk('books');
@@ -51,14 +53,12 @@ class BookDirectoryMoveServiceTest extends TestCase
         $service = new BookDirectoryMoveService();
         $result = $service->moveBookDirectoryContents('old/path', 'new/path');
 
-        $this->assertTrue($result['moved']);
+        $this->assertFalse($result['moved']);
+        $this->assertStringContainsString('new/path', $result['error']);
 
-        $this->assertSame('new/path_01', $result['directoryPath']);
-
-        $this->assertTrue($disk->exists('new/path/file.txt'));
+        // Nothing on disk changed — no suffixed directory was created, nothing moved.
+        $this->assertTrue($disk->exists('old/path/file.txt'));
         $this->assertSame('existing', $disk->get('new/path/file.txt'));
-
-        $this->assertTrue($disk->exists('new/path_01/file.txt'));
-        $this->assertSame('from-old', $disk->get('new/path_01/file.txt'));
+        $this->assertFalse($disk->exists('new/path_01/file.txt'));
     }
 }
