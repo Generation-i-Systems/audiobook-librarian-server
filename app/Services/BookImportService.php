@@ -1707,6 +1707,7 @@ class BookImportService
             $this->setFileOwnership($targetFile);
 
             $this->copyMatchingPdfFile($source, $target);
+            $this->copyMatchingEbookFile($source, $target);
             return;
         }
 
@@ -1790,6 +1791,7 @@ class BookImportService
             chmod($targetFile, 0664);
 
             $this->moveMatchingPdfFile($source, $target);
+            $this->moveMatchingEbookFile($source, $target);
             return;
         }
 
@@ -1899,8 +1901,9 @@ class BookImportService
             chmod($targetFile, 0664);
             $this->setFileOwnership($targetFile);
 
-            // Also move matching PDF if exists
+            // Also move matching PDF/ebook if they exist
             $this->moveMatchingPdfFile($filePath, $targetDir);
+            $this->moveMatchingEbookFile($filePath, $targetDir);
         }
 
         // CRITICAL: Verify destination has files BEFORE deleting cross-filesystem copies
@@ -1951,8 +1954,9 @@ class BookImportService
             chmod($targetFile, 0664);
             $this->setFileOwnership($targetFile);
 
-            // Also copy matching PDF if exists
+            // Also copy matching PDF/ebook if they exist
             $this->copyMatchingPdfFile($filePath, $targetDir);
+            $this->copyMatchingEbookFile($filePath, $targetDir);
         }
     }
 
@@ -2039,6 +2043,115 @@ class BookImportService
         }
 
         return null;
+    }
+
+    /**
+     * Ebook formats to look for alongside audio files. PDF is handled separately
+     * (findMatchingPdfFile() etc.) with its own long-established logic; this list
+     * covers the other common companion-ebook formats.
+     */
+    private const EBOOK_EXTENSIONS = ['epub', 'mobi', 'azw', 'azw3', 'azw4', 'kfx', 'fb2', 'lit', 'pdb', 'ibooks'];
+
+    /**
+     * Find and copy a matching ebook file for an audio file (same basename, or the
+     * only ebook in the same directory — companion ebooks are usually named after
+     * the book/series rather than the individual audio track).
+     */
+    protected function copyMatchingEbookFile(string $audioFilePath, string $targetDir): void
+    {
+        $ebookPath = $this->findMatchingEbookFile($audioFilePath);
+
+        if ($ebookPath && File::exists($ebookPath)) {
+            $ebookFilename = basename($ebookPath);
+            $targetEbookPath = "{$targetDir}/{$ebookFilename}";
+
+            try {
+                if (File::copy($ebookPath, $targetEbookPath)) {
+                    chmod($targetEbookPath, 0664);
+                    Log::info("Copied matching ebook file", [
+                        'ebook' => $ebookPath,
+                        'target' => $targetEbookPath,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to copy matching ebook file: " . $e->getMessage(), [
+                    'ebook' => $ebookPath,
+                    'target' => $targetEbookPath,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Find and move a matching ebook file for an audio file. See copyMatchingEbookFile().
+     */
+    protected function moveMatchingEbookFile(string $audioFilePath, string $targetDir): void
+    {
+        $ebookPath = $this->findMatchingEbookFile($audioFilePath);
+
+        if ($ebookPath && File::exists($ebookPath)) {
+            $ebookFilename = basename($ebookPath);
+            $targetEbookPath = "{$targetDir}/{$ebookFilename}";
+
+            $sameFileSystem = $this->areOnSameFileSystem($ebookPath, $targetDir);
+
+            try {
+                if ($sameFileSystem) {
+                    if (File::move($ebookPath, $targetEbookPath)) {
+                        chmod($targetEbookPath, 0664);
+                        Log::info("Moved matching ebook file", [
+                            'ebook' => $ebookPath,
+                            'target' => $targetEbookPath,
+                        ]);
+                    }
+                } elseif (File::copy($ebookPath, $targetEbookPath)) {
+                    chmod($targetEbookPath, 0664);
+                    File::delete($ebookPath);
+                    Log::info("Moved matching ebook file", [
+                        'ebook' => $ebookPath,
+                        'target' => $targetEbookPath,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to move matching ebook file: " . $e->getMessage(), [
+                    'ebook' => $ebookPath,
+                    'target' => $targetEbookPath,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Find an ebook file related to an audio file: same basename first (checked
+     * against every supported extension), otherwise the only ebook sitting in the
+     * same source directory (the common case — one ebook covers the whole book,
+     * not each individual track).
+     */
+    protected function findMatchingEbookFile(string $audioFilePath): ?string
+    {
+        $pathInfo = pathinfo($audioFilePath);
+        $directory = $pathInfo['dirname'];
+        $basename = $pathInfo['filename'];
+
+        foreach (self::EBOOK_EXTENSIONS as $extension) {
+            $ebookPath = "{$directory}/{$basename}.{$extension}";
+            if (File::exists($ebookPath) && File::isFile($ebookPath)) {
+                return $ebookPath;
+            }
+        }
+
+        if (!File::isDirectory($directory)) {
+            return null;
+        }
+
+        $ebooksInDirectory = array_values(array_filter(
+            File::files($directory),
+            fn ($file) => in_array(strtolower($file->getExtension()), self::EBOOK_EXTENSIONS, true)
+        ));
+
+        // Only auto-match when unambiguous — if there are several ebooks we can't
+        // safely guess which one belongs to this audio file.
+        return count($ebooksInDirectory) === 1 ? $ebooksInDirectory[0]->getPathname() : null;
     }
 
     /**
@@ -6852,6 +6965,176 @@ class BookImportService
     }
 
     /**
+     * Show a duplicate-conflict menu with extra non-terminal options for playing audio
+     * (mpv/mplayer) or listing directory contents, to help decide whether the source
+     * and existing copies are really the same book. Only the base options passed in
+     * end the loop; play/list options redisplay the menu.
+     */
+    protected function selectDuplicateAction(
+        object $uiService,
+        string $question,
+        array $baseOptions,
+        string $default,
+        array $sourceAudioFiles,
+        string $existingDir,
+        string $sourcePathForListing,
+        callable $lineCallback
+    ): string {
+        $options = $baseOptions;
+        $options['p'] = 'Play source audio (mpv/mplayer)';
+        $options['e'] = 'Play existing audio (mpv/mplayer)';
+        $options['l'] = 'List source contents';
+        $options['x'] = 'List existing contents';
+
+        while (true) {
+            $choice = strtolower(trim($uiService->select($question, $options, $default)));
+
+            switch ($choice) {
+                case 'p':
+                    $this->playAudioFiles($sourceAudioFiles, $lineCallback);
+                    continue 2;
+                case 'e':
+                    $this->playAudioFiles($this->findAudioFilesInDirectory($existingDir), $lineCallback);
+                    continue 2;
+                case 'l':
+                    $this->listDirectoryContents($sourcePathForListing, $lineCallback);
+                    continue 2;
+                case 'x':
+                    $this->listDirectoryContents($existingDir, $lineCallback);
+                    continue 2;
+            }
+
+            return $choice;
+        }
+    }
+
+    /**
+     * Flatten an existing Book's relations into the same metadata shape the review
+     * screen displays, so a duplicate-conflict screen can show real data about the
+     * existing entry instead of leaving the "Current Book Details" panel blank.
+     */
+    public function buildExistingBookDetailsMetadata(Book $existingBook, string $existingDir = ''): array
+    {
+        $existingBook->loadMissing(['authors', 'narrators', 'series', 'genres', 'publisher']);
+        $firstSeries = $existingBook->series->first();
+
+        return [
+            'title' => $existingBook->title ?? '',
+            'author' => $existingBook->authors->pluck('name')->toArray(),
+            'narrator' => $existingBook->narrators->pluck('name')->toArray(),
+            'series' => $firstSeries ? $firstSeries->name : '',
+            'series_number' => $firstSeries ? ($firstSeries->pivot->series_number ?? '') : '',
+            'year' => $existingBook->release_date ? substr((string) $existingBook->release_date, 0, 4) : '',
+            'genre' => $existingBook->genres->pluck('name')->toArray(),
+            'publisher' => $existingBook->publisher->name ?? '',
+            'description' => $existingBook->description ?? '',
+            'confidence' => 100,
+            'source_path' => $existingDir !== '' ? $existingDir : ($existingBook->directory_path ?? ''),
+            'directory_path' => $existingBook->directory_path ?? '',
+        ];
+    }
+
+    /**
+     * Locate the mpv or mplayer binary on PATH. Prefers mpv (more modern, still
+     * maintained); falls back to mplayer if that's what's installed.
+     */
+    protected function resolveAudioPlayerBinary(): ?string
+    {
+        foreach (['mpv', 'mplayer'] as $candidate) {
+            $found = trim((string) shell_exec('command -v ' . escapeshellarg($candidate) . ' 2>/dev/null'));
+            if ($found !== '') {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Play one or more audio files for manual A/B comparison (narrator identity,
+     * audio quality). Blocks until the player exits — same interaction model as the
+     * existing mplayer-based comparison tool in ReviewProgressionFantasyDuplicates.
+     */
+    public function playAudioFiles(array $filePaths, callable $lineCallback): void
+    {
+        $filePaths = array_values(array_filter($filePaths, fn ($path) => is_string($path) && $path !== ''));
+
+        if (empty($filePaths)) {
+            $lineCallback('  No audio files found to play.');
+            return;
+        }
+
+        $player = $this->resolveAudioPlayerBinary();
+        if ($player === null) {
+            $lineCallback('  ⚠️  Neither mpv nor mplayer is installed — cannot play audio.');
+            return;
+        }
+
+        $lineCallback("  ▶ Playing with {$player} (q to quit): " . implode(', ', array_map('basename', $filePaths)));
+        $escaped = implode(' ', array_map('escapeshellarg', $filePaths));
+        passthru("{$player} {$escaped}");
+    }
+
+    /**
+     * Find audio files directly inside a directory, for playback/comparison
+     * purposes. Non-recursive — matches how a book's own files are laid out.
+     */
+    public function findAudioFilesInDirectory(string $directory): array
+    {
+        if (!File::isDirectory($directory)) {
+            return [];
+        }
+
+        $files = [];
+        foreach (File::files($directory) as $file) {
+            if (in_array(strtolower($file->getExtension()), self::AUDIO_EXTENSIONS, true)) {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        sort($files);
+
+        return $files;
+    }
+
+    /**
+     * Print the contents of a directory (filename + size), for the "list directory
+     * contents" option on duplicate-conflict screens.
+     */
+    public function listDirectoryContents(string $path, callable $lineCallback): void
+    {
+        if (File::isFile($path)) {
+            $lineCallback('  ' . basename($path) . ' (' . $this->formatFileSize(File::size($path)) . ')');
+            return;
+        }
+
+        if (!File::isDirectory($path)) {
+            $lineCallback("  Not found: {$path}");
+            return;
+        }
+
+        $files = File::allFiles($path);
+        if (empty($files)) {
+            $lineCallback('  (empty directory)');
+            return;
+        }
+
+        $lineCallback("  Contents of {$path}:");
+        foreach ($files as $file) {
+            $lineCallback('    ' . $file->getRelativePathname() . ' (' . $this->formatFileSize($file->getSize()) . ')');
+        }
+    }
+
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes >= 1024 * 1024) {
+            return number_format($bytes / (1024 * 1024), 1) . ' MB';
+        }
+
+        return number_format($bytes / 1024, 1) . ' KB';
+    }
+
+    /**
      * Whether a directory directly contains at least one audio file (non-recursive).
      * Used to distinguish a book's own directory from an ancestor directory that
      * only contains audio files via sibling books' subdirectories.
@@ -9166,6 +9449,14 @@ class BookImportService
                     $sourceType = $isFile ? 'file' : 'directory';
                     $sourceTypePlural = $isFile ? 'files' : 'directories';
 
+                    $lineCallback("  Existing directory: {$existingDir}");
+                    $lineCallback("  Source path: {$audiobook['path']}");
+                    if ($uiService) {
+                        $uiService->setCurrentBook($buildUiMetadataCallback(
+                            $this->buildExistingBookDetailsMetadata($existingBook, $existingDir)
+                        ));
+                    }
+
                     if ($comparison['identical']) {
                         $infoCallback("🔍 Source and existing {$sourceTypePlural} are identical");
 
@@ -9176,7 +9467,16 @@ class BookImportService
                             '3' => 'Import anyway with new name',
                         ];
 
-                        $choice = $uiService->select("Identical {$sourceTypePlural} detected - choose action", $options, '1');
+                        $choice = $this->selectDuplicateAction(
+                            $uiService,
+                            "Identical {$sourceTypePlural} detected - choose action",
+                            $options,
+                            '1',
+                            $audiobook['files'],
+                            $existingDir,
+                            $audiobook['path'],
+                            $lineCallback
+                        );
 
                         switch ($choice) {
                             case '2':
@@ -9262,7 +9562,16 @@ class BookImportService
                             '4' => 'Import anyway with new name',
                         ];
 
-                        $choice = $uiService->select(ucfirst($sourceTypePlural) . " differ - choose action", $options, '1');
+                        $choice = $this->selectDuplicateAction(
+                            $uiService,
+                            ucfirst($sourceTypePlural) . " differ - choose action",
+                            $options,
+                            '1',
+                            $audiobook['files'],
+                            $existingDir,
+                            $audiobook['path'],
+                            $lineCallback
+                        );
 
                         switch ($choice) {
                             case '2':

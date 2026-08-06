@@ -193,6 +193,28 @@ class ImportUIService implements ImportUIInterface
         });
     }
 
+    /**
+     * Re-apply new terminal dimensions (e.g. after a SIGWINCH resize event) and
+     * redraw immediately, so the layout doesn't stay stretched/clipped to the old
+     * size until the next unrelated screen update.
+     */
+    public function resize(int $width, int $height): void
+    {
+        if ($this->plainMode) {
+            $this->width = $width;
+            $this->height = $height;
+            return;
+        }
+
+        $this->width = max(40, $width - 1);
+        $this->height = max(20, $height - 1);
+        $layout = $this->computeLayout();
+        $this->maxLogs = $layout['maxLogs'];
+        $this->screen = new Screen($this->width, $this->height);
+
+        $this->renderFull();
+    }
+
     protected function enableAlternateScreen(): void
     {
         if ($this->alternateScreenEnabled) {

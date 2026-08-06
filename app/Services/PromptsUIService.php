@@ -52,6 +52,11 @@ class PromptsUIService implements ImportUIInterface
         $this->height = max(20, $height);
     }
 
+    public function resize(int $width, int $height): void
+    {
+        $this->initialize($width, $height);
+    }
+
     /**
      * Strip invalid UTF-8 bytes so soloterm's grapheme splitter never crashes.
      */

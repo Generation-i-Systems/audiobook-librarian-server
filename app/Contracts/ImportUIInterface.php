@@ -10,6 +10,12 @@ interface ImportUIInterface
     public function initialize(int $width, int $height): void;
 
     /**
+     * Re-apply new terminal dimensions (e.g. after a SIGWINCH resize event) and
+     * redraw the current screen at the new size.
+     */
+    public function resize(int $width, int $height): void;
+
+    /**
      * Ask a question and return the user's text response
      */
     public function ask(string $question, string $default = ''): string;

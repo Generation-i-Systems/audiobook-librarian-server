@@ -479,6 +479,128 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingEbookFileReturnsNullWhenNoEbookExists(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+        mkdir($tempDir);
+
+        $audioFile = $tempDir . '/audiobook.m4b';
+        touch($audioFile);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('findMatchingEbookFile');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $audioFile);
+
+        $this->assertNull($result);
+
+        unlink($audioFile);
+        rmdir($tempDir);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingEbookFileReturnsSameBasenameEpub(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+        mkdir($tempDir);
+
+        $audioFile = $tempDir . '/audiobook.m4b';
+        $epubFile = $tempDir . '/audiobook.epub';
+        touch($audioFile);
+        touch($epubFile);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('findMatchingEbookFile');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $audioFile);
+
+        $this->assertEquals($epubFile, $result);
+
+        unlink($audioFile);
+        unlink($epubFile);
+        rmdir($tempDir);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingEbookFileMatchesOtherSupportedFormats(): void
+    {
+        foreach (['mobi', 'azw', 'azw3', 'azw4', 'kfx', 'fb2', 'lit', 'pdb', 'ibooks'] as $extension) {
+            $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+            mkdir($tempDir);
+
+            $audioFile = $tempDir . '/audiobook.m4b';
+            $ebookFile = "{$tempDir}/audiobook.{$extension}";
+            touch($audioFile);
+            touch($ebookFile);
+
+            $reflection = new \ReflectionClass($this->service);
+            $method = $reflection->getMethod('findMatchingEbookFile');
+            $method->setAccessible(true);
+
+            $result = $method->invoke($this->service, $audioFile);
+
+            $this->assertEquals($ebookFile, $result, "Failed to match .{$extension}");
+
+            unlink($audioFile);
+            unlink($ebookFile);
+            rmdir($tempDir);
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingEbookFileFallsBackToTheOnlyEbookInTheDirectory(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+        mkdir($tempDir);
+
+        $audioFile = $tempDir . '/Part 1.mp3';
+        $ebookFile = $tempDir . '/The Book Title.mobi';
+        touch($audioFile);
+        touch($ebookFile);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('findMatchingEbookFile');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $audioFile);
+
+        $this->assertEquals($ebookFile, $result);
+
+        unlink($audioFile);
+        unlink($ebookFile);
+        rmdir($tempDir);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingEbookFileReturnsNullWhenMultipleEbooksAreAmbiguous(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+        mkdir($tempDir);
+
+        $audioFile = $tempDir . '/Part 1.mp3';
+        $epub = $tempDir . '/Book One.epub';
+        $mobi = $tempDir . '/Book One.mobi';
+        touch($audioFile);
+        touch($epub);
+        touch($mobi);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('findMatchingEbookFile');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $audioFile);
+
+        $this->assertNull($result);
+
+        unlink($audioFile);
+        unlink($epub);
+        unlink($mobi);
+        rmdir($tempDir);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function moveFilesToLibraryReturnsFalseWhenDestinationHasNoAudioFiles(): void
     {
         $sourceDir = $this->createTempDirectory('book_import_source');

@@ -106,6 +106,18 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
   via `passthru()` to play audio for manual A/B comparison. Neither the TTY menu loop nor the
   mplayer playback can be exercised by PHPUnit; only the pure duplicate-pair-finding logic
   (`findDuplicatePairs()`/`findBookOccupyingSlot()`) is realistically testable in isolation.
+- **`BookImportService::playAudioFiles()`** (`app/Services/BookImportService.php`) — shells out
+  to `mpv` (preferred) or `mplayer` via `passthru()` from the main import duplicate-conflict
+  screens (`selectDuplicateAction()`'s `p`/`e` options), used to A/B-compare source vs. existing
+  audio for narrator/quality judgment. `resolveAudioPlayerBinary()`'s `command -v` check and the
+  empty-file-list branch are unit tested; actual playback, terminal takeover, and `q`-to-quit
+  behavior cannot be — verify manually with both mpv and mplayer installed and neither installed.
+- **`ImportUIService::resize()`** (`app/Services/ImportUIService.php`) and the `SIGWINCH` handler
+  in `ImportBooksFromDownloads::setupSignalHandlers()` — redraws the import TUI at a new size
+  when the terminal window is resized mid-import. `pcntl_signal(SIGWINCH, ...)` cannot be
+  triggered from PHPUnit (no real TTY/signal delivery in the test runner); only the deterministic
+  plain-mode width/height update is unit tested. Verify manually by resizing a real terminal
+  while `book:import` is running.
 
 ---
 

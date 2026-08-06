@@ -1038,6 +1038,17 @@ class ImportBooksFromDownloads extends Command
                 $this->handleUserInterruption();
             });
 
+            // Terminal window resized — re-read dimensions and redraw at the new size
+            // instead of staying stretched/clipped to whatever size we started at.
+            if (defined('SIGWINCH')) {
+                pcntl_signal(SIGWINCH, function () {
+                    if ($this->uiService) {
+                        [$width, $height] = $this->getTerminalDimensions();
+                        $this->uiService->resize($width, $height);
+                    }
+                });
+            }
+
             // Enable signal handling
             pcntl_async_signals(true);
         }
