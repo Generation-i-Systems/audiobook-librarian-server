@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\ExternalReadApiController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
+use App\Http\Controllers\Api\AdminGroupController;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\EmailOtpController;
 use App\Http\Controllers\Api\PasswordResetController;
@@ -84,7 +85,13 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
         Route::get('/user', function (Request $request) {
-            return $request->user();
+            $user = $request->user();
+            $user->setAttribute(
+                'groups',
+                $user->groups()->get(['groups.id', 'groups.name'])
+            );
+
+            return $user;
         });
 
         Route::get('/me', [UserApiController::class, 'me']);
@@ -388,6 +395,15 @@ Route::prefix('v1')->group(function () {
             Route::get('/', [BookContributionController::class, 'pending']);
             Route::post('/{contribution}/approve', [BookContributionController::class, 'approve']);
             Route::post('/{contribution}/reject', [BookContributionController::class, 'reject']);
+        });
+
+        // Admin: Group management routes
+        Route::middleware('admin')->prefix('admin/groups')->group(function () {
+            Route::get('/', [AdminGroupController::class, 'index']);
+            Route::get('/{group}', [AdminGroupController::class, 'show']);
+            Route::post('/', [AdminGroupController::class, 'store']);
+            Route::post('/{group}/members', [AdminGroupController::class, 'addMember']);
+            Route::delete('/{group}/members/{user}', [AdminGroupController::class, 'removeMember']);
         });
 
         // Admin: User management routes
