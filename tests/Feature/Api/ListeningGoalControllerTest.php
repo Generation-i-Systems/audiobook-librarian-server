@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Models\Author;
 use App\Models\Book;
 use App\Models\BookPosition;
 use App\Models\Device;
@@ -11,6 +12,7 @@ use App\Models\ListeningGoal;
 use App\Models\ListeningStatistic;
 use App\Models\Genre;
 use App\Models\Playlist;
+use App\Models\Series;
 use App\Models\User;
 use App\Models\UserBookStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -129,6 +131,136 @@ class ListeningGoalControllerTest extends TestCase
             ->assertJsonPath('goals.0.genre_name', null)
             ->assertJsonPath('goals.0.progress_minutes', 0)
             ->assertJsonPath('goals.0.progress_percent', 0);
+    }
+
+    public function test_series_goal_progress_counts_listening_from_series_books(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $series = Series::factory()->create(['name' => 'The Trilogy']);
+        $inSeriesBook = Book::factory()->create();
+        $inSeriesBook->series()->attach($series, ['series_number' => 1]);
+        $otherBook = Book::factory()->create();
+
+        ListeningGoal::create([
+            'user_id' => $user->id,
+            'period_type' => 'week',
+            'metric' => 'series_hours',
+            'target_minutes' => 60,
+            'series_id' => $series->id,
+            'is_active' => true,
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $user->id,
+            'device_id' => 'series-goal-device',
+            'book_id' => $inSeriesBook->id,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 1800,
+            'session_type' => 'listening',
+        ]);
+        ListeningStatistic::create([
+            'user_id' => $user->id,
+            'device_id' => 'series-goal-device',
+            'book_id' => $otherBook->id,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 3600,
+            'session_type' => 'listening',
+        ]);
+
+        $response = $this->getJson('/api/v1/goals/listening');
+
+        $response->assertOk()
+            ->assertJsonPath('goals.0.metric', 'series_hours')
+            ->assertJsonPath('goals.0.series_name', 'The Trilogy')
+            ->assertJsonPath('goals.0.progress_minutes', 30);
+    }
+
+    public function test_author_goal_progress_counts_listening_from_author_books(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $author = Author::factory()->create(['name' => 'Jane Doe']);
+        $authorBook = Book::factory()->create();
+        $authorBook->authors()->attach($author);
+        $otherBook = Book::factory()->create();
+
+        ListeningGoal::create([
+            'user_id' => $user->id,
+            'period_type' => 'week',
+            'metric' => 'author_hours',
+            'target_minutes' => 60,
+            'author_id' => $author->id,
+            'is_active' => true,
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $user->id,
+            'device_id' => 'author-goal-device',
+            'book_id' => $authorBook->id,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 1200,
+            'session_type' => 'listening',
+        ]);
+        ListeningStatistic::create([
+            'user_id' => $user->id,
+            'device_id' => 'author-goal-device',
+            'book_id' => $otherBook->id,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 3600,
+            'session_type' => 'listening',
+        ]);
+
+        $response = $this->getJson('/api/v1/goals/listening');
+
+        $response->assertOk()
+            ->assertJsonPath('goals.0.metric', 'author_hours')
+            ->assertJsonPath('goals.0.author_name', 'Jane Doe')
+            ->assertJsonPath('goals.0.progress_minutes', 20);
+    }
+
+    public function test_book_goal_progress_counts_listening_for_that_book_only(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $targetBook = Book::factory()->create();
+        $otherBook = Book::factory()->create();
+
+        ListeningGoal::create([
+            'user_id' => $user->id,
+            'period_type' => 'week',
+            'metric' => 'book_hours',
+            'target_minutes' => 60,
+            'book_id' => $targetBook->id,
+            'is_active' => true,
+        ]);
+
+        ListeningStatistic::create([
+            'user_id' => $user->id,
+            'device_id' => 'book-goal-device',
+            'book_id' => $targetBook->id,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 900,
+            'session_type' => 'listening',
+        ]);
+        ListeningStatistic::create([
+            'user_id' => $user->id,
+            'device_id' => 'book-goal-device',
+            'book_id' => $otherBook->id,
+            'listening_date' => now()->toDateString(),
+            'seconds_listened' => 3600,
+            'session_type' => 'listening',
+        ]);
+
+        $response = $this->getJson('/api/v1/goals/listening');
+
+        $response->assertOk()
+            ->assertJsonPath('goals.0.metric', 'book_hours')
+            ->assertJsonPath('goals.0.book_title', $targetBook->title)
+            ->assertJsonPath('goals.0.progress_minutes', 15);
     }
 
     public function test_books_finished_goal_progress_counts_completed_books(): void

@@ -20,12 +20,14 @@ class ListeningGoalController extends Controller
     {
     }
 
+    private const METRICS = 'total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours,books_finished,series_hours,author_hours,book_hours';
+
     /** GET /goals/listening — list all active listening goals with current progress */
     public function index(): JsonResponse
     {
         $goals = ListeningGoal::where('user_id', Auth::id())
             ->where('is_active', true)
-            ->with(['genre', 'playlist'])
+            ->with(['genre', 'playlist', 'series', 'author', 'book'])
             ->orderBy('period_type')
             ->get()
             ->map(fn ($goal) => $this->formatGoalWithProgress($goal));
@@ -38,10 +40,13 @@ class ListeningGoalController extends Controller
     {
         $validated = $request->validate([
             'period_type'    => 'required|string|in:day,week,month,year,custom',
-            'metric'         => 'required|string|in:total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours,books_finished',
+            'metric'         => 'required|string|in:' . self::METRICS,
             'target_minutes' => 'required|integer|min:1|max:14400',
             'genre_id'       => 'nullable|integer|exists:genres,id',
             'playlist_id'    => 'nullable|integer|exists:playlists,id',
+            'series_id'      => 'nullable|integer|exists:series,id',
+            'author_id'      => 'nullable|integer|exists:authors,id',
+            'book_id'        => 'nullable|integer|exists:books,id',
             'start_date'     => 'required_if:period_type,custom|nullable|date',
             'end_date'       => 'required_if:period_type,custom|nullable|date|after_or_equal:start_date',
         ]);
@@ -56,12 +61,15 @@ class ListeningGoalController extends Controller
             'target_minutes' => $validated['target_minutes'],
             'genre_id'       => $validated['genre_id'] ?? null,
             'playlist_id'    => $validated['playlist_id'] ?? null,
+            'series_id'      => $validated['series_id'] ?? null,
+            'author_id'      => $validated['author_id'] ?? null,
+            'book_id'        => $validated['book_id'] ?? null,
             'start_date'     => $validated['start_date'] ?? null,
             'end_date'       => $validated['end_date'] ?? null,
             'is_active'      => true,
         ]);
 
-        $goal->load(['genre', 'playlist']);
+        $goal->load(['genre', 'playlist', 'series', 'author', 'book']);
         return response()->json(['goal' => $this->formatGoalWithProgress($goal)], 201);
     }
 
@@ -72,10 +80,13 @@ class ListeningGoalController extends Controller
 
         $validated = $request->validate([
             'period_type'    => 'sometimes|string|in:day,week,month,year,custom',
-            'metric'         => 'sometimes|string|in:total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours,books_finished',
+            'metric'         => 'sometimes|string|in:' . self::METRICS,
             'target_minutes' => 'sometimes|integer|min:1|max:14400',
             'genre_id'       => 'nullable|integer|exists:genres,id',
             'playlist_id'    => 'nullable|integer|exists:playlists,id',
+            'series_id'      => 'nullable|integer|exists:series,id',
+            'author_id'      => 'nullable|integer|exists:authors,id',
+            'book_id'        => 'nullable|integer|exists:books,id',
             'start_date'     => 'sometimes|nullable|date',
             'end_date'       => 'sometimes|nullable|date|after_or_equal:start_date',
             'is_active'      => 'sometimes|boolean',
@@ -88,7 +99,7 @@ class ListeningGoalController extends Controller
         $this->assertPlaylistOwnership($validated['playlist_id'] ?? null);
 
         $goal->update($validated);
-        $goal->load(['genre', 'playlist']);
+        $goal->load(['genre', 'playlist', 'series', 'author', 'book']);
 
         return response()->json(['goal' => $this->formatGoalWithProgress($goal)]);
     }
@@ -237,6 +248,17 @@ class ListeningGoalController extends Controller
                         ->where('user_book_status.playlist_id', $goal->playlist_id);
                 });
                 break;
+            case 'series_hours':
+                $query->join('book_series', 'book_series.book_id', '=', 'listening_statistics.book_id')
+                    ->where('book_series.series_id', $goal->series_id);
+                break;
+            case 'author_hours':
+                $query->join('author_book', 'author_book.book_id', '=', 'listening_statistics.book_id')
+                    ->where('author_book.author_id', $goal->author_id);
+                break;
+            case 'book_hours':
+                $query->where('listening_statistics.book_id', $goal->book_id);
+                break;
         }
 
         return $query;
@@ -316,6 +338,12 @@ class ListeningGoalController extends Controller
             'genre_name'       => $goal->genre?->name,
             'playlist_id'      => $goal->playlist_id,
             'playlist_name'    => $goal->playlist?->name,
+            'series_id'        => $goal->series_id,
+            'series_name'      => $goal->series?->name,
+            'author_id'        => $goal->author_id,
+            'author_name'      => $goal->author?->name,
+            'book_id'          => $goal->book_id,
+            'book_title'       => $goal->book?->title,
             'start_date'       => $periodStart->toDateString(),
             'end_date'         => $periodEnd->toDateString(),
             'elapsed_percent'  => $this->elapsedPercent($periodStart, $periodEnd),

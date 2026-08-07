@@ -10,10 +10,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $user_id
  * @property string $period_type  day|week|month|year|custom
- * @property string $metric       total_hours|genre_hours|playlist_hours|fiction_hours|nonfiction_hours|books_finished
+ * @property string $metric       total_hours|genre_hours|playlist_hours|fiction_hours|nonfiction_hours|books_finished|series_hours|author_hours|book_hours
  * @property int $target_minutes
  * @property int|null $genre_id
  * @property int|null $playlist_id
+ * @property int|null $series_id
+ * @property int|null $author_id
+ * @property int|null $book_id
  * @property \Illuminate\Support\Carbon|null $start_date
  * @property \Illuminate\Support\Carbon|null $end_date
  * @property bool $is_active
@@ -22,6 +25,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read \App\Models\User $user
  * @property-read \App\Models\Genre|null $genre
  * @property-read \App\Models\Playlist|null $playlist
+ * @property-read \App\Models\Series|null $series
+ * @property-read \App\Models\Author|null $author
+ * @property-read \App\Models\Book|null $book
  */
 class ListeningGoal extends Model
 {
@@ -29,13 +35,17 @@ class ListeningGoal extends Model
 
     protected $fillable = [
         'user_id', 'period_type', 'metric', 'target_minutes',
-        'genre_id', 'playlist_id', 'start_date', 'end_date', 'is_active',
+        'genre_id', 'playlist_id', 'series_id', 'author_id', 'book_id',
+        'start_date', 'end_date', 'is_active',
     ];
 
     protected $casts = [
         'target_minutes' => 'integer',
         'genre_id'       => 'integer',
         'playlist_id'    => 'integer',
+        'series_id'      => 'integer',
+        'author_id'      => 'integer',
+        'book_id'        => 'integer',
         'start_date'     => 'date',
         'end_date'       => 'date',
         'is_active'      => 'boolean',
@@ -54,5 +64,20 @@ class ListeningGoal extends Model
     public function playlist(): BelongsTo
     {
         return $this->belongsTo(Playlist::class);
+    }
+
+    public function series(): BelongsTo
+    {
+        return $this->belongsTo(Series::class);
+    }
+
+    public function author(): BelongsTo
+    {
+        return $this->belongsTo(Author::class);
+    }
+
+    public function book(): BelongsTo
+    {
+        return $this->belongsTo(Book::class);
     }
 }
