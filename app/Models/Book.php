@@ -341,7 +341,9 @@ class Book extends Model
         ];
 
         if (Schema::hasTable('book_tags')) {
-            $relations['userTags'] = fn ($q) => $q->where('user_id', $userId);
+            // Only the caller's own private tags — not tags they merely
+            // created at system/group scope, which live in the same table.
+            $relations['userTags'] = fn ($q) => $q->where('owner_key', 'user:' . $userId);
         }
 
         return $query->with($relations);

@@ -560,7 +560,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             if ($tag !== '') {
                 $query->whereHas('userTags', function ($q) use ($userId, $tag): void {
-                    $q->where('user_id', $userId)->whereJsonContains('tags', $tag);
+                    $q->where('owner_key', 'user:' . $userId)->whereJsonContains('tags', $tag);
                 });
             }
         }

@@ -180,6 +180,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/tags', [BookTagController::class, 'show']);
         Route::put('/books/{book}/tags', [BookTagController::class, 'update']);
+        Route::get('/tags/popular', [BookTagController::class, 'popular']);
         Route::get('/books/{book}/download', [BookDownloadController::class, 'download']);
         Route::get('/books/{book}/download/{file}/chunks', [BookDownloadController::class, 'downloadFileChunks'])
             ->where('file', '.*')
