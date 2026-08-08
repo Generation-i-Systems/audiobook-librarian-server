@@ -161,6 +161,7 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/recommendations', [UserLibraryController::class, 'recommendations'])->name('recommendations');
         Route::get('/history', [UserLibraryController::class, 'history'])->name('history');
         Route::get('/goals', [UserLibraryController::class, 'goals'])->name('goals');
+        Route::get('/tags', [UserLibraryController::class, 'tags'])->name('tags');
     });
 
     Route::resource('books', BookController::class)->only(['index', 'show'])->middleware('library');
@@ -172,6 +173,7 @@ Route::middleware(['auth'])->group(function (): void {
     Route::get('/books/{book}/play', [\App\Http\Controllers\PlayerController::class, 'show'])->name('books.play');
     Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+    Route::post('/books/{book}/tags', [\App\Http\Controllers\TagController::class, 'update'])->name('books.tags.update');
 
     // Favorite Authors routes
     Route::get('/favorites', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'index'])
@@ -441,6 +443,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('authors/toggle-merge', [Admin\AuthorController::class, 'toggleMerge'])->name('authors.toggle-merge');
     Route::post('authors/clear-merge', [Admin\AuthorController::class, 'clearMerge'])->name('authors.clear-merge');
     Route::post('authors/merge', [Admin\AuthorController::class, 'merge'])->name('authors.merge');
+
+    Route::get('tags', [Admin\TagController::class, 'index'])->name('tags.index');
+    Route::get('tags/{tag}/edit', [Admin\TagController::class, 'edit'])->where('tag', '.+')->name('tags.edit');
+    Route::put('tags/{tag}', [Admin\TagController::class, 'update'])->where('tag', '.+')->name('tags.update');
+    Route::delete('tags/{tag}', [Admin\TagController::class, 'destroy'])->where('tag', '.+')->name('tags.destroy');
 
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);

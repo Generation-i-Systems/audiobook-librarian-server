@@ -131,6 +131,7 @@ class User extends Authenticatable
         return $this->belongsToMany(Book::class)->withPivot('progress', 'last_listened')->withTimestamps();
     }
 
+    /** @return BelongsToMany<Group, $this> */
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(Group::class, 'group_members')->withTimestamps();

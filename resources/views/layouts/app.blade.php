@@ -101,6 +101,9 @@
                                     <a class="nav-link" style="color:white" href="{{ route('admin.series.manage') }}">Manage Series</a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.tags.index') }}">Tags</a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('admin.messages.index') }}">Messages</a>
                                 </li>
@@ -147,6 +150,7 @@
                                         <div class="dropdown-divider"></div>
                                         <a class="dropdown-item" href="{{ route('my-library.history') }}">Reading History</a>
                                         <a class="dropdown-item" href="{{ route('my-library.goals') }}">Reading Goals</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.tags') }}">My Tags</a>
                                     </div>
                                 </li>
                             @endif

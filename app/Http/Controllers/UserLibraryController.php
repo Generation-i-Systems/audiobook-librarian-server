@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\BookTagService;
 use Illuminate\Support\Facades\Auth;
 
 class UserLibraryController extends Controller
 {
+    public function __construct(private readonly BookTagService $bookTagService)
+    {
+    }
+
     /**
      * Show the user's book queue.
      */
@@ -68,5 +73,17 @@ class UserLibraryController extends Controller
             ->get();
 
         return view('user.library.goals', compact('goals'));
+    }
+
+    /**
+     * Show the user's own tags plus tags shared within their groups.
+     */
+    public function tags()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $tags = $this->bookTagService->myTagsOverview($user);
+
+        return view('user.library.tags', compact('tags'));
     }
 }

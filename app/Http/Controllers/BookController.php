@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Book;
+use App\Models\User;
+use App\Services\BookTagService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Session;
@@ -17,13 +21,19 @@ class BookController extends Controller
 
     protected GoogleBooksApiService $googleBooksApiService;
 
+    protected BookTagService $bookTagService;
+
     /**
      * BookController constructor.
      */
-    public function __construct(DocumentStoreServiceInterface $documentStoreService, GoogleBooksApiService $googleBooksApiService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        GoogleBooksApiService $googleBooksApiService,
+        BookTagService $bookTagService
+    ) {
         $this->documentStoreService = $documentStoreService;
         $this->googleBooksApiService = $googleBooksApiService;
+        $this->bookTagService = $bookTagService;
     }
 
     /**
@@ -366,7 +376,19 @@ class BookController extends Controller
         $relatedBooks = array_filter($relatedBooks, 'is_array'); // Filter out non-array values
         $relatedBooks = array_map([$this, 'ensureBookFields'], $relatedBooks);
 
-        return view('books.show', compact('book', 'relatedBooks'));
+        $tags = ['system' => [], 'groups' => [], 'user' => []];
+        $popularTags = collect();
+        if (Auth::check()) {
+            $bookModel = Book::find($book['id']);
+            if ($bookModel) {
+                /** @var User $user */
+                $user = Auth::user();
+                $tags = $this->bookTagService->visibleTagsForBook($user, $bookModel);
+                $popularTags = $this->bookTagService->popularTags(20);
+            }
+        }
+
+        return view('books.show', compact('book', 'relatedBooks', 'tags', 'popularTags'));
     }
 
     /**

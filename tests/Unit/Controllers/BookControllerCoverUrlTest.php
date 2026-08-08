@@ -6,6 +6,7 @@ namespace Tests\Unit\Controllers;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\BookController;
+use App\Services\BookTagService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Support\Facades\URL;
 use Mockery;
@@ -18,8 +19,9 @@ class BookControllerCoverUrlTest extends TestCase
     {
         $documentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $googleBooks = Mockery::mock(GoogleBooksApiService::class);
+        $bookTagService = Mockery::mock(BookTagService::class);
 
-        $controller = new BookController($documentStore, $googleBooks);
+        $controller = new BookController($documentStore, $googleBooks, $bookTagService);
 
         $ref = new \ReflectionClass($controller);
         $method = $ref->getMethod('ensureBookFieldsMinimal');
@@ -50,8 +52,9 @@ class BookControllerCoverUrlTest extends TestCase
 
         $documentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $googleBooks = Mockery::mock(GoogleBooksApiService::class);
+        $bookTagService = Mockery::mock(BookTagService::class);
 
-        $controller = new BookController($documentStore, $googleBooks);
+        $controller = new BookController($documentStore, $googleBooks, $bookTagService);
 
         $ref = new \ReflectionClass($controller);
         $method = $ref->getMethod('ensureBookFieldsMinimal');

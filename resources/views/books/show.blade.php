@@ -61,6 +61,94 @@
                 </p>
                 <p>{{ isset($book['description']) ? $book['description'] : 'No description available.' }}</p>
 
+                @auth
+                    @php $currentUser = Auth::user(); $userGroups = $currentUser->groups()->get(['groups.id', 'groups.name']); @endphp
+                    <div class="mb-3" id="book-tags">
+                        <strong>Tags:</strong>
+                        <div class="mt-1">
+                            @forelse(($tags['system'] ?? []) as $tag)
+                                <span class="badge bg-primary me-1">{{ $tag }}</span>
+                            @empty
+                            @endforelse
+                            @foreach(($tags['groups'] ?? []) as $groupTags)
+                                @foreach($groupTags['tags'] as $tag)
+                                    <span class="badge bg-info text-dark me-1" title="{{ $groupTags['groupName'] }}">{{ $tag }}</span>
+                                @endforeach
+                            @endforeach
+                            @foreach(($tags['user'] ?? []) as $tag)
+                                <span class="badge bg-secondary me-1">{{ $tag }}</span>
+                            @endforeach
+                            @if(empty($tags['system'] ?? []) && empty($tags['groups'] ?? []) && empty($tags['user'] ?? []))
+                                <span class="text-muted">No tags yet.</span>
+                            @endif
+                        </div>
+
+                        @if(!empty($popularTags))
+                            <div class="mt-2">
+                                <small class="text-muted">Popular tags:</small><br>
+                                @foreach($popularTags as $popularTag)
+                                    <span class="badge bg-light text-dark border tag-suggestion" style="cursor:pointer" data-tag="{{ $popularTag }}">
+                                        {{ $popularTag }}
+                                    </span>
+                                @endforeach
+                            </div>
+                            <script>
+                                document.querySelectorAll('#book-tags .tag-suggestion').forEach(function (chip) {
+                                    chip.addEventListener('click', function () {
+                                        var tag = chip.dataset.tag;
+                                        document.querySelectorAll('#book-tags .tag-input').forEach(function (el) {
+                                            el.value = el.value ? el.value + ', ' + tag : tag;
+                                        });
+                                    });
+                                });
+                            </script>
+                        @endif
+
+                        <div class="row mt-2 g-2">
+                            @if($currentUser->isAdmin())
+                                <div class="col-md-4">
+                                    <form action="{{ route('books.tags.update', $book['id']) }}" method="POST" class="border rounded p-2">
+                                        @csrf
+                                        <label class="form-label small fw-bold">System Tags</label>
+                                        <input type="hidden" name="scope" value="system">
+                                        <input type="text" name="tags" class="form-control form-control-sm tag-input"
+                                            value="{{ implode(', ', $tags['system'] ?? []) }}" placeholder="comma separated">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary mt-1">Save</button>
+                                    </form>
+                                </div>
+                            @endif
+
+                            @foreach($userGroups as $group)
+                                @php
+                                    $existingGroupTags = collect($tags['groups'] ?? [])->firstWhere('groupId', $group->id)['tags'] ?? [];
+                                @endphp
+                                <div class="col-md-4">
+                                    <form action="{{ route('books.tags.update', $book['id']) }}" method="POST" class="border rounded p-2">
+                                        @csrf
+                                        <label class="form-label small fw-bold">{{ $group->name }} Tags</label>
+                                        <input type="hidden" name="scope" value="group">
+                                        <input type="hidden" name="group_id" value="{{ $group->id }}">
+                                        <input type="text" name="tags" class="form-control form-control-sm tag-input"
+                                            value="{{ implode(', ', $existingGroupTags) }}" placeholder="comma separated">
+                                        <button type="submit" class="btn btn-sm btn-outline-info mt-1">Save</button>
+                                    </form>
+                                </div>
+                            @endforeach
+
+                            <div class="col-md-4">
+                                <form action="{{ route('books.tags.update', $book['id']) }}" method="POST" class="border rounded p-2">
+                                    @csrf
+                                    <label class="form-label small fw-bold">My Tags</label>
+                                    <input type="hidden" name="scope" value="user">
+                                    <input type="text" name="tags" class="form-control form-control-sm tag-input"
+                                        value="{{ implode(', ', $tags['user'] ?? []) }}" placeholder="comma separated">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary mt-1">Save</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endauth
+
                 <div class="mb-3">
                     <a href="{{ route('books.play', $book['id']) }}" class="btn btn-success me-2">
                         <i class="bi bi-play-circle-fill"></i> Play
