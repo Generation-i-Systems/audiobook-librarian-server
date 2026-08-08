@@ -4,6 +4,12 @@ This file contains the text of prompts sent to the AI assistant.
 
 ---
 
+## 2026-08-08
+
+update the import script to use more AI by including the previous imports of other books in the same parent directory if they were user modified so that patterns modified by the user may be applied to the other files in the same parent dir (ignoring generic parents). in the edit menu add an item to reverse the title and series and make sure this is something that the AI would notice
+
+---
+
 ## 2026-08-03
 
 build a backend-independent Skin Store at www.ablibrarian.com. Phase 1 must provide remote free-skin browsing, previews, downloads, and skin-packaged rules for every client backend; paid skins remain previewable and clearly unavailable until a later Phase 2 commerce release. Keep the self-hosted server gallery proxy only for legacy compatibility.

@@ -180,4 +180,38 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
 
         $this->assertSame(1, $extractionCallCount, 'Editing series must still trigger series-number extraction');
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function swapTitleAndSeriesChoiceSwapsBothFields(): void
+    {
+        $metadata = [
+            'title' => 'The Forgotten Five',
+            'author' => ['Some Author'],
+            'series' => 'Rebel Undercover',
+        ];
+
+        $choices = ['s', '9'];
+        $selectCallback = function (string $question, array $options, string $default) use (&$choices): string {
+            return array_shift($choices) ?? $default;
+        };
+
+        $extractSeriesNumberFromTitleCallback = function (array &$metadata): void {
+        };
+
+        $result = $this->service->editMetadataFields(
+            $metadata,
+            [],
+            fn (string $question, string $default) => $default,
+            $selectCallback,
+            fn (array $metadata, array $keys) => null,
+            $extractSeriesNumberFromTitleCallback,
+            fn () => ['Other'],
+            function (): void {
+            },
+            fn (array $metadata) => $metadata
+        );
+
+        $this->assertSame('Rebel Undercover', $result['title']);
+        $this->assertSame('The Forgotten Five', $result['series']);
+    }
 }

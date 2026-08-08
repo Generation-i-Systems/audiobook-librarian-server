@@ -2,6 +2,9 @@
 
 ### Added
 
+- Import edit menu: a "Swap Title ↔ Series" action lets the user quickly correct a book whose Title and Series were extracted backwards.
+- Import AI processing now learns each directory's folder-name-to-fields parsing pattern from user corrections: any edit made in the edit menu (Title, Author, Narrator, Series, Series Number, Year, Genre — including a Title/Series swap) on a previously imported sibling book in the same (non-generic) parent directory is recorded as a "folder name → correct fields" example and fed into the AI prompt as extra context, so uncommon/non-standard naming conventions that don't fit the built-in path-parsing rules can be learned per directory instead of the AI repeating the same mistake on every book in it. Hints are de-duplicated and capped per directory to keep prompts bounded.
+
 - Ported the `app:refresh` command from the school-bus-dashboard codebase. This command clears application caches, repairs directory permissions in writable storage/cache locations, runs pending database migrations, restarts queue workers, resets the PHP OPcache, reloads the PHP-FPM service, and optionally builds frontend assets when changes are detected.
 - Cached manifest chunk hashes for local book files, plus `books:cache-file-chunk-hashes` to pre-generate them by explicit book ids, newest books, all books, or a bounded batch with a system-load threshold for frequent cron runs.
 - `books:cache-file-chunk-hashes` now prints each processed book's id, author, and title alongside generated/cached/missing/skipped counts.

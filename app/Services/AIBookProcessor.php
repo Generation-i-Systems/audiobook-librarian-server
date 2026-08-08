@@ -405,13 +405,14 @@ class AIBookProcessor
         string $directoryPath,
         array $fileNames = [],
         array $fileTags = [],
-        array $nfoData = null
+        array $nfoData = null,
+        array $patternHints = []
     ): array {
         try {
             // Check rate limits before making request
             $this->respectRateLimit();
 
-            $prompt = $this->buildPrompt($directoryPath, $fileNames, $fileTags, $nfoData);
+            $prompt = $this->buildPrompt($directoryPath, $fileNames, $fileTags, $nfoData, $patternHints);
             $response = $this->callAIAPI($prompt);
 
             return $this->parseAIResponse($response);
@@ -432,7 +433,8 @@ class AIBookProcessor
         string $directoryPath,
         array $fileNames,
         array $fileTags,
-        array $nfoData = null
+        array $nfoData = null,
+        array $patternHints = []
     ): string {
         $prompt = "Extract audiobook metadata from this data and return JSON only:\n\n";
 
@@ -531,6 +533,19 @@ class AIBookProcessor
             "- use directory structure instead\n";
         $prompt .= "- Always remove leading numbers/dashes from title " .
             "(e.g., '3 Title' → 'Title', '01 - Title' → 'Title')\n\n";
+
+        if (!empty($patternHints)) {
+            $prompt .= "LEARN THIS DIRECTORY'S FOLDER-NAME-TO-FIELDS PARSING PATTERN FROM PAST USER CORRECTIONS:\n";
+            $prompt .= "These are real folder names from OTHER books already imported from this same directory, " .
+                "and how the user corrected the AI's parsing of them. This directory may use an uncommon " .
+                "naming convention that the general path-parsing rules above don't cover — use these examples " .
+                "to infer that convention:\n";
+            foreach ($patternHints as $hint) {
+                $prompt .= "- {$hint}\n";
+            }
+            $prompt .= "If this book's folder name follows the same convention, apply the SAME parsing " .
+                "the user already established rather than repeating the mistake the AI made last time.\n\n";
+        }
 
         $prompt .= "IMPORTANT: For genre, you MUST choose from this EXACT list of valid library genres:\n";
         $prompt .= "Church, Classic, Computer, Other, Science, Fantasy, History, General Fiction, " .

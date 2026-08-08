@@ -4525,7 +4525,8 @@ class BookImportService
                 basename($audiobook['path']),
                 $fileNames,
                 $fileTags,
-                $nfoData
+                $nfoData,
+                $this->getParentDirectoryPatternHints($audiobook)
             );
 
             if ($aiResult) {
@@ -4998,6 +4999,24 @@ class BookImportService
      */
     private const GENERIC_CONTAINER_DIRS = ['download', 'downloads', 'audiobooks', 'audiobook', 'unsorted', 'books', 'media'];
 
+    /**
+     * Fields tracked for generic "user corrected this field" AI pattern hints. Limited to
+     * fields the AI itself proposes (see AIBookProcessor::buildPrompt()) — custom_directory_path
+     * is derived separately and was never an AI guess, so editing it isn't an "AI mistake" to flag.
+     */
+    private const PATTERN_HINT_FIELD_LABELS = [
+        'title' => 'Title',
+        'author' => 'Author',
+        'narrator' => 'Narrator',
+        'series' => 'Series',
+        'series_number' => 'Series Number',
+        'year' => 'Year',
+        'genre' => 'Genre',
+    ];
+
+    /** Cap on stored hints per directory so the AI prompt doesn't grow unbounded on large series. */
+    private const MAX_PATTERN_HINTS_PER_DIRECTORY = 8;
+
     private function isGenericContainerDirectory(string $path): bool
     {
         return in_array(strtolower(basename($path)), self::GENERIC_CONTAINER_DIRS, true);
@@ -5007,11 +5026,22 @@ class BookImportService
      * Remember manually-edited author/genre/series for this book's parent directory,
      * so a later, independently-processed sibling book can reuse them.
      *
+     * When $originalMetadata (the AI-proposed values before the user's edits) is given,
+     * also record a folder-name-to-fields correction example — anchored on this book's own
+     * folder name — so the AI prompt for the next sibling book can learn how *this
+     * directory's* naming convention actually maps to fields, instead of relying solely on
+     * the generic path-parsing rules baked into the prompt. This is what lets uncommon
+     * naming patterns (that don't fit the standard "ParentDir/N Title" rule) be learned
+     * directory-by-directory from the user's own corrections.
+     *
      * Skipped for generic container directories (e.g. a flat /media/downloads folder)
      * since unrelated books placed directly under them must not share metadata.
      */
-    protected function recordParentDirectoryManualOverrides(array $metadata, array $audiobook): void
-    {
+    protected function recordParentDirectoryManualOverrides(
+        array $metadata,
+        array $audiobook,
+        ?array $originalMetadata = null
+    ): void {
         $path = (string) ($audiobook['path'] ?? '');
         if ($path === '') {
             return;
@@ -5031,6 +5061,116 @@ class BookImportService
                 $this->parentDirectoryManualOverrides[$parentDir][$field] = $metadata[$field];
             }
         }
+
+        if ($originalMetadata === null) {
+            return;
+        }
+
+        $folderName = basename(rtrim($path, '/'));
+        $hint = $this->describePathParsingCorrection($originalMetadata, $metadata, $folderName);
+        if ($hint !== null) {
+            $this->addParentDirectoryPatternHint($parentDir, $hint);
+        }
+    }
+
+    /**
+     * Build a folder-name-to-fields correction example: what this book's actual folder name
+     * is, which fields the AI mis-parsed from it, and what the correct values are. Anchoring
+     * on the real folder name (rather than an abstract "field X was wrong") gives the AI a
+     * concrete few-shot example of how to parse this directory's specific naming convention,
+     * including uncommon patterns the built-in path-parsing rules don't cover.
+     *
+     * Returns null when nothing the AI proposes actually changed (e.g. the user accepted
+     * every field as-is).
+     */
+    private function describePathParsingCorrection(
+        array $originalMetadata,
+        array $finalMetadata,
+        string $folderName
+    ): ?string {
+        $diffs = [];
+        foreach (self::PATTERN_HINT_FIELD_LABELS as $field => $label) {
+            $original = $this->normalizeMetadataValueForHint($originalMetadata[$field] ?? null);
+            $final = $this->normalizeMetadataValueForHint($finalMetadata[$field] ?? null);
+            if ($original !== $final) {
+                $diffs[$label] = [$original, $final];
+            }
+        }
+
+        if (empty($diffs)) {
+            return null;
+        }
+
+        $correctionParts = [];
+        foreach ($diffs as $label => [$original, $final]) {
+            $correctionParts[] = "{$label}: AI guessed \"{$original}\", correct is \"{$final}\"";
+        }
+
+        $hint = "Folder \"{$folderName}\" in this directory was mis-parsed by the AI — " .
+            implode('; ', $correctionParts) . '.';
+
+        if (isset($diffs['Title'], $diffs['Series'])
+            && $diffs['Title'][0] !== '' && $diffs['Series'][0] !== ''
+            && strcasecmp($diffs['Title'][0], $diffs['Series'][1]) === 0
+            && strcasecmp($diffs['Series'][0], $diffs['Title'][1]) === 0
+        ) {
+            $hint .= ' Note: Title and Series were swapped — the AI mistook the series name for the title ' .
+                'and vice versa.';
+        }
+
+        return $hint . ' Learn how this directory\'s folder names map to fields from this example, and apply ' .
+            'the same path-parsing pattern to other, similarly-named folders here.';
+    }
+
+    /**
+     * String representation of a metadata field value for hint comparison/display.
+     * Array-valued fields (author, narrator, genre) are joined for a readable diff.
+     */
+    private function normalizeMetadataValueForHint(mixed $value): string
+    {
+        if (is_array($value)) {
+            return implode(', ', array_map(static fn ($v) => trim((string) $v), $value));
+        }
+
+        return trim((string) ($value ?? ''));
+    }
+
+    /**
+     * Append a pattern hint for a parent directory, de-duplicated and capped so the AI
+     * prompt doesn't grow unbounded across a large series with many manual edits.
+     */
+    private function addParentDirectoryPatternHint(string $parentDir, string $hint): void
+    {
+        $hints = $this->parentDirectoryManualOverrides[$parentDir]['_pattern_hints'] ?? [];
+        if (in_array($hint, $hints, true)) {
+            return;
+        }
+
+        $hints[] = $hint;
+        if (count($hints) > self::MAX_PATTERN_HINTS_PER_DIRECTORY) {
+            $hints = array_slice($hints, -self::MAX_PATTERN_HINTS_PER_DIRECTORY);
+        }
+
+        $this->parentDirectoryManualOverrides[$parentDir]['_pattern_hints'] = $hints;
+    }
+
+    /**
+     * Pattern hints recorded from previously imported, user-edited sibling books in the
+     * same (non-generic) parent directory, to pass into the AI prompt for this book.
+     */
+    protected function getParentDirectoryPatternHints(array $audiobook): array
+    {
+        $path = (string) ($audiobook['path'] ?? '');
+        if ($path === '') {
+            return [];
+        }
+
+        $parentDir = dirname(rtrim($path, '/'));
+        if ($parentDir === '' || $parentDir === '.' || $this->isGenericContainerDirectory($parentDir)) {
+            return [];
+        }
+
+        return $this->parentDirectoryManualOverrides[$parentDir]['_pattern_hints'] ?? [];
     }
 
     /**
@@ -5050,6 +5190,7 @@ class BookImportService
         }
 
         $overrides = $this->parentDirectoryManualOverrides[$parentDir] ?? [];
+        unset($overrides['_pattern_hints']);
         if (empty($overrides)) {
             return $aiMetadata;
         }
@@ -5082,6 +5223,10 @@ class BookImportService
         ?callable $selectFilteredCallback = null
     ): array {
         $selectFilteredCallback ??= $selectWithImmediateInterruptCallback;
+        $originalMetadata = [];
+        foreach (self::PATTERN_HINT_FIELD_LABELS as $field => $label) {
+            $originalMetadata[$field] = $metadata[$field] ?? null;
+        }
         if ($forceSequential) {
             $currentTitle = $metadata['title'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']) ?? '';
             $metadata['title'] = $askInlineCallback('Title', (string) $currentTitle);
@@ -5153,7 +5298,7 @@ class BookImportService
                     }
                 }
             }
-            $this->recordParentDirectoryManualOverrides($metadata, $audiobook);
+            $this->recordParentDirectoryManualOverrides($metadata, $audiobook, $originalMetadata);
 
             return $metadata;
         }
@@ -5199,6 +5344,9 @@ class BookImportService
                 'c' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
                 'n' => 'Add narrator to directory name',
             ];
+            if ($currentTitle !== '' && $currentSeries !== '') {
+                $options['s'] = "Swap Title \u{2194} Series: \"{$currentTitle}\" \u{2194} \"{$currentSeries}\"";
+            }
             if ($manualEnrichmentCallback !== null && $getEnrichmentServiceCallback !== null) {
                 $options['r'] = 'Request enrichment (Audible/Google Books)';
             }
@@ -5229,6 +5377,11 @@ class BookImportService
                         unset($metadata['series']);
                         $metadata['series_number'] = '';
                     }
+                    break;
+                case 's':
+                    $metadata['title'] = (string) $currentSeries;
+                    $metadata['series'] = (string) $currentTitle;
+                    $titleManuallyEdited = true;
                     break;
                 case '5':
                     $metadata['series_number'] = $askInlineCallback('Series Number', (string) $currentSeriesNumber);
@@ -5330,7 +5483,7 @@ class BookImportService
                 }
             }
         }
-        $this->recordParentDirectoryManualOverrides($metadata, $audiobook);
+        $this->recordParentDirectoryManualOverrides($metadata, $audiobook, $originalMetadata);
 
         return $metadata;
     }
