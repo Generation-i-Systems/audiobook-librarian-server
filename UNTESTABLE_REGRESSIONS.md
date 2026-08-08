@@ -118,8 +118,26 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
   triggered from PHPUnit (no real TTY/signal delivery in the test runner); only the deterministic
   plain-mode width/height update is unit tested. Verify manually by resizing a real terminal
   while `book:import` is running.
-
----
+- **Genre typeahead selector** — `ImportUIService::selectFilteredWithArrowKeys()` (raw-TTY
+  arrow-key + type-to-filter loop, used in `--ui=ncurses` mode) and
+  `HybridUIService::selectFiltered()` / `App\Services\ScrollableSearchPrompt` (Laravel Prompts
+  `SearchPrompt`-based, used in the default `--ui=hybrid` mode) cannot be driven by PHPUnit since
+  `terminalSupportsArrowInput()` is forced false under `app()->environment('testing')`. Only the
+  filtering/sorting algorithm (`App\Support\TypeaheadFilter`) and the non-arrow fallback loop
+  (`ImportUIService::selectFilteredFallback()`) are unit tested. Verify manually in a real
+  terminal: typing should narrow the Genre list (earliest match first), Backspace should widen it
+  again, and Enter/arrow-key navigation should still pick the highlighted genre. Escape should
+  back out of just that selection (empty-string return, not the `'q'` quit sentinel — the caller
+  falls back to the field's current/default value) without exiting the whole import, in both
+  `--ui=ncurses` and the default `--ui=hybrid` mode — verify manually since raw ESC-key handling
+  and `Laravel\Prompts\SearchPrompt`'s internal loop can't be driven by PHPUnit either.
+- **Text field editing (Title, Directory Path, etc.)** — `ImportUIService::readLineWithEditableDefault()`
+  (raw-TTY line editor, `--ui=ncurses`) and `HybridUIService::ask()` / `App\Services\ScrollableTextPrompt`
+  (Laravel Prompts `TextPrompt`-based, default `--ui=hybrid` mode) have the same
+  PHPUnit-can't-drive-a-raw-TTY limitation as the genre selector above. Verify manually: typing
+  should edit the prefilled default text, Enter should submit whatever's currently in the field,
+  and Escape should discard any edits and leave the field's original value untouched (not blank
+  it out, and not quit the import).
 
 ## 6. Browser / JavaScript UI
 

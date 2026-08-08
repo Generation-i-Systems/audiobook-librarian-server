@@ -22,6 +22,31 @@ class BackupDatabase extends Command
     protected $description = 'Create a backup of the MySQL database';
 
     /**
+     * Minimum time between automatic (non-manual) backups.
+     */
+    public const AUTO_BACKUP_MIN_INTERVAL_HOURS = 4.0;
+
+    /**
+     * Hours elapsed since the most recent backup, or null if none exists.
+     */
+    public static function hoursSinceLastBackup(?string $backupDir = null): ?float
+    {
+        $backupDir = $backupDir ?? (string) config('app.database_backup_path');
+        if (!is_dir($backupDir)) {
+            return null;
+        }
+
+        $files = glob($backupDir . '/backup_*.sql.gz');
+        if ($files === false || count($files) === 0) {
+            return null;
+        }
+
+        $latestMtime = max(array_map('filemtime', $files));
+
+        return (time() - $latestMtime) / 3600;
+    }
+
+    /**
      * Execute the console command.
      */
     public function handle()

@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Contracts\ImportUIInterface;
+use App\Support\TypeaheadFilter;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\progress;
+use function Laravel\Prompts\search;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\table;
@@ -121,6 +123,33 @@ class PromptsUIService implements ImportUIInterface
         );
 
         return (string) $response;
+    }
+
+    public function selectFiltered(string $question, array $options, string $default = ''): string
+    {
+        $question = $this->clean($question);
+        $options  = $this->cleanOptions($options);
+
+        if ($this->plainMode) {
+            return $this->selectPlain($question, $options, $default);
+        }
+
+        if (empty($options)) {
+            return '';
+        }
+
+        $formattedOptions = [];
+        foreach ($options as $key => $label) {
+            $formattedOptions[(string) $key] = $label;
+        }
+
+        $selected = search(
+            label: $question,
+            options: fn (string $value) => TypeaheadFilter::filter($formattedOptions, $value),
+            placeholder: 'Type to filter...',
+        );
+
+        return (string) $selected;
     }
 
     protected function selectPlain(string $question, array $options, string $default): string

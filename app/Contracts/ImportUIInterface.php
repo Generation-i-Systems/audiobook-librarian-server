@@ -26,6 +26,12 @@ interface ImportUIInterface
     public function select(string $question, array $options, string $default = ''): string;
 
     /**
+     * Present a selection menu that narrows as the user types, matching
+     * options whose label contains the typed text (earliest match first).
+     */
+    public function selectFiltered(string $question, array $options, string $default = ''): string;
+
+    /**
      * Ask a yes/no confirmation question
      */
     public function confirm(string $question, bool $default = false): bool;

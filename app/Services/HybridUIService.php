@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
+use App\Support\TypeaheadFilter;
+
 use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\text;
 
 class HybridUIService extends ImportUIService
 {
@@ -132,20 +133,26 @@ class HybridUIService extends ImportUIService
 
         echo "\e[{$cursorY};{$cursorX}H";
 
-        $response = text(
+        $prompt = new ScrollableTextPrompt(
             label: $question,
             default: $default,
-            required: false
+            required: false,
         );
 
-        if (strtolower(trim($response)) === 'q') {
+        $response = $prompt->prompt();
+
+        // wasCancelled() means Escape was pressed: value() already reverted to
+        // $default, so skip the 'q' quit-sentinel check entirely — cancelling
+        // shouldn't quit the import just because a field's original text
+        // happened to be the literal word "q".
+        if (!$prompt->wasCancelled() && strtolower(trim((string) $response)) === 'q') {
             return 'q';
         }
 
         // Restore layout
         $this->renderFull();
 
-        return $response;
+        return (string) $response;
     }
 
     public function select(string $question, array $options, string $default = ''): string
@@ -188,6 +195,54 @@ class HybridUIService extends ImportUIService
         $response = $prompt->prompt();
 
         $this->renderFull();
+
+        return (string) $response;
+    }
+
+    public function selectFiltered(string $question, array $options, string $default = ''): string
+    {
+        $this->renderFull();
+
+        $cursorY = $this->getPromptCursorY();
+
+        if (empty($options)) {
+            return '';
+        }
+
+        $formattedOptions = [];
+        foreach ($options as $key => $label) {
+            $formattedOptions[(string) $key] = $label;
+        }
+
+        $layout = $this->computeLayout();
+        $scroll = max(5, min(count($formattedOptions), $layout['menuHeight'] - 4));
+
+        $prompt = new ScrollableSearchPrompt(
+            label: $question,
+            options: fn (string $value) => TypeaheadFilter::filter($formattedOptions, $value),
+            placeholder: 'Type to filter...',
+            scroll: $scroll,
+            cursorRow: $cursorY,
+            onScrollUp: function (): void {
+                $this->scrollLog('up');
+            },
+            onScrollDown: function (): void {
+                $this->scrollLog('down');
+            },
+        );
+
+        $response = $prompt->prompt();
+
+        $this->renderFull();
+
+        if ($prompt->wasCancelled()) {
+            // Not the 'q' sentinel: Escape backs out of just this selection, it
+            // doesn't quit the whole import. Every call site falls back to the
+            // current/default value when the returned key isn't a valid option
+            // (e.g. `$genreOptions[$selectedGenreIdx] ?? $displayGenre`), and no
+            // real option key is ever an empty string, so this reliably no-ops.
+            return '';
+        }
 
         return (string) $response;
     }

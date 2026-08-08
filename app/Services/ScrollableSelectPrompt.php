@@ -72,4 +72,16 @@ class ScrollableSelectPrompt extends SelectPrompt
     {
         return new SelectPromptRenderer($this);
     }
+
+    /**
+     * See ScrollableSearchPrompt::renderTheme() for why this is needed: the
+     * custom Output installed by HybridUIService rtrims trailing blank lines
+     * at write time, but Prompt::render() sizes its next cursor-up move off
+     * the untrimmed frame. Trimming here keeps the two in sync so the box
+     * doesn't creep upward on repeated renders.
+     */
+    protected function renderTheme(): string
+    {
+        return rtrim(parent::renderTheme(), "\r\n");
+    }
 }

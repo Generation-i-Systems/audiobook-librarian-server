@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\ImportUIInterface;
+use App\Support\TypeaheadFilter;
 use SoloTerm\Screen\Screen;
 
 class ImportUIService implements ImportUIInterface
@@ -396,6 +397,23 @@ class ImportUIService implements ImportUIInterface
         return true;
     }
 
+    /**
+     * Non-blocking check for whether more bytes are already available (or
+     * arrive within a short window) on the given stream.
+     */
+    protected function morePendingOn(mixed $stream): bool
+    {
+        if (!is_resource($stream)) {
+            return false;
+        }
+
+        $read = [$stream];
+        $write = [];
+        $except = [];
+
+        return @stream_select($read, $write, $except, 0, 30_000) > 0;
+    }
+
     protected function parseTerminalKeySequence(string $char): array
     {
         $rawBytes = $char;
@@ -422,6 +440,19 @@ class ImportUIService implements ImportUIInterface
         }
 
         $stream = $this->getInputStream();
+
+        // A genuine standalone Escape press has no follow-up bytes. The input
+        // stream is set blocking (enableRawInput()), so reading the "intro"
+        // byte unconditionally would hang here until the user pressed
+        // something else entirely. Peek first: if nothing has arrived within
+        // a short window, this was Escape on its own — report it immediately
+        // instead of waiting on a read that may never resolve.
+        if (!$this->morePendingOn($stream)) {
+            if ($this->isKeyDebugEnabled()) {
+                $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+            }
+            return ['escape'];
+        }
 
         $intro = fgetc($stream);
         if ($intro === false) {
@@ -685,6 +716,11 @@ class ImportUIService implements ImportUIInterface
 
                 if ($actionType === 'enter') {
                     return (string) ($state['buffer'] ?? '');
+                }
+
+                if ($actionType === 'escape') {
+                    // Leave the original content untouched, discarding any edits.
+                    return $default;
                 }
 
                 if ($actionType === 'page-up') {
@@ -1694,6 +1730,230 @@ class ImportUIService implements ImportUIInterface
                 "\e[31mInvalid option '{$choice}'. Please choose one of the listed keys.\e[0m",
             ], $lines);
         }
+    }
+
+    /**
+     * Like select(), but narrows the option list as the user types. Matches
+     * are ordered by how early the typed text appears in the label
+     * (earliest first), then alphabetically.
+     */
+    public function selectFiltered(string $question, array $options, string $default = ''): string
+    {
+        if (count($options) === 0) {
+            return '';
+        }
+
+        if ($this->terminalSupportsArrowInput()) {
+            $choice = $this->selectFilteredWithArrowKeys($question, $options, $default);
+            if ($this->interrupted) {
+                return '';
+            }
+
+            return $choice;
+        }
+
+        return $this->selectFilteredFallback($question, $options, $default);
+    }
+
+    protected function selectFilteredFallback(string $question, array $options, string $default = ''): string
+    {
+        $filter = '';
+        $activeOptions = $options;
+        $noMatchMessage = null;
+
+        while (true) {
+            $lines = ["\e[1;33m{$question}\e[0m"];
+            if ($noMatchMessage !== null) {
+                $lines[] = "\e[31m{$noMatchMessage}\e[0m";
+            } elseif ($filter !== '') {
+                $lines[] = "Filter: {$filter}";
+            } else {
+                $lines[] = 'Type to filter, or enter an option key';
+            }
+            $lines = array_merge($lines, $this->formatOptionsAsColumns($activeOptions, 2));
+
+            $this->promptLines = $lines;
+            $input = trim((string) $this->ask('Select option', $default, false));
+            $choice = strtolower($input);
+            $noMatchMessage = null;
+
+            if ($this->isQuitInput($choice)) {
+                $this->promptLines = [];
+                $this->renderFull();
+                return 'q';
+            }
+
+            if ($input === '' && $default !== '') {
+                $choice = strtolower(trim($default));
+            }
+
+            if (array_key_exists($choice, $options)) {
+                $this->promptLines = [];
+                $this->renderFull();
+                return $choice;
+            }
+
+            $filter = $input;
+            $activeOptions = TypeaheadFilter::filter($options, $filter);
+
+            if ($filter !== '' && empty($activeOptions)) {
+                $noMatchMessage = "No matches for '{$filter}'.";
+                $activeOptions = $options;
+            }
+        }
+    }
+
+    protected function selectFilteredWithArrowKeys(string $question, array $options, string $default = ''): string
+    {
+        $filter = '';
+        $activeOptions = $options;
+        $selectedIndex = self::resolveDefaultSelectionIndex(array_keys($options), $default);
+        $rawState = $this->enableRawInput();
+
+        $stream = $this->getInputStream();
+
+        try {
+            while (true) {
+                if ($this->interrupted) {
+                    $this->promptLines = [];
+                    $this->renderFull();
+                    return '';
+                }
+
+                $keys = array_keys($activeOptions);
+                $count = count($keys);
+                if ($selectedIndex >= $count) {
+                    $selectedIndex = max(0, $count - 1);
+                }
+
+                $desiredColumns = 3;
+                $availableWidth = max(20, $this->width - 8);
+                $maxItemLen = 0;
+                foreach ($activeOptions as $val) {
+                    $maxItemLen = max($maxItemLen, mb_strlen((string) $val));
+                }
+                $idealColWidth = min($availableWidth, max(10, $maxItemLen + 2));
+                $maxColumnsThatFit = (int) max(1, floor($availableWidth / $idealColWidth));
+                $columns = min(max(1, $desiredColumns), min(4, $maxColumnsThatFit));
+                $rows = (int) ceil(max(1, $count) / $columns);
+
+                $selectedKey = $count > 0 ? (string) $keys[$selectedIndex] : null;
+
+                $lines = [
+                    "\e[1;33m{$question}\e[0m",
+                    'Type to filter, Up/Down/Left/Right + Enter to select, Backspace to edit filter',
+                ];
+
+                if ($filter !== '') {
+                    $lines[] = "Filter: {$filter}";
+                }
+
+                if ($count === 0) {
+                    $lines[] = "\e[31mNo matches for '{$filter}'.\e[0m";
+                } else {
+                    $gridOptions = [];
+                    foreach ($keys as $key) {
+                        $label = (string) ($activeOptions[$key] ?? '');
+                        $gridOptions[$key] = ((string) $key === $selectedKey) ? "\e[7m{$label}\e[0m" : $label;
+                    }
+                    $lines = array_merge($lines, $this->formatOptionsAsColumns($gridOptions, $columns));
+                }
+
+                $this->promptLines = $lines;
+                $this->renderFull();
+
+                $char = fgetc($stream);
+                if ($char === false || $char === '') {
+                    if (feof($stream)) {
+                        break;
+                    }
+                    continue;
+                }
+
+                if ($char === "\n" || $char === "\r") {
+                    if ($selectedKey !== null) {
+                        $this->promptLines = [];
+                        $this->renderFull();
+                        return $selectedKey;
+                    }
+                    continue;
+                }
+
+                $action = $this->parseTerminalKeySequence($char);
+                $actionType = (string) ($action[0] ?? '');
+
+                if ($actionType === 'up' || $actionType === 'down' || $actionType === 'left' || $actionType === 'right') {
+                    if ($count > 0) {
+                        $selectedIndex = self::moveGridSelection(
+                            $selectedIndex,
+                            $actionType,
+                            max(1, $rows),
+                            max(1, $columns),
+                            $count
+                        );
+                    }
+                    continue;
+                }
+
+                if ($actionType === 'page-up') {
+                    $this->scrollLog('up');
+                    continue;
+                }
+
+                if ($actionType === 'page-down') {
+                    $this->scrollLog('down');
+                    continue;
+                }
+
+                if ($actionType === 'backspace') {
+                    if ($filter !== '') {
+                        $filter = mb_substr($filter, 0, -1);
+                        $activeOptions = TypeaheadFilter::filter($options, $filter);
+                        $selectedIndex = 0;
+                    }
+                    continue;
+                }
+
+                if ($char === "\x1B") {
+                    // Standalone Escape: back out of just this selection (not the
+                    // 'q' quit sentinel). Every call site falls back to the
+                    // current/default value when the returned key isn't a valid
+                    // option, and no real option key is ever an empty string.
+                    $this->promptLines = [];
+                    $this->renderFull();
+                    return '';
+                }
+
+                if (ctype_print($char)) {
+                    $newFilter = $filter . $char;
+                    $newActiveOptions = TypeaheadFilter::filter($options, $newFilter);
+
+                    if (empty($newActiveOptions) && $this->isQuitInput(strtolower($newFilter))) {
+                        $this->promptLines = [];
+                        $this->renderFull();
+                        return 'q';
+                    }
+
+                    if (!empty($newActiveOptions)) {
+                        $filter = $newFilter;
+                        $activeOptions = $newActiveOptions;
+                        $selectedIndex = 0;
+                    }
+                    continue;
+                }
+            }
+        } finally {
+            $this->restoreRawInput($rawState);
+            // Hide cursor again for normal rendering
+            echo "\e[?25l";
+        }
+
+        if ($default !== '' && array_key_exists($default, $options)) {
+            return $default;
+        }
+
+        $firstKey = (string) array_key_first($options);
+        return $firstKey !== '' ? $firstKey : '';
     }
 
     /**

@@ -5078,8 +5078,10 @@ class BookImportService
         bool $forceSequential = false,
         ?callable $manualEnrichmentCallback = null,
         ?callable $getEnrichmentServiceCallback = null,
-        ?callable $generateDirectoryPathCallback = null
+        ?callable $generateDirectoryPathCallback = null,
+        ?callable $selectFilteredCallback = null
     ): array {
+        $selectFilteredCallback ??= $selectWithImmediateInterruptCallback;
         if ($forceSequential) {
             $currentTitle = $metadata['title'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']) ?? '';
             $metadata['title'] = $askInlineCallback('Title', (string) $currentTitle);
@@ -5123,7 +5125,7 @@ class BookImportService
                 $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
                 $currentGenreIdx = array_search($displayGenre, $validGenres, true);
                 $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
-                $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
+                $selectedGenreIdx = $selectFilteredCallback('Genre', $genreOptions, $defaultGenreIdx);
                 $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
                 if (is_array($metadata['genre'] ?? null)) {
                     $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
@@ -5247,7 +5249,7 @@ class BookImportService
                     }
                     $currentGenreIdx = array_search($displayGenre, $validGenres, true);
                     $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
-                    $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
+                    $selectedGenreIdx = $selectFilteredCallback('Genre', $genreOptions, $defaultGenreIdx);
                     $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
 
                     if (is_array($metadata['genre'] ?? null)) {
@@ -7933,7 +7935,7 @@ class BookImportService
      */
     public function getValidGenres(): array
     {
-        return [
+        $genres = [
             'Science Fiction',
             'Fantasy',
             'LitRPG',
@@ -7954,6 +7956,10 @@ class BookImportService
             'Other',
             'Science',
         ];
+
+        sort($genres, SORT_STRING | SORT_FLAG_CASE);
+
+        return $genres;
     }
 
     protected function validateAndMapGenre(string $genreName): string

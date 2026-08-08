@@ -455,16 +455,28 @@ class ImportBooksFromDownloads extends Command
             // Initialize persistent cache system
             $this->initializeCache();
 
-            // Create a database backup unless --no-backup is specified
+            // Create a database backup unless --no-backup is specified, and unless a
+            // recent-enough backup already exists (avoid re-backing up on every import run).
             if (!$this->option('no-backup')) {
-                $this->uiService->logMessage('Creating a database backup before importing books...');
+                $hoursSinceLastBackup = BackupDatabase::hoursSinceLastBackup();
+                $minInterval = BackupDatabase::AUTO_BACKUP_MIN_INTERVAL_HOURS;
+                if ($hoursSinceLastBackup !== null && $hoursSinceLastBackup < $minInterval) {
+                    $this->uiService->logMessage(sprintf(
+                        'Skipping automatic database backup - last backup was created ' .
+                        '%.1f hour(s) ago (threshold: %.0f hours).',
+                        $hoursSinceLastBackup,
+                        $minInterval
+                    ));
+                } else {
+                    $this->uiService->logMessage('Creating a database backup before importing books...');
 
-                // Capture backup command output and redirect to TUI log
-                try {
-                    $this->callSilent('backup:database', ['--suffix' => 'import-books']);
-                    $this->uiService->logMessage('✓ Database backup created successfully.');
-                } catch (\Exception $e) {
-                    $this->uiService->logMessage('⚠️  Database backup failed: ' . $e->getMessage());
+                    // Capture backup command output and redirect to TUI log
+                    try {
+                        $this->callSilent('backup:database', ['--suffix' => 'import-books']);
+                        $this->uiService->logMessage('✓ Database backup created successfully.');
+                    } catch (\Exception $e) {
+                        $this->uiService->logMessage('⚠️  Database backup failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -1100,6 +1112,21 @@ class ImportBooksFromDownloads extends Command
         return $response;
     }
 
+    protected function selectFilteredWithImmediateInterrupt(
+        string $question,
+        array $options,
+        string $default = ''
+    ): string {
+        $response = $this->uiService->selectFiltered($question, $options, $default);
+
+        /** @var string $response */
+        if (strtolower(trim($response)) === 'q') {
+            $this->handleUserQuit();
+        }
+
+        return $response;
+    }
+
     /**
      * Helper methods for background processing
      */
@@ -1387,7 +1414,12 @@ class ImportBooksFromDownloads extends Command
                 fn () => $this->getEnrichmentService(),
                 fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
                     'include_narrator' => (bool) $this->option('include-narrator'),
-                ]))
+                ])),
+                fn ($question, $options, $default) => $this->selectFilteredWithImmediateInterrupt(
+                    $question,
+                    $options,
+                    $default
+                )
             ),
             fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
@@ -1515,7 +1547,12 @@ class ImportBooksFromDownloads extends Command
                 fn () => $this->getEnrichmentService(),
                 fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
                     'include_narrator' => (bool) $this->option('include-narrator'),
-                ]))
+                ])),
+                fn ($question, $options, $default) => $this->selectFilteredWithImmediateInterrupt(
+                    $question,
+                    $options,
+                    $default
+                )
             ),
             fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
@@ -1595,7 +1632,12 @@ class ImportBooksFromDownloads extends Command
             fn () => $this->getEnrichmentService(),
             fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
                 'include_narrator' => (bool) $this->option('include-narrator'),
-            ]))
+            ])),
+            fn ($question, $options, $default) => $this->selectFilteredWithImmediateInterrupt(
+                $question,
+                $options,
+                $default
+            )
         );
     }
 

@@ -45,6 +45,17 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function getValidGenresReturnsGenresSortedAlphabetically(): void
+    {
+        $genres = $this->service->getValidGenres();
+
+        $sorted = $genres;
+        sort($sorted, SORT_STRING | SORT_FLAG_CASE);
+
+        $this->assertSame($sorted, $genres);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generateDirectoryPathIncludesSeriesNumberInTitle(): void
     {
         $metadata = [
