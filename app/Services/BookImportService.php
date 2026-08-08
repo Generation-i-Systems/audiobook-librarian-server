@@ -791,6 +791,22 @@ class BookImportService
                 }
             }
 
+            // Seed chapters from metadata.json (or another source that provided a
+            // 'chapters' key) — never overwrites chapters a book already has.
+            if (!empty($metadata['chapters']) && is_array($metadata['chapters'])) {
+                app(BookChapterService::class)->importJsonChaptersIfMissing(
+                    $book,
+                    $metadata['chapters'],
+                    (string) ($metadata['chapters_source'] ?? 'import')
+                );
+                // BookObserver::saved() (fired by the $book->save() above) eager-loads
+                // 'chapters' onto this same model instance while it's still empty —
+                // same reason the genre sync above unsets its relation. Without this,
+                // $book->chapters on the model we return here would show stale (empty)
+                // results even though the rows exist in the database.
+                $book->unsetRelation('chapters');
+            }
+
             DB::commit();
             return $book;
         } catch (\Exception $e) {
@@ -812,6 +828,12 @@ class BookImportService
      */
     public function processCoverImage(Book $book, array $metadata): void
     {
+        // No directory means nowhere to save a cover to yet (e.g. a Book that
+        // hasn't been assigned/moved to its final location) — nothing to do.
+        if (empty($book->directory_path)) {
+            return;
+        }
+
         // Handle cover image with download support
         // CRITICAL: Priority order:
         // 1. Existing cover in directory
@@ -934,24 +956,12 @@ class BookImportService
                 }
             }
 
-            // Update cover if new one provided
-            if (!empty($metadata['cover_data'])) {
-                $coverPath = $this->saveEmbeddedCover($metadata['cover_data'], $book->directory_path);
-                if ($coverPath) {
-                    $book->cover_image = $coverPath;
-                }
-            } elseif (!empty($metadata['cover_url'])) {
-                $source = 'googlebooks';
-                if (!empty($metadata['cover_is_local_file'])) {
-                    $source = 'local';
-                } elseif (isset($metadata['audible_raw'])) {
-                    $source = 'audible';
-                }
-                $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
-                if ($coverPath) {
-                    $book->cover_image = $coverPath;
-                }
-            }
+            // Cover image processing is deferred to processCoverImage(), called by the
+            // caller after any file move — see the same note on persistConfirmedBook()'s
+            // new-book path. Saving it here would create the target directory (and drop
+            // a cover.jpg into it) before moveFilesToLibrary() ever runs, which then
+            // finds that directory already exists and raises a false "directory already
+            // exists" conflict prompt against a directory this same import just made.
 
             // Update publisher
             if (!empty($metadata['publisher'])) {
@@ -1024,6 +1034,22 @@ class BookImportService
                 }
             }
 
+            // Seed chapters from metadata.json (or another source that provided a
+            // 'chapters' key) — never overwrites chapters a book already has.
+            if (!empty($metadata['chapters']) && is_array($metadata['chapters'])) {
+                app(BookChapterService::class)->importJsonChaptersIfMissing(
+                    $book,
+                    $metadata['chapters'],
+                    (string) ($metadata['chapters_source'] ?? 'import')
+                );
+                // BookObserver::saved() (fired by the $book->save() above) eager-loads
+                // 'chapters' onto this same model instance while it's still empty —
+                // same reason the genre sync above unsets its relation. Without this,
+                // $book->chapters on the model we return here would show stale (empty)
+                // results even though the rows exist in the database.
+                $book->unsetRelation('chapters');
+            }
+
             // Generate librarian.json after all relationships are updated
             $this->updateLibraryJson($book);
 
@@ -1038,6 +1064,42 @@ class BookImportService
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Build the title-derived leaf directory segment (series number prefix,
+     * GraphicAudio marker, optional narrator suffix) — the last path component
+     * generateDirectoryPath() appends when include_title is set. Split out so
+     * checkForAlternateSeriesDirectory() can build the same segment when
+     * redirecting a book into an existing alternate series directory.
+     */
+    protected function buildTitleDirectorySegment(array $metadata, bool $includeNarrator = false): string
+    {
+        $title = $metadata['title'];
+
+        // If we have a series number, prefix it to the title
+        if (!empty($metadata['series_number'])) {
+            $seriesNumber = $this->formatSeriesNumberForTitlePrefix($metadata['series_number']);
+            if ($seriesNumber !== '') {
+                $title = $seriesNumber . ' ' . $title;
+            }
+        }
+
+        // Add GraphicAudio marker if detected
+        $title = $this->addGraphicAudioMarker($title, $metadata);
+
+        // Add narrator if requested
+        if ($includeNarrator) {
+            $narrators = $metadata['narrator'] ?? null;
+            if ($narrators !== null) {
+                $narratorString = is_array($narrators) ? implode(', ', $narrators) : (string) $narrators;
+                if ($narratorString !== '') {
+                    $title .= " ({$narratorString})";
+                }
+            }
+        }
+
+        return $title;
     }
 
     /**
@@ -1116,31 +1178,7 @@ class BookImportService
 
         // Add title if requested
         if (!empty($metadata['title']) && ($options['include_title'] ?? false)) {
-            $title = $metadata['title'];
-
-            // If we have a series number, prefix it to the title
-            if (!empty($metadata['series_number'])) {
-                $seriesNumber = $this->formatSeriesNumberForTitlePrefix($metadata['series_number']);
-                if ($seriesNumber !== '') {
-                    $title = $seriesNumber . ' ' . $title;
-                }
-            }
-
-            // Add GraphicAudio marker if detected
-            $title = $this->addGraphicAudioMarker($title, $metadata);
-
-            // Add narrator if requested
-            if ($includeNarrator) {
-                $narrators = $metadata['narrator'] ?? null;
-                if ($narrators !== null) {
-                    $narratorString = is_array($narrators) ? implode(', ', $narrators) : (string) $narrators;
-                    if ($narratorString !== '') {
-                        $title .= " ({$narratorString})";
-                    }
-                }
-            }
-
-            $path .= '/' . $title;
+            $path .= '/' . $this->buildTitleDirectorySegment($metadata, $includeNarrator);
         }
 
         // "Import anyway with new name": the computed path may collide with an existing
@@ -2551,6 +2589,152 @@ class BookImportService
     }
 
     /**
+     * Scan the book library for existing genre/author/series directories whose
+     * series folder name matches $seriesName but whose genre or author
+     * combination differs from ($expectedGenre, $expectedAuthorDir) while still
+     * sharing at least one author. This catches a series having been filed
+     * under a different genre, or with only some of the current authors (or an
+     * extra one) — situations where continuing onto the freshly computed path
+     * would silently fork the series across two locations in the library.
+     *
+     * @param  array<int, string>  $authors
+     * @return array<int, array{relative_path: string, genre: string, author_dir: string, series_dir: string, book_count: int}>
+     */
+    public function findAlternateSeriesDirectories(
+        array $authors,
+        string $seriesName,
+        string $expectedGenre,
+        string $expectedAuthorDir
+    ): array {
+        $seriesName = trim($seriesName);
+        if ($seriesName === '' || empty($authors)) {
+            return [];
+        }
+
+        $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
+        if (!$bookStoragePath || !File::isDirectory($bookStoragePath)) {
+            return [];
+        }
+
+        $normalizedAuthors = array_map(
+            fn ($name) => mb_strtolower($this->normalizeAuthorName((string) $name)),
+            $authors
+        );
+
+        $alternates = [];
+
+        try {
+            foreach (File::directories($bookStoragePath) as $genreDir) {
+                $genre = basename($genreDir);
+
+                foreach (File::directories($genreDir) as $authorDir) {
+                    $authorDirName = basename($authorDir);
+
+                    $dirAuthors = array_map(
+                        fn ($name) => mb_strtolower(trim($name)),
+                        preg_split('/\s*&\s*/', $authorDirName) ?: [$authorDirName]
+                    );
+
+                    if (array_intersect($normalizedAuthors, $dirAuthors) === []) {
+                        continue;
+                    }
+
+                    if ($genre === $expectedGenre && $authorDirName === $expectedAuthorDir) {
+                        continue;
+                    }
+
+                    foreach (File::directories($authorDir) as $seriesDir) {
+                        $seriesDirName = basename($seriesDir);
+                        if (stripos($seriesDirName, $seriesName) === false) {
+                            continue;
+                        }
+
+                        $alternates[] = [
+                            'relative_path' => $genre . '/' . $authorDirName . '/' . $seriesDirName,
+                            'genre' => $genre,
+                            'author_dir' => $authorDirName,
+                            'series_dir' => $seriesDirName,
+                            'book_count' => count(File::directories($seriesDir)),
+                        ];
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Error searching for alternate series directories: ' . $e->getMessage());
+        }
+
+        return $alternates;
+    }
+
+    /**
+     * If the book has a series, ask the user whether to reuse an existing
+     * genre/author/series location elsewhere in the library instead of the
+     * freshly computed one, when that existing location differs by genre or by
+     * an overlapping-but-different author combination. No-ops (returns
+     * $metadata unchanged) when there's no series or nothing alternate is
+     * found. There's no interactive prompt possible in auto/non-interactive
+     * import, but this is only ever reached from the interactive edit menu, so
+     * that case doesn't need a separate guard here.
+     */
+    public function checkForAlternateSeriesDirectory(
+        array $metadata,
+        callable $selectCallback,
+        callable $uiServiceLogCallback
+    ): array {
+        if (empty($metadata['series'])) {
+            return $metadata;
+        }
+
+        $authors = is_array($metadata['author'] ?? null) ? $metadata['author'] : [$metadata['author'] ?? ''];
+        $authors = array_values(array_filter(array_map('trim', $authors), fn ($a) => $a !== ''));
+        if (empty($authors)) {
+            return $metadata;
+        }
+
+        $genreData = $metadata['genre'] ?? 'Unknown';
+        $expectedGenre = is_array($genreData) ? ($genreData[0] ?? 'Unknown') : $genreData;
+        if (is_string($expectedGenre) && str_contains($expectedGenre, ':')) {
+            $expectedGenre = trim(explode(':', $expectedGenre)[0]);
+        }
+        $expectedGenre = $expectedGenre !== '' ? $expectedGenre : 'Unknown';
+
+        $expectedAuthorDir = $this->formatAuthorsForDirectory($authors);
+        $cleanedSeries = $this->cleanSeriesName((string) $metadata['series'], $authors);
+
+        $alternates = $this->findAlternateSeriesDirectories($authors, $cleanedSeries, $expectedGenre, $expectedAuthorDir);
+        if (empty($alternates)) {
+            return $metadata;
+        }
+
+        $options = ['0' => "Keep computed location: {$expectedGenre}/{$expectedAuthorDir}/..."];
+        foreach ($alternates as $idx => $alt) {
+            $bookWord = $alt['book_count'] === 1 ? 'book' : 'books';
+            $options[(string) ($idx + 1)] = "{$alt['relative_path']} ({$alt['book_count']} {$bookWord})";
+        }
+
+        $uiServiceLogCallback(sprintf(
+            '⚠️  "%s" already exists elsewhere in the library under a different genre/author combination.',
+            $cleanedSeries
+        ));
+
+        $choice = $selectCallback('Use an existing series location instead?', $options, '0');
+        $chosenIdx = ((int) $choice) - 1;
+
+        if (!isset($alternates[$chosenIdx])) {
+            return $metadata;
+        }
+
+        $chosen = $alternates[$chosenIdx];
+        $metadata['genre'] = $chosen['genre'];
+        $titleSegment = !empty($metadata['title']) ? $this->buildTitleDirectorySegment($metadata) : '';
+        $metadata['custom_directory_path'] = $chosen['relative_path'] . ($titleSegment !== '' ? '/' . $titleSegment : '');
+
+        $uiServiceLogCallback("📁 Using existing location: {$metadata['custom_directory_path']}");
+
+        return $metadata;
+    }
+
+    /**
      * Metadata filenames that can be safely overwritten
      */
     private const METADATA_FILES = ['librarian.json', 'cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp'];
@@ -3413,7 +3597,103 @@ class BookImportService
             $result['abridged'] = (bool) $data['abridged'];
         }
 
+        if (!empty($data['chapters']) && is_array($data['chapters'])) {
+            $chapters = $this->normalizeMetadataJsonChapters($data['chapters'], $directoryPath);
+            if (!empty($chapters)) {
+                $result['chapters'] = $chapters;
+                $result['chapters_source'] = 'metadata_json';
+            }
+        }
+
         return !empty($result) ? $result : null;
+    }
+
+    /**
+     * Convert AudioBookShelf-style metadata.json chapters (start/end timestamps
+     * in seconds, relative to a single consolidated audio file) into the shape
+     * BookChapterService::toDatabaseChapters() expects.
+     *
+     * @param  array<int, mixed>  $rawChapters
+     * @return array<int, array{chapter_number: int, title: string, start_seconds: float|null, duration: float|null, file_name: string}>
+     */
+    private function normalizeMetadataJsonChapters(array $rawChapters, string $directoryPath): array
+    {
+        $fileName = $this->findSingleAudioFileName($directoryPath);
+
+        $chapters = [];
+        foreach (array_values($rawChapters) as $index => $chapter) {
+            if (!is_array($chapter) || !is_numeric($chapter['start'] ?? null)) {
+                continue;
+            }
+
+            $start = (float) $chapter['start'];
+            $duration = is_numeric($chapter['end'] ?? null) ? max(0.0, (float) $chapter['end'] - $start) : null;
+
+            $chapters[] = [
+                'chapter_number' => $index + 1,
+                'title' => (string) ($chapter['title'] ?? ('Chapter ' . ($index + 1))),
+                'start_seconds' => $start,
+                'duration' => $duration,
+                'file_name' => $fileName,
+            ];
+        }
+
+        return $chapters;
+    }
+
+    /**
+     * If a directory contains exactly one audio file, return its basename —
+     * chapters described by start/end timestamps in metadata.json are relative
+     * to that single file. Returns '' when there's none or more than one (a
+     * multi-file audiobook's per-chapter file can't be inferred this way).
+     */
+    private function findSingleAudioFileName(string $directoryPath): string
+    {
+        $directoryPath = rtrim($directoryPath, '/');
+        if ($directoryPath === '' || !is_dir($directoryPath)) {
+            return '';
+        }
+
+        $audioFiles = [];
+        foreach (scandir($directoryPath) ?: [] as $entry) {
+            $extension = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
+            if (in_array($extension, self::AUDIO_EXTENSIONS, true) && is_file($directoryPath . '/' . $entry)) {
+                $audioFiles[] = $entry;
+            }
+        }
+
+        return count($audioFiles) === 1 ? $audioFiles[0] : '';
+    }
+
+    /**
+     * Find non-audio companion files (metadata.json, cover image) sitting in the
+     * same directory as $referenceFilePath, excluding anything already in
+     * $excludeFiles. Used by processMultiBookSplit() — a multi-book-part's move
+     * only moves the exact file list it's given, unlike a regular single-book
+     * import which moves the whole source directory, so these have to be found
+     * and added explicitly or they're left behind in the source.
+     *
+     * @param  array<int, string>  $excludeFiles
+     * @return array<int, string>
+     */
+    public function findCompanionFiles(string $referenceFilePath, array $excludeFiles): array
+    {
+        $dir = dirname($referenceFilePath);
+        if (!is_dir($dir)) {
+            return [];
+        }
+
+        $excludeRealPaths = array_filter(array_map('realpath', $excludeFiles));
+
+        $found = [];
+        foreach (['metadata.json', 'cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp'] as $name) {
+            $path = $dir . '/' . $name;
+            if (is_file($path) && !in_array(realpath($path), $excludeRealPaths, true)) {
+                $found[] = $path;
+            }
+        }
+
+        return $found;
     }
 
     /**
@@ -4454,9 +4734,49 @@ class BookImportService
             $uiMetadata['directory_path'] = $generateDirectoryPathCallback($uiMetadata, [
                 'include_title' => true,
             ]);
+            $uiMetadata['directory_existing_prefix'] = $this->longestExistingDirectoryPrefix(
+                (string) $uiMetadata['directory_path']
+            );
         }
 
         return $uiMetadata;
+    }
+
+    /**
+     * Given a relative library directory path (e.g. "Fantasy/Author/Series/04 Title"),
+     * return the longest leading run of path segments that already exists as real
+     * directories under the book storage root, with a trailing slash (e.g.
+     * "Fantasy/Author/Series/"). Returns '' if even the first segment doesn't exist,
+     * or the path is empty.
+     */
+    protected function longestExistingDirectoryPrefix(string $relativePath): string
+    {
+        $relativePath = trim($relativePath, '/');
+        if ($relativePath === '') {
+            return '';
+        }
+
+        $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
+        if (!$bookStoragePath || !File::isDirectory($bookStoragePath)) {
+            return '';
+        }
+        $bookStoragePath = rtrim((string) $bookStoragePath, '/');
+
+        $existingSegments = [];
+        $cumulative = '';
+        foreach (explode('/', $relativePath) as $segment) {
+            $cumulative = $cumulative === '' ? $segment : $cumulative . '/' . $segment;
+            if (!File::isDirectory($bookStoragePath . '/' . $cumulative)) {
+                break;
+            }
+            $existingSegments[] = $segment;
+        }
+
+        if (empty($existingSegments)) {
+            return '';
+        }
+
+        return implode('/', $existingSegments) . '/';
     }
 
     /**
@@ -5257,6 +5577,7 @@ class BookImportService
             }
             $metadata['year'] = $askInlineCallback('Year', (string) $currentYear);
 
+            $genreSelectionCancelled = false;
             if (!empty($this->config['genre'])) {
                 $uiServiceLogCallback('⚠️  Genre is forced to "' . $this->config['genre'] . '" by CLI option.');
                 $metadata['genre'] = $this->config['genre'];
@@ -5271,6 +5592,10 @@ class BookImportService
                 $currentGenreIdx = array_search($displayGenre, $validGenres, true);
                 $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
                 $selectedGenreIdx = $selectFilteredCallback('Genre', $genreOptions, $defaultGenreIdx);
+                // An Escape cancel returns a key that isn't in $genreOptions (never a
+                // valid option itself), so this also detects cancellation without the
+                // callback needing a separate out-of-band signal.
+                $genreSelectionCancelled = !array_key_exists($selectedGenreIdx, $genreOptions);
                 $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
                 if (is_array($metadata['genre'] ?? null)) {
                     $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
@@ -5280,13 +5605,25 @@ class BookImportService
                 }
             }
 
-            $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
-            if ($currentDirectory === '') {
-                $currentDirectory = $this->generateDirectoryPath($metadata, [
-                    'include_title' => true,
-                ]);
+            $metadata = $this->checkForAlternateSeriesDirectory(
+                $metadata,
+                $selectWithImmediateInterruptCallback,
+                $uiServiceLogCallback
+            );
+
+            // Escape on the Genre step leaves genre as-is (above) and also bails out
+            // of the rest of this sequential walkthrough — Title/Author/Narrator/
+            // Series/Series Number/Year already collected above stay applied, but we
+            // skip re-prompting for Directory Path and leave it untouched.
+            if (!$genreSelectionCancelled) {
+                $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
+                if ($currentDirectory === '') {
+                    $currentDirectory = $this->generateDirectoryPath($metadata, [
+                        'include_title' => true,
+                    ]);
+                }
+                $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
             }
-            $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
 
             $metadata['confidence'] = 100;
             $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
@@ -5351,8 +5688,17 @@ class BookImportService
                 $options['r'] = 'Request enrichment (Audible/Google Books)';
             }
             $options['9'] = "\e[1;32mDone\e[0m";
+            $options['y'] = "\e[1;32mAccept and Import\e[0m";
 
             $choice = $selectWithImmediateInterruptCallback('Select field to edit', $options, '9');
+
+            if ($choice === 'y' || $choice === 'accept') {
+                // Signal to reviewAndApprove() that the user wants to finish editing and
+                // accept in one step, instead of returning to the Accept/Edit/Skip menu
+                // and having to pick Accept separately.
+                $metadata['_action'] = 'accept_and_import';
+                break;
+            }
 
             if ($choice === '9' || $choice === 'd' || $choice === 'done' || $choice === '') {
                 break;
@@ -5376,12 +5722,23 @@ class BookImportService
                     if (empty($metadata['series'])) {
                         unset($metadata['series']);
                         $metadata['series_number'] = '';
+                    } else {
+                        $metadata = $this->checkForAlternateSeriesDirectory(
+                            $metadata,
+                            $selectWithImmediateInterruptCallback,
+                            $uiServiceLogCallback
+                        );
                     }
                     break;
                 case 's':
                     $metadata['title'] = (string) $currentSeries;
                     $metadata['series'] = (string) $currentTitle;
                     $titleManuallyEdited = true;
+                    $metadata = $this->checkForAlternateSeriesDirectory(
+                        $metadata,
+                        $selectWithImmediateInterruptCallback,
+                        $uiServiceLogCallback
+                    );
                     break;
                 case '5':
                     $metadata['series_number'] = $askInlineCallback('Series Number', (string) $currentSeriesNumber);
@@ -5411,6 +5768,11 @@ class BookImportService
                     } else {
                         $metadata['genre'] = $newGenre;
                     }
+                    $metadata = $this->checkForAlternateSeriesDirectory(
+                        $metadata,
+                        $selectWithImmediateInterruptCallback,
+                        $uiServiceLogCallback
+                    );
                     break;
                 case '8':
                     $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
@@ -5429,7 +5791,8 @@ class BookImportService
                         true,
                         $manualEnrichmentCallback,
                         $getEnrichmentServiceCallback,
-                        $generateDirectoryPathCallback
+                        $generateDirectoryPathCallback,
+                        $selectFilteredCallback
                     );
                     continue 2;
                 case 'c':
@@ -5928,6 +6291,12 @@ class BookImportService
                     'operation' => $getFileOperationCallback(),
                 ]);
 
+                // createBookFromMetadata() explicitly defers cover processing until after
+                // the files (and thus the target directory) exist, to avoid the premature
+                // directory creation that would otherwise trip moveFilesToLibrary()'s
+                // conflict detection. This is that deferred step.
+                $this->processCoverImage($book, $metadata);
+
                 if ($infoCallback) {
                     $infoCallback("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
                 }
@@ -6085,6 +6454,30 @@ class BookImportService
                     $bookTitle = $fileTagMetadata['title'];
                 }
             }
+
+            // A per-book metadata.json sitting next to THIS book's own audio file
+            // (e.g. a "Book N" subfolder) is fully authoritative — same as the
+            // single-book import path — and overrides the AI/filename/tag guesses
+            // above. $audiobook['path'] here is the shared parent directory for
+            // the whole multi-book source, so it can't be used to find this;
+            // each part's own file location has to be checked individually.
+            $partMetadataJson = $this->readMetadataJson(dirname($firstFilePath));
+            if ($partMetadataJson !== null) {
+                $bookMetadata = array_merge($bookMetadata, $partMetadataJson);
+                $bookMetadata['confidence'] = 100;
+                $bookMetadata['_metadata_json'] = true;
+                if (!empty($partMetadataJson['title'])) {
+                    $bookTitle = $partMetadataJson['title'];
+                }
+            }
+
+            // Non-audio companion files (metadata.json, cover image) living beside
+            // this part's audio file aren't audio, so they were never part of
+            // $audiobook['files'] and won't be picked up by $files above. A
+            // multi-book-part move only moves the exact list handed to it (unlike
+            // a regular single-book import, which moves the whole source
+            // directory) — without adding them here they're silently left behind.
+            $files = array_merge($files, $this->findCompanionFiles($firstFilePath, $files));
 
             // If we still don't have a good title, use the one from fileInfos
             if (empty($bookMetadata['title'])) {
@@ -10083,6 +10476,50 @@ class BookImportService
     }
 
     /**
+     * Validate and lock in the currently-displayed directory path/genre as
+     * accepted, logging the confirmed metadata. Shared by reviewAndApprove()'s
+     * own Accept choice and the edit menu's "Accept and Import" shortcut so both
+     * paths apply the exact same checks. Returns false (and logs a warning
+     * explaining why) if genre is invalid or the directory has a real conflict —
+     * the caller is expected to keep the review loop going in that case.
+     */
+    private function attemptAcceptFromReview(
+        array &$metadata,
+        string $currentDirectoryPath,
+        bool $isGenreValid,
+        array $audiobook,
+        callable $uiServiceLogCallback
+    ): bool {
+        if (!$isGenreValid) {
+            $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 2 → Genre)');
+
+            return false;
+        }
+        if ($this->directoryPathHasRealConflict($currentDirectoryPath, (string) ($audiobook['path'] ?? ''))) {
+            $uiServiceLogCallback('⚠️  Cannot accept: target directory already contains files - please choose a different directory (Option 2 → Directory Path)');
+
+            return false;
+        }
+
+        // Lock in the exact path shown at approval time so the file is moved
+        // to what the user actually approved, even if this book already
+        // existed with a different stored directory_path.
+        $metadata['custom_directory_path'] = $currentDirectoryPath;
+
+        Log::channel('import')->info('User confirmed metadata', [
+            'source_path' => $audiobook['path'] ?? null,
+            'title' => $metadata['title'] ?? null,
+            'author' => $metadata['author'] ?? null,
+            'genre' => $metadata['genre'] ?? null,
+            'series' => $metadata['series'] ?? null,
+            'series_number' => $metadata['series_number'] ?? null,
+            'directory_path' => $currentDirectoryPath,
+        ]);
+
+        return true;
+    }
+
+    /**
      * Manual review and approval
      */
     public function reviewAndApprove(
@@ -10175,30 +10612,10 @@ class BookImportService
 
             $choice = strtolower(trim($choice));
             if (in_array($choice, ['1', 'a', 'accept'], true)) {
-                if (!$isGenreValid) {
-                    $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 2 → Genre)');
-                    continue;
+                if ($this->attemptAcceptFromReview($metadata, $currentDirectoryPath, $isGenreValid, $audiobook, $uiServiceLogCallback)) {
+                    return true;
                 }
-                if ($this->directoryPathHasRealConflict($currentDirectoryPath, (string) ($audiobook['path'] ?? ''))) {
-                    $uiServiceLogCallback('⚠️  Cannot accept: target directory already contains files - please choose a different directory (Option 2 → Directory Path)');
-                    continue;
-                }
-                // Lock in the exact path shown at approval time so the file is moved
-                // to what the user actually approved, even if this book already
-                // existed with a different stored directory_path.
-                $metadata['custom_directory_path'] = $currentDirectoryPath;
-
-                Log::channel('import')->info('User confirmed metadata', [
-                    'source_path' => $audiobook['path'] ?? null,
-                    'title' => $metadata['title'] ?? null,
-                    'author' => $metadata['author'] ?? null,
-                    'genre' => $metadata['genre'] ?? null,
-                    'series' => $metadata['series'] ?? null,
-                    'series_number' => $metadata['series_number'] ?? null,
-                    'directory_path' => $currentDirectoryPath,
-                ]);
-
-                return true;
+                continue;
             }
             if (in_array($choice, ['3', 's', 'skip'], true)) {
                 return false;
@@ -10229,8 +10646,21 @@ class BookImportService
                 if ($isGenreValid) {
                     $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
                 }
+
                 $currentCoverUrl = (string) ($metadata['cover_url'] ?? $currentCoverUrl);
                 $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+
+                // The edit menu's "Accept and Import" option sets this so the user can
+                // finish editing and accept in one step, instead of coming back here and
+                // separately picking Accept. Reuses the exact same validation the normal
+                // Accept choice uses — falls through to the Accept/Edit/Skip menu again
+                // (with whatever warning attemptAcceptFromReview logged) if it can't.
+                if (($metadata['_action'] ?? null) === 'accept_and_import') {
+                    unset($metadata['_action']);
+                    if ($this->attemptAcceptFromReview($metadata, $currentDirectoryPath, $isGenreValid, $audiobook, $uiServiceLogCallback)) {
+                        return true;
+                    }
+                }
                 continue;
             }
 

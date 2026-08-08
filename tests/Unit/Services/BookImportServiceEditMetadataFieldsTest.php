@@ -214,4 +214,173 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
         $this->assertSame('Rebel Undercover', $result['title']);
         $this->assertSame('The Forgotten Five', $result['series']);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function acceptAndImportChoiceExitsTheMenuAndSignalsTheAction(): void
+    {
+        $metadata = [
+            'title' => 'A Book',
+            'author' => ['Some Author'],
+        ];
+
+        $choices = ['y'];
+        $selectCallback = function (string $question, array $options, string $default) use (&$choices): string {
+            return array_shift($choices) ?? $default;
+        };
+
+        $result = $this->service->editMetadataFields(
+            $metadata,
+            [],
+            fn (string $question, string $default) => $default,
+            $selectCallback,
+            fn (array $metadata, array $keys) => null,
+            function (array &$metadata): void {
+            },
+            fn () => ['Other'],
+            function (): void {
+            },
+            fn (array $metadata) => $metadata
+        );
+
+        $this->assertSame('accept_and_import', $result['_action']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function editAllFieldsSequentialUsesTheFilteredSelectCallbackForGenre(): void
+    {
+        $metadata = [
+            'title' => 'Old Title',
+            'author' => ['Old Author'],
+            'narrator' => ['Old Narrator'],
+            'series' => 'Old Series',
+            'series_number' => '1',
+            'year' => '2020',
+            'genre' => 'Fantasy',
+        ];
+
+        $askResponses = [
+            'New Title',
+            'New Author',
+            'New Narrator',
+            'New Series',
+            '2',
+            '2021',
+            '/library/New Title',
+        ];
+        $askInlineCallback = function (string $question, string $default) use (&$askResponses): string {
+            return array_shift($askResponses) ?? $default;
+        };
+
+        // 'a' picks "Edit all fields (sequential)"; '9' finishes afterward.
+        $menuChoices = ['a', '9'];
+        $plainSelectCalls = [];
+        $plainSelectCallback = function (string $question, array $options, string $default) use (&$menuChoices, &$plainSelectCalls): string {
+            $plainSelectCalls[] = $question;
+            return array_shift($menuChoices) ?? $default;
+        };
+
+        $filteredSelectCalls = [];
+        $filteredSelectCallback = function (string $question, array $options, string $default) use (&$filteredSelectCalls): string {
+            $filteredSelectCalls[] = $question;
+            // validGenres = ['Fantasy', 'Horror', 'Other'] -> genreOptions '2' = 'Horror'.
+            return '2';
+        };
+
+        $getFirstNonEmptyCallback = function (array $metadata, array $keys) {
+            foreach ($keys as $key) {
+                if (!empty($metadata[$key] ?? null)) {
+                    return $metadata[$key];
+                }
+            }
+            return null;
+        };
+
+        $result = $this->service->editMetadataFields(
+            $metadata,
+            [],
+            $askInlineCallback,
+            $plainSelectCallback,
+            $getFirstNonEmptyCallback,
+            function (array &$metadata): void {
+            },
+            fn () => ['Fantasy', 'Horror', 'Other'],
+            function (): void {
+            },
+            fn (array $metadata) => $metadata,
+            selectFilteredCallback: $filteredSelectCallback
+        );
+
+        $this->assertSame(1, count($filteredSelectCalls), 'Genre must be selected via the filtered callback exactly once');
+        $this->assertSame('Genre', $filteredSelectCalls[0]);
+        $this->assertNotContains('Genre', $plainSelectCalls, 'The plain (unfiltered) select callback must not be asked about Genre');
+        $this->assertSame('Horror', $result['genre']);
+        $this->assertSame('New Title', $result['title']);
+        $this->assertSame('/library/New Title', $result['custom_directory_path']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function escapeCancellingGenreDuringSequentialEditSkipsDirectoryPathButKeepsOtherEdits(): void
+    {
+        $metadata = [
+            'title' => 'Old Title',
+            'author' => ['Old Author'],
+            'narrator' => ['Old Narrator'],
+            'series' => 'Old Series',
+            'series_number' => '1',
+            'year' => '2020',
+            'genre' => 'Fantasy',
+        ];
+
+        $askQuestions = [];
+        $askResponses = [
+            'New Title',
+            'New Author',
+            'New Narrator',
+            'New Series',
+            '2',
+            '2021',
+        ];
+        $askInlineCallback = function (string $question, string $default) use (&$askResponses, &$askQuestions): string {
+            $askQuestions[] = $question;
+            return array_shift($askResponses) ?? $default;
+        };
+
+        $menuChoices = ['a', '9'];
+        $plainSelectCallback = function (string $question, array $options, string $default) use (&$menuChoices): string {
+            return array_shift($menuChoices) ?? $default;
+        };
+
+        // Escape cancels the filtered Genre prompt: not a valid option key.
+        $filteredSelectCallback = fn (string $question, array $options, string $default): string => '';
+
+        $getFirstNonEmptyCallback = function (array $metadata, array $keys) {
+            foreach ($keys as $key) {
+                if (!empty($metadata[$key] ?? null)) {
+                    return $metadata[$key];
+                }
+            }
+            return null;
+        };
+
+        $result = $this->service->editMetadataFields(
+            $metadata,
+            [],
+            $askInlineCallback,
+            $plainSelectCallback,
+            $getFirstNonEmptyCallback,
+            function (array &$metadata): void {
+            },
+            fn () => ['Fantasy', 'Horror', 'Other'],
+            function (): void {
+            },
+            fn (array $metadata) => $metadata,
+            selectFilteredCallback: $filteredSelectCallback
+        );
+
+        $this->assertNotContains('Directory Path', $askQuestions, 'Escape on Genre must skip the Directory Path prompt');
+        $this->assertSame('Fantasy', $result['genre'], 'Escape on Genre must leave the original genre untouched');
+        $this->assertSame('New Title', $result['title'], 'Fields collected before the cancelled Genre step must still apply');
+        $this->assertSame('New Author', $result['author'][0] ?? null);
+        $this->assertArrayNotHasKey('custom_directory_path', $result, 'Directory path must be left untouched, not defaulted');
+    }
 }

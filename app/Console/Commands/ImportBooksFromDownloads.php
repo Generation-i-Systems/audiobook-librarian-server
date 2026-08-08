@@ -1577,6 +1577,10 @@ class ImportBooksFromDownloads extends Command
                 ConfirmedBookMetadata::fromConfirmed($metadata),
                 $fakeAudiobook
             );
+            // No files are moved by this "fix a previous import" flow — the book's
+            // directory already exists, so there's no premature-directory-creation
+            // risk in processing the cover right away.
+            $this->getImportService()->processCoverImage($book, $metadata);
             $freshTitle = $book->fresh()->title ?? $book->title;
             $this->info("✅ Updated: {$freshTitle}");
 

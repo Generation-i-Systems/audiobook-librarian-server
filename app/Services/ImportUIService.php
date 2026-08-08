@@ -117,6 +117,41 @@ class ImportUIService implements ImportUIInterface
         return $directoryPath !== '' ? $directoryPath : 'N/A';
     }
 
+    /**
+     * Bold the leading portion of a displayed directory path that already exists on
+     * disk (BookImportService::longestExistingDirectoryPrefix(), stashed on
+     * currentBook by buildUiMetadata()), so the user can see at a glance how much of
+     * the path is new versus already there.
+     */
+    protected function boldExistingDirectoryPrefix(string $displayValue): string
+    {
+        $existingPrefix = $this->stringifyForDisplay($this->currentBook['directory_existing_prefix'] ?? null);
+        if ($existingPrefix === '') {
+            return $displayValue;
+        }
+
+        // $displayValue may have been truncated with a trailing "..." before this
+        // runs. Compare against the real path text only — the ellipsis itself is
+        // never part of an existing directory name, and comparing it verbatim
+        // would spuriously reject a match that's otherwise entirely correct.
+        $ellipsis = '';
+        $pathText = $displayValue;
+        if (str_ends_with($displayValue, '...')) {
+            $ellipsis = '...';
+            $pathText = mb_substr($displayValue, 0, mb_strlen($displayValue) - 3);
+        }
+
+        $boldLen = min(mb_strlen($existingPrefix), mb_strlen($pathText));
+        if ($boldLen === 0 || mb_substr($pathText, 0, $boldLen) !== mb_substr($existingPrefix, 0, $boldLen)) {
+            return $displayValue;
+        }
+
+        $boldPart = mb_substr($pathText, 0, $boldLen);
+        $restPart = mb_substr($pathText, $boldLen);
+
+        return "\e[1m{$boldPart}\e[0m{$restPart}{$ellipsis}";
+    }
+
     protected function getPromptHeight(): int
     {
         $layout = $this->computeLayout();
@@ -1091,6 +1126,10 @@ class ImportUIService implements ImportUIInterface
             // Truncate long values to fit on one line
             if (mb_strlen($displayValue) > $valueMaxWidth) {
                 $displayValue = mb_substr($displayValue, 0, $valueMaxWidth - 3) . '...';
+            }
+
+            if ($label === 'Directory') {
+                $displayValue = $this->boldExistingDirectoryPrefix($displayValue);
             }
 
             $labelText = str_pad($label . ':', $labelWidth);

@@ -126,6 +126,62 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function reviewAndApproveAcceptsImmediatelyWhenEditMenuSignalsAcceptAndImport(): void
+    {
+        // The edit-fields menu's "Accept and Import" option sets metadata['_action']
+        // = 'accept_and_import' so the user doesn't have to come back to the
+        // Accept/Edit/Skip menu and separately pick Accept after Done.
+        Genre::create(['name' => 'Science Fiction']);
+
+        $metadata = [
+            'title' => 'Test Book',
+            'author' => ['Author'],
+            'genre' => 'Science Fiction',
+            'confidence' => 90,
+        ];
+
+        $audiobook = [
+            'path' => '/tmp/book',
+            'files' => ['/tmp/book/file.m4b'],
+        ];
+
+        $selectCallCount = 0;
+        // Only ONE "Choose an option" prompt: '2' (Edit). The edit callback below
+        // simulates the user picking "Accept and Import" from inside that menu.
+        $selectResponses = ['2'];
+        $inputInterrupted = false;
+
+        $result = $this->service->reviewAndApprove(
+            $metadata,
+            $audiobook,
+            fn ($data) => $data,
+            function ($message, $data = null): void {
+            },
+            function ($question, $options, $default) use (&$selectResponses, &$selectCallCount) {
+                $selectCallCount++;
+                return array_shift($selectResponses) ?? $default;
+            },
+            fn ($question, $default = '') => $default,
+            fn ($cover, $genre, $directory, $isFinal) => [],
+            function ($data, $isAll) {
+                $data['_action'] = 'accept_and_import';
+                return $data;
+            },
+            fn ($data, $book, $service) => $data,
+            fn () => null,
+            fn () => $this->service->getValidGenres(),
+            fn ($data) => true,
+            fn ($data, $options) => 'dir/path',
+            $inputInterrupted
+        );
+
+        $this->assertTrue($result);
+        $this->assertSame(1, $selectCallCount, 'Accept and Import must not require a second Choose-an-option prompt');
+        $this->assertSame('dir/path', $metadata['custom_directory_path']);
+        $this->assertArrayNotHasKey('_action', $metadata);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reviewAndApproveRejectsAcceptWhenTargetDirectoryAlreadyHasAudioFiles(): void
     {
         // A directory collision must be caught BEFORE confirmation, not discovered for

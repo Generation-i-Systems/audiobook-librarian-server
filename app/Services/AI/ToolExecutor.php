@@ -2544,6 +2544,9 @@ class ToolExecutor
 
                 if ($autoApply) {
                     $this->importService->updateBookFromMetadata($book, $metadata, [], []);
+                    // No files are moved here — $bookPath was already confirmed to exist
+                    // above — so it's safe to process the cover immediately.
+                    $this->importService->processCoverImage($book, $metadata);
                 }
 
                 $results[] = [
