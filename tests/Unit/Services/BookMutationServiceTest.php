@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
+use App\Jobs\EmbedBookJob;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Services\BookMutationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -62,6 +64,8 @@ class BookMutationServiceTest extends TestCase
 
         $book->chapters()->create(['chapter_number' => 1, 'file_name' => 'old.mp3', 'format' => 'mp3', 'duration' => 60, 'size_bytes' => 1000]);
 
+        Queue::fake();
+
         $updated = (new BookMutationService())->updateBook((string) $book->id, [
             'title' => 'Updated Title',
             'authors' => [(string) $existingAuthor->id],
@@ -83,5 +87,13 @@ class BookMutationServiceTest extends TestCase
         $this->assertSame('Updated Series', $updated->series->first()?->name);
         $this->assertCount(1, $updated->chapters);
         $this->assertSame('new.mp3', $updated->chapters->first()?->file_name);
+        Queue::assertPushed(EmbedBookJob::class, fn (EmbedBookJob $job) => $this->jobTargetsBook($job, $updated->id));
+    }
+
+    private function jobTargetsBook(EmbedBookJob $job, int $bookId): bool
+    {
+        $reflection = new \ReflectionProperty($job, 'bookId');
+        $reflection->setAccessible(true);
+        return $reflection->getValue($job) === $bookId;
     }
 }

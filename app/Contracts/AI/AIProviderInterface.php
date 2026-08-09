@@ -20,6 +20,12 @@ interface AIProviderInterface
     public function transcribe(string $audioPath): ?string;
 
     /**
+     * Generate a short text description of an image (e.g. a book cover),
+     * for use as embeddable text in a similarity/recommendation pipeline.
+     */
+    public function describeImage(string $imagePath, ?string $prompt = null): AIResponse;
+
+    /**
      * Get the provider name
      */
     public function getName(): string;

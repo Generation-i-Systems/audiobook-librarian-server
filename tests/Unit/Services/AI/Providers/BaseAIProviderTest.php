@@ -52,6 +52,31 @@ class BaseAIProviderTest extends TestCase
         $this->assertArrayHasKey('pricing', $stats);
     }
 
+    public function testDescribeImageReturnsSuccessResponse(): void
+    {
+        $provider = $this->createTestProvider();
+        $imagePath = tempnam(sys_get_temp_dir(), 'cover');
+
+        try {
+            $response = $provider->describeImage($imagePath);
+
+            $this->assertTrue($response->isSuccess());
+            $this->assertEquals('test image description', $response->getContent());
+        } finally {
+            unlink($imagePath);
+        }
+    }
+
+    public function testDescribeImageReturnsFailureWhenFileMissing(): void
+    {
+        $provider = $this->createTestProvider();
+
+        $response = $provider->describeImage('/nonexistent/path/cover.jpg');
+
+        $this->assertFalse($response->isSuccess());
+        $this->assertStringContainsString('not found', $response->getError());
+    }
+
     public function testParseStructuredResponseHandlesValidJson(): void
     {
         $provider = $this->createTestProvider();
@@ -157,6 +182,15 @@ class BaseAIProviderTest extends TestCase
                 return [
                     'success' => true,
                     'content' => '{"result": "test"}',
+                    'metadata' => ['usage' => ['input_tokens' => 10, 'output_tokens' => 20]],
+                ];
+            }
+
+            protected function callAPIWithImage(string $imagePath, string $prompt, array $options = []): array
+            {
+                return [
+                    'success' => true,
+                    'content' => 'test image description',
                     'metadata' => ['usage' => ['input_tokens' => 10, 'output_tokens' => 20]],
                 ];
             }

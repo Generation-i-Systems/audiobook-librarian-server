@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Jobs\EmbedBookJob;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
@@ -111,6 +112,12 @@ class BookMutationService
 
         $book->refresh();
         $book->load(['authors', 'narrators', 'genres', 'series', 'publisher']);
+
+        // Author/genre/series pivot changes above don't mark the Book model dirty,
+        // so BookObserver::saved() alone won't catch them. This is the primary
+        // book-edit path (see BookObserver's dormant pivotAttached/pivotDetached/
+        // pivotUpdated events, which nothing in this codebase actually fires today).
+        EmbedBookJob::dispatch($book->id);
 
         return $book;
     }

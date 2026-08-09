@@ -38,17 +38,74 @@ class ClaudeProvider extends BaseAIProvider
 
     protected function callAPI(string $prompt, array $options = []): array
     {
+        return $this->sendMessage([
+            ['role' => 'user', 'content' => $prompt],
+        ], $options);
+    }
+
+    protected function callAPIWithSchema(string $prompt, array $schema, array $options = []): array
+    {
+        // Add JSON schema instruction
+        $schemaJson = json_encode($schema, JSON_PRETTY_PRINT);
+        $enhancedPrompt = "{$prompt}\n\nReturn a JSON response matching this schema:\n{$schemaJson}\n\nIMPORTANT: Return ONLY valid JSON, no markdown formatting or explanation.";
+
+        return $this->callAPI($enhancedPrompt, $options);
+    }
+
+    protected function callAPIWithImage(string $imagePath, string $prompt, array $options = []): array
+    {
+        $imageData = file_get_contents($imagePath);
+        if ($imageData === false) {
+            return ['success' => false, 'error' => "Unable to read image file: {$imagePath}"];
+        }
+
+        return $this->sendMessage([
+            [
+                'role' => 'user',
+                'content' => [
+                    [
+                        'type' => 'image',
+                        'source' => [
+                            'type' => 'base64',
+                            'media_type' => $this->getImageMimeType($imagePath),
+                            'data' => base64_encode($imageData),
+                        ],
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => $prompt,
+                    ],
+                ],
+            ],
+        ], $options, $options['maxOutputTokens'] ?? 1024);
+    }
+
+    protected function getImageMimeType(string $filePath): string
+    {
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+    }
+
+    /**
+     * The one call site for Anthropic::messages()->create() (PHPStan's baseline
+     * expects exactly one occurrence of the unresolvable-facade error in this
+     * file — see phpstan-baseline.neon — so callAPI/callAPIWithImage funnel
+     * through here rather than each calling the facade directly).
+     */
+    protected function sendMessage(array $messages, array $options, int $defaultMaxTokens = 8192): array
+    {
         try {
             $response = Anthropic::messages()->create([
                 'model' => $this->model,
-                'max_tokens' => $options['maxOutputTokens'] ?? 8192,
+                'max_tokens' => $options['maxOutputTokens'] ?? $defaultMaxTokens,
                 'temperature' => $options['temperature'] ?? 0.1,
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => $prompt,
-                    ],
-                ],
+                'messages' => $messages,
             ]);
 
             if (isset($response['content'][0]['text'])) {
@@ -65,15 +122,6 @@ class ClaudeProvider extends BaseAIProvider
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
-    }
-
-    protected function callAPIWithSchema(string $prompt, array $schema, array $options = []): array
-    {
-        // Add JSON schema instruction
-        $schemaJson = json_encode($schema, JSON_PRETTY_PRINT);
-        $enhancedPrompt = "{$prompt}\n\nReturn a JSON response matching this schema:\n{$schemaJson}\n\nIMPORTANT: Return ONLY valid JSON, no markdown formatting or explanation.";
-
-        return $this->callAPI($enhancedPrompt, $options);
     }
 
     protected function calculateUsage(array $result): array

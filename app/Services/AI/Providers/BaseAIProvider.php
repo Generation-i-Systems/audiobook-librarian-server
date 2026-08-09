@@ -15,9 +15,15 @@ abstract class BaseAIProvider implements AIProviderInterface
     protected int $retryDelayMs = 1000;
     protected float $sessionCost = 0.0;
 
+    protected const DEFAULT_IMAGE_DESCRIPTION_PROMPT = 'Describe this audiobook cover image in 2-3 sentences. '
+        . 'Focus on visual style, mood, color palette, and any notable imagery, so the description can be used '
+        . 'to find books with a similar look and feel. Do not guess at the title or author from the cover text.';
+
     abstract protected function callAPI(string $prompt, array $options = []): array;
 
     abstract protected function callAPIWithSchema(string $prompt, array $schema, array $options = []): array;
+
+    abstract protected function callAPIWithImage(string $imagePath, string $prompt, array $options = []): array;
 
     public function complete(string $prompt, array $options = []): AIResponse
     {
@@ -84,6 +90,38 @@ abstract class BaseAIProvider implements AIProviderInterface
 
             return AIResponse::successWithData(
                 data: $data,
+                usage: $usage,
+                metadata: $result['metadata'] ?? []
+            );
+        });
+    }
+
+    public function describeImage(string $imagePath, ?string $prompt = null): AIResponse
+    {
+        if (!file_exists($imagePath)) {
+            return AIResponse::failure("Image file not found: {$imagePath}");
+        }
+
+        $prompt ??= self::DEFAULT_IMAGE_DESCRIPTION_PROMPT;
+
+        return $this->executeWithRetry(function () use ($imagePath, $prompt) {
+            if (!$this->canMakeRequest()) {
+                return AIResponse::failure('Rate limit exceeded');
+            }
+
+            $this->trackRequest();
+
+            $result = $this->callAPIWithImage($imagePath, $prompt);
+
+            if (!$result['success']) {
+                return AIResponse::failure($result['error'] ?? 'Unknown error');
+            }
+
+            $usage = $this->calculateUsage($result);
+            $this->sessionCost += $usage['cost'];
+
+            return AIResponse::success(
+                content: $result['content'],
                 usage: $usage,
                 metadata: $result['metadata'] ?? []
             );

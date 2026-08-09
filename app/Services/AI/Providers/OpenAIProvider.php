@@ -137,6 +137,59 @@ class OpenAIProvider extends BaseAIProvider
         }
     }
 
+    protected function callAPIWithImage(string $imagePath, string $prompt, array $options = []): array
+    {
+        try {
+            $imageData = file_get_contents($imagePath);
+            if ($imageData === false) {
+                return ['success' => false, 'error' => "Unable to read image file: {$imagePath}"];
+            }
+
+            $dataUri = 'data:' . $this->getImageMimeType($imagePath) . ';base64,' . base64_encode($imageData);
+
+            $response = $this->client->chat()->create([
+                'model' => $this->model,
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            ['type' => 'text', 'text' => $prompt],
+                            ['type' => 'image_url', 'image_url' => ['url' => $dataUri]],
+                        ],
+                    ],
+                ],
+                'max_tokens' => $options['maxOutputTokens'] ?? 1024,
+                'temperature' => $options['temperature'] ?? 0.1,
+            ]);
+
+            if (isset($response['choices'][0]['message']['content'])) {
+                return [
+                    'success' => true,
+                    'content' => $response['choices'][0]['message']['content'],
+                    'metadata' => [
+                        'usage' => $response['usage'] ?? [],
+                    ],
+                ];
+            }
+
+            return ['success' => false, 'error' => 'No valid response content'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function getImageMimeType(string $filePath): string
+    {
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+    }
+
     protected function calculateUsage(array $result): array
     {
         $metadata = $result['metadata'] ?? [];

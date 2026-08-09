@@ -159,6 +159,59 @@ class GeminiProviderTest extends TestCase
         $this->assertEquals(0.40, $stats['pricing']['output_per_million']);
     }
 
+    public function testDescribeImageReturnsFailureWhenImageFileNotFound(): void
+    {
+        $provider = new GeminiProvider();
+
+        $response = $provider->describeImage('/nonexistent/cover.jpg');
+
+        $this->assertFalse($response->isSuccess());
+        $this->assertStringContainsString('not found', $response->getError());
+    }
+
+    public function testDescribeImageReturnsSuccessResponse(): void
+    {
+        config(['services.gemini.api_key' => 'test-key']);
+
+        $imagePath = tempnam(sys_get_temp_dir(), 'cover') . '.jpg';
+        file_put_contents($imagePath, 'fake-jpeg-bytes');
+
+        $mockResponse = new Response(200, [], json_encode([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            ['text' => 'A moody blue cover with a lone figure against a starry sky.'],
+                        ],
+                    ],
+                ],
+            ],
+            'usageMetadata' => [
+                'promptTokenCount' => 50,
+                'candidatesTokenCount' => 15,
+            ],
+        ]));
+
+        $mock = new MockHandler([$mockResponse]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $provider = new GeminiProvider();
+        $this->setProtectedProperty($provider, 'client', $client);
+
+        try {
+            $response = $provider->describeImage($imagePath);
+
+            $this->assertTrue($response->isSuccess());
+            $this->assertEquals(
+                'A moody blue cover with a lone figure against a starry sky.',
+                $response->getContent()
+            );
+        } finally {
+            unlink($imagePath);
+        }
+    }
+
     protected function setProtectedProperty($object, $propertyName, $value): void
     {
         $reflection = new \ReflectionClass($object);

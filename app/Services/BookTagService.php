@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Jobs\EmbedBookJob;
 use App\Models\Book;
 use App\Models\BookTag;
 use App\Models\Group;
@@ -85,6 +86,12 @@ class BookTagService
                 'tags' => $normalizedTags,
             ]
         );
+
+        // Only system-scope tags feed the recommendation-engine embedding text
+        // (EmbedBookJob::buildMetadataText) — group/user tags are private.
+        if ($scope === 'system') {
+            EmbedBookJob::dispatch($book->id);
+        }
 
         return ['scope' => $scope, 'groupId' => $groupId, 'tags' => $normalizedTags];
     }

@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Jobs\EmbedBookJob;
 use App\Models\Book;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\Log;
@@ -11,11 +12,21 @@ class BookObserver
     use HandlesLibraryJson;
 
     /**
+     * Book fields that feed the recommendation-engine embedding text; a change to
+     * any of these should trigger re-embedding (see EmbedBookJob::buildMetadataText).
+     */
+    private const EMBEDDABLE_FIELDS = ['title', 'description', 'cover_image'];
+
+    /**
      * Handle the Book "saved" event.
      * This fires after both create and update operations.
      */
     public function saved(Book $book): void
     {
+        if ($book->wasRecentlyCreated || $book->wasChanged(self::EMBEDDABLE_FIELDS)) {
+            EmbedBookJob::dispatch($book->id);
+        }
+
         // Only update librarian.json if the book has a directory path
         if (empty($book->directory_path)) {
             return;
@@ -79,6 +90,10 @@ class BookObserver
 
     private function handlePivotChange(Book $book, string $relationName): void
     {
+        if (in_array($relationName, ['authors', 'genres', 'series'], true)) {
+            EmbedBookJob::dispatch($book->id);
+        }
+
         if (empty($book->directory_path)) {
             return;
         }

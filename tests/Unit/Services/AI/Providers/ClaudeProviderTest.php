@@ -106,4 +106,14 @@ class ClaudeProviderTest extends TestCase
         $this->assertArrayHasKey('rate_limits', $stats);
         $this->assertArrayHasKey('pricing', $stats);
     }
+
+    public function testDescribeImageReturnsFailureWhenImageFileNotFound(): void
+    {
+        $provider = new ClaudeProvider();
+
+        $response = $provider->describeImage('/nonexistent/cover.jpg');
+
+        $this->assertFalse($response->isSuccess());
+        $this->assertStringContainsString('not found', $response->getError());
+    }
 }

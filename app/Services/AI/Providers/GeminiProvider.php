@@ -125,6 +125,67 @@ class GeminiProvider extends BaseAIProvider
         return $this->callAPI($enhancedPrompt, $options);
     }
 
+    protected function callAPIWithImage(string $imagePath, string $prompt, array $options = []): array
+    {
+        try {
+            $imageData = file_get_contents($imagePath);
+            if ($imageData === false) {
+                return ['success' => false, 'error' => "Unable to read image file: {$imagePath}"];
+            }
+
+            $response = $this->client->post($this->getApiUrl(), [
+                'query' => ['key' => $this->apiKey],
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $prompt],
+                                [
+                                    'inline_data' => [
+                                        'mime_type' => $this->getImageMimeType($imagePath),
+                                        'data' => base64_encode($imageData),
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'generationConfig' => [
+                        'temperature' => $options['temperature'] ?? 0.1,
+                        'maxOutputTokens' => $options['maxOutputTokens'] ?? 1024,
+                    ],
+                ],
+            ]);
+
+            $body = json_decode($response->getBody(), true);
+
+            if (isset($body['candidates'][0]['content']['parts'][0]['text'])) {
+                return [
+                    'success' => true,
+                    'content' => $body['candidates'][0]['content']['parts'][0]['text'],
+                    'metadata' => [
+                        'usage' => $body['usageMetadata'] ?? [],
+                    ],
+                ];
+            }
+
+            return ['success' => false, 'error' => 'No valid response content'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function getImageMimeType(string $filePath): string
+    {
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+    }
+
     protected function calculateUsage(array $result): array
     {
         $metadata = $result['metadata'] ?? [];
