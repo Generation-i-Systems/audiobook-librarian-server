@@ -21,6 +21,7 @@ use App\Traits\Auditable;
  * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Author>|array $authors
  * @property-read \Illuminate\Database\Eloquent\Relations\Pivot|null $pivot
  * @property-read int|null $book_count
+ * @property-read int|null $book_count_in_genre
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property-read int|null $books_count
@@ -61,9 +62,11 @@ class Series extends Model
         return \Database\Factories\SeriesFactory::new();
     }
 
+    /** @return BelongsToMany<Book, $this, BookSeriesPivot> */
     public function books(): BelongsToMany
     {
         return $this->belongsToMany(Book::class, 'book_series')
+            ->using(BookSeriesPivot::class)
             ->withPivot('series_number')
             ->withTimestamps();
     }

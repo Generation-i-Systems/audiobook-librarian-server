@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\BookDownloadController;
 use App\Http\Controllers\Api\BookImportApiController;
 use App\Http\Controllers\Api\BookTagController;
 use App\Http\Controllers\Api\BookSeriesGenreController;
+use App\Http\Controllers\Api\DiscoveryController;
 use App\Http\Controllers\Api\BookmarkApiController;
 use App\Http\Controllers\Api\BookmarkSyncController;
 use App\Http\Controllers\Api\BookMatchController;
@@ -27,6 +28,8 @@ use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\AdminGroupController;
 use App\Http\Controllers\Api\AdminUserController;
+use App\Http\Controllers\Api\AdminUserTagFilterController;
+use App\Http\Controllers\Api\UserTagFilterController;
 use App\Http\Controllers\Api\EmailOtpController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PositionSyncController;
@@ -237,6 +240,18 @@ Route::prefix('v1')->group(function () {
         Route::get('/genres', [BookSeriesGenreController::class, 'listGenres']);
         Route::get('/genres/{genre}/authors', [BookSeriesGenreController::class, 'authorsByGenre']);
         Route::get('/genres/{genreId}/authors', [BookSeriesGenreController::class, 'authorsByGenreSimple']);
+        Route::get('/genres/{genre}/books', [BookSeriesGenreController::class, 'booksByGenre']);
+        Route::get('/genres/{genre}/series', [BookSeriesGenreController::class, 'seriesByGenre']);
+
+        // Discovery (recommendation shelves) Routes
+        Route::get('/discovery/shelves', [DiscoveryController::class, 'shelves']);
+        Route::get('/discovery/shelves/{shelfKey}/books', [DiscoveryController::class, 'shelfBooks']);
+        Route::get('/discovery/surprise', [DiscoveryController::class, 'surprise']);
+
+        // Self-service content filter (require/ban a tag)
+        Route::get('/users/me/tag-filters', [UserTagFilterController::class, 'index']);
+        Route::post('/users/me/tag-filters', [UserTagFilterController::class, 'store']);
+        Route::delete('/users/me/tag-filters/{id}', [UserTagFilterController::class, 'destroy']);
 
         // Book Request Route
         Route::post('/book-requests', [BookRequestApiController::class, 'store']);
@@ -415,6 +430,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/{id}/send-welcome', [AdminUserController::class, 'sendWelcome']);
             Route::post('/{id}/login-qr', [AdminUserController::class, 'generateLoginQr']);
             Route::post('/{id}/verify', [AdminUserController::class, 'verify']);
+            Route::get('/{id}/tag-filters', [AdminUserTagFilterController::class, 'index']);
+            Route::post('/{id}/tag-filters', [AdminUserTagFilterController::class, 'store']);
+            Route::delete('/{id}/tag-filters/{filterId}', [AdminUserTagFilterController::class, 'destroy']);
         });
 
         // Authenticated: set initial password (used after OTP login when must_change_password=true)

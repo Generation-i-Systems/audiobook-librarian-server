@@ -45,6 +45,7 @@ class Genre extends Model
 
     protected $casts = ['is_fiction' => 'boolean'];
 
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsToMany<Book, $this> */
     public function books(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Book::class);

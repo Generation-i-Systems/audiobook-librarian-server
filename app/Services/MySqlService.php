@@ -565,6 +565,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             }
         }
 
+        // Unconditional (not gated by an explicit ?tag= param): a user's own require/ban
+        // content-filter rules apply to every listing, not just when they search by tag.
+        if ($userId) {
+            app(UserTagFilterService::class)->applyToBookQuery($query, $userId);
+        }
+
         if (!empty($filters['series_id'])) {
             $query->whereHas('series', function ($q) use ($filters): void {
                 $q->where('series.id', $filters['series_id']);
@@ -688,6 +694,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 } else {
                     $query->orderBy('title', $order);
                 }
+                break;
+            case 'random':
+                $query->inRandomOrder();
                 break;
             case 'title':
             default:

@@ -370,7 +370,7 @@ class ToolExecutor
 
         if ($includeBooks) {
             $books = $series->books()->with(['authors', 'genres', 'narrators'])->get();
-            $result['books'] = $books->map(function ($book) use ($series) {
+            $result['books'] = $books->map(function (Book $book) use ($series): array {
                 return [
                     'id' => $book->id,
                     'title' => $book->title,

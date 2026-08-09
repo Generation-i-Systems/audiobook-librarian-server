@@ -60,6 +60,17 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('04:00')
             ->appendOutputTo(storage_path('logs/abb-scraping.log'));
 
+        // Catch-all recompute of every user's discovery shelves, so newly-added books
+        // surface even without a status-change trigger. Runs after the nightly embedding
+        // backfill so recommendations reflect same-day catalog changes.
+        $schedule->command('books:backfill-embeddings')
+            ->dailyAt('04:30')
+            ->appendOutputTo(storage_path('logs/embedding-backfill.log'));
+
+        $schedule->command('books:refresh-recommendations')
+            ->dailyAt('05:30')
+            ->appendOutputTo(storage_path('logs/recommendations-refresh.log'));
+
         // Send daily email notifications for new books by favorite authors at 8:00 AM
         $schedule->command('favorites:send-notifications')
             ->dailyAt('08:00')

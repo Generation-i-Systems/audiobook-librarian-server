@@ -71,6 +71,7 @@ use Illuminate\Support\Facades\Schema;
  * @property array<array-key, mixed>|null $mongo_record
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\BookSeriesPivot|null $pivot
  * @property string|null $last_library_json_update
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property-read int|null $authors_count
@@ -297,9 +298,11 @@ class Book extends Model
         return $this->belongsTo(Publisher::class);
     }
 
+    /** @return BelongsToMany<Series, $this, BookSeriesPivot> */
     public function series(): BelongsToMany
     {
         return $this->belongsToMany(Series::class, 'book_series')
+            ->using(BookSeriesPivot::class)
             ->withPivot('series_number')
             ->withTimestamps();
     }
@@ -327,6 +330,11 @@ class Book extends Model
     public function userTags(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(BookTag::class);
+    }
+
+    public function embedding(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(BookEmbedding::class);
     }
 
     /**
