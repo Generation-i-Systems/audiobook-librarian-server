@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
+use App\Models\Author;
+use App\Models\Series;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
 use App\Services\LibriVoxBrowseService;
 use Illuminate\Http\Request;
@@ -65,7 +67,7 @@ class BookSeriesGenreController extends Controller
         }
 
         // Build the base query
-        $query = \App\Models\Series::query()
+        $query = Series::query()
             ->select([
                 'series.id',
                 'series.name',
@@ -139,7 +141,7 @@ class BookSeriesGenreController extends Controller
         }
 
         // Get total count before pagination - need to remove GROUP BY for accurate count
-        $countQuery = \App\Models\Series::query()
+        $countQuery = Series::query()
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
 
@@ -254,7 +256,7 @@ class BookSeriesGenreController extends Controller
         $userId = Auth::id();
 
         /** @var \App\Models\Series|null $series */
-        $series = \App\Models\Series::query()->find($seriesId);
+        $series = Series::query()->find($seriesId);
 
         if (!$series) {
             return response()->json([
@@ -422,10 +424,16 @@ class BookSeriesGenreController extends Controller
                 'message' => 'The specified genre could not be found',
             ], 404);
         }
-        $books = array_filter($this->documentStoreService->listBooks(), function ($book) use ($genreId) {
-            return ($book['genre_id'] ?? null) == $genreId;
-        });
-        $authorIds = array_unique(array_column($books, 'author_id'));
+        // documentStoreService->listBooks() with no args returns a paginated wrapper
+        // (['data' => ..., 'total' => ...]), not a flat book list, and defaults to only
+        // the first 24 books — neither is suitable for "every author in this genre", so
+        // this queries authors directly instead of filtering a (wrong/partial) book list.
+        $authorIds = Author::query()
+            ->whereHas('books', function ($q) use ($genre): void {
+                $q->whereHas('genres', fn ($g) => $g->where('genres.id', $genre['id']));
+            })
+            ->pluck('id')
+            ->all();
         $authors = array_filter($this->documentStoreService->listAuthors(), function ($author) use ($authorIds, $search) {
             $match = in_array($author['id'], $authorIds);
             if ($search) {
@@ -435,9 +443,14 @@ class BookSeriesGenreController extends Controller
             return $match;
         });
         $authors = array_values($authors);
-        usort($authors, function ($a, $b) {
-            return strcmp($a['name'], $b['name']);
-        });
+
+        if ($request->input('sort') === 'random') {
+            shuffle($authors);
+        } else {
+            usort($authors, function ($a, $b) {
+                return strcmp($a['name'], $b['name']);
+            });
+        }
 
         $total = count($authors);
         $page = (int) $request->input('page', 1);
@@ -464,6 +477,132 @@ class BookSeriesGenreController extends Controller
     }
 
     /**
+     * Get a paginated, sortable list of books in a genre.
+     */
+    public function booksByGenre(Request $request, $genreId)
+    {
+        $documentStore = $this->documentStoreService;
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = min(100, max(1, (int) $request->input('per_page', 24)));
+        $withCover = $request->boolean('with_cover', true);
+        $inlineCovers = $request->boolean('inlineCovers', false);
+
+        $genre = $documentStore->getGenre($genreId);
+        if (!$genre) {
+            return response()->json([
+                'error' => 'Genre not found',
+                'message' => 'The specified genre could not be found',
+            ], 404);
+        }
+
+        $sort = $this->resolveGenreBooksSort((string) $request->input('sort', 'recent'));
+        $order = (string) $request->input('order', $sort === 'title' ? 'asc' : 'desc');
+
+        $userId = Auth::id();
+        $booksData = $documentStore->listBooks(
+            $page,
+            $perPage,
+            ['genre_id' => $genre['id']],
+            true,
+            $sort,
+            $order,
+            false,
+            $userId
+        );
+        $books = $booksData['data'];
+
+        $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
+
+        $total = (int) ($booksData['total'] ?? 0);
+
+        return response()->json([
+            'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
+            'data' => array_values($transformedBooks),
+            'meta' => [
+                'current_page' => $page,
+                'from' => $total > 0 ? (($page - 1) * $perPage) + 1 : null,
+                'last_page' => $booksData['lastPage'] ?? max(1, (int) ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'to' => $total > 0 ? min($page * $perPage, $total) : null,
+                'total' => $total,
+            ],
+        ]);
+    }
+
+    /**
+     * Maps a client-facing sort name to the underlying listBooks() sort key.
+     */
+    private function resolveGenreBooksSort(string $requested): string
+    {
+        return match ($requested) {
+            'alpha', 'title' => 'title',
+            'random' => 'random',
+            default => 'created_at', // 'recent' and anything unrecognized
+        };
+    }
+
+    /**
+     * Get a paginated, sortable list of series with a book in a genre.
+     */
+    public function seriesByGenre(Request $request, $genreId)
+    {
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = min(100, max(1, (int) $request->input('per_page', 24)));
+        $sort = (string) $request->input('sort', 'alpha');
+
+        $genre = $this->documentStoreService->getGenre($genreId);
+        if (!$genre) {
+            return response()->json([
+                'error' => 'Genre not found',
+                'message' => 'The specified genre could not be found',
+            ], 404);
+        }
+
+        $genreId = $genre['id'];
+        $inGenre = fn ($q) => $q->whereHas('genres', fn ($g) => $g->where('genres.id', $genreId));
+
+        $query = Series::query()
+            ->whereHas('books', $inGenre)
+            ->withCount(['books as book_count_in_genre' => $inGenre]);
+
+        switch ($sort) {
+            case 'random':
+                $query->inRandomOrder();
+                break;
+            case 'recent':
+                $query->withMax(['books as latest_book_added_at' => $inGenre], 'created_at')
+                    ->orderByDesc('latest_book_added_at');
+                break;
+            case 'length':
+            case 'series_length':
+                $query->orderByDesc('book_count_in_genre');
+                break;
+            case 'alpha':
+            default:
+                $query->orderBy('name');
+                break;
+        }
+
+        $total = (clone $query)->count();
+        $series = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        return response()->json([
+            'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
+            'data' => $series->map(fn (Series $s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'book_count_in_genre' => $s->book_count_in_genre,
+            ])->values()->all(),
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+            ],
+        ]);
+    }
+
+    /**
      * Get all authors with books in a given genre.
      */
     public function authorsByGenreSimple($genreId, Request $request)
@@ -476,10 +615,14 @@ class BookSeriesGenreController extends Controller
                 'message' => 'The specified genre could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), function ($book) use ($genreId) {
-            return ($book['genre_id'] ?? null) == $genreId;
-        });
-        $authorIds = array_unique(array_column($books, 'author_id'));
+        // See authorsByGenre() above for why this can't filter documentStore->listBooks()'s
+        // return value directly (it's a paginated wrapper, and defaults to only 24 books).
+        $authorIds = Author::query()
+            ->whereHas('books', function ($q) use ($genre): void {
+                $q->whereHas('genres', fn ($g) => $g->where('genres.id', $genre['id']));
+            })
+            ->pluck('id')
+            ->all();
         $authors = array_filter($documentStore->listAuthors(), fn ($author) => in_array($author['id'], $authorIds));
         $authors = array_values($authors);
         usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));

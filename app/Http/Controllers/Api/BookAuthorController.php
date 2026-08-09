@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
+use App\Models\Author;
+use App\Services\BookDataTransformer;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
 use App\Services\LibriVoxBrowseService;
 use Illuminate\Http\Request;
@@ -16,13 +18,33 @@ class BookAuthorController extends Controller
 {
     use BookTransformTrait;
 
+    private const SAMPLE_TITLE_COUNT = 3;
+
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
         private readonly LibriVoxBrowseService $libriVoxBrowseService,
+        private readonly BookDataTransformer $bookDataTransformer,
     ) {
         $this->documentStoreService = $documentStoreService;
+    }
+
+    /**
+     * @return array{imageUrl: ?string, sampleTitles: array<int, string>}
+     */
+    private function authorImageAndSampleTitles(Author $author, bool $includeNeedsReview): array
+    {
+        $books = $author->books()
+            ->when(!$includeNeedsReview, fn ($q) => $q->where('books.needs_review', false))
+            ->get(['books.id', 'books.title', 'books.cover_image', 'books.directory_path']);
+
+        $coverBook = $books->first(fn ($book) => !empty($book->cover_image));
+
+        return [
+            'imageUrl' => $coverBook ? $this->bookDataTransformer->coverUrl($coverBook) : null,
+            'sampleTitles' => $books->pluck('title')->filter()->shuffle()->take(self::SAMPLE_TITLE_COUNT)->values()->all(),
+        ];
     }
 
     /**
@@ -256,13 +278,16 @@ class BookAuthorController extends Controller
                     ];
                 });
 
+            $imageAndTitles = $this->authorImageAndSampleTitles($author, $includeNeedsReview);
+
             return [
                 'id' => $author->id,
                 'name' => $author->name,
                 'biography' => null, // Column doesn't exist in database
                 'book_count' => $totalBookCount,
                 'book_count_in_genre' => $author->book_count_in_genre ?? $author->book_count,
-                'image_url' => null, // Column doesn't exist in database
+                'image_url' => $imageAndTitles['imageUrl'],
+                'sample_book_titles' => $imageAndTitles['sampleTitles'],
                 'genres' => $author->genres,
                 'series' => $authorSeries->toArray(),
                 'isFavorite' => (bool) $author->isFavorite,
@@ -377,13 +402,16 @@ class BookAuthorController extends Controller
                 ->exists();
         }
 
+        $imageAndTitles = $this->authorImageAndSampleTitles($author, $includeNeedsReview);
+
         return response()->json([
             'id' => $author->id,
             'name' => $author->name,
             'biography' => null,
             'book_count' => $totalBookCount,
             'book_count_in_genre' => $totalBookCount,
-            'image_url' => null,
+            'image_url' => $imageAndTitles['imageUrl'],
+            'sample_book_titles' => $imageAndTitles['sampleTitles'],
             'genres' => $genres,
             'series' => $authorSeries,
             'isFavorite' => $isFavorite,

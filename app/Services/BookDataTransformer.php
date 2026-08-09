@@ -83,12 +83,23 @@ class BookDataTransformer
         return $camelCasedBook;
     }
 
+    /**
+     * The public cover-image URL for a book, or null if it has none. Shared so anything
+     * that needs to point at a book's cover (e.g. using it as an author's photo) builds
+     * the same URL the book-listing endpoints already use.
+     */
+    public function coverUrl(Book $book): ?string
+    {
+        if (!$book->cover_image) {
+            return null;
+        }
+
+        return $this->normalizeCoverUrl(request()->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover');
+    }
+
     public function toBookListItem(Book $book, ?int $userId = null): array
     {
-        $coverUrl = null;
-        if ($book->cover_image) {
-            $coverUrl = $this->normalizeCoverUrl(request()->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover');
-        }
+        $coverUrl = $this->coverUrl($book);
 
         $baseData = [
             'id' => $book->id,
