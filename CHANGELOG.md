@@ -94,6 +94,7 @@
 
 ### Fixed
 
+- Series-number pivot saves now remove ordinal zero-padding while preserving valid sub-one values and non-numeric text.
 - Badge evaluation now only grants badges for reachable conditions and real user activity
     - Canonical badge definitions now align with actual tracked data (goals, playlists, library, recommendations, seasonal activity, and series exploration)
     - Legacy impossible badge definitions are deactivated during canonical seeding, and action badges remain available

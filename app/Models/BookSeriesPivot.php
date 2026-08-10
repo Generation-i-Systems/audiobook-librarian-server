@@ -16,4 +16,23 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 class BookSeriesPivot extends Pivot
 {
     protected $table = 'book_series';
+
+    protected static function booted(): void
+    {
+        static::saving(function (BookSeriesPivot $pivot): void {
+            $pivot->series_number = self::normalizeSeriesNumber($pivot->series_number);
+        });
+    }
+
+    public static function normalizeSeriesNumber(mixed $seriesNumber): mixed
+    {
+        if (
+            !is_string($seriesNumber)
+            || preg_match('/^\d+(?:\.\d+)?(?:\s*[-,]\s*\d+(?:\.\d+)?)*$/', $seriesNumber) !== 1
+        ) {
+            return $seriesNumber;
+        }
+
+        return preg_replace('/(?<!\d)0+(?=\d)/', '', $seriesNumber);
+    }
 }

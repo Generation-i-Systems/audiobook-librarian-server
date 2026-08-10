@@ -390,3 +390,7 @@ descriptions are still only being set if they started out blank
 ---
 
 commit
+
+---
+
+update the db save logic to enforce series-number leading-zero normalization going forward while preserving leading zeroes for values below one

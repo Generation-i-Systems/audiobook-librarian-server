@@ -4,6 +4,7 @@ namespace App\Services\AI;
 
 use App\Models\Author;
 use App\Models\Book;
+use App\Models\BookSeriesPivot;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
@@ -2335,7 +2336,7 @@ class ToolExecutor
                         DB::table('book_series')
                             ->where('book_id', $book->id)
                             ->where('series_id', $series->id)
-                            ->update(['series_number' => $value]);
+                            ->update(['series_number' => BookSeriesPivot::normalizeSeriesNumber($value)]);
                     }
                     break;
 

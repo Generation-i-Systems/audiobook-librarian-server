@@ -49,6 +49,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
     ]
     ```
 - All code (backend, frontend, API) expects and produces this format only.
+- Persisted `book_series.series_number` values remove ordinal zero-padding on every application save path (`"003"` becomes `"3"`), while valid values below one (such as `"0.5"`) and non-numeric text remain unchanged.
 - Legacy formats (string, key-value, separate objects) are not supported.
 - Migration: update any old data to this format.
 

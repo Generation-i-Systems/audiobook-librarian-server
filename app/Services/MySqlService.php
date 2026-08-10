@@ -9,6 +9,7 @@ use App\Contracts\DocumentStatsServiceInterface;
 use App\Models\Author;
 use App\Models\Badge;
 use App\Models\Book;
+use App\Models\BookSeriesPivot;
 use App\Models\BookProgress;
 use App\Models\Genre;
 use App\Models\Narrator;
@@ -1598,7 +1599,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                         DB::table('book_series')->insert([
                             'book_id' => $pivot->book_id,
                             'series_id' => $primarySeriesId,
-                            'series_number' => $pivot->series_number,
+                            'series_number' => BookSeriesPivot::normalizeSeriesNumber($pivot->series_number),
                             'created_at' => now(),
                             'updated_at' => now(),
                         ]);

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Book;
+use App\Models\BookSeriesPivot;
 use App\Models\Author;
 use App\Models\Genre;
 use App\Models\Series;
@@ -1287,6 +1288,7 @@ PROMPT;
                         $seriesName = trim($parsedData['series_name']);
                         $raw = $parsedData['series_number'];
                         $seriesNumber = is_numeric($raw) && str_contains((string) $raw, '.') ? (float) $raw : (int) $raw;
+                        $seriesNumber = BookSeriesPivot::normalizeSeriesNumber($seriesNumber);
 
                         // Find or create the series
                         $series = Series::firstOrCreate(
