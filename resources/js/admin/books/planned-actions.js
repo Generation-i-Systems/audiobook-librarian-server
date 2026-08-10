@@ -312,7 +312,7 @@
         } catch (e) {}
     }
 
-    function syncCoverUrlTextToHidden() {
+    function syncCoverUrlTextToHidden(preserveExistingUrl = false) {
         const coverText = document.getElementById("coverImageUrlText");
         if (!coverText) {
             return;
@@ -324,7 +324,7 @@
         );
 
         const value = coverText.value.trim();
-        if (coverImageUrl) {
+        if (coverImageUrl && (value !== "" || !preserveExistingUrl)) {
             coverImageUrl.value = value;
         }
         if (audibleCoverImageUrl) {
@@ -411,7 +411,7 @@
 
         if (form) {
             form.addEventListener("submit", function () {
-                syncCoverUrlTextToHidden();
+                syncCoverUrlTextToHidden(true);
             });
         }
 

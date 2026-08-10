@@ -12,6 +12,18 @@ Sass emits deprecation warnings for application and Bootstrap `@import` usage. P
 
 ---
 
+## 2026-08-10
+
+adding a cover image from the web book edit silently fails
+
+editing https://books.ablibrarian.com/admin/books/14469/edit?search=cannon&sort=recent_desc
+
+---
+
+Call to undefined method App\Auth\DocumentstoreUser::groups() when opening /admin/books/5809
+
+---
+
 update the import script to use more AI by including the previous imports of other books in the same parent directory if they were user modified so that patterns modified by the user may be applied to the other files in the same parent dir (ignoring generic parents). in the edit menu add an item to reverse the title and series and make sure this is something that the AI would notice
 
 ---

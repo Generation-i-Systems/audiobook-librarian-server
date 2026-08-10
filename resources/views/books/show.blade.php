@@ -62,7 +62,7 @@
                 <p>{{ isset($book['description']) ? $book['description'] : 'No description available.' }}</p>
 
                 @auth
-                    @php $currentUser = Auth::user(); $userGroups = $currentUser->groups()->get(['groups.id', 'groups.name']); @endphp
+                    @php $currentUser = Auth::user(); @endphp
                     <div class="mb-3" id="book-tags">
                         <strong>Tags:</strong>
                         <div class="mt-1">

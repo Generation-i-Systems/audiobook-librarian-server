@@ -741,6 +741,8 @@ import {
                     coverUrlInput.val(coverUrl);
                 }
 
+                $("#coverImageUrlText").val(coverUrl);
+
                 const coverPreview = $("#current-cover-image");
                 if (coverPreview.length) {
                     coverPreview.attr("src", coverUrl);

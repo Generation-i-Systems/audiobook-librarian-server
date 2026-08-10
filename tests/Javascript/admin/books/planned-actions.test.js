@@ -62,6 +62,19 @@ describe("planned-actions behavior", () => {
         expect(candidate.checked).toBe(false);
     });
 
+    test("preserves an autofill cover URL when the visible field is empty on submit", () => {
+        const textInput = document.getElementById("coverImageUrlText");
+        const hiddenInput = document.getElementById("coverImageUrl");
+
+        textInput.value = "";
+        hiddenInput.value = "https://example.com/provider-cover.jpg";
+        document.getElementById("book-form").dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+        );
+
+        expect(hiddenInput.value).toBe("https://example.com/provider-cover.jpg");
+    });
+
     test("clears stale cover URL fields when a candidate is selected", () => {
         const textInput = document.getElementById("coverImageUrlText");
         const hiddenInput = document.getElementById("coverImageUrl");

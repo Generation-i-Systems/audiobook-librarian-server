@@ -730,9 +730,13 @@
                                     <label for="coverImageUrlText" class="form-label">
                                         Cover Image URL <span class="text-muted">(Optional)</span>
                                     </label>
-                                    <input type="text" class="form-control" id="coverImageUrlText"
+                                    <input type="url" class="form-control @error('coverImageUrl') is-invalid @enderror" id="coverImageUrlText"
+                                        name="coverImageUrlText"
                                         value="{{ old('audibleCoverImageUrl', old('coverImageUrl', '')) }}"
                                         placeholder="https://...">
+                                    @error('coverImageUrl')
+                                        <span class="invalid-feedback d-block">{{ $message }}</span>
+                                    @enderror
                                 </div>
 
                                 <div class="mt-3">

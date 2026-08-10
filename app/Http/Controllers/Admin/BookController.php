@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
+use App\Models\Book;
+use App\Models\User;
 use App\Services\AudioFileAnalyzer;
 use App\Services\AudibleService;
 use App\Services\AudiobookBayService;
 use App\Services\BookDirectoryMoveService;
 use App\Services\BookDirectoryParser;
+use App\Services\BookTagService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\HardcoverService;
@@ -17,6 +20,7 @@ use App\Traits\BookImportTrait;
 use App\Traits\HandlesLibraryJson;
 use App\Traits\ProcessesBookData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -329,7 +333,21 @@ class BookController extends Controller
         $relatedBooks = array_filter($relatedBooks, 'is_array'); // Filter out non-array values
         $relatedBooks = array_map([$this, 'ensureBookFields'], $relatedBooks);
 
-        return view('books.show', compact('book', 'relatedBooks'));
+        $tags = ['system' => [], 'groups' => [], 'user' => []];
+        $popularTags = collect();
+        $userGroups = collect();
+        if (Auth::check()) {
+            $user = User::find(Auth::id());
+            $bookModel = Book::find($book['id']);
+            if ($user && $bookModel) {
+                $bookTagService = app(BookTagService::class);
+                $tags = $bookTagService->visibleTagsForBook($user, $bookModel);
+                $popularTags = $bookTagService->popularTags(20);
+                $userGroups = $user->groups()->get(['groups.id', 'groups.name']);
+            }
+        }
+
+        return view('books.show', compact('book', 'relatedBooks', 'tags', 'popularTags', 'userGroups'));
     }
 
     /**
@@ -1020,9 +1038,10 @@ class BookController extends Controller
             }
         }
 
-        if (!$coverProcessed && $request->filled('coverImageUrl')) {
+        if (!$coverProcessed && ($request->filled('coverImageUrl') || $request->filled('coverImageUrlText'))) {
+            $coverUrl = $request->input('coverImageUrl') ?: $request->input('coverImageUrlText');
             Log::debug('Updating cover image URL', [
-                'coverImageUrl' => $request->input('coverImageUrl'),
+                'coverImageUrl' => $coverUrl,
                 'coverImageSource' => $request->input('coverImageSource'),
                 'coverImage' => $request->input('coverImage'),
                 'coverImageCandidate' => $request->input('coverImageCandidate'),
@@ -1030,7 +1049,6 @@ class BookController extends Controller
                 'googleBooksId' => $request->input('googleBooksId'),
             ]);
             // Handle external cover image URL
-            $coverUrl = $request->input('coverImageUrl');
             $directoryPath = $targetDirectoryPath;
             $googleBooksId = $request->input('googleBooksId') ?? $book['googleBooksId'] ?? null;
 

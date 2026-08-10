@@ -40,6 +40,8 @@
 
 ### Fixed
 
+- Admin book-detail pages now render tag controls using the matching Eloquent user rather than calling the unavailable `groups()` relationship on the authenticated `DocumentstoreUser` wrapper.
+- The web book-edit cover URL input had no form name and relied entirely on JavaScript copying it into a hidden field. If that handler did not run, the update silently submitted no cover URL and never attempted a download. The visible field now submits directly and displays any download error.
 - `BookSeriesGenreController::authorsByGenre()`/`authorsByGenreSimple()` (`GET /genres/{genre}/authors`) always returned zero authors for any genre: both filtered `documentStoreService->listBooks()`'s return value directly, but that method returns a paginated wrapper (`['data' => ..., 'total' => ...]`), not a flat book list, and defaults to only its first 24 books regardless. Found while adding genre-scoped books/series endpoints and a random sort option to this same controller. Both now query authors directly via `Author::whereHas('books.genres', ...)`.
 - `UserAccountService::createUser()` silently dropped `must_change_password` (not in `User::$fillable` and not passed to `User::create()`), so every code path that tried to force a newly created account to set its own password on first login (admin-created users, OTP-created pending accounts) had that flag quietly discarded and defaulting to `false`. Found while adding an admin "send sign-in email instead of setting a password" option, which depends on this flag. Now fillable and passed through.
 - Book edit metadata autofill now preserves an existing selected genre, including directory-derived genres, and no longer adds blank genre rows from provider categories that are not configured genre options.

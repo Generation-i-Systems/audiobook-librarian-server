@@ -378,6 +378,7 @@ class BookController extends Controller
 
         $tags = ['system' => [], 'groups' => [], 'user' => []];
         $popularTags = collect();
+        $userGroups = collect();
         if (Auth::check()) {
             $bookModel = Book::find($book['id']);
             if ($bookModel) {
@@ -385,10 +386,11 @@ class BookController extends Controller
                 $user = Auth::user();
                 $tags = $this->bookTagService->visibleTagsForBook($user, $bookModel);
                 $popularTags = $this->bookTagService->popularTags(20);
+                $userGroups = $user->groups()->get(['groups.id', 'groups.name']);
             }
         }
 
-        return view('books.show', compact('book', 'relatedBooks', 'tags', 'popularTags'));
+        return view('books.show', compact('book', 'relatedBooks', 'tags', 'popularTags', 'userGroups'));
     }
 
     /**
