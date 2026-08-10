@@ -400,8 +400,10 @@ class BookControllerUpdateTest extends TestCase
 
     #[\PHPUnit\Framework\Attributes\Test]
     #[AllowMockObjectsWithoutExpectations]
-    public function updateBookMovesFilesWhenDirectoryPathChangesAndDestinationExists(): void
+    public function updateBookRejectsDirectoryPathChangeWhenDestinationAlreadyHasContent(): void
     {
+        // A directory collision on edit must be rejected, not silently resolved by
+        // appending a suffix — the user confirmed this exact path in the edit form.
         Log::spy();
         Storage::fake('books');
 
@@ -439,16 +441,7 @@ class BookControllerUpdateTest extends TestCase
                 return [];
             });
 
-        $this->documentStoreService->expects($this->once())
-            ->method('updateBook')
-            ->with(
-                $this->equalTo($bookId),
-                $this->callback(function ($data) {
-                    return ($data['directoryPath'] ?? null) === 'new/path_01'
-                        && ($data['coverImage'] ?? null) === 'cover.jpg';
-                })
-            )
-            ->willReturn(true);
+        $this->documentStoreService->expects($this->never())->method('updateBook');
 
         $request = new Request([
             'title' => 'Move Test',
@@ -461,14 +454,14 @@ class BookControllerUpdateTest extends TestCase
         $response = $this->controller->update($request, $bookId);
 
         $this->assertEquals(302, $response->getStatusCode());
+        $this->assertTrue($response->getSession()->get('move_failed'));
+        $this->assertStringContainsString('new/path', (string) $response->getSession()->get('move_error'));
 
-        $this->assertTrue(Storage::disk('books')->exists('new/path_01/track1.mp3'));
-        $this->assertTrue(Storage::disk('books')->exists('new/path_01/cover.jpg'));
-        $this->assertTrue(Storage::disk('books')->exists('new/path_01/track2.mp3'));
-
-        $this->assertTrue(Storage::disk('books')->exists('new/path/cover.jpg'));
-        $this->assertTrue(Storage::disk('books')->exists('new/path/sub/track2.mp3'));
-
-        $this->assertCount(0, Storage::disk('books')->allFiles('old/path'));
+        // Nothing moved — no suffixed directory, old directory untouched, target unchanged.
+        $this->assertFalse(Storage::disk('books')->exists('new/path_01'));
+        $this->assertTrue(Storage::disk('books')->exists('old/path/track1.mp3'));
+        $this->assertTrue(Storage::disk('books')->exists('old/path/cover.jpg'));
+        $this->assertTrue(Storage::disk('books')->exists('old/path/sub/track2.mp3'));
+        $this->assertSame('newcover', Storage::disk('books')->get('new/path/cover.jpg'));
     }
 }
