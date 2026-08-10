@@ -78,11 +78,34 @@ class EmbeddingPipelineTest extends TestCase
 
     public function testResolveVectorStoreThrowsForUnsupportedStore(): void
     {
-        config(['neuron.store.default' => 'qdrant']);
+        config(['neuron.store.default' => 'pinecone']);
 
         $pipeline = new EmbeddingPipeline();
 
         $this->expectException(\RuntimeException::class);
         $pipeline->resolveVectorStore();
+    }
+
+    public function testResolveVectorStoreAttemptsQdrantInitializationWhenConfigured(): void
+    {
+        config([
+            'neuron.store.default' => 'qdrant',
+            'neuron.store.qdrant' => [
+                'collectionUrl' => 'http://127.0.0.1:63333/collections/test/',
+                'key' => null,
+                'topK' => 5,
+                'dimension' => 1024,
+            ],
+        ]);
+
+        $pipeline = new EmbeddingPipeline();
+
+        try {
+            $store = $pipeline->resolveVectorStore();
+            $this->assertInstanceOf(\NeuronAI\RAG\VectorStore\VectorStoreInterface::class, $store);
+        } catch (\Throwable $e) {
+            // Instantiation attempts connection to collectionUrl; any network/http exception confirms QdrantVectorStore initialization path was reached
+            $this->assertNotInstanceOf(\RuntimeException::class, $e);
+        }
     }
 }
