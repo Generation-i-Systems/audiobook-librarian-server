@@ -1632,8 +1632,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 }
             }
 
-            // If not found in config, try to get from database
-            $genre = Genre::find($id);
+            // If not found in config, try to get from database by id, then by name
+            // (the /genres/{genre}/... routes pass the genre name, not the numeric id).
+            $genre = is_numeric($id) ? Genre::find($id) : null;
+            $genre ??= Genre::where('name', $id)->first();
 
             return $genre ? $genre->toArray() : null;
         } catch (\Exception $e) {
