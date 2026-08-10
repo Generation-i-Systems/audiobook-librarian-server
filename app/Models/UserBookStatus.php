@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $target_date
  * @property \Illuminate\Support\Carbon|null $started_at
  * @property \Illuminate\Support\Carbon|null $finished_at
+ * @property \Illuminate\Support\Carbon|null $marked_read_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
@@ -64,6 +65,7 @@ class UserBookStatus extends Model
         'target_date',
         'started_at',
         'finished_at',
+        'marked_read_at',
     ];
 
     protected $casts = [
@@ -74,6 +76,7 @@ class UserBookStatus extends Model
         'target_date' => 'date',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
+        'marked_read_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

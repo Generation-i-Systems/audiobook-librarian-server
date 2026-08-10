@@ -841,6 +841,25 @@
                         },
                         "description": "User-defined tags saved for this book",
                         "example": ["Favorites", "Series"]
+                    },
+                    "user_data": {
+                        "type": "object",
+                        "description": "User-scoped data for the authenticated caller, present when the request is authenticated.",
+                        "properties": {
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "The authenticated user's own (scope=user) tags for this book",
+                                "example": ["Favorites", "sci-fi"]
+                            },
+                            "is_read": {
+                                "type": "boolean",
+                                "description": "Whether the user manually marked this book as read. Independent of status/finished_at — never counted toward completion stats, badges, or goals.",
+                                "example": false
+                            }
+                        }
                     }
                 }
             },
@@ -4719,6 +4738,68 @@
                                         },
                                         "status": {
                                             "$ref": "#/components/schemas/UserBookStatus"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/status/{book}/read": {
+            "post": {
+                "tags": ["Status"],
+                "summary": "Mark or unmark a book as read",
+                "description": "Independent of `status`/`finished_at`/`read_count` — never affects completion stats, badges, or goal fulfillment.",
+                "operationId": "markBookRead",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "book",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["is_read"],
+                                "properties": {
+                                    "is_read": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Read status updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "is_read": {
+                                            "type": "boolean"
                                         }
                                     }
                                 }

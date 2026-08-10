@@ -110,6 +110,51 @@ class UserStatusController extends Controller
         ], 200);
     }
 
+    /**
+     * Mark (or unmark) a book as read for the authenticated user, independent of `status`.
+     * Deliberately does not touch status/started_at/finished_at/read_count and does not
+     * dispatch BookStatusUpdated — this must never affect completion stats, badges, or
+     * goal fulfillment (see BookCompletionService, which never reads marked_read_at).
+     */
+    public function markRead(Request $request, Book $book): JsonResponse
+    {
+        $data = $request->validate([
+            'is_read' => ['required', 'boolean'],
+        ]);
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        /** @var UserBookStatus|null $statusModel */
+        $statusModel = UserBookStatus::where('user_id', $user->id)
+            ->where('book_id', $book->id)
+            ->first();
+
+        $markedReadAt = $data['is_read'] ? now() : null;
+
+        if ($statusModel) {
+            UserBookStatus::where('user_id', $user->id)
+                ->where('book_id', $book->id)
+                ->update(['marked_read_at' => $markedReadAt]);
+            $statusModel = UserBookStatus::where('user_id', $user->id)
+                ->where('book_id', $book->id)
+                ->first();
+        } else {
+            $statusModel = UserBookStatus::create([
+                'user_id' => $user->id,
+                'book_id' => $book->id,
+                'status' => 'queue',
+                'order' => 0,
+                'marked_read_at' => $markedReadAt,
+            ]);
+        }
+
+        return response()->json([
+            'message' => $data['is_read'] ? 'Book marked as read.' : 'Book unmarked as read.',
+            'is_read' => $statusModel->marked_read_at !== null,
+        ], 200);
+    }
+
     public function setNonLibrary(Request $request): JsonResponse
     {
         $data = $request->validate([

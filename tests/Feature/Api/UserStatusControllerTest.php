@@ -154,6 +154,86 @@ class UserStatusControllerTest extends TestCase
         $response->assertJsonPath('data.0.bookId', $book2->id);
     }
 
+    public function test_can_mark_a_book_as_read_without_an_existing_status_row(): void
+    {
+        Event::fake();
+
+        $response = $this->postJson('/api/v1/status/' . $this->book->id . '/read', [
+            'is_read' => true,
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200);
+
+        $response->assertJson(['is_read' => true]);
+
+        $this->assertDatabaseHas('user_book_status', [
+            'user_id' => $this->user->id,
+            'book_id' => $this->book->id,
+            'status' => 'queue',
+        ]);
+        $row = UserBookStatus::where('user_id', $this->user->id)->where('book_id', $this->book->id)->first();
+        $this->assertNotNull($row->marked_read_at);
+
+        // Marking read must never dispatch the stats/badge/goal-affecting status event.
+        Event::assertNotDispatched(BookStatusUpdated::class);
+    }
+
+    public function test_marking_read_does_not_touch_status_or_completion_fields(): void
+    {
+        UserBookStatus::factory()->create([
+            'user_id' => $this->user->id,
+            'book_id' => $this->book->id,
+            'status' => 'in_progress',
+            'read_count' => 0,
+            'finished_at' => null,
+        ]);
+
+        $this->postJson('/api/v1/status/' . $this->book->id . '/read', [
+            'is_read' => true,
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200);
+
+        $this->assertDatabaseHas('user_book_status', [
+            'user_id' => $this->user->id,
+            'book_id' => $this->book->id,
+            'status' => 'in_progress',
+            'read_count' => 0,
+            'finished_at' => null,
+        ]);
+    }
+
+    public function test_can_unmark_a_book_as_read(): void
+    {
+        UserBookStatus::factory()->create([
+            'user_id' => $this->user->id,
+            'book_id' => $this->book->id,
+            'status' => 'queue',
+            'marked_read_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/v1/status/' . $this->book->id . '/read', [
+            'is_read' => false,
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200);
+
+        $response->assertJson(['is_read' => false]);
+        $this->assertDatabaseHas('user_book_status', [
+            'user_id' => $this->user->id,
+            'book_id' => $this->book->id,
+            'marked_read_at' => null,
+        ]);
+    }
+
+    public function test_marked_read_is_returned_when_fetching_the_book(): void
+    {
+        $this->book->update(['directory_exists' => true, 'needs_review' => false]);
+
+        $this->postJson('/api/v1/status/' . $this->book->id . '/read', [
+            'is_read' => true,
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200);
+
+        $response = $this->getJson('/api/v1/books/' . $this->book->id, ['X-Acting-As-Test' => '1']);
+
+        $response->assertOk();
+        $response->assertJsonPath('user_data.is_read', true);
+    }
+
     public function test_can_get_reading_goals(): void
     {
         $book2 = Book::factory()->create();

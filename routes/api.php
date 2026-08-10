@@ -105,6 +105,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/history', [UserStatusController::class, 'history']);
             Route::get('/goals', [UserStatusController::class, 'goals']);
             Route::post('/{book}/set', [UserStatusController::class, 'set']);
+            Route::post('/{book}/read', [UserStatusController::class, 'markRead']);
             Route::post('/non-library/set', [UserStatusController::class, 'setNonLibrary']);
             Route::post('/queue/reorder', [UserStatusController::class, 'reorder']);
         });
