@@ -176,6 +176,7 @@ class PlaylistController extends Controller
             'title'     => $book !== null ? $book->title : $item->title,
             'author'    => $book !== null ? $book->authors->pluck('name')->join(', ') : $item->author,
             'cover_url' => null, // cover served separately via book details endpoint
+            'is_read'   => $item->marked_read_at !== null,
         ];
     }
 }
