@@ -8,7 +8,9 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
 use App\Models\Author;
+use App\Models\Book;
 use App\Models\Series;
+use App\Services\BookDataTransformer;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
 use App\Services\LibriVoxBrowseService;
 use Illuminate\Http\Request;
@@ -23,6 +25,7 @@ class BookSeriesGenreController extends Controller
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
         private readonly LibriVoxBrowseService $libriVoxBrowseService,
+        private readonly BookDataTransformer $bookDataTransformer,
     ) {
         $this->documentStoreService = $documentStoreService;
     }
@@ -234,6 +237,11 @@ class BookSeriesGenreController extends Controller
                 'book_count_by_author' => $series->book_count_by_author ?? $series->book_count,
                 'authors' => $series->authors,
                 'isFavorite' => (bool) $series->isFavorite,
+                'cover_urls' => $this->seriesCoverUrls($series, function ($q) use ($includeNeedsReview) {
+                    if (!$includeNeedsReview) {
+                        $q->where('books.needs_review', false);
+                    }
+                }),
             ];
         });
 
@@ -322,14 +330,22 @@ class BookSeriesGenreController extends Controller
             ], 404);
         }
 
+        $genreIds = array_values(array_filter(array_map('intval', (array) $request->input('genre_ids', []))));
+
+        $filters = ['series_id' => $seriesId];
+        if (!empty($genreIds)) {
+            $filters['genre_id'] = $genreIds;
+        }
+
         $userId = Auth::id();
-        $booksData = $documentStore->listBooks(1, $perPage, ['series_id' => $seriesId], true, 'title', 'asc', false, $userId);
+        $booksData = $documentStore->listBooks(1, $perPage, $filters, true, 'title', 'asc', false, $userId);
         $books = $booksData['data'];
 
         $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
+            'genres' => $this->seriesGenreOptions((int) $series['id']),
             'data' => $transformedBooks,
             'meta' => [
                 'current_page' => 1,
@@ -340,6 +356,27 @@ class BookSeriesGenreController extends Controller
                 'total' => $booksData['total'],
             ],
         ]);
+    }
+
+    /**
+     * The distinct genres across a series' non-needs_review books, for the series-detail
+     * screen's genre filter chips. Always the full set, regardless of any genre_ids filter
+     * applied to the book list itself, so the chip row doesn't shrink as chips are selected.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    private function seriesGenreOptions(int $seriesId): array
+    {
+        return \App\Models\Genre::query()
+            ->whereHas('books', function ($q) use ($seriesId): void {
+                $q->whereHas('series', fn ($s) => $s->where('series.id', $seriesId))
+                    ->where('books.needs_review', false);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($genre) => ['id' => $genre->id, 'name' => $genre->name])
+            ->values()
+            ->all();
     }
 
     /**
@@ -559,7 +596,10 @@ class BookSeriesGenreController extends Controller
         }
 
         $genreId = $genre['id'];
-        $inGenre = fn ($q) => $q->whereHas('genres', fn ($g) => $g->where('genres.id', $genreId));
+        // Excludes needs_review books, matching listBooks()'s default and the series-detail
+        // screen's book list, so the count shown here matches what opening the series shows.
+        $inGenre = fn ($q) => $q->whereHas('genres', fn ($g) => $g->where('genres.id', $genreId))
+            ->where('books.needs_review', false);
 
         $query = Series::query()
             ->whereHas('books', $inGenre)
@@ -592,6 +632,7 @@ class BookSeriesGenreController extends Controller
                 'id' => $s->id,
                 'name' => $s->name,
                 'book_count_in_genre' => $s->book_count_in_genre,
+                'cover_urls' => $this->seriesCoverUrls($s, $inGenre),
             ])->values()->all(),
             'meta' => [
                 'current_page' => $page,
@@ -600,6 +641,29 @@ class BookSeriesGenreController extends Controller
                 'last_page' => max(1, (int) ceil($total / $perPage)),
             ],
         ]);
+    }
+
+    /**
+     * The cover URLs of the first four books of a series (matching the given scope, e.g. a
+     * genre + needs_review filter), in series-number order where known, for the client's
+     * hybrid cover mosaic.
+     *
+     * @param \Closure(\Illuminate\Database\Eloquent\Builder<Book>): void $scope
+     * @return list<string>
+     */
+    private function seriesCoverUrls(Series $s, \Closure $scope): array
+    {
+        $books = $s->books()
+            ->when(true, $scope)
+            ->orderByRaw('CAST(book_series.series_number AS DECIMAL(10,2)) ASC')
+            ->limit(4)
+            ->get();
+
+        return $books
+            ->map(fn (Book $book) => $this->bookDataTransformer->coverUrl($book))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**

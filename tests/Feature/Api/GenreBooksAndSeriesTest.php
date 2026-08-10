@@ -82,6 +82,37 @@ class GenreBooksAndSeriesTest extends ApiTestCase
         $this->assertNotContains('Unrelated Saga', $names);
     }
 
+    public function testSeriesByGenreIncludesCoverUrlsForFirstFourBooksInSeriesOrder(): void
+    {
+        $genre = Genre::factory()->create();
+        $series = Series::factory()->create(['name' => 'Numbered Saga']);
+
+        $booksByNumber = [];
+        foreach ([3, 1, 2] as $number) {
+            $book = Book::factory()->create(['cover_image' => "cover-{$number}.jpg"]);
+            $book->genres()->attach($genre->id);
+            $series->books()->attach($book->id, ['series_number' => (string) $number]);
+            $booksByNumber[$number] = $book;
+        }
+
+        $unrelatedGenre = Genre::factory()->create();
+        $bookInOtherGenre = Book::factory()->create(['cover_image' => 'cover-other.jpg']);
+        $bookInOtherGenre->genres()->attach($unrelatedGenre->id);
+        $series->books()->attach($bookInOtherGenre->id, ['series_number' => '4']);
+
+        $response = $this->getJson("/api/v1/genres/{$genre->id}/series");
+
+        $response->assertOk();
+        $data = $response->json('data');
+        $coverUrls = $data[0]['cover_urls'];
+
+        // Ordered by series_number (1, 2, 3), and excludes the book only in the other genre.
+        $this->assertCount(3, $coverUrls);
+        $this->assertStringContainsString("/books/{$booksByNumber[1]->id}/cover", $coverUrls[0]);
+        $this->assertStringContainsString("/books/{$booksByNumber[2]->id}/cover", $coverUrls[1]);
+        $this->assertStringContainsString("/books/{$booksByNumber[3]->id}/cover", $coverUrls[2]);
+    }
+
     public function testSeriesByGenreSortsByLengthDescending(): void
     {
         $genre = Genre::factory()->create();

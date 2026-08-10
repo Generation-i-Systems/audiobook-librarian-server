@@ -1385,6 +1385,13 @@
                         "description": "Number of books in this series by the filtered author (if author filter applied)",
                         "example": 4
                     },
+                    "cover_urls": {
+                        "type": "array",
+                        "description": "Cover image URLs of up to the first four books in this series, in series-number order, for a hybrid cover mosaic.",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
                     "authors": {
                         "type": "array",
                         "items": {
@@ -10869,6 +10876,17 @@
                             "type": "integer",
                             "default": 100
                         }
+                    },
+                    {
+                        "name": "genre_ids[]",
+                        "in": "query",
+                        "description": "Optional genre ids to filter this series' books by (OR semantics across multiple values). Omit to show every genre.",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer"
+                            }
+                        }
                     }
                 ],
                 "responses": {
@@ -10881,6 +10899,17 @@
                                     "properties": {
                                         "series": {
                                             "type": "object"
+                                        },
+                                        "genres": {
+                                            "type": "array",
+                                            "description": "Distinct genres across this series' books (unaffected by genre_ids), for a genre filter-chip row.",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {"type": "integer"},
+                                                    "name": {"type": "string"}
+                                                }
+                                            }
                                         },
                                         "data": {
                                             "type": "array",
@@ -11235,6 +11264,13 @@
                                                     },
                                                     "book_count_in_genre": {
                                                         "type": "integer"
+                                                    },
+                                                    "cover_urls": {
+                                                        "type": "array",
+                                                        "description": "Cover image URLs of up to the first four books in this series (within the genre), in series-number order, for a hybrid cover mosaic.",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     }
                                                 }
                                             }

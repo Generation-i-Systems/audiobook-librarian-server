@@ -537,7 +537,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
         if (!empty($filters['genre_id'])) {
             $query->whereHas('genres', function ($q) use ($filters): void {
-                $q->where('genres.id', $filters['genre_id']);
+                if (is_array($filters['genre_id'])) {
+                    $q->whereIn('genres.id', $filters['genre_id']);
+                } else {
+                    $q->where('genres.id', $filters['genre_id']);
+                }
             });
         } elseif (!empty($filters['genre'])) {
             $query->whereHas('genres', function ($q) use ($filters): void {
