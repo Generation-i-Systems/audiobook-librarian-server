@@ -25,6 +25,12 @@ class BookDataTransformer
             }
         }
 
+        $totalSize = $book->getAttribute('total_size');
+        if ($totalSize !== null) {
+            $camelCasedBook['total_size'] = (int) $totalSize;
+            $camelCasedBook['totalSize'] = (int) $totalSize;
+        }
+
         if ($userId !== null) {
             $camelCasedBook = array_merge($camelCasedBook, $this->transformUserData($book));
         }
@@ -125,6 +131,7 @@ class BookDataTransformer
             'needs_review' => (bool) $book->needs_review,
             'file_count' => $book->audio_file_count,
             'total_size' => $book->getAttribute('total_size'),
+            'totalSize' => $book->getAttribute('total_size'),
             'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
             'updated_at' => $book->updated_at ? $book->updated_at->toIso8601String() : null,
             'authors_data' => $book->authors->toArray(),
@@ -241,6 +248,7 @@ class BookDataTransformer
             'status' => null,
             'recommendation' => null,
             'userTags' => [],
+            'isRead' => false,
         ];
 
         if ($book->relationLoaded('progress') && $book->progress->isNotEmpty()) {
@@ -264,6 +272,7 @@ class BookDataTransformer
                 'detail' => $status->status_detail,
                 'readCount' => $status->read_count,
             ];
+            $userData['isRead'] = $status->marked_read_at !== null;
         }
 
         if ($book->relationLoaded('recommendations') && $book->recommendations->isNotEmpty()) {
@@ -283,7 +292,7 @@ class BookDataTransformer
         }
 
         if ($book->relationLoaded('userTags') && $book->userTags->isNotEmpty()) {
-            $userData['userTags'] = $book->userTags->first()->tags ?? [];
+            $userData['userTags'] = $book->userTags->pluck('tags')->flatten()->filter()->unique()->values()->all();
         }
 
         return $userData;

@@ -50,6 +50,24 @@ class BookTagControllerTest extends ApiTestCase
         ]);
     }
 
+    public function test_user_scope_tags_are_returned_when_fetching_the_book(): void
+    {
+        $book = Book::factory()->create([
+            'directory_exists' => true,
+            'needs_review' => false,
+        ]);
+
+        $this->putJson('/api/v1/books/' . $book->id . '/tags', [
+            'scope' => 'user',
+            'tags' => ['Favorites'],
+        ])->assertOk();
+
+        $response = $this->getJson('/api/v1/books/' . $book->id);
+
+        $response->assertOk();
+        $response->assertJsonPath('user_data.tags', ['Favorites']);
+    }
+
     public function test_non_admin_cannot_set_system_tags(): void
     {
         $book = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);

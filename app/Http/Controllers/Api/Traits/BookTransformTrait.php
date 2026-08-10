@@ -29,10 +29,29 @@ trait BookTransformTrait
             'duration'    => $book['duration'] ?? null,
             'description' => $book['description'] ?? null,
             'file_count'  => isset($book['audio_file_count']) ? (int) $book['audio_file_count'] : (isset($book['file_count']) ? (int) $book['file_count'] : null),
-            'total_size'  => isset($book['total_size']) ? (int) $book['total_size'] : null,
+            'total_size'  => isset($book['total_size']) ? (int) $book['total_size'] : (isset($book['totalSize']) ? (int) $book['totalSize'] : null),
             'created_at'  => $book['created_at'] ?? $book['date_added'] ?? null,
             'updated_at'  => $book['updated_at'] ?? null,
         ];
+
+        // The client reads user-scoped data (tags, progress, etc.) from a nested
+        // "user_data" object — see BookUserDataDto — not from top-level keys, so
+        // this must be nested here or the client silently ignores it.
+        $tags = $book['userTags'] ?? $book['user_tags'] ?? $book['user_data']['tags'] ?? $book['tags'] ?? [];
+        $isRead = $book['isRead'] ?? $book['is_read'] ?? $book['user_data']['is_read'] ?? false;
+
+        if (array_key_exists('userTags', $book)
+            || array_key_exists('user_tags', $book)
+            || array_key_exists('user_data', $book)
+            || array_key_exists('isRead', $book)
+            || array_key_exists('is_read', $book)
+            || array_key_exists('tags', $book)
+        ) {
+            $transformedBook['user_data'] = [
+                'tags' => $this->normalizeArray($tags),
+                'is_read' => (bool) $isRead,
+            ];
+        }
 
         if (isset($book['progress'])) {
             $transformedBook['progress'] = $book['progress'];
