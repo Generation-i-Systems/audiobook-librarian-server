@@ -3,6 +3,15 @@ import laravel from "laravel-vite-plugin";
 import path from "path";
 
 export default defineConfig({
+    css: {
+        preprocessorOptions: {
+            scss: {
+                // Bootstrap 5's distributed Sass still uses legacy internals. Do not mask
+                // deprecations in application styles, but suppress dependency-only warnings.
+                quietDeps: true,
+            },
+        },
+    },
     plugins: [
         laravel({
             input: [

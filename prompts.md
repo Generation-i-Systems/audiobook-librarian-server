@@ -6,6 +6,12 @@ This file contains the text of prompts sent to the AI assistant.
 
 ## 2026-08-08
 
+pm notice run vite build
+vite v6.4.3 building for production...
+Sass emits deprecation warnings for application and Bootstrap `@import` usage. Please migrate the dependency and stylesheet so production builds remain clean.
+
+---
+
 update the import script to use more AI by including the previous imports of other books in the same parent directory if they were user modified so that patterns modified by the user may be applied to the other files in the same parent dir (ignoring generic parents). in the edit menu add an item to reverse the title and series and make sure this is something that the AI would notice
 
 ---

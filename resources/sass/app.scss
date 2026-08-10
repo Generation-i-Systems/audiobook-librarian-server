@@ -1,11 +1,11 @@
-// Fonts
-@import url('https://fonts.bunny.net/css?family=Nunito');
-
-// Variables
-@import 'variables';
-
-// Bootstrap
-@import 'bootstrap/scss/bootstrap';
+// Application theme values are configured before Bootstrap is loaded.
+@use 'variables' as app;
+@use 'bootstrap/scss/bootstrap' with (
+    $body-bg: app.$body-bg,
+    $font-family-sans-serif: app.$font-family-sans-serif,
+    $font-size-base: app.$font-size-base,
+    $line-height-base: app.$line-height-base
+);
 
 .navbar-custom {
     background-color: #007bff;

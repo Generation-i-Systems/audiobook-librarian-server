@@ -31,6 +31,8 @@
 
 ### Changed
 
+- Frontend Sass now loads Bootstrap through the Sass module system with the application's theme values configured explicitly. The declared Bootstrap minimum is aligned with the installed 5.3.8 release, and Vite suppresses only third-party Bootstrap deprecation diagnostics.
+
 - New clients now treat `www.ablibrarian.com` as the backend-independent Skin Store. The existing self-hosted skin/theme proxy remains a legacy compatibility path only; Store commerce and entitlements are intentionally outside this server.
 - Server storage, import, backup, and Librivox defaults no longer depend on `/media`; all are portable environment-configurable paths. Added Caddy HTTPS Compose profile, native Linux/macOS/Windows installation guidance, and cross-platform configuration CI coverage.
 

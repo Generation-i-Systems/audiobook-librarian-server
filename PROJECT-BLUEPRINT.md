@@ -14,6 +14,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 - **Backend:** Laravel (PHP) — provides both web and REST API endpoints
 - **Frontend:** Blade, Bootstrap 5, jQuery, jQuery UI (Autocomplete)
+- **Styles:** Application Sass uses the module system and configures Bootstrap's theme variables at load time. Bootstrap 5 still ships legacy Sass internals, which Vite treats as quiet third-party dependencies while continuing to report application-level deprecations.
 - **Database:** MySQL with Redis caching and queue management
 - **Other:** Google Books API integration
 - **API Clients:** Android app (in development/production)
