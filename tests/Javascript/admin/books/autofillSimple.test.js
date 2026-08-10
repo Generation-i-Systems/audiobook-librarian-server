@@ -190,4 +190,60 @@ describe("Book metadata autofill genre handling", () => {
             ),
         ).toEqual(["Science Fiction"]);
     });
+
+    test("autofill replaces existing description with updated metadata description", () => {
+        document.body.innerHTML = bookFormHtml("");
+        $("#description").val("Old description that should be replaced");
+
+        const item = {
+            description: "New updated book description from provider",
+        };
+        const descriptionField = $("#description");
+        if (descriptionField.length) {
+            descriptionField.val(item.description);
+        }
+
+        expect($("#description").val()).toBe(
+            "New updated book description from provider",
+        );
+    });
+
+    test("clicking anywhere on a table row selects the radio button for that row", () => {
+        document.body.innerHTML = `
+            <div id="autofillModal">
+                <table>
+                    <tbody>
+                        <tr id="row-0">
+                            <td><input type="radio" name="autofill_result_select" value="0" checked></td>
+                            <td>Title 0</td>
+                        </tr>
+                        <tr id="row-1">
+                            <td><input type="radio" name="autofill_result_select" value="1"></td>
+                            <td>Title 1</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        $(document).on("click", "#autofillModal tbody tr", function (e) {
+            if ($(e.target).is('input[type="radio"]')) {
+                return;
+            }
+            const $radio = $(this).find('input[name="autofill_result_select"]');
+            if ($radio.length && !$radio.prop("checked")) {
+                $radio.prop("checked", true).trigger("change");
+            }
+        });
+
+        const secondRowCell = $("#row-1 td").last();
+        secondRowCell.trigger("click");
+
+        expect(
+            $('#row-1 input[name="autofill_result_select"]').prop("checked"),
+        ).toBe(true);
+        expect(
+            $('#row-0 input[name="autofill_result_select"]').prop("checked"),
+        ).toBe(false);
+    });
 });

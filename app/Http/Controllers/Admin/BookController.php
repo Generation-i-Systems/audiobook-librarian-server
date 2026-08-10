@@ -427,6 +427,20 @@ class BookController extends Controller
 
         // Capture return URL from request or referer
         $returnUrl = request()->input('returnUrl') ?? request()->header('referer');
+        $tags = ['system' => [], 'groups' => [], 'user' => []];
+        $tagSuggestions = ['system' => [], 'user' => []];
+        $canManageSystemTags = false;
+        if (Auth::check()) {
+            $user = User::find(Auth::id());
+            $bookModel = Book::find($book['id']);
+            if ($user && $bookModel) {
+                $bookTagService = app(BookTagService::class);
+                $tags = $bookTagService->visibleTagsForBook($user, $bookModel);
+                $tagSuggestions['system'] = $bookTagService->systemTagsOverview()->pluck('name')->all();
+                $tagSuggestions['user'] = collect($bookTagService->myTagsOverview($user)['user'])->pluck('tag')->all();
+                $canManageSystemTags = $user->isAdmin();
+            }
+        }
 
         return view('admin.books.edit', [
             'book' => $book,
@@ -437,6 +451,9 @@ class BookController extends Controller
             'directoryPath' => $directoryPath,
             'isModal' => request()->ajax() || request('isModal', false),
             'returnUrl' => $returnUrl,
+            'tags' => $tags,
+            'tagSuggestions' => $tagSuggestions,
+            'canManageSystemTags' => $canManageSystemTags,
         ]);
     }
 
@@ -1530,7 +1547,7 @@ class BookController extends Controller
             ]];
         }
 
-        $description = trim((string) ($result['description'] ?? ''));
+        $description = trim((string) ($result['description'] ?? $result['summary'] ?? $result['publisher_summary'] ?? $result['merchandising_summary'] ?? ''));
         if ($description !== '') {
             $updates['description'] = $description;
         }

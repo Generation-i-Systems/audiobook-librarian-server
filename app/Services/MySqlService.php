@@ -559,14 +559,15 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             });
         }
 
-        if ($userId && !empty($filters['tag']) && Schema::hasTable('book_tags')) {
-            $tag = trim((string) $filters['tag']);
-
-            if ($tag !== '') {
-                $query->whereHas('userTags', function ($q) use ($userId, $tag): void {
-                    $q->where('owner_key', 'user:' . $userId)->whereJsonContains('tags', $tag);
-                });
-            }
+        $tagSpec = [];
+        if (!empty($filters['tag'])) {
+            $tagSpec = is_array($filters['tag']) ? $filters['tag'] : [$filters['tag']];
+        }
+        if (!empty($filters['tags'])) {
+            $tagSpec = array_merge($tagSpec, is_array($filters['tags']) ? $filters['tags'] : [$filters['tags']]);
+        }
+        if (!empty($tagSpec)) {
+            app(UserTagFilterService::class)->applyRequestTagFilters($query, $tagSpec, $userId);
         }
 
         // Unconditional (not gated by an explicit ?tag= param): a user's own require/ban

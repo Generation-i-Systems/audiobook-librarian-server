@@ -61,6 +61,9 @@
             @if(session('error'))
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
+            @if(session('success'))
+                <div class="alert alert-success">{{ session('success') }}</div>
+            @endif
             @if(session('errors') && session('errors')->has('general'))
                 <div class="alert alert-danger">{{ session('errors')->first('general') }}</div>
             @endif
@@ -495,6 +498,50 @@
                         </div>
                     </div>
                 </div>
+
+                @if(isset($book))
+                    <div class="book-form-card mt-3" id="book-tags-editor">
+                        <h5 class="book-form-section-title">
+                            <span><i class="fas fa-tags me-2"></i>Tags</span>
+                        </h5>
+                        <div class="card-content">
+                            <div class="row g-3">
+                                @if($canManageSystemTags ?? false)
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="system-tags">System Tags</label>
+                                        <input type="hidden" form="system-tags-form" name="scope" value="system">
+                                        <div class="tag-editor" data-tags-input="system-tags" data-suggestions="{{ json_encode($tagSuggestions['system'] ?? []) }}">
+                                            <input type="text" class="form-control" form="system-tags-form" id="system-tags" name="tags"
+                                                value="{{ implode(', ', $tags['system'] ?? []) }}" placeholder="comma separated" list="system-tags-suggestions">
+                                            <datalist id="system-tags-suggestions">
+                                                @foreach($tagSuggestions['system'] ?? [] as $tagSuggestion)
+                                                    <option value="{{ $tagSuggestion }}"></option>
+                                                @endforeach
+                                            </datalist>
+                                        </div>
+                                        <button type="submit" form="system-tags-form" class="btn btn-outline-primary btn-sm mt-2">Save System Tags</button>
+                                        <div class="tag-save-status small mt-2" id="system-tags-save-status" role="status"></div>
+                                    </div>
+                                @endif
+                                <div class="col-md-6">
+                                    <label class="form-label" for="my-tags">My Tags</label>
+                                    <input type="hidden" form="my-tags-form" name="scope" value="user">
+                                    <div class="tag-editor" data-tags-input="my-tags" data-suggestions="{{ json_encode($tagSuggestions['user'] ?? []) }}">
+                                        <input type="text" class="form-control" form="my-tags-form" id="my-tags" name="tags"
+                                            value="{{ implode(', ', $tags['user'] ?? []) }}" placeholder="comma separated" list="my-tags-suggestions">
+                                        <datalist id="my-tags-suggestions">
+                                            @foreach($tagSuggestions['user'] ?? [] as $tagSuggestion)
+                                                <option value="{{ $tagSuggestion }}"></option>
+                                            @endforeach
+                                        </datalist>
+                                    </div>
+                                    <button type="submit" form="my-tags-form" class="btn btn-outline-secondary btn-sm mt-2">Save My Tags</button>
+                                    <div class="tag-save-status small mt-2" id="my-tags-save-status" role="status"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Additional Information Card --}}
                 <div class="book-form-card">
@@ -1140,4 +1187,14 @@
                     @endif
                 @endif
             </form>
+            @if(isset($book))
+                @if($canManageSystemTags ?? false)
+                    <form id="system-tags-form" data-tag-save data-status-target="system-tags-save-status" action="{{ route('books.tags.update', $book['id']) }}" method="POST">
+                        @csrf
+                    </form>
+                @endif
+                <form id="my-tags-form" data-tag-save data-status-target="my-tags-save-status" action="{{ route('books.tags.update', $book['id']) }}" method="POST">
+                    @csrf
+                </form>
+            @endif
         </div>

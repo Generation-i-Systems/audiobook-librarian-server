@@ -95,12 +95,18 @@
                         firstSeriesNameInput.val(data.series);
                     }
                 }
-                if (data.seriesNumber) {
+                if (data.seriesNumber !== undefined && data.seriesNumber !== null && data.seriesNumber !== "") {
                     const firstSeriesNumberInput = $(
                         '#series-group .series-row:first input[name*="[number]"]',
                     );
                     if (firstSeriesNumberInput.length) {
-                        firstSeriesNumberInput.val(data.seriesNumber);
+                        let num = String(data.seriesNumber).trim();
+                        if (/^0+[1-9]/.test(num)) {
+                            num = num.replace(/^0+/, "");
+                        } else if (/^0+\d+\.\d+/.test(num)) {
+                            num = num.replace(/^0+/, "");
+                        }
+                        firstSeriesNumberInput.val(num);
                     }
                 }
 

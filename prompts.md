@@ -24,6 +24,10 @@ Call to undefined method App\Auth\DocumentstoreUser::groups() when opening /admi
 
 ---
 
+I should be able to update tags from the admin book edit page both for my use and system tags
+
+---
+
 update the import script to use more AI by including the previous imports of other books in the same parent directory if they were user modified so that patterns modified by the user may be applied to the other files in the same parent dir (ignoring generic parents). in the edit menu add an item to reverse the title and series and make sure this is something that the AI would notice
 
 ---
@@ -346,3 +350,43 @@ and the genre already set from the directory path is being changed. Neither shou
 
 Normal Jest hook runs are failing because the new autofill regression test imports large DOM
 wiring files with low coverage, dropping global coverage below the enforced threshold.
+
+## 2026-08-10
+
+Enhance the admin book-edit tags control with existing-tag autocomplete and pseudo-chip editing.
+
+---
+
+Saving tags clears other modifications like a cover update.
+
+---
+
+Tags are not saving unless clicked twice, and tag changes must also be saved with the main book form.
+
+---
+
+Saving the book after tag edits raised a duplicate `author_book` pivot constraint error.
+
+---
+
+make sure that tags and file size are returned with all book records for the book details screen in the client
+
+---
+
+update all list search operations such as genre, series, or book to allow filtering by tag as specified in the api request to support specifying tags both to require or ban (tag or -tag) results with a tag for the returned results
+
+---
+
+update the autofill book metadata on the edit book page to replace the description with the updated one and update the parse path to fields to not add leading zeros to the series number even if they are in the path
+
+---
+
+also update the auto fill dialog to select an entry from clicking anywhere on that row not just on the radio button itself
+
+---
+
+descriptions are still only being set if they started out blank
+
+---
+
+commit

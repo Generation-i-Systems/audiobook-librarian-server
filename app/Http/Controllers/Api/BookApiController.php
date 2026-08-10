@@ -140,6 +140,7 @@ class BookApiController extends Controller
             'author'           => $request->input('author'),
             'series'           => $request->input('series'),
             'tag'              => $request->input('tag'),
+            'tags'             => $request->input('tags'),
             'title'            => $request->input('title'),
             'publication_date' => $request->input('publication_date'),
             'date_added'       => $request->input('date_added'),
@@ -311,6 +312,34 @@ class BookApiController extends Controller
             ], 400);
         }
 
+        $tagSpec = array_filter([$request->input('tag'), $request->input('tags')]);
+        $tagService = app(\App\Services\UserTagFilterService::class);
+        $parsedTags = $tagService::parseTagSpecs($tagSpec);
+
+        if (!empty($parsedTags['required']) || !empty($parsedTags['banned'])) {
+            $matchingBookQuery = \App\Models\Book::query();
+            $tagService->applyRequestTagFilters($matchingBookQuery, $tagSpec, Auth::id());
+            $matchingBookIds = $matchingBookQuery->pluck('id')->all();
+
+            if ($type === 'genre') {
+                $validIds = \App\Models\Genre::query()
+                    ->whereHas('books', fn ($b) => $b->whereIn('books.id', $matchingBookIds))
+                    ->pluck('id')->all();
+            } elseif ($type === 'author') {
+                $validIds = \App\Models\Author::query()
+                    ->whereHas('books', fn ($b) => $b->whereIn('books.id', $matchingBookIds))
+                    ->pluck('id')->all();
+            } elseif ($type === 'series') {
+                $validIds = \App\Models\Series::query()
+                    ->whereHas('books', fn ($b) => $b->whereIn('books.id', $matchingBookIds))
+                    ->pluck('id')->all();
+            } else {
+                $validIds = [];
+            }
+
+            $items = array_filter($items, fn ($item) => in_array($item['id'] ?? null, $validIds));
+        }
+
         if ($search) {
             $items = array_filter($items, fn ($item) => stripos($item['name'], $search) !== false);
         }
@@ -351,6 +380,7 @@ class BookApiController extends Controller
             'author'           => $request->input('author'),
             'series'           => $request->input('series'),
             'tag'              => $request->input('tag'),
+            'tags'             => $request->input('tags'),
             'publication_date' => $request->input('publication_date'),
             'date_added'       => $request->input('date_added'),
             'status'           => $request->input('status'),

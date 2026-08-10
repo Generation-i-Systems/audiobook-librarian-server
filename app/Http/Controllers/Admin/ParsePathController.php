@@ -50,6 +50,15 @@ class ParsePathController extends Controller
             }
         }
 
+        if (!empty($seriesNumber)) {
+            $strNum = trim((string) $seriesNumber);
+            if (is_numeric($strNum)) {
+                $seriesNumber = (string) (str_contains($strNum, '.') ? (float) $strNum : (int) $strNum);
+            } else {
+                $seriesNumber = preg_replace('/^0+(?=[1-9]|\d\.)/', '', $strNum);
+            }
+        }
+
         // Format author as string
         $author = '';
         if (!empty($bookPathInfo['author'])) {

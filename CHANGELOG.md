@@ -2,6 +2,12 @@
 
 ### Added
 
+- Require & Ban Tag Filtering (`tag` / `-tag`) supported across all book search and listing API endpoints (`GET /books`, `GET /genres/{genre}/books`, `GET /authors/{author}/books`, `GET /series/{series}/books`).
+- Autofill book metadata modal on the edit book page now replaces description unconditionally with updated provider metadata and supports selecting an entry by clicking anywhere on the result row.
+- Path-to-fields parsing now normalizes series numbers to strip leading zeros (e.g. `"01"` -> `"1"`).
+
+- Admin book edit pages now expose separate System Tags and My Tags controls, using the existing authorization-enforced tag update endpoint.
+- Admin book-edit tag controls now provide scope-safe existing-tag suggestions and editable chip-style tags.
 - Book recommendation embedding pipeline (foundation for AI-powered "discovery shelves"): `EmbedBookJob` embeds each book's title/authors/series/genres/system tags/description plus an AI-generated cover-art caption into a local vector store (`neuron-ai`'s zero-infra `file` driver), tracked via a new `book_embeddings` table so unchanged books/covers are skipped on re-run. Automatically re-embeds on book create/update, author/genre/series changes, and system-tag edits; `php artisan books:backfill-embeddings [--force]` catches up existing books. Adds `AIProviderInterface::describeImage()` (implemented for Claude/Gemini/OpenAI) and a small `AIProviderFactory` shared with the existing AI assistant's provider-selection logic.
 - Netflix-style "discovery shelves" recommendation engine: `GET /discovery/shelves` and `GET /discovery/shelves/{shelfKey}/books` serve precomputed, per-user shelves (never computed live — the vector store is O(n) per lookup). Six pluggable `RecommendationStrategyInterface` implementations ship today — per-recent-book similarity, a recency-weighted "New for You", genre affinity, continue-a-series, author affinity, and quick/epic-length shelves — orchestrated by `RecommendationEngine`, which tolerates one strategy failing without losing the others' shelves. Recomputed automatically on any reading-status change (`BookStatusUpdated` → `RefreshRecommendationsListener`) and by a new daily `books:refresh-recommendations` sweep. Adding a future shelf idea is additive: a new strategy class registered in `config/recommendations.php`, no schema or client change.
 - `GET /discovery/surprise` — a "surprise me" single-book pick, live-computed (unlike the shelves above). Prefers an unread book that starts a series (or isn't in one) in a genre the user has already completed a book in, falling back to any first-in-series book, then any unread book at all.
@@ -40,6 +46,9 @@
 
 ### Fixed
 
+- Saving tags from an admin book-edit page no longer reloads the page and discards unsaved cover or metadata edits.
+- Tag text entered immediately before Save Tags is now included on the first click, and Save Changes persists tag edits even when its separate tag button was not used.
+- Saving a book after tag edits no longer allows the held initial submit to reach directory-conflict handlers and trigger a competing duplicate update.
 - Admin book-detail pages now render tag controls using the matching Eloquent user rather than calling the unavailable `groups()` relationship on the authenticated `DocumentstoreUser` wrapper.
 - The web book-edit cover URL input had no form name and relied entirely on JavaScript copying it into a hidden field. If that handler did not run, the update silently submitted no cover URL and never attempted a download. The visible field now submits directly and displays any download error.
 - `BookSeriesGenreController::authorsByGenre()`/`authorsByGenreSimple()` (`GET /genres/{genre}/authors`) always returned zero authors for any genre: both filtered `documentStoreService->listBooks()`'s return value directly, but that method returns a paginated wrapper (`['data' => ..., 'total' => ...]`), not a flat book list, and defaults to only its first 24 books regardless. Found while adding genre-scoped books/series endpoints and a random sort option to this same controller. Both now query authors directly via `Author::whereHas('books.genres', ...)`.

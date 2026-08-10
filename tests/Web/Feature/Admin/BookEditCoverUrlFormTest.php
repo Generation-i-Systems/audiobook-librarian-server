@@ -27,6 +27,9 @@ class BookEditCoverUrlFormTest extends TestCase
             'isModal' => false,
             'returnUrl' => null,
             'errors' => new ViewErrorBag(),
+            'tags' => ['system' => ['featured'], 'groups' => [], 'user' => ['to-listen']],
+            'tagSuggestions' => ['system' => ['award-winner'], 'user' => ['reread']],
+            'canManageSystemTags' => true,
         ])->render();
 
         $this->assertMatchesRegularExpression(
@@ -37,5 +40,18 @@ class BookEditCoverUrlFormTest extends TestCase
             '/<input[^>]*id="coverImageUrlText"[^>]*name="coverImageUrlText"/s',
             $html
         );
+        $this->assertStringContainsString('System Tags', $html);
+        $this->assertStringContainsString('My Tags', $html);
+        $this->assertStringContainsString('value="featured"', $html);
+        $this->assertStringContainsString('value="to-listen"', $html);
+        $this->assertGreaterThan(
+            strpos($html, 'Directory &amp; Files'),
+            strpos($html, 'id="book-tags-editor"')
+        );
+        $this->assertStringContainsString('form="system-tags-form"', $html);
+        $this->assertStringContainsString('form="my-tags-form"', $html);
+        $this->assertStringContainsString('class="tag-editor"', $html);
+        $this->assertStringContainsString('value="award-winner"', $html);
+        $this->assertStringContainsString('value="reread"', $html);
     }
 }

@@ -84,4 +84,111 @@ class UserTagFilterService
             }
         }
     }
+
+    /**
+     * Parse tag specifications from a string or array into required and banned tag lists.
+     * Supports:
+     * - "fantasy,-sci-fi"
+     * - ["fantasy", "-sci-fi"]
+     * - "tag1,tag2,-tag3"
+     *
+     * @param mixed $rawTags
+     * @return array{required: string[], banned: string[]}
+     */
+    public static function parseTagSpecs(mixed $rawTags): array
+    {
+        $required = [];
+        $banned = [];
+
+        if ($rawTags === null || $rawTags === '' || $rawTags === []) {
+            return ['required' => [], 'banned' => []];
+        }
+
+        $items = [];
+        if (is_array($rawTags)) {
+            foreach ($rawTags as $item) {
+                if (is_string($item)) {
+                    foreach (explode(',', $item) as $part) {
+                        $trimmed = trim($part);
+                        if ($trimmed !== '') {
+                            $items[] = $trimmed;
+                        }
+                    }
+                }
+            }
+        } elseif (is_string($rawTags)) {
+            foreach (explode(',', $rawTags) as $part) {
+                $trimmed = trim($part);
+                if ($trimmed !== '') {
+                    $items[] = $trimmed;
+                }
+            }
+        }
+
+        foreach ($items as $item) {
+            if (str_starts_with($item, '-')) {
+                $tag = ltrim($item, '-');
+                if ($tag !== '') {
+                    $banned[] = $tag;
+                }
+            } else {
+                $required[] = $item;
+            }
+        }
+
+        return [
+            'required' => array_values(array_unique($required)),
+            'banned' => array_values(array_unique($banned)),
+        ];
+    }
+
+    /**
+     * Applies request-specified required and banned tag filters to a Book query builder.
+     *
+     * @param Builder $query
+     * @param mixed $tagSpec
+     * @param int|null $userId
+     */
+    public function applyRequestTagFilters(Builder $query, mixed $tagSpec, ?int $userId = null): void
+    {
+        if (!Schema::hasTable('book_tags')) {
+            return;
+        }
+
+        $parsed = self::parseTagSpecs($tagSpec);
+        $requiredTags = $parsed['required'];
+        $bannedTags = $parsed['banned'];
+
+        if (empty($requiredTags) && empty($bannedTags)) {
+            return;
+        }
+
+        $groupIds = [];
+        if ($userId) {
+            $groupIds = User::find($userId)?->groups()->pluck('groups.id')->all() ?? [];
+        }
+
+        $scopeMatcher = function ($q, string $tag) use ($userId, $groupIds): void {
+            $q->where(function ($qq) use ($userId, $groupIds): void {
+                $qq->where('owner_key', 'system');
+                if ($userId) {
+                    $qq->orWhere('owner_key', 'user:' . $userId);
+                    foreach ($groupIds as $groupId) {
+                        $qq->orWhere('owner_key', 'group:' . $groupId);
+                    }
+                } else {
+                    $qq->orWhere('owner_key', 'LIKE', 'user:%')
+                       ->orWhere('owner_key', 'LIKE', 'group:%');
+                }
+            })->whereJsonContains('tags', $tag);
+        };
+
+        foreach ($requiredTags as $reqTag) {
+            $query->whereHas('userTags', fn ($q) => $scopeMatcher($q, $reqTag));
+        }
+
+        foreach ($bannedTags as $banTag) {
+            $query->whereDoesntHave('userTags', fn ($q) => $scopeMatcher($q, $banTag));
+        }
+    }
 }

@@ -596,6 +596,16 @@ import {
             }, 100);
         });
 
+        $(document).on("click", "#autofillModal tbody tr", function (e) {
+            if ($(e.target).is('input[type="radio"]')) {
+                return;
+            }
+            const $radio = $(this).find('input[name="autofill_result_select"]');
+            if ($radio.length && !$radio.prop("checked")) {
+                $radio.prop("checked", true).trigger("change");
+            }
+        });
+
         $(document).on(
             "change",
             'input[name="autofill_result_select"]',
@@ -718,10 +728,29 @@ import {
                 $("#release_date").val(publishedYear + "-01-01");
             }
 
-            if (item.description) {
+            let itemDesc =
+                item.description ||
+                item.summary ||
+                item.publisher_summary ||
+                item.merchandising_summary ||
+                item.description_html ||
+                item.overview ||
+                "";
+            if (Array.isArray(itemDesc)) {
+                itemDesc = itemDesc.join("\n");
+            } else if (typeof itemDesc === "object" && itemDesc !== null) {
+                itemDesc =
+                    itemDesc.value ||
+                    itemDesc.text ||
+                    itemDesc.html ||
+                    String(itemDesc);
+            }
+            if (itemDesc) {
                 const descriptionField = $("#description");
-                if (descriptionField.length && !descriptionField.val()) {
-                    descriptionField.val(decodeHtmlEntities(item.description));
+                if (descriptionField.length) {
+                    descriptionField.val(
+                        decodeHtmlEntities(String(itemDesc)),
+                    );
                 }
             }
 

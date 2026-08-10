@@ -513,4 +513,8 @@
                 max-height: 70vh;
                 overflow-y: auto;
             }
+
+            #autofillModal tbody tr {
+                cursor: pointer;
+            }
         </style>

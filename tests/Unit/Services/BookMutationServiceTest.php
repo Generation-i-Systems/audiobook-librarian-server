@@ -90,6 +90,25 @@ class BookMutationServiceTest extends TestCase
         Queue::assertPushed(EmbedBookJob::class, fn (EmbedBookJob $job) => $this->jobTargetsBook($job, $updated->id));
     }
 
+    #[Test]
+    public function updateBookReplacesExistingMultiAuthorRelationsWithoutDuplicatePivotRows(): void
+    {
+        $book = Book::factory()->create();
+        $firstAuthor = Author::query()->create(['name' => 'First Author']);
+        $secondAuthor = Author::query()->create(['name' => 'Second Author']);
+        $removedAuthor = Author::query()->create(['name' => 'Removed Author']);
+        $book->authors()->attach([$firstAuthor->id, $secondAuthor->id, $removedAuthor->id]);
+
+        (new BookMutationService())->updateBook((string) $book->id, [
+            'authors' => [(string) $firstAuthor->id, (string) $secondAuthor->id],
+        ]);
+
+        $book->refresh();
+        $book->load('authors');
+
+        $this->assertSame(['First Author', 'Second Author'], $book->authors->pluck('name')->sort()->values()->all());
+    }
+
     private function jobTargetsBook(EmbedBookJob $job, int $bookId): bool
     {
         $reflection = new \ReflectionProperty($job, 'bookId');

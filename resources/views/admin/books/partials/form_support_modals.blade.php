@@ -196,6 +196,7 @@
                 'resources/js/admin/books/form-helpers.js',
                 'resources/js/admin/books/init-book-form.js',
                 'resources/js/admin/books/form-autocomplete.js',
+                'resources/js/admin/books/tag-editor.js',
                 'resources/js/admin/books/autofill-simple.js',
                 'resources/js/admin/books/form-cover.js',
                 'resources/js/admin/books/form-directory.js',

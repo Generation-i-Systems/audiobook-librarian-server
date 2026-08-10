@@ -225,6 +225,21 @@
                 "[init-book-form] registerDirectoryFeatures is not a function",
             );
         }
+        if (typeof bookForm.initializeTagEditors === "function") {
+            bookForm.initializeTagEditors($container);
+        } else {
+            console.error("[init-book-form] initializeTagEditors is not a function");
+        }
+        if (typeof bookForm.initializeTagSaveForms === "function") {
+            bookForm.initializeTagSaveForms();
+        } else {
+            console.error("[init-book-form] initializeTagSaveForms is not a function");
+        }
+        if (typeof bookForm.initializeBookFormTagSave === "function") {
+            bookForm.initializeBookFormTagSave();
+        } else {
+            console.error("[init-book-form] initializeBookFormTagSave is not a function");
+        }
     }
 
     window.initBookForm = initBookForm;

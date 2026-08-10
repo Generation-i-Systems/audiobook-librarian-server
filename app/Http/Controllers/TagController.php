@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Book;
 use App\Models\User;
 use App\Services\BookTagService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,7 +19,7 @@ class TagController extends Controller
     {
     }
 
-    public function update(Request $request, Book $book): RedirectResponse
+    public function update(Request $request, Book $book): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'scope' => ['required', 'string', 'in:system,group,user'],
@@ -26,12 +27,14 @@ class TagController extends Controller
             'tags' => ['nullable', 'string'],
         ]);
 
-        /** @var User $user */
-        $user = Auth::user();
+        $user = User::find(Auth::id());
+        if (!$user) {
+            abort(403, 'Authenticated user record not found.');
+        }
         $tags = $this->splitTags($validated['tags'] ?? '');
 
         try {
-            $this->bookTagService->updateTags(
+            $result = $this->bookTagService->updateTags(
                 $user,
                 $book,
                 $validated['scope'],
@@ -39,7 +42,17 @@ class TagController extends Controller
                 $tags,
             );
         } catch (HttpExceptionInterface $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage() ?: 'You are not allowed to set these tags.',
+                ], $e->getStatusCode());
+            }
+
             return back()->with('error', $e->getMessage() ?: 'You are not allowed to set these tags.');
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(array_merge($result, ['message' => 'Tags updated successfully!']));
         }
 
         return back()->with('success', 'Tags updated successfully!');

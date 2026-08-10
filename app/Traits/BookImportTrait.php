@@ -493,6 +493,15 @@ trait BookImportTrait
                 $edition = $metadata['edition'];
             }
 
+            if ($seriesNumber !== null && $seriesNumber !== '') {
+                $strNum = trim((string) $seriesNumber);
+                if (is_numeric($strNum)) {
+                    $seriesNumber = (string) (str_contains($strNum, '.') ? (float) $strNum : (int) $strNum);
+                } else {
+                    $seriesNumber = preg_replace('/^0+(?=[1-9]|\d\.)/', '', $strNum);
+                }
+            }
+
             // Set series data if we have a valid series name (string, not numeric)
             /** @phpstan-ignore-next-line function.alreadyNarrowedType */
             if (!empty($series) && is_string($series)) {

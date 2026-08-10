@@ -114,6 +114,16 @@ class BookAuthorController extends Controller
             $query->where('books.needs_review', false);
         }
 
+        $tagSpec = array_filter([$request->input('tag'), $request->input('tags')]);
+        $tagService = app(\App\Services\UserTagFilterService::class);
+        $parsedTags = $tagService::parseTagSpecs($tagSpec);
+
+        if (!empty($parsedTags['required']) || !empty($parsedTags['banned'])) {
+            $query->whereHas('books', function ($b) use ($tagService, $tagSpec, $userId) {
+                $tagService->applyRequestTagFilters($b, $tagSpec, $userId);
+            });
+        }
+
         // Add genre filtering if specified
         if ($genreId || $genreName) {
             $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
@@ -170,6 +180,12 @@ class BookAuthorController extends Controller
 
         if (!$includeNeedsReview) {
             $countQuery->where('books.needs_review', false);
+        }
+
+        if (!empty($parsedTags['required']) || !empty($parsedTags['banned'])) {
+            $countQuery->whereHas('books', function ($b) use ($tagService, $tagSpec, $userId) {
+                $tagService->applyRequestTagFilters($b, $tagSpec, $userId);
+            });
         }
 
         if ($isFavorite && $userId) {
@@ -230,7 +246,7 @@ class BookAuthorController extends Controller
         $authors = $query->offset($offset)->limit($perPage)->get();
 
         // Get genres and series for each author
-        $authorsWithDetails = $authors->map(function (\App\Models\Author $author) use ($includeNeedsReview) {
+        $authorsWithDetails = $authors->map(function (\App\Models\Author $author) use ($includeNeedsReview, $tagService, $tagSpec, $userId) {
             // Get genres for this author
             $authorBooksQuery = $author->books();
             if (!$includeNeedsReview) {
@@ -253,6 +269,9 @@ class BookAuthorController extends Controller
                 ->where('author_book.author_id', $author->id)
                 ->when(!$includeNeedsReview, function ($q) {
                     $q->where('books.needs_review', false);
+                })
+                ->tap(function ($q) use ($tagService, $tagSpec, $userId) {
+                    $tagService->applyRequestTagFilters($q, $tagSpec, $userId);
                 })
                 ->distinct('books.id')
                 ->count('books.id');
@@ -436,7 +455,15 @@ class BookAuthorController extends Controller
         }
 
         $userId = Auth::id();
-        $booksData = $documentStore->listBooks(1, $perPage, ['author_id' => $authorId], true, 'title', 'asc', false, $userId);
+        $filters = ['author_id' => $authorId];
+        if ($request->has('tag')) {
+            $filters['tag'] = $request->input('tag');
+        }
+        if ($request->has('tags')) {
+            $filters['tags'] = $request->input('tags');
+        }
+
+        $booksData = $documentStore->listBooks(1, $perPage, $filters, true, 'title', 'asc', false, $userId);
         $books = $booksData['data'];
 
         $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
@@ -465,7 +492,15 @@ class BookAuthorController extends Controller
         if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
+        $filters = ['author_id' => $authorId];
+        if ($request->has('tag')) {
+            $filters['tag'] = $request->input('tag');
+        }
+        if ($request->has('tags')) {
+            $filters['tags'] = $request->input('tags');
+        }
+        $booksData = $documentStore->listBooks(1, 1000, $filters, true, 'title', 'asc', false, Auth::id());
+        $books = array_filter($booksData['data'] ?? [], fn ($book) => ($book['author_id'] ?? null) == $authorId);
         $seriesIds = array_unique(array_column($books, 'series_id'));
         $series = array_filter($documentStore->listSeries(), fn ($ser) => in_array($ser['id'], $seriesIds));
         $series = array_values($series);
@@ -500,10 +535,18 @@ class BookAuthorController extends Controller
         }
 
         $userId = Auth::id();
+        $filters = ['author_id' => $authorId, 'genre_id' => $genreId];
+        if ($request->has('tag')) {
+            $filters['tag'] = $request->input('tag');
+        }
+        if ($request->has('tags')) {
+            $filters['tags'] = $request->input('tags');
+        }
+
         $booksData = $documentStore->listBooks(
             $page,
             $perPage,
-            ['author_id' => $authorId, 'genre_id' => $genreId],
+            $filters,
             true,
             'title',
             'asc',

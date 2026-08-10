@@ -15,6 +15,7 @@ class BookApiOpenApiTest extends TestCase
 
     protected $token;
     protected $openApiSpec;
+    protected User $user;
 
     protected function setUp(): void
     {
@@ -27,6 +28,7 @@ class BookApiOpenApiTest extends TestCase
             'password' => bcrypt('password'),
             'role' => 'admin',
         ]);
+        $this->user = $user;
         $this->actingAs($user);
         $this->token = 'testing-bypass-token';
 
@@ -241,7 +243,7 @@ class BookApiOpenApiTest extends TestCase
             $this->assertMatchesRegularExpression('/^http(s)?:\/\/.+\/api\/v1\/books\/\d+\/cover$/', $responseData['cover_url']);
         }
         $this->assertIsInt($responseData['file_count'] ?? 0);
-        $this->assertIsInt($responseData['total_size'] ?? 0);
+        $this->assertTrue(is_int($responseData['total_size']) || is_null($responseData['total_size']));
         // Timestamps can be in Z format or +00:00 format, but may be empty for some endpoints
         if (!empty($responseData['created_at'])) {
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|\+00:00)$/', $responseData['created_at']);
@@ -249,6 +251,40 @@ class BookApiOpenApiTest extends TestCase
         if (!empty($responseData['updated_at'])) {
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|\+00:00)$/', $responseData['updated_at']);
         }
+    }
+
+    public function test_get_single_book_returns_total_size_and_user_tags()
+    {
+        $book = Book::factory()->create([
+            'directory_exists' => true,
+            'needs_review' => false,
+        ]);
+
+        \App\Models\Chapter::create([
+            'book_id' => $book->id,
+            'chapter_number' => 1,
+            'file_name' => 'track01.mp3',
+            'size_bytes' => 123456789,
+        ]);
+
+        \App\Models\BookTag::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'scope' => 'user',
+            'owner_key' => 'user:' . $this->user->id,
+            'tags' => ['Fantasy', 'Must Read'],
+        ]);
+
+        $response = $this->withHeaders([
+            'Accept' => 'application/json',
+        ])->getJson('/api/v1/books/' . $book->id);
+
+        $response->assertStatus(200);
+        $data = $response->json();
+
+        $this->assertEquals(123456789, $data['total_size']);
+        $this->assertArrayHasKey('user_data', $data);
+        $this->assertEquals(['Fantasy', 'Must Read'], $data['user_data']['tags']);
     }
 
     /**

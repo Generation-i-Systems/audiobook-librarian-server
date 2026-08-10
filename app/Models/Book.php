@@ -356,4 +356,36 @@ class Book extends Model
 
         return $query->with($relations);
     }
+
+    public function getTotalSizeAttribute(): ?int
+    {
+        if (array_key_exists('total_size', $this->attributes) && $this->attributes['total_size'] !== null) {
+            return (int) $this->attributes['total_size'];
+        }
+
+        if (array_key_exists('totalSize', $this->attributes) && $this->attributes['totalSize'] !== null) {
+            return (int) $this->attributes['totalSize'];
+        }
+
+        if ($this->relationLoaded('chapters') && $this->chapters->isNotEmpty()) {
+            $sum = (int) $this->chapters->sum('size_bytes');
+            if ($sum > 0) {
+                return $sum;
+            }
+        }
+
+        if ($this->exists && Schema::hasTable('chapters')) {
+            $sum = (int) $this->chapters()->sum('size_bytes');
+            if ($sum > 0) {
+                return $sum;
+            }
+        }
+
+        return null;
+    }
+
+    public function setTotalSizeAttribute($value): void
+    {
+        $this->attributes['total_size'] = $value !== null ? (int) $value : null;
+    }
 }
