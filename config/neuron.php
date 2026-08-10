@@ -106,14 +106,14 @@ return [
         'default' => env('NEURON_EMBEDDING_PROVIDER'),
 
         'openai' => [
-            'key' => env('OPENAI_KEY'),
+            'key' => env('OPENAI_KEY', env('OPENAI_API_KEY')),
             'model' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-ada-002'),
             'dimensions' => 1024,
         ],
 
         'gemini' => [
-            'key' => env('GEMINI_KEY'),
-            'model' => env('GEMINI_EMBEDDING_MODEL', 'gemini-pro-embed-v1'),
+            'key' => env('GEMINI_KEY', env('GEMINI_API_KEY')),
+            'model' => env('GEMINI_EMBEDDING_MODEL', 'gemini-embedding-001'),
             'config' => [],
         ],
 
@@ -171,7 +171,7 @@ return [
             'collectionUrl' => env('QDRANT_COLLECTION_URL'),
             'key' => env('QDRANT_KEY'),
             'topK' => 5,
-            'dimension' => 1024,
+            'dimension' => (int) env('QDRANT_DIMENSION', 3072),
         ],
 
         'meilisearch' => [

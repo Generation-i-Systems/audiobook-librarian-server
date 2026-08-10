@@ -24,7 +24,7 @@ class AIProviderFactory
         return match ($providerName) {
             'claude' => new ClaudeProvider($model),
             'openai' => new OpenAIProvider($model),
-            default => new GeminiProvider($model),
+            default => new GeminiProvider($model, (bool) config('services.gemini.paid_tier', false)),
         };
     }
 }

@@ -16,8 +16,10 @@ abstract class BaseAIProvider implements AIProviderInterface
     protected float $sessionCost = 0.0;
 
     protected const DEFAULT_IMAGE_DESCRIPTION_PROMPT = 'Describe this audiobook cover image in 2-3 sentences. '
-        . 'Focus on visual style, mood, color palette, and any notable imagery, so the description can be used '
-        . 'to find books with a similar look and feel. Do not guess at the title or author from the cover text.';
+        . 'Focus on visual style, mood, color palette, depicted characters (specifically noting male or female characters), '
+        . 'and attire (specifically noting if characters are fully clothed, in armor, shirtless, or scantily clad), '
+        . 'so the description can be used to match books with a similar visual aesthetic or content tone. '
+        . 'Do not guess at the title or author from the cover text.';
 
     abstract protected function callAPI(string $prompt, array $options = []): array;
 

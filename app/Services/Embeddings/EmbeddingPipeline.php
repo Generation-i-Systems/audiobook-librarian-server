@@ -68,21 +68,25 @@ class EmbeddingPipeline
     {
         $name = config('neuron.store.default', 'file');
 
-        // Only the zero-external-infra 'file' driver is wired up today. Swapping to
-        // Qdrant/Chroma/etc. later is a data migration (see docs), not just a config
-        // flip, so an unsupported store name fails loudly rather than silently
-        // misreading 'file'-shaped config keys against a different store's schema.
-        if ($name !== 'file') {
-            throw new \RuntimeException("Vector store '{$name}' is not yet supported; only 'file' is implemented.");
+        if (!in_array($name, ['file', 'qdrant'], true)) {
+            throw new \RuntimeException("Vector store '{$name}' is not supported; implemented stores are 'file' and 'qdrant'.");
         }
 
-        $config = config('neuron.store.file', []);
+        $config = config("neuron.store.{$name}", []);
 
-        return new FileVectorStore(
-            directory: $config['directory'] ?? storage_path('neuron'),
-            topK: $config['topK'] ?? 5,
-            name: $config['name'] ?? 'neuron',
-            ext: $config['ext'] ?? '.store'
-        );
+        return match ($name) {
+            'file' => new FileVectorStore(
+                directory: $config['directory'] ?? storage_path('neuron'),
+                topK: (int) ($config['topK'] ?? 5),
+                name: $config['name'] ?? 'neuron',
+                ext: $config['ext'] ?? '.store'
+            ),
+            'qdrant' => new QdrantVectorStore(
+                collectionUrl: $config['collectionUrl'] ?? 'http://localhost:6333/collections/audiobook-librarian/',
+                key: $config['key'] ?? null,
+                topK: (int) ($config['topK'] ?? 5),
+                dimension: (int) ($config['dimension'] ?? 3072)
+            ),
+        };
     }
 }
