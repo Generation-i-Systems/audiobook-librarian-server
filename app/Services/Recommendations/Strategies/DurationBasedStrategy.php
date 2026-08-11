@@ -23,7 +23,9 @@ class DurationBasedStrategy implements RecommendationStrategyInterface
 
     private const QUICK_MAX_SECONDS = 18000; // 5 hours
     private const EPIC_MIN_SECONDS = 72000; // 20 hours
-    private const BOOKS_PER_SHELF = 10;
+    // Larger than the discovery-shelf preview size (see DiscoveryController::DEFAULT_SHELF_PREVIEW_SIZE)
+    // so "Show more" has real additional books to page into instead of just re-showing the preview.
+    private const BOOKS_PER_SHELF = 30;
 
     public function __construct(private readonly FavoredGenreResolver $favoredGenres)
     {

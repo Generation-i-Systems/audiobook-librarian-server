@@ -6,6 +6,7 @@ namespace App\Services\Recommendations;
 
 use App\Models\Genre;
 use App\Models\User;
+use App\Services\BookCompletionService;
 use Illuminate\Support\Collection;
 
 /**
@@ -20,9 +21,11 @@ class FavoredGenreResolver
      */
     public function forUser(User $user): Collection
     {
+        $completedBookIds = app(BookCompletionService::class)->getCompletedBookIdsForUser($user->id);
+
         return Genre::query()
-            ->whereHas('books', function ($query) use ($user): void {
-                $query->whereHas('statuses', fn ($q) => $q->where('user_id', $user->id)->where('status', 'completed'));
+            ->whereHas('books', function ($query) use ($completedBookIds): void {
+                $query->whereIn('books.id', $completedBookIds ?: [0]);
             })
             ->pluck('id');
     }

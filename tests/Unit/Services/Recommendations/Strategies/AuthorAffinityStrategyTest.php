@@ -23,7 +23,7 @@ class AuthorAffinityStrategyTest extends TestCase
 
         $completedBook = Book::factory()->create();
         $completedBook->authors()->attach($author->id);
-        UserBookStatus::factory()->create(['user_id' => $user->id, 'book_id' => $completedBook->id, 'status' => 'completed']);
+        UserBookStatus::factory()->create(['user_id' => $user->id, 'book_id' => $completedBook->id, 'status' => 'completed', 'finished_at' => now()]);
 
         $shelves = (new AuthorAffinityStrategy())->generate($user);
 
@@ -38,7 +38,7 @@ class AuthorAffinityStrategyTest extends TestCase
         foreach (range(1, 2) as $_) {
             $completedBook = Book::factory()->create();
             $completedBook->authors()->attach($author->id);
-            UserBookStatus::factory()->create(['user_id' => $user->id, 'book_id' => $completedBook->id, 'status' => 'completed']);
+            UserBookStatus::factory()->create(['user_id' => $user->id, 'book_id' => $completedBook->id, 'status' => 'completed', 'finished_at' => now()]);
         }
 
         $unreadBook = Book::factory()->create();

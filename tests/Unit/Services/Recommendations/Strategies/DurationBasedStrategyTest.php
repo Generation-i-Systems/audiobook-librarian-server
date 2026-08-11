@@ -33,7 +33,7 @@ class DurationBasedStrategyTest extends TestCase
 
         $completedBook = Book::factory()->create(['duration' => 10000]);
         $completedBook->genres()->attach($genre->id);
-        UserBookStatus::factory()->create(['user_id' => $user->id, 'book_id' => $completedBook->id, 'status' => 'completed']);
+        UserBookStatus::factory()->create(['user_id' => $user->id, 'book_id' => $completedBook->id, 'status' => 'completed', 'finished_at' => now()]);
 
         $quickBook = Book::factory()->create(['duration' => 3600]); // 1hr, well under 5hr threshold
         $quickBook->genres()->attach($genre->id);

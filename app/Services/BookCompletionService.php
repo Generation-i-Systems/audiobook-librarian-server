@@ -101,7 +101,132 @@ class BookCompletionService
             $merged = $merged->filter(fn (Carbon $date): bool => $date->gte($startDate));
         }
 
-        return $merged;
+        // Some synced progress rows (book_progress/book_positions) reference a book_id that
+        // doesn't correspond to any real book — e.g. a client sending its own local-only book
+        // id before that book was ever matched to the server catalog. Silently keeping those
+        // around skews "most recent completions" (a phantom row can rank above a real one) and
+        // produces empty Book lookups downstream, so they're filtered out here once, centrally.
+        $validIds = $this->validBookIds($merged->keys()->all());
+
+        // $merged is typed as an Eloquent Collection here (it originates from a Model
+        // query's ->get()->mapWithKeys(), which preserves the runtime class via `new
+        // static(...)`), even though its items are Carbon dates, not models. Eloquent
+        // Collection's `only()` override calls ->getKey() on each item expecting a model,
+        // so it must be converted to a plain Collection before filtering by key here.
+        return collect($merged->all())->only($validIds);
+    }
+
+    /** @param array<int, int> $bookIds */
+    private function validBookIds(array $bookIds): array
+    {
+        return Book::query()->whereIn('id', $bookIds)->pluck('id')->all();
+    }
+
+    /** @return array<int, int> */
+    public function getCompletedBookIdsForUser(int $userId): array
+    {
+        return $this->getCompletedBookDatesForUser($userId)->keys()->all();
+    }
+
+    /**
+     * Books the user has started but not finished, merged across the same three sources as
+     * {@see getCompletedBookDatesForUser()}: user_book_status.status='in_progress',
+     * book_progress (completed=false with real playback position), and the event-sourced
+     * book_positions (completed=false with real playback position).
+     *
+     * @return array<int, int>
+     */
+    public function getInProgressBookIdsForUser(int $userId): array
+    {
+        $statusIds = UserBookStatus::query()
+            ->where('user_id', $userId)
+            ->where('status', 'in_progress')
+            ->whereNotNull('book_id')
+            ->pluck('book_id');
+
+        $progressIds = BookProgress::query()
+            ->where('user_id', $userId)
+            ->where('completed', false)
+            ->where('current_position_seconds', '>', 0)
+            ->whereNotNull('book_id')
+            ->pluck('book_id');
+
+        $positionIds = BookPosition::query()
+            ->where('user_id', $userId)
+            ->where('completed', false)
+            ->where('position_ms', '>', 0)
+            ->pluck('book_id');
+
+        $merged = $statusIds->merge($progressIds)->merge($positionIds)
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $this->validBookIds($merged);
+    }
+
+    /**
+     * Every book the user has any engagement signal for — completed, in-progress, or any
+     * other user_book_status row (queued/wishlisted/etc.) — for "don't recommend a book the
+     * user already has a relationship with" exclusion logic.
+     *
+     * @return array<int, int>
+     */
+    public function getEngagedBookIdsForUser(int $userId): array
+    {
+        $statusIds = $this->validBookIds(
+            UserBookStatus::query()
+                ->where('user_id', $userId)
+                ->whereNotNull('book_id')
+                ->pluck('book_id')
+                ->map(fn ($id): int => (int) $id)
+                ->all(),
+        );
+
+        return array_values(array_unique(array_merge(
+            $statusIds,
+            $this->getCompletedBookIdsForUser($userId),
+            $this->getInProgressBookIdsForUser($userId),
+        )));
+    }
+
+    /**
+     * Normalized titles of every book the user has engaged with, for filtering out
+     * "recommendations" that are really just a different edition/narration of a book the
+     * user already read (different book_id, same catalog title) — see normalizeTitle().
+     *
+     * @return array<int, string>
+     */
+    public function getEngagedNormalizedTitles(int $userId): array
+    {
+        $ids = $this->getEngagedBookIdsForUser($userId);
+        if (empty($ids)) {
+            return [];
+        }
+
+        return Book::query()->whereIn('id', $ids)->pluck('title')
+            ->map(fn (string $title): string => self::normalizeTitle($title))
+            ->filter(fn (string $title): bool => $title !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Lowercases, strips parenthetical edition/format notes (e.g. "(Unabridged)",
+     * "(GraphicAudio)"), and strips punctuation/whitespace, so different catalog entries for
+     * the same underlying book ("Elantris" vs "Elantris (Tenth Anniversary Edition)") compare
+     * equal.
+     */
+    public static function normalizeTitle(string $title): string
+    {
+        $normalized = strtolower($title);
+        $normalized = preg_replace('/\([^)]*\)/', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\[[^\]]*\]/', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('/[^a-z0-9]+/', '', $normalized) ?? $normalized;
+
+        return $normalized;
     }
 
     /** @return Collection<int, array{book_id:int,title:string,finished_at:Carbon}> */

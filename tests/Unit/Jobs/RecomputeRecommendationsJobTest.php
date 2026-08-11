@@ -42,6 +42,7 @@ class RecomputeRecommendationsJobTest extends TestCase
             'user_id' => $user->id,
             'book_id' => $completedBook->id,
             'status' => 'completed',
+            'finished_at' => now(),
         ]);
 
         $unreadBook = Book::factory()->create();

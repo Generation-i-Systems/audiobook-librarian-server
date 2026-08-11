@@ -6,6 +6,7 @@ namespace App\Services\Recommendations\Strategies;
 
 use App\Models\Book;
 use App\Models\User;
+use App\Services\BookCompletionService;
 use App\Services\Embeddings\BookEmbeddingTextBuilder;
 use App\Services\Embeddings\EmbeddingPipeline;
 use App\Services\Recommendations\Concerns\ExcludesEngagedBooks;
@@ -26,7 +27,9 @@ class NewForYouStrategy implements RecommendationStrategyInterface
     use ExcludesEngagedBooks;
 
     private const SEED_COUNT = 5;
-    private const SHELF_SIZE = 10;
+    // Larger than the discovery-shelf preview size (see DiscoveryController::DEFAULT_SHELF_PREVIEW_SIZE)
+    // so "Show more" has real additional books to page into instead of just re-showing the preview.
+    private const SHELF_SIZE = 30;
     private const SIMILARITY_WEIGHT = 0.6;
     private const RECENCY_WEIGHT = 0.4;
 
@@ -48,24 +51,30 @@ class NewForYouStrategy implements RecommendationStrategyInterface
 
     public function generate(User $user): array
     {
-        $seeds = $user->bookStatuses()
-            ->where('status', 'completed')
-            ->whereNotNull('finished_at')
-            ->orderByDesc('finished_at')
-            ->limit(self::SEED_COUNT)
-            ->with(['book.authors', 'book.genres'])
+        $completedDates = app(BookCompletionService::class)->getCompletedBookDatesForUser($user->id);
+        $recentBookIds = $completedDates->sortDesc()->keys()->take(self::SEED_COUNT)->all();
+
+        $seeds = Book::query()
+            ->whereIn('id', $recentBookIds ?: [0])
+            ->with(['authors', 'genres'])
             ->get()
-            ->pluck('book')
-            ->filter();
+            ->sortBy(fn (Book $book): int => array_search($book->id, $recentBookIds, true))
+            ->values();
 
         if ($seeds->isEmpty()) {
             return [];
         }
 
         $excluded = $this->excludedBookIds($user);
+        $excludedTitles = app(BookCompletionService::class)->getEngagedNormalizedTitles($user->id);
+        foreach ($seeds as $seed) {
+            $excludedTitles[] = BookCompletionService::normalizeTitle($seed->title);
+        }
+        $excludedTitles = array_values(array_unique(array_filter($excludedTitles, fn (string $t): bool => $t !== '')));
+
         $books = $this->pipeline->isAvailable()
-            ? ($this->viaVector($seeds, $excluded) ?? $this->viaSql($seeds, $excluded))
-            : $this->viaSql($seeds, $excluded);
+            ? ($this->viaVector($seeds, $excluded, $excludedTitles) ?? $this->viaSql($seeds, $excluded, $excludedTitles))
+            : $this->viaSql($seeds, $excluded, $excludedTitles);
 
         return empty($books) ? [] : [new ShelfResult('new_for_you', 'New for You', $books)];
     }
@@ -73,9 +82,11 @@ class NewForYouStrategy implements RecommendationStrategyInterface
     /**
      * @param Collection<int, Book> $seeds
      * @param array<int, int> $excluded
+     * @param array<int, string> $excludedTitles books to treat as duplicates of something the
+     *   user already engaged with — see BookCompletionService::normalizeTitle()
      * @return array<int, array{book_id: int, score: float|null}>|null null falls back to SQL
      */
-    private function viaVector(Collection $seeds, array $excluded): ?array
+    private function viaVector(Collection $seeds, array $excluded, array $excludedTitles): ?array
     {
         try {
             $provider = $this->pipeline->resolveEmbeddingProvider();
@@ -118,11 +129,23 @@ class NewForYouStrategy implements RecommendationStrategyInterface
 
         arsort($best);
 
-        return collect($best)
-            ->take(self::SHELF_SIZE)
-            ->map(fn (float $score, int $bookId): array => ['book_id' => $bookId, 'score' => $score])
-            ->values()
-            ->all();
+        // Vector metadata only carries book_id, so title-based dedup needs a bulk lookup here.
+        $titles = Book::query()->whereIn('id', array_keys($best))->pluck('title', 'id');
+
+        $results = [];
+        foreach ($best as $bookId => $score) {
+            $normalized = BookCompletionService::normalizeTitle((string) ($titles[$bookId] ?? ''));
+            if ($normalized !== '' && in_array($normalized, $excludedTitles, true)) {
+                continue;
+            }
+
+            $results[] = ['book_id' => $bookId, 'score' => $score];
+            if (count($results) >= self::SHELF_SIZE) {
+                break;
+            }
+        }
+
+        return $results;
     }
 
     private function recencyScore(int $bookId): float
@@ -140,9 +163,10 @@ class NewForYouStrategy implements RecommendationStrategyInterface
     /**
      * @param Collection<int, Book> $seeds
      * @param array<int, int> $excluded
+     * @param array<int, string> $excludedTitles
      * @return array<int, array{book_id: int, score: float|null}>
      */
-    private function viaSql(Collection $seeds, array $excluded): array
+    private function viaSql(Collection $seeds, array $excluded, array $excludedTitles = []): array
     {
         $genreIds = $seeds->flatMap(fn (Book $b) => $b->genres->pluck('id'))->unique();
         $authorIds = $seeds->flatMap(fn (Book $b) => $b->authors->pluck('id'))->unique();
@@ -152,6 +176,7 @@ class NewForYouStrategy implements RecommendationStrategyInterface
         }
 
         $excludeIds = array_merge($excluded, $seeds->pluck('id')->all());
+        $fetchLimit = $excludedTitles === [] ? self::SHELF_SIZE : self::SHELF_SIZE * 3;
 
         $candidates = Book::query()
             ->whereNotIn('id', $excludeIds ?: [0])
@@ -164,9 +189,18 @@ class NewForYouStrategy implements RecommendationStrategyInterface
                 }
             })
             ->orderByDesc('created_at')
-            ->limit(self::SHELF_SIZE)
+            ->limit($fetchLimit)
             ->get();
 
-        return $candidates->map(fn (Book $b): array => ['book_id' => $b->id, 'score' => null])->values()->all();
+        if ($excludedTitles !== []) {
+            $candidates = $candidates
+                ->filter(fn (Book $b): bool => !in_array(BookCompletionService::normalizeTitle($b->title), $excludedTitles, true))
+                ->values();
+        }
+
+        return $candidates->take(self::SHELF_SIZE)
+            ->map(fn (Book $b): array => ['book_id' => $b->id, 'score' => null])
+            ->values()
+            ->all();
     }
 }

@@ -40,7 +40,7 @@ class DiscoverySurpriseControllerTest extends TestCase
 
         $completedBook = Book::factory()->create();
         $completedBook->genres()->attach($favoredGenre->id);
-        UserBookStatus::factory()->create(['user_id' => $this->user->id, 'book_id' => $completedBook->id, 'status' => 'completed']);
+        UserBookStatus::factory()->create(['user_id' => $this->user->id, 'book_id' => $completedBook->id, 'status' => 'completed', 'finished_at' => now()]);
 
         $series = Series::factory()->create();
         $seriesBook1 = Book::factory()->create();
@@ -65,7 +65,7 @@ class DiscoverySurpriseControllerTest extends TestCase
         $favoredGenre = Genre::factory()->create();
         $completedBook = Book::factory()->create();
         $completedBook->genres()->attach($favoredGenre->id);
-        UserBookStatus::factory()->create(['user_id' => $this->user->id, 'book_id' => $completedBook->id, 'status' => 'completed']);
+        UserBookStatus::factory()->create(['user_id' => $this->user->id, 'book_id' => $completedBook->id, 'status' => 'completed', 'finished_at' => now()]);
 
         $otherGenre = Genre::factory()->create();
         $standaloneBook = Book::factory()->create();

@@ -10,6 +10,7 @@ use App\Models\RecommendationShelf;
 use App\Models\RecommendationShelfBook;
 use App\Models\Series;
 use App\Models\User;
+use App\Services\BookCompletionService;
 use App\Services\BookDataTransformer;
 use App\Services\Recommendations\FavoredGenreResolver;
 use Illuminate\Database\Eloquent\Builder;
@@ -114,7 +115,7 @@ class DiscoveryController extends Controller
     {
         $userId = Auth::id();
         $user = User::find($userId);
-        $excluded = $user->bookStatuses()->whereNotNull('book_id')->pluck('book_id')->all();
+        $excluded = app(BookCompletionService::class)->getEngagedBookIdsForUser($userId);
 
         $favoredGenreIds = $this->favoredGenres->forUser($user);
 
