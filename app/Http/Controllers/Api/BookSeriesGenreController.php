@@ -693,6 +693,14 @@ class BookSeriesGenreController extends Controller
                 'name' => $s->name,
                 'book_count_in_genre' => $s->book_count_in_genre,
                 'cover_urls' => $this->seriesCoverUrls($s, $inGenre),
+                'authors' => $s->books()
+                    ->when(true, $inGenre)
+                    ->join('author_book', 'books.id', '=', 'author_book.book_id')
+                    ->join('authors', 'author_book.author_id', '=', 'authors.id')
+                    ->select('authors.name')
+                    ->distinct()
+                    ->pluck('name')
+                    ->toArray(),
             ])->values()->all(),
             'meta' => [
                 'current_page' => $page,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Series;
@@ -111,6 +112,34 @@ class GenreBooksAndSeriesTest extends ApiTestCase
         $this->assertStringContainsString("/books/{$booksByNumber[1]->id}/cover", $coverUrls[0]);
         $this->assertStringContainsString("/books/{$booksByNumber[2]->id}/cover", $coverUrls[1]);
         $this->assertStringContainsString("/books/{$booksByNumber[3]->id}/cover", $coverUrls[2]);
+    }
+
+    public function testSeriesByGenreIncludesAuthorsScopedToTheGenre(): void
+    {
+        $genre = Genre::factory()->create();
+        $series = Series::factory()->create(['name' => 'Multi-Author Saga']);
+
+        $inGenreAuthor = Author::factory()->create(['name' => 'In-Genre Author']);
+        $inGenreBook = Book::factory()->create();
+        $inGenreBook->genres()->attach($genre->id);
+        $inGenreBook->authors()->attach($inGenreAuthor->id);
+        $series->books()->attach($inGenreBook->id, ['series_number' => '1']);
+
+        $unrelatedGenre = Genre::factory()->create();
+        $otherGenreAuthor = Author::factory()->create(['name' => 'Other-Genre Author']);
+        $otherGenreBook = Book::factory()->create();
+        $otherGenreBook->genres()->attach($unrelatedGenre->id);
+        $otherGenreBook->authors()->attach($otherGenreAuthor->id);
+        $series->books()->attach($otherGenreBook->id, ['series_number' => '2']);
+
+        $response = $this->getJson("/api/v1/genres/{$genre->id}/series");
+
+        $response->assertOk();
+        $data = $response->json('data');
+        $authors = $data[0]['authors'];
+
+        $this->assertContains('In-Genre Author', $authors);
+        $this->assertNotContains('Other-Genre Author', $authors);
     }
 
     public function testSeriesByGenreSortsByLengthDescending(): void
