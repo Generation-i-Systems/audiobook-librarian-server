@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\Book;
 use App\Models\ListeningEvent;
 use App\Services\BadgeService;
@@ -61,6 +62,7 @@ class EventController extends Controller
         $skippedCount    = 0;
         $serverTimestamp = (int) (now()->timestamp * 1000);
         $hasSessionEnd   = false;
+        $recommendationsDirty = false;
 
         ControllerDatabase::beginTransaction();
         try {
@@ -103,7 +105,7 @@ class EventController extends Controller
                     'migration_source_id' => $eventData['migrationSourceId'] ?? null,
                 ]);
 
-                $this->positionMaterializer->materialize([
+                $isSignificant = $this->positionMaterializer->materialize([
                     'id'           => $eventData['id'],
                     'user_id'      => $user->id,
                     'book_id'      => $resolvedBookId,
@@ -113,6 +115,9 @@ class EventController extends Controller
                     'metadata'     => $eventData['metadata'] ?? [],
                     'device_id'    => $eventData['deviceId'],
                 ]);
+                if ($isSignificant) {
+                    $recommendationsDirty = true;
+                }
 
                 if ($eventData['eventType'] === 'SESSION_END') {
                     $hasSessionEnd = true;
@@ -167,6 +172,12 @@ class EventController extends Controller
             });
 
             ControllerDatabase::commit();
+
+            // A book was just started or finished — recommendation shelves are precomputed and
+            // stale otherwise, so re-run them (outside the transaction, queued).
+            if ($recommendationsDirty) {
+                RecomputeRecommendationsJob::dispatch((int) $user->id);
+            }
 
             // Evaluate badges on SESSION_END events (outside transaction)
             $badgesEarned = [];

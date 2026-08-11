@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Api;
 
+use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\Book;
 use App\Models\ListeningEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class EventSyncTest extends TestCase
@@ -232,5 +234,84 @@ class EventSyncTest extends TestCase
         $this->assertDatabaseMissing('listening_events', [
             'id' => 'migrated-event-1',
         ]);
+    }
+
+    public function testSyncDispatchesRecomputeOnBookFinishEvent(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create();
+        $this->actingAs($user, 'api');
+
+        $payload = [
+            'events' => [
+                [
+                    'id' => 'finish-event-1',
+                    'bookId' => $book->id,
+                    'eventType' => 'BOOK_FINISH',
+                    'timestampMs' => 1707945600000,
+                    'positionMs' => 3600000,
+                    'metadata' => [],
+                    'deviceId' => 'test-device',
+                    'timezone' => 'UTC',
+                    'createdAt' => 1707945600000,
+                ],
+            ],
+            'lastSyncTimestamp' => 0,
+        ];
+
+        $this->postJson('/api/v1/sync/events', $payload, [
+            'X-Device-ID' => 'test-device',
+            'X-Acting-As-Test' => 'true',
+        ])->assertStatus(200);
+
+        Queue::assertPushed(RecomputeRecommendationsJob::class);
+    }
+
+    public function testSyncDoesNotDispatchRecomputeForRoutineProgressUpdates(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create();
+        $this->actingAs($user, 'api');
+
+        // Book already has a materialized position for this user — a routine SEEK/PLAY_PAUSE
+        // on an already-started, unfinished book should not trigger a recompute.
+        \App\Models\BookPosition::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'device_id' => 'test-device',
+            'position_ms' => 1000,
+            'progress_percentage' => 5,
+            'completed' => false,
+            'last_event_timestamp_ms' => 1707945500000,
+            'last_event_id' => 'earlier-event',
+        ]);
+
+        $payload = [
+            'events' => [
+                [
+                    'id' => 'seek-event-1',
+                    'bookId' => $book->id,
+                    'eventType' => 'SEEK',
+                    'timestampMs' => 1707945600000,
+                    'positionMs' => 1234567,
+                    'metadata' => [],
+                    'deviceId' => 'test-device',
+                    'timezone' => 'UTC',
+                    'createdAt' => 1707945600000,
+                ],
+            ],
+            'lastSyncTimestamp' => 0,
+        ];
+
+        $this->postJson('/api/v1/sync/events', $payload, [
+            'X-Device-ID' => 'test-device',
+            'X-Acting-As-Test' => 'true',
+        ])->assertStatus(200);
+
+        Queue::assertNotPushed(RecomputeRecommendationsJob::class);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\BookPosition;
 use App\Models\BookProgress;
 use App\Models\Device;
@@ -204,6 +205,7 @@ class PositionSyncController extends Controller
 
         $conflicts = [];
         $accepted = 0;
+        $recommendationsDirty = false;
         $positionMaterializer = app(PositionMaterializer::class);
 
         foreach ($validated['positions'] as $pos) {
@@ -246,7 +248,10 @@ class PositionSyncController extends Controller
                 ]
             );
 
-            $positionMaterializer->materialize([
+            // is_finished flows into BookProgress.completed above, but this synthetic event is
+            // always PLAY_PAUSE, so the materializer's own BOOK_FINISH-based detection can't see
+            // it — treat is_finished as significant directly rather than relying on that check.
+            $isSignificant = $positionMaterializer->materialize([
                 'id' => 'position-sync-' . $pos['book_id'] . '-' . $deviceId . '-' . time(),
                 'user_id' => $user->id,
                 'book_id' => $pos['book_id'],
@@ -259,8 +264,15 @@ class PositionSyncController extends Controller
                 ],
                 'device_id' => $deviceId,
             ]);
+            if ($isSignificant || ($pos['is_finished'] ?? false)) {
+                $recommendationsDirty = true;
+            }
 
             $accepted++;
+        }
+
+        if ($recommendationsDirty) {
+            RecomputeRecommendationsJob::dispatch((int) $user->id);
         }
 
         $badgesEarned = [];

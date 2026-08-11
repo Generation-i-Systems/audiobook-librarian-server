@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\BookStatusUpdated;
 use App\Http\Controllers\Controller;
+use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\Book;
 use App\Models\UserBookStatus;
 use App\Models\User;
@@ -148,6 +149,11 @@ class UserStatusController extends Controller
                 'marked_read_at' => $markedReadAt,
             ]);
         }
+
+        // Doesn't dispatch BookStatusUpdated (see class doc above), but marked_read_at IS an
+        // exclusion signal for recommendations (BookCompletionService::getEngagedBookIdsForUser),
+        // so shelves still need a recompute — just not the badge/stats/goal side effects.
+        RecomputeRecommendationsJob::dispatch($user->id);
 
         return response()->json([
             'message' => $data['is_read'] ? 'Book marked as read.' : 'Book unmarked as read.',

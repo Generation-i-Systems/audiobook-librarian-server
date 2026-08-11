@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Api;
 
+use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\Book;
 use App\Models\BookProgress;
 use App\Models\Device;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 use Laravel\Sanctum\Sanctum;
 
@@ -260,6 +262,31 @@ class PositionSyncControllerTest extends TestCase
             'current_position_seconds' => 3600,
             'progress_percentage' => 50.0,
         ]);
+    }
+
+    public function testStorePositionDispatchesRecomputeWhenBookIsFinished()
+    {
+        Queue::fake();
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'X-Device-ID' => 'device-1',
+            'X-Device-Name' => 'Test Phone',
+        ])
+            ->postJson('/api/v1/sync/positions', [
+                'client_timestamp' => now()->toIso8601String(),
+                'positions' => [
+                    [
+                        'book_id' => $this->book->id,
+                        'position_ms' => 3600000,
+                        'progress_percentage' => 100.0,
+                        'is_finished' => true,
+                        'updated_at' => now()->toIso8601String(),
+                    ],
+                ],
+            ])->assertStatus(200);
+
+        Queue::assertPushed(RecomputeRecommendationsJob::class);
     }
 
     public function testStorePositionDetectsConflicts()

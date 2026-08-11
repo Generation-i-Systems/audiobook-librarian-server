@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\Book;
 use App\Models\User;
 use App\Models\UserBookStatus;
 use App\Events\BookStatusUpdated;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class UserStatusControllerTest extends TestCase
@@ -197,6 +199,17 @@ class UserStatusControllerTest extends TestCase
             'read_count' => 0,
             'finished_at' => null,
         ]);
+    }
+
+    public function test_marking_read_dispatches_a_recommendation_recompute(): void
+    {
+        Queue::fake();
+
+        $this->postJson('/api/v1/status/' . $this->book->id . '/read', [
+            'is_read' => true,
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200);
+
+        Queue::assertPushed(RecomputeRecommendationsJob::class);
     }
 
     public function test_can_unmark_a_book_as_read(): void

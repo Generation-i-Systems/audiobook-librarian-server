@@ -23,11 +23,14 @@ class PositionMaterializer
     /**
      * Update the materialized position from a listening event.
      * Only updates if the event is newer than the current record.
+     *
+     * @return bool true if this event just started or just finished a book for the user —
+     *   i.e. their recommendation exclusion set changed and shelves should be recomputed.
      */
-    public function materialize(array $eventData): void
+    public function materialize(array $eventData): bool
     {
         if (! in_array($eventData['event_type'], self::POSITION_CARRYING_EVENTS, true)) {
-            return;
+            return false;
         }
 
         $existing = BookPosition::where('user_id', $eventData['user_id'])
@@ -36,7 +39,7 @@ class PositionMaterializer
             ->first();
 
         if ($existing && $existing->last_event_timestamp_ms >= $eventData['timestamp_ms']) {
-            return;
+            return false;
         }
 
         $metadata = $eventData['metadata'] ?? [];
@@ -57,6 +60,11 @@ class PositionMaterializer
             $attributes['completed'] = true;
         }
 
+        $wasCompleted = $existing !== null && $existing->completed;
+        $hadAnyPriorPosition = BookPosition::where('user_id', $eventData['user_id'])
+            ->where('book_id', $eventData['book_id'])
+            ->exists();
+
         BookPosition::updateOrCreate(
             [
                 'user_id' => $eventData['user_id'],
@@ -65,6 +73,11 @@ class PositionMaterializer
             ],
             $attributes,
         );
+
+        $justFinished = ($attributes['completed'] ?? false) && ! $wasCompleted;
+        $justStarted = ! $hadAnyPriorPosition && ($eventData['position_ms'] ?? 0) > 0;
+
+        return $justFinished || $justStarted;
     }
 
     /**
