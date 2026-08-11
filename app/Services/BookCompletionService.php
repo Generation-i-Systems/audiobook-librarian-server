@@ -20,6 +20,13 @@ use Illuminate\Support\Collection;
  */
 class BookCompletionService
 {
+    // A book_positions row marked completed=true whose position is far short of the book's
+    // known duration can't be a genuine finish — e.g. a stray/erroneous BOOK_FINISH event
+    // firing moments after playback starts. Requiring most of the book's duration filters
+    // these out without rejecting legitimate completions that stop slightly before the
+    // literal end (trailing silence/credits).
+    private const MIN_COMPLETION_FRACTION = 0.9;
+
     public function completedProgressQuery(?int $userId, string $deviceId, ?Carbon $startDate = null)
     {
         $query = BookProgress::query()
@@ -65,10 +72,24 @@ class BookCompletionService
         // The modern event-sourced completion path (BOOK_FINISH -> PositionMaterializer) writes
         // to book_positions, not book_progress/user_book_status. last_event_timestamp_ms is the
         // client-reported time of the finishing event.
-        $positionDates = BookPosition::query()
+        $positionRows = BookPosition::query()
             ->where('user_id', $userId)
             ->where('completed', true)
-            ->get(['book_id', 'last_event_timestamp_ms'])
+            ->get(['book_id', 'position_ms', 'last_event_timestamp_ms']);
+
+        $durationSecondsByBookId = Book::query()
+            ->whereIn('id', $positionRows->pluck('book_id')->unique())
+            ->pluck('duration', 'id');
+
+        $positionDates = $positionRows
+            ->filter(function (BookPosition $position) use ($durationSecondsByBookId): bool {
+                $durationSeconds = $durationSecondsByBookId->get((int) $position->book_id);
+                if ($durationSeconds === null || $durationSeconds <= 0) {
+                    return true;
+                }
+
+                return $position->position_ms >= $durationSeconds * 1000 * self::MIN_COMPLETION_FRACTION;
+            })
             ->mapWithKeys(function (BookPosition $position): array {
                 return [(int) $position->book_id => Carbon::createFromTimestampMs((int) $position->last_event_timestamp_ms)];
             });

@@ -67,7 +67,7 @@ class GenreAffinityStrategyTest extends TestCase
         $user = User::factory()->create();
         $genre = Genre::factory()->create(['name' => 'Sci-Fi']);
 
-        $completedBook = Book::factory()->create();
+        $completedBook = Book::factory()->create(['duration' => 3600]);
         $completedBook->genres()->attach($genre->id);
         BookPosition::query()->create([
             'user_id' => $user->id,

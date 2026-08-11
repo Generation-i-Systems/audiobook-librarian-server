@@ -23,7 +23,7 @@ class BookCompletionServiceTest extends TestCase
         // must not be treated as a real completion — it previously poisoned "most recent
         // completions" ranking since the phantom row still had a (bogus) date.
         $user = User::factory()->create();
-        $realBook = Book::factory()->create();
+        $realBook = Book::factory()->create(['duration' => 3600]);
 
         BookPosition::query()->create([
             'user_id' => $user->id,
@@ -54,6 +54,45 @@ class BookCompletionServiceTest extends TestCase
         $this->assertCount(1, $dates);
         $this->assertTrue($dates->has($realBook->id));
         $this->assertFalse($dates->has(999999999));
+    }
+
+    public function testGetCompletedBookDatesForUserIgnoresACompletedFlagFarShortOfTheBooksDuration(): void
+    {
+        // Regression: a real device sent a BOOK_FINISH event for a ~13-hour book after only
+        // 37 seconds of playback (position_ms=37590 vs duration=46628s) — completed=true was
+        // trusted at face value, so the book showed up as "just finished" in discovery shelves
+        // despite the user not having listened to any meaningful portion of it.
+        $user = User::factory()->create();
+        $barelyStartedBook = Book::factory()->create(['duration' => 46628]);
+        $genuinelyFinishedBook = Book::factory()->create(['duration' => 3600]);
+
+        BookPosition::query()->create([
+            'user_id' => $user->id,
+            'book_id' => $barelyStartedBook->id,
+            'device_id' => 'device-1',
+            'position_ms' => 37590,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'last_event_timestamp_ms' => now()->valueOf(),
+            'last_event_id' => 'event-bogus',
+        ]);
+
+        BookPosition::query()->create([
+            'user_id' => $user->id,
+            'book_id' => $genuinelyFinishedBook->id,
+            'device_id' => 'device-1',
+            'position_ms' => 3600000,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'last_event_timestamp_ms' => now()->valueOf(),
+            'last_event_id' => 'event-real',
+        ]);
+
+        $service = new BookCompletionService();
+        $dates = $service->getCompletedBookDatesForUser($user->id);
+
+        $this->assertFalse($dates->has($barelyStartedBook->id));
+        $this->assertTrue($dates->has($genuinelyFinishedBook->id));
     }
 
     public function testGetInProgressBookIdsForUserIgnoresPhantomBookIds(): void
