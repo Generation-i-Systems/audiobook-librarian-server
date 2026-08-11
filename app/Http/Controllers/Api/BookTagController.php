@@ -63,4 +63,17 @@ class BookTagController extends Controller
 
         return response()->json(['tags' => $this->bookTagService->popularTags($limit)]);
     }
+
+    /**
+     * GET /tags/all — every tag visible to the caller (system tags plus the caller's
+     * own tags and tags from groups they belong to), deduplicated and sorted, each
+     * with the number of distinct books carrying that tag.
+     */
+    public function all(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return response()->json(['tags' => $this->bookTagService->visibleTags($user)]);
+    }
 }

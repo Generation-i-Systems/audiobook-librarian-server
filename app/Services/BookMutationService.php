@@ -10,6 +10,7 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
+use Illuminate\Support\Facades\DB;
 
 class BookMutationService
 {
@@ -237,7 +238,7 @@ class BookMutationService
                 ];
             }
 
-            $book->series()->sync($seriesSyncData);
+            $this->syncSeriesRelations($book, $seriesSyncData);
 
             return;
         }
@@ -248,7 +249,7 @@ class BookMutationService
 
         if ($data['series_name']) {
             $series = Series::firstOrCreate(['name' => $data['series_name']]);
-            $book->series()->sync([
+            $this->syncSeriesRelations($book, [
                 $series->id => [
                     'series_number' => null,
                 ],
@@ -258,6 +259,45 @@ class BookMutationService
         }
 
         $book->series()->detach();
+    }
+
+    /**
+     * @param  array<int, array{series_number: mixed}>  $seriesSyncData
+     */
+    private function syncSeriesRelations(Book $book, array $seriesSyncData): void
+    {
+        if ($seriesSyncData === []) {
+            $book->series()->detach();
+
+            return;
+        }
+
+        $timestamp = now();
+        $seriesIds = array_keys($seriesSyncData);
+
+        DB::transaction(function () use ($book, $seriesSyncData, $seriesIds, $timestamp): void {
+            DB::table('book_series')
+                ->where('book_id', $book->id)
+                ->whereNotIn('series_id', $seriesIds)
+                ->delete();
+
+            DB::table('book_series')->upsert(
+                array_map(
+                    fn (int $seriesId) => [
+                        'book_id' => $book->id,
+                        'series_id' => $seriesId,
+                        'series_number' => $seriesSyncData[$seriesId]['series_number'],
+                        'created_at' => $timestamp,
+                        'updated_at' => $timestamp,
+                    ],
+                    $seriesIds,
+                ),
+                ['book_id', 'series_id'],
+                ['series_number', 'updated_at'],
+            );
+
+            $book->touch();
+        });
     }
 
     private function syncChapters(Book $book, array $data, bool $replaceExisting): void

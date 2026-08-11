@@ -9,9 +9,11 @@ use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
+use App\Models\Series;
 use App\Services\BookMutationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -107,6 +109,29 @@ class BookMutationServiceTest extends TestCase
         $book->load('authors');
 
         $this->assertSame(['First Author', 'Second Author'], $book->authors->pluck('name')->sort()->values()->all());
+    }
+
+    #[Test]
+    public function updateBookUpdatesAnAlreadyAttachedSeriesWithoutCreatingAnotherPivotRow(): void
+    {
+        $book = Book::factory()->create();
+        $series = Series::factory()->create(['name' => 'Existing Series']);
+        $book->series()->attach($series->id, ['series_number' => '1']);
+
+        (new BookMutationService())->updateBook((string) $book->id, [
+            'series' => [
+                ['seriesName' => $series->name, 'number' => '2'],
+            ],
+        ]);
+
+        $this->assertSame(1, DB::table('book_series')
+            ->where('book_id', $book->id)
+            ->where('series_id', $series->id)
+            ->count());
+        $this->assertSame('2', DB::table('book_series')
+            ->where('book_id', $book->id)
+            ->where('series_id', $series->id)
+            ->value('series_number'));
     }
 
     private function jobTargetsBook(EmbedBookJob $job, int $bookId): bool

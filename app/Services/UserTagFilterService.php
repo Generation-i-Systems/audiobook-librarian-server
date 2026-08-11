@@ -91,6 +91,9 @@ class UserTagFilterService
      * - "fantasy,-sci-fi"
      * - ["fantasy", "-sci-fi"]
      * - "tag1,tag2,-tag3"
+     * - [null, ["fantasy", "-sci-fi"]] (the shape produced by
+     *   array_filter([$request->input('tag'), $request->input('tags')]) when the client
+     *   sends repeated ?tags[]= parameters)
      *
      * @param mixed $rawTags
      * @return array{required: string[], banned: string[]}
@@ -105,25 +108,25 @@ class UserTagFilterService
         }
 
         $items = [];
-        if (is_array($rawTags)) {
-            foreach ($rawTags as $item) {
-                if (is_string($item)) {
-                    foreach (explode(',', $item) as $part) {
-                        $trimmed = trim($part);
-                        if ($trimmed !== '') {
-                            $items[] = $trimmed;
-                        }
-                    }
+        $collect = function (mixed $value) use (&$collect, &$items): void {
+            if (is_array($value)) {
+                foreach ($value as $nested) {
+                    $collect($nested);
                 }
+
+                return;
             }
-        } elseif (is_string($rawTags)) {
-            foreach (explode(',', $rawTags) as $part) {
+            if (!is_string($value)) {
+                return;
+            }
+            foreach (explode(',', $value) as $part) {
                 $trimmed = trim($part);
                 if ($trimmed !== '') {
                     $items[] = $trimmed;
                 }
             }
-        }
+        };
+        $collect($rawTags);
 
         foreach ($items as $item) {
             if (str_starts_with($item, '-')) {

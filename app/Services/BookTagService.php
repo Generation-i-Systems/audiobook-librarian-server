@@ -124,6 +124,70 @@ class BookTagService
     }
 
     /**
+     * All system-scope tag names, deduplicated and sorted alphabetically.
+     *
+     * @return Collection<int, string>
+     */
+    public function allTags(): Collection
+    {
+        /** @var array<string, string> $seen */
+        $seen = [];
+        BookTag::query()->where('scope', 'system')->pluck('tags')->each(function (array $tags) use (&$seen): void {
+            foreach ($tags as $tag) {
+                $key = mb_strtolower($tag);
+                $seen[$key] ??= $tag;
+            }
+        });
+
+        return collect($seen)->sort()->values();
+    }
+
+    /**
+     * All tag names visible to the caller — system tags plus the caller's own
+     * tags and tags from any group they belong to — deduplicated and sorted,
+     * each with the number of distinct books carrying that tag.
+     *
+     * Unlike allTags()/popularTags() (system-scope only, because they feed
+     * shared suggestion lists), this is caller-scoped: only the caller's own
+     * scopes are aggregated, so no other user's tags can leak through.
+     *
+     * @return Collection<int, array{name: string, count: int}>
+     */
+    public function visibleTags(User $user): Collection
+    {
+        $groupIds = $user->groups()->pluck('groups.id');
+
+        $ownerKeys = array_merge(
+            ['system'],
+            $groupIds->map(fn (int $id): string => "group:{$id}")->all(),
+            ["user:{$user->id}"],
+        );
+
+        /** @var array<string, string> $labels */
+        $labels = [];
+        /** @var array<string, array<int, true>> $bookIdsByTag */
+        $bookIdsByTag = [];
+        BookTag::query()
+            ->whereIn('owner_key', $ownerKeys)
+            ->get(['book_id', 'tags'])
+            ->each(function (BookTag $bookTag) use (&$labels, &$bookIdsByTag): void {
+                foreach ($bookTag->tags as $tag) {
+                    $key = mb_strtolower($tag);
+                    $labels[$key] ??= $tag;
+                    $bookIdsByTag[$key][$bookTag->book_id] = true;
+                }
+            });
+
+        $tags = [];
+        foreach ($labels as $key => $label) {
+            $tags[] = ['name' => $label, 'count' => count($bookIdsByTag[$key] ?? [])];
+        }
+        usort($tags, fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+
+        return collect($tags);
+    }
+
+    /**
      * The caller's own tags plus tags for any group they belong to, grouped by tag
      * name with the books carrying each, for the "My Tags" user page.
      *

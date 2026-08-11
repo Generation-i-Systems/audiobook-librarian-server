@@ -25,6 +25,28 @@ class UserTagFilterServiceTest extends TestCase
         $this->service = new UserTagFilterService();
     }
 
+    public function testParseTagSpecsFlattensNestedArrayFromRepeatedTagsInput(): void
+    {
+        // Mirrors array_filter([$request->input('tag'), $request->input('tags')])
+        // when the client sends repeated ?tags[]= parameters.
+        $rawTags = [null, ['cozy', '-spoilers']];
+
+        $parsed = UserTagFilterService::parseTagSpecs($rawTags);
+
+        $this->assertSame(['cozy'], $parsed['required']);
+        $this->assertSame(['spoilers'], $parsed['banned']);
+    }
+
+    public function testParseTagSpecsFlattensCommaSeparatedStringsInsideNestedArray(): void
+    {
+        $rawTags = ['fantasy,-sci-fi', ['litrpg', '-romance']];
+
+        $parsed = UserTagFilterService::parseTagSpecs($rawTags);
+
+        $this->assertSame(['fantasy', 'litrpg'], $parsed['required']);
+        $this->assertSame(['sci-fi', 'romance'], $parsed['banned']);
+    }
+
     public function testSetFilterCreatesARequireRow(): void
     {
         $user = User::factory()->create();

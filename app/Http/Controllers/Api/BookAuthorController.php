@@ -443,7 +443,7 @@ class BookAuthorController extends Controller
     public function booksByAuthor($authorId, Request $request)
     {
         $documentStore = $this->documentStoreService;
-        $perPage = $request->input('per_page', 100);
+        $perPage = (int) $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $author = $documentStore->getAuthor($authorId);
@@ -518,7 +518,7 @@ class BookAuthorController extends Controller
      */
     public function booksByAuthorAndGenre($authorId, $genreId, Request $request)
     {
-        $perPage = $request->input('per_page', 100);
+        $perPage = (int) $request->input('per_page', 100);
         $page = max(1, (int) $request->input('page', 1));
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);

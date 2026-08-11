@@ -171,6 +171,100 @@ class BookTagControllerTest extends ApiTestCase
         $response->assertJsonMissing(['tags' => ['my-secret-tag']]);
     }
 
+    public function test_all_tags_includes_system_user_and_group_tags_visible_to_the_caller(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $group = Group::query()->create(['name' => 'Book Club']);
+        $group->members()->attach($this->user->id);
+        $book = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+
+        // System tag (admin-scoped).
+        Sanctum::actingAs($admin);
+        $this->putJson('/api/v1/books/' . $book->id . '/tags', [
+            'scope' => 'system',
+            'tags' => ['staff-pick'],
+        ])->assertOk();
+
+        // Group tag from a group the caller belongs to.
+        Sanctum::actingAs($this->user);
+        $this->putJson('/api/v1/books/' . $book->id . '/tags', [
+            'scope' => 'group',
+            'group_id' => $group->id,
+            'tags' => ['book-club-pick'],
+        ])->assertOk();
+
+        // The caller's own private user tag.
+        $this->putJson('/api/v1/books/' . $book->id . '/tags', [
+            'scope' => 'user',
+            'tags' => ['Queue'],
+        ])->assertOk();
+
+        $response = $this->getJson('/api/v1/tags/all');
+
+        $response->assertOk();
+        $response->assertJson([
+            'tags' => [
+                ['name' => 'Queue', 'count' => 1],
+                ['name' => 'book-club-pick', 'count' => 1],
+                ['name' => 'staff-pick', 'count' => 1],
+            ],
+        ]);
+    }
+
+    public function test_all_tags_counts_distinct_books_per_tag_across_scopes(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $group = Group::query()->create(['name' => 'Book Club']);
+        $group->members()->attach($this->user->id);
+        $bookA = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+        $bookB = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+
+        // The same tag on two different books, via different scopes — must count as 2.
+        Sanctum::actingAs($admin);
+        $this->putJson('/api/v1/books/' . $bookA->id . '/tags', [
+            'scope' => 'system',
+            'tags' => ['spicy'],
+        ])->assertOk();
+
+        Sanctum::actingAs($this->user);
+        $this->putJson('/api/v1/books/' . $bookB->id . '/tags', [
+            'scope' => 'user',
+            'tags' => ['spicy'],
+        ])->assertOk();
+
+        // The same tag twice on the same book (system + user scope) must still count as 1.
+        Sanctum::actingAs($admin);
+        $this->putJson('/api/v1/books/' . $bookB->id . '/tags', [
+            'scope' => 'system',
+            'tags' => ['spicy'],
+        ])->assertOk();
+
+        Sanctum::actingAs($this->user);
+        $response = $this->getJson('/api/v1/tags/all');
+
+        $response->assertOk();
+        $response->assertJson(['tags' => [['name' => 'spicy', 'count' => 2]]]);
+    }
+
+    public function test_all_tags_does_not_leak_another_users_private_tags(): void
+    {
+        $otherUser = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+
+        Sanctum::actingAs($otherUser);
+        $this->putJson('/api/v1/books/' . $book->id . '/tags', [
+            'scope' => 'user',
+            'tags' => ['other-users-secret'],
+        ])->assertOk();
+
+        Sanctum::actingAs($this->user);
+        $response = $this->getJson('/api/v1/tags/all');
+
+        $response->assertOk();
+        $response->assertJson(['tags' => []]);
+        $response->assertJsonMissing(['tags' => ['other-users-secret']]);
+    }
+
     public function test_it_filters_books_by_tag_for_the_authenticated_user(): void
     {
         $matchingBook = Book::factory()->create([

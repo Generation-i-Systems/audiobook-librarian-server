@@ -338,7 +338,7 @@ class BookSeriesGenreController extends Controller
     public function booksBySeries($seriesId, Request $request)
     {
         $documentStore = $this->documentStoreService;
-        $perPage = $request->input('per_page', 100);
+        $perPage = (int) $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $series = $documentStore->getSeries($seriesId);
@@ -497,7 +497,7 @@ class BookSeriesGenreController extends Controller
      */
     public function authorsByGenre(Request $request, $genreId)
     {
-        $perPage = $request->input('per_page', 20);
+        $perPage = (int) $request->input('per_page', 20);
         $search = $request->input('search');
         $genre = $this->documentStoreService->getGenre($genreId);
         if (!$genre) {

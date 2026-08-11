@@ -91,4 +91,18 @@ class SeriesBooksTest extends ApiTestCase
         $this->assertContains($actionBook->id, $ids);
         $this->assertNotContains($horrorBook->id, $ids);
     }
+
+    public function testBooksBySeriesAcceptsPerPageAsQueryStringString(): void
+    {
+        $series = Series::factory()->create();
+        $book = Book::factory()->create(['needs_review' => false]);
+        $series->books()->attach($book->id, ['series_number' => '1']);
+
+        // The client sends ?page=1&per_page=100, so per_page arrives as a string.
+        $response = $this->getJson("/api/v1/series/{$series->id}/books?page=1&per_page=100");
+
+        $response->assertOk();
+        $this->assertSame(100, $response->json('meta.per_page'));
+        $this->assertSame($book->id, $response->json('data.0.id'));
+    }
 }

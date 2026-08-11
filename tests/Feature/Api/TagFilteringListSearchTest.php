@@ -125,6 +125,81 @@ class TagFilteringListSearchTest extends ApiTestCase
         $this->assertNotContains($series2->id, $seriesBanIds);
     }
 
+    public function test_series_list_supports_repeated_tags_array_parameters(): void
+    {
+        $this->withoutExceptionHandling();
+        $series1 = Series::factory()->create(['name' => 'Magic Saga']);
+        $series2 = Series::factory()->create(['name' => 'Spooky Tales']);
+
+        $book1 = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+        $book2 = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+
+        $series1->books()->attach($book1->id);
+        $series2->books()->attach($book2->id);
+
+        BookTag::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book1->id,
+            'scope' => 'user',
+            'owner_key' => 'user:' . $this->user->id,
+            'tags' => ['magic'],
+        ]);
+
+        BookTag::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book2->id,
+            'scope' => 'user',
+            'owner_key' => 'user:' . $this->user->id,
+            'tags' => ['magic', 'scary'],
+        ]);
+
+        // Client sends repeated ?tags[]= parameters; require 'magic', ban 'scary'.
+        $response = $this->getJson('/api/v1/series?tags[]=magic&tags[]=-scary');
+        $response->assertStatus(200);
+        $seriesIds = array_column($response->json('series'), 'id');
+        $this->assertContains($series1->id, $seriesIds);
+        $this->assertNotContains($series2->id, $seriesIds);
+    }
+
+    public function test_genre_series_supports_repeated_tags_array_parameters(): void
+    {
+        $this->withoutExceptionHandling();
+        $genre = Genre::factory()->create(['name' => 'Adventure']);
+        $series1 = Series::factory()->create(['name' => 'Quest Chronicles']);
+        $series2 = Series::factory()->create(['name' => 'Dark Horizons']);
+
+        $book1 = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+        $book2 = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+
+        $genre->books()->attach($book1->id);
+        $genre->books()->attach($book2->id);
+        $series1->books()->attach($book1->id);
+        $series2->books()->attach($book2->id);
+
+        BookTag::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book1->id,
+            'scope' => 'user',
+            'owner_key' => 'user:' . $this->user->id,
+            'tags' => ['heroic'],
+        ]);
+
+        BookTag::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book2->id,
+            'scope' => 'user',
+            'owner_key' => 'user:' . $this->user->id,
+            'tags' => ['gory'],
+        ]);
+
+        // Require 'heroic' using the repeated tags[] array form the client sends.
+        $response = $this->getJson('/api/v1/genres/' . $genre->id . '/series?tags[]=heroic');
+        $response->assertStatus(200);
+        $seriesIds = array_column($response->json('data'), 'id');
+        $this->assertContains($series1->id, $seriesIds);
+        $this->assertNotContains($series2->id, $seriesIds);
+    }
+
     public function test_authors_list_supports_require_and_ban_tag_filters(): void
     {
         $author1 = Author::factory()->create(['name' => 'Author One']);
