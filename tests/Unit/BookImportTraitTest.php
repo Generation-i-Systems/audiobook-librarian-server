@@ -106,7 +106,7 @@ class BookImportTraitTest extends TestCase
             $this->assertEquals(['Fiction'], $book['genre']);
         }
         $this->assertEquals(['Author Name'], $book['author']);
-        $this->assertEquals(['My Series' => '01.5'], $book['series']);
+        $this->assertEquals(['My Series' => '1.5'], $book['series']);
         $this->assertEquals('Book [01.5] Title', $book['title']);
     }
 
