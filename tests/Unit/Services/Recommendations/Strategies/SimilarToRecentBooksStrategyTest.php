@@ -106,4 +106,63 @@ class SimilarToRecentBooksStrategyTest extends TestCase
         $this->assertCount(1, $shelves);
         $this->assertSame([['book_id' => $candidate->id, 'score' => null]], $shelves[0]->books);
     }
+
+    public function testOrdersShelvesByMostRecentFinishFirst(): void
+    {
+        $user = User::factory()->create();
+        $genre = Genre::factory()->create();
+
+        $oldest = Book::factory()->create(['title' => 'Finished First']);
+        $oldest->genres()->attach($genre->id);
+        UserBookStatus::factory()->create([
+            'user_id' => $user->id,
+            'book_id' => $oldest->id,
+            'status' => 'completed',
+            'finished_at' => now()->subDays(3),
+        ]);
+
+        $newest = Book::factory()->create(['title' => 'Finished Most Recently']);
+        $newest->genres()->attach($genre->id);
+        UserBookStatus::factory()->create([
+            'user_id' => $user->id,
+            'book_id' => $newest->id,
+            'status' => 'completed',
+            'finished_at' => now(),
+        ]);
+
+        $middle = Book::factory()->create(['title' => 'Finished In Between']);
+        $middle->genres()->attach($genre->id);
+        UserBookStatus::factory()->create([
+            'user_id' => $user->id,
+            'book_id' => $middle->id,
+            'status' => 'completed',
+            'finished_at' => now()->subDay(),
+        ]);
+
+        $candidate = Book::factory()->create();
+        $candidate->genres()->attach($genre->id);
+
+        $pipeline = Mockery::mock(EmbeddingPipeline::class);
+        $pipeline->shouldReceive('isAvailable')->andReturn(false);
+
+        $aiProvider = Mockery::mock(\App\Contracts\AI\AIProviderInterface::class);
+        $aiProvider->shouldReceive('completeStructured')->andReturn(AIResponse::failure('no key configured'));
+
+        $strategy = Mockery::mock(
+            SimilarToRecentBooksStrategy::class,
+            [$pipeline, new BookEmbeddingTextBuilder()]
+        )->makePartial()->shouldAllowMockingProtectedMethods();
+        $strategy->shouldReceive('aiProvider')->andReturn($aiProvider);
+
+        $shelves = $strategy->generate($user);
+
+        $this->assertSame(
+            [
+                'Because you finished Finished Most Recently',
+                'Because you finished Finished In Between',
+                'Because you finished Finished First',
+            ],
+            array_map(fn ($shelf) => $shelf->title, $shelves),
+        );
+    }
 }

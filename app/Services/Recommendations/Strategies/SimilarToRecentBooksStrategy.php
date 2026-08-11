@@ -34,11 +34,22 @@ class SimilarToRecentBooksStrategy extends AbstractSimilarityStrategy
         $completedDates = app(BookCompletionService::class)->getCompletedBookDatesForUser($user->id);
         $recentBookIds = $completedDates->sortDesc()->keys()->take(self::SEED_COUNT)->all();
 
-        $seeds = Book::query()
-            ->whereIn('id', $recentBookIds ?: [0])
+        if (empty($recentBookIds)) {
+            return [];
+        }
+
+        // Reorder by $recentBookIds (most recently finished first) rather than sortBy()+
+        // array_search(), which silently misorders if id types ever mismatch (strict
+        // comparison failing to match falls back to position 0).
+        $booksById = Book::query()
+            ->whereIn('id', $recentBookIds)
             ->with(['authors', 'genres', 'series'])
             ->get()
-            ->sortBy(fn (Book $book): int => array_search($book->id, $recentBookIds, true))
+            ->keyBy('id');
+
+        $seeds = collect($recentBookIds)
+            ->map(fn (int $id) => $booksById->get($id))
+            ->filter()
             ->values();
 
         if ($seeds->isEmpty()) {
