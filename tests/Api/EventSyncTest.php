@@ -314,4 +314,135 @@ class EventSyncTest extends TestCase
 
         Queue::assertNotPushed(RecomputeRecommendationsJob::class);
     }
+
+    public function testSyncResolvesBookIdFromTrailingIdSuffixInBookPath(): void
+    {
+        // Regression: the client's local library path sometimes carries the real server book
+        // id as a trailing "_<id>" suffix on the leaf folder (its own local disambiguation),
+        // even when bookId itself is a stale/local-only id that doesn't exist on the server.
+        // Real data: "Jeffery H. Haskell/Grimm's War/09 The Longest Battle_13667" for a book
+        // whose actual directory_path is ".../09 The Longest Battle" (no suffix) — the old
+        // basename LIKE match failed on the suffix and the event was recorded under a phantom
+        // book_id, hiding real completed listening from every downstream feature.
+        $user = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create([
+            'directory_path' => "Jeffery H. Haskell/Grimm's War/09 The Longest Battle",
+        ]);
+        $this->actingAs($user, 'api');
+
+        $payload = [
+            'events' => [
+                [
+                    'id' => 'test-event-suffix',
+                    'bookId' => 999999999,
+                    'bookPath' => "Jeffery H. Haskell/Grimm's War/09 The Longest Battle_{$book->id}",
+                    'eventType' => 'BOOK_FINISH',
+                    'timestampMs' => 1707945600000,
+                    'positionMs' => 1234567,
+                    'metadata' => [],
+                    'deviceId' => 'test-device',
+                    'timezone' => 'UTC',
+                    'createdAt' => 1707945600000,
+                ],
+            ],
+            'lastSyncTimestamp' => 0,
+        ];
+
+        $this->postJson('/api/v1/sync/events', $payload, [
+            'X-Device-ID' => 'test-device',
+            'X-Acting-As-Test' => 'true',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('listening_events', [
+            'id' => 'test-event-suffix',
+            'book_id' => $book->id,
+        ]);
+        $this->assertDatabaseMissing('listening_events', [
+            'id' => 'test-event-suffix',
+            'book_id' => 999999999,
+        ]);
+    }
+
+    public function testSyncFallsBackToDirectoryPathMatchWhenBookPathHasNoIdSuffix(): void
+    {
+        $user = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create([
+            'directory_path' => 'Some Author/Some Series/01 Some Book Title',
+        ]);
+        $this->actingAs($user, 'api');
+
+        $payload = [
+            'events' => [
+                [
+                    'id' => 'test-event-fallback',
+                    'bookId' => 999999998,
+                    'bookPath' => 'Some Author/Some Series/01 Some Book Title',
+                    'eventType' => 'SESSION_END',
+                    'timestampMs' => 1707945600000,
+                    'positionMs' => 1234567,
+                    'metadata' => [],
+                    'deviceId' => 'test-device',
+                    'timezone' => 'UTC',
+                    'createdAt' => 1707945600000,
+                ],
+            ],
+            'lastSyncTimestamp' => 0,
+        ];
+
+        $this->postJson('/api/v1/sync/events', $payload, [
+            'X-Device-ID' => 'test-device',
+            'X-Acting-As-Test' => 'true',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('listening_events', [
+            'id' => 'test-event-fallback',
+            'book_id' => $book->id,
+        ]);
+    }
+
+    public function testSyncResolvesBookIdByTitleAndAuthorWhenPathDoesNotMatchAnything(): void
+    {
+        // Files that never went through our download manager (imported from elsewhere, or
+        // synced against a title/author-keyed backend) may have a local path unrelated to the
+        // server's directory structure — title+author is the last resort.
+        $user = User::factory()->create(['role' => 'library-user']);
+        $author = \App\Models\Author::factory()->create(['name' => 'Some Author']);
+        $book = Book::factory()->create([
+            'title' => 'Some Unique Title',
+            'directory_path' => 'Completely/Unrelated/Path',
+        ]);
+        $book->authors()->attach($author->id);
+        $this->actingAs($user, 'api');
+
+        $payload = [
+            'events' => [
+                [
+                    'id' => 'test-event-title-author',
+                    'bookId' => 999999997,
+                    'bookPath' => '/storage/emulated/0/Audiobooks/Some Unique Title',
+                    'eventType' => 'SESSION_END',
+                    'timestampMs' => 1707945600000,
+                    'positionMs' => 1234567,
+                    'metadata' => [
+                        'fallbackTitle' => 'Some Unique Title',
+                        'fallbackAuthor' => 'Some Author',
+                    ],
+                    'deviceId' => 'test-device',
+                    'timezone' => 'UTC',
+                    'createdAt' => 1707945600000,
+                ],
+            ],
+            'lastSyncTimestamp' => 0,
+        ];
+
+        $this->postJson('/api/v1/sync/events', $payload, [
+            'X-Device-ID' => 'test-device',
+            'X-Acting-As-Test' => 'true',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('listening_events', [
+            'id' => 'test-event-title-author',
+            'book_id' => $book->id,
+        ]);
+    }
 }

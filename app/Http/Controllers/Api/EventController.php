@@ -6,9 +6,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\RecomputeRecommendationsJob;
-use App\Models\Book;
 use App\Models\ListeningEvent;
 use App\Services\BadgeService;
+use App\Services\BookIdResolver;
 use App\Services\PositionMaterializer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,6 +19,7 @@ class EventController extends Controller
 {
     public function __construct(
         private readonly PositionMaterializer $positionMaterializer,
+        private readonly BookIdResolver $bookIdResolver,
     ) {
     }
 
@@ -77,16 +78,13 @@ class EventController extends Controller
                     continue;
                 }
 
-                $resolvedBookId = $eventData['bookId'];
-                if (! Book::where('id', $resolvedBookId)->exists()) {
-                    $bookPath = $eventData['bookPath'] ?? null;
-                    if ($bookPath) {
-                        $book = Book::where('directory_path', 'like', '%' . basename($bookPath) . '%')->first();
-                        if ($book) {
-                            $resolvedBookId = $book->id;
-                        }
-                    }
-                }
+                $metadata = $eventData['metadata'] ?? [];
+                $resolvedBookId = $this->bookIdResolver->resolve(
+                    $eventData['bookId'],
+                    $eventData['bookPath'] ?? null,
+                    $metadata['fallbackTitle'] ?? null,
+                    $metadata['fallbackAuthor'] ?? null,
+                ) ?? $eventData['bookId'];
 
                 ListeningEvent::create([
                     'id'                  => $eventData['id'],
