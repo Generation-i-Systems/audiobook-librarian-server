@@ -7509,6 +7509,41 @@
                 }
             }
         },
+        "/tags/all": {
+            "get": {
+                "tags": ["Books"],
+                "summary": "List all tags visible to the authenticated user",
+                "description": "Returns deduplicated system, personal, and group tags visible to the authenticated user, with their distinct-book usage counts.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Visible tags retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "tags": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
         "/books/{book}/external-reads": {
             "get": {
                 "tags": ["External Reads"],

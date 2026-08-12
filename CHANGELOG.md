@@ -46,6 +46,7 @@
 
 ### Fixed
 
+- Stabilized API tests by giving completed-position fixtures an explicit matching duration and accepting whole-number JSON percentages as numeric. Documented the existing `GET /tags/all` endpoint in OpenAPI so the route-coverage gate passes.
 - Saving tags from an admin book-edit page no longer reloads the page and discards unsaved cover or metadata edits.
 - Tag text entered immediately before Save Tags is now included on the first click, and Save Changes persists tag edits even when its separate tag button was not used.
 - Saving a book after tag edits no longer allows the held initial submit to reach directory-conflict handlers and trigger a competing duplicate update.

@@ -106,7 +106,7 @@ class StatisticsStreakTest extends ApiTestCase
         // Regression test: the modern client finish path (BOOK_FINISH -> PositionMaterializer)
         // writes to book_positions, not book_progress/user_book_status. The overview endpoint
         // must count these or real finishes go missing from the user's stats.
-        $book = Book::factory()->create();
+        $book = Book::factory()->create(['duration' => 7_200]);
 
         BookPosition::create([
             'user_id'                 => $this->user->id,

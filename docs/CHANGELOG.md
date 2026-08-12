@@ -4,6 +4,7 @@
 
 ### Added
 
+- Documented the existing `GET /tags/all` endpoint in `openapi.json`.
 - Documented per-user book tag endpoints in `openapi.json`
 - Documented tag filtering support on book list and search endpoints
 

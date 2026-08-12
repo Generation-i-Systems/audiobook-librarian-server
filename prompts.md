@@ -14,6 +14,10 @@ Sass emits deprecation warnings for application and Bootstrap `@import` usage. P
 
 ## 2026-08-10
 
+watch the github actions and fix any changes and recommit and repush after fixing anything that needs fixing
+
+---
+
 adding a cover image from the web book edit silently fails
 
 editing https://books.ablibrarian.com/admin/books/14469/edit?search=cannon&sort=recent_desc

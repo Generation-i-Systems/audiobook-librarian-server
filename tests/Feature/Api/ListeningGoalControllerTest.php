@@ -337,7 +337,7 @@ class ListeningGoalControllerTest extends TestCase
             'status' => 'completed', 'finished_at' => now(), 'order' => 1,
         ]);
 
-        $positionBook = Book::factory()->create();
+        $positionBook = Book::factory()->create(['duration' => 7_200]);
         BookPosition::create([
             'user_id' => $user->id,
             'book_id' => $positionBook->id,
@@ -474,7 +474,7 @@ class ListeningGoalControllerTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('goals.0.start_date', now()->startOfDay()->toDateString())
             ->assertJsonPath('goals.0.end_date', now()->endOfDay()->toDateString());
-        $this->assertIsFloat($response->json('goals.0.elapsed_percent'));
+        $this->assertIsNumeric($response->json('goals.0.elapsed_percent'));
     }
 
     public function test_breakdown_returns_book_entries_for_books_finished_metric(): void
