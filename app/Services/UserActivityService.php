@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Badge;
 use App\Models\Book;
+use App\Models\BookPosition;
 use App\Models\ListeningEvent;
 use App\Models\User;
 use App\Models\UserBadge;
@@ -52,37 +53,91 @@ class UserActivityService
                 fn ($badges) => $this->mapCategoryBadges($badges, $earnedBadgeIds, $user)
             );
 
+            // Events not carrying a real playback position (downloads, app-open, etc.) must
+            // never be the sole basis for "In Progress" — a book that's only ever had a
+            // DOWNLOAD_COMPLETE event was never actually started. BOOK_MARK_COMPLETE isn't in
+            // PositionMaterializer's list (it doesn't carry a position to materialize) but is
+            // still a genuine engagement signal here.
+            $positionCarryingEventTypes = [...PositionMaterializer::POSITION_CARRYING_EVENTS, 'BOOK_MARK_COMPLETE'];
+
             $listeningEvents = ListeningEvent::where('user_id', $userId)
                 ->with('book')
                 ->orderBy('timestamp_ms', 'desc')
                 ->get()
                 ->groupBy('book_id');
 
-            $derivedProgress = $listeningEvents->map(function ($events) {
+            $positionsByBookId = BookPosition::where('user_id', $userId)
+                ->whereIn('book_id', $listeningEvents->keys())
+                ->get()
+                ->groupBy('book_id')
+                ->map(fn ($rows) => $rows->sortByDesc('last_event_timestamp_ms')->first());
+
+            $derivedProgress = $listeningEvents->map(function ($events, $bookId) use ($positionsByBookId, $positionCarryingEventTypes) {
                 /** @var ListeningEvent $latest */
                 $latest = $events->first();
                 /** @var Book|null $book */
                 $book = $latest->book;
-
-                $percentage = 0;
                 $metadata = $latest->metadata ?? [];
+                $title = $book instanceof Book ? $book->title : ($metadata['fallbackTitle'] ?? 'Unknown Book');
 
-                if (isset($metadata['progress_percentage'])) {
-                    $percentage = $metadata['progress_percentage'];
-                } elseif ($book instanceof Book && $book->duration) {
-                    $percentage = ($latest->position_ms / ($book->duration * 1000)) * 100;
+                /** @var BookPosition|null $position */
+                $position = $positionsByBookId->get($bookId);
+
+                // Only trust the materialized position (deduplicated across devices, only ever
+                // updated by real playback/completion events) when book_id resolves to a real,
+                // known-duration book — a raw "latest event" can be a stale/unrelated event
+                // (e.g. a chapter-index reset fired moments after finishing) that misrepresents
+                // current progress, and a phantom book_id's completed flag can't be sanity-
+                // checked against a duration at all, so it isn't trustworthy either.
+                if ($position !== null && $book instanceof Book && $book->duration) {
+                    $percentage = $this->clampPercentage(($position->position_ms / ($book->duration * 1000)) * 100);
+                    // A position far short of the book's duration can't be a genuine finish —
+                    // e.g. a stray/erroneous BOOK_FINISH event (see BookCompletionService).
+                    $isPlausibleCompletion = $position->position_ms >= $book->duration * 1000 * BookCompletionService::MIN_COMPLETION_FRACTION;
+
+                    return [
+                        'book_id' => $bookId,
+                        'book_title' => $title,
+                        'percentage' => $percentage,
+                        'last_listened_at' => Carbon::createFromTimestampMs((int) $position->last_event_timestamp_ms),
+                        'status' => ($position->completed && $isPlausibleCompletion) ? 'Finished' : 'In Progress',
+                    ];
                 }
 
-                $isCompleted = $latest->event_type === 'BOOK_FINISH'
-                    || $latest->event_type === 'BOOK_MARK_COMPLETE'
-                    || $percentage >= 95;
+                $hasRealPlaybackEvent = $events->contains(fn (ListeningEvent $e) => in_array($e->event_type, $positionCarryingEventTypes, true));
+                if (!$hasRealPlaybackEvent) {
+                    return [
+                        'book_id' => $bookId,
+                        'book_title' => $title,
+                        'percentage' => 0.0,
+                        'last_listened_at' => Carbon::createFromTimestampMs($latest->timestamp_ms),
+                        'status' => 'Downloaded',
+                    ];
+                }
+
+                // A BOOK_FINISH/BOOK_MARK_COMPLETE event elsewhere in the group is a genuine
+                // completion signal even if it isn't the absolute latest event — e.g. a
+                // chapter-index reset firing moments after a finish, which would otherwise
+                // hide the completion behind a stale 0% (this only reaches here when book_id
+                // is a phantom id with no materialized BookPosition to fall back on instead).
+                $finishEvent = $events->first(fn (ListeningEvent $e) => in_array($e->event_type, ['BOOK_FINISH', 'BOOK_MARK_COMPLETE'], true));
+                $eventForStatus = $finishEvent ?? $latest;
+                $statusMetadata = $eventForStatus->metadata ?? [];
+
+                $percentage = isset($statusMetadata['progress_percentage'])
+                    ? $this->clampPercentage((float) $statusMetadata['progress_percentage'])
+                    : (($book instanceof Book && $book->duration)
+                        ? $this->clampPercentage(($eventForStatus->position_ms / ($book->duration * 1000)) * 100)
+                        : 0.0);
+
+                $isCompleted = $finishEvent !== null || $percentage >= 95;
 
                 return [
-                    'book_id' => $latest->book_id,
-                    'book_title' => $book ? $book->title : 'Unknown Book',
-                    'percentage' => (float) $percentage,
+                    'book_id' => $bookId,
+                    'book_title' => $title,
+                    'percentage' => $percentage,
                     'last_listened_at' => Carbon::createFromTimestampMs($latest->timestamp_ms),
-                    'completed' => $isCompleted,
+                    'status' => $isCompleted ? 'Finished' : 'In Progress',
                 ];
             })->values();
 
@@ -90,7 +145,7 @@ class UserActivityService
                 return [
                     'book_id' => $item['book_id'],
                     'book_title' => $item['book_title'],
-                    'status' => $item['completed'] ? 'Finished' : 'In Progress',
+                    'status' => $item['status'],
                     'updated_at' => $item['last_listened_at'],
                 ];
             });
@@ -122,6 +177,11 @@ class UserActivityService
 
             return [];
         }
+    }
+
+    private function clampPercentage(float $percentage): float
+    {
+        return min(100.0, max(0.0, $percentage));
     }
 
     public function getBadgeTips(string $userId): array

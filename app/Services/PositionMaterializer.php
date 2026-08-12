@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Log;
 
 class PositionMaterializer
 {
-    private const POSITION_CARRYING_EVENTS = [
+    /** @var list<string> also referenced by UserActivityService to distinguish real listening
+     * activity from download/app-open-only noise. */
+    public const POSITION_CARRYING_EVENTS = [
         'PLAY_START',
         'PLAY_PAUSE',
         'PLAY_RESUME',

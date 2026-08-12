@@ -25,7 +25,8 @@ class BookCompletionService
     // firing moments after playback starts. Requiring most of the book's duration filters
     // these out without rejecting legitimate completions that stop slightly before the
     // literal end (trailing silence/credits).
-    private const MIN_COMPLETION_FRACTION = 0.9;
+    // Also referenced by UserActivityService for the same sanity check on its admin display.
+    public const MIN_COMPLETION_FRACTION = 0.9;
 
     public function completedProgressQuery(?int $userId, string $deviceId, ?Carbon $startDate = null)
     {

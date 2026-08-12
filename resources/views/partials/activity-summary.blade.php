@@ -132,8 +132,10 @@
                                     </td>
                                     <td>{{ $item['last_listened_at'] ? \Carbon\Carbon::parse($item['last_listened_at'])->diffForHumans() : 'Never' }}</td>
                                     <td>
-                                        @if($item['completed'])
+                                        @if($item['status'] === 'Finished')
                                             <span class="badge bg-success">Completed</span>
+                                        @elseif($item['status'] === 'Downloaded')
+                                            <span class="badge bg-secondary">Downloaded</span>
                                         @else
                                             <span class="badge bg-primary">In Progress</span>
                                         @endif

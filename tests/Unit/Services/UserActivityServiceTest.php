@@ -152,7 +152,7 @@ class UserActivityServiceTest extends TestCase
             'id' => 'evt-1',
             'user_id' => $user->id,
             'book_id' => $book->id,
-            'event_type' => 'BOOK_PROGRESS',
+            'event_type' => 'SESSION_END',
             'timestamp_ms' => now()->getTimestampMs(),
             'position_ms' => 800000,
             'metadata' => ['progress_percentage' => 80],
@@ -174,5 +174,207 @@ class UserActivityServiceTest extends TestCase
         $this->assertSame('Recommender', $activity['recommendations'][0]['sender_name']);
         $this->assertSame('You should read this.', $activity['recommendations'][0]['message']);
         $this->assertCount(1, $activity['tips']);
+    }
+
+    #[Test]
+    public function downloadOnlyBooksAreMarkedDownloadedNotInProgress(): void
+    {
+        // Regression: a book that was only ever downloaded (never played) must not show up
+        // as "In Progress" just because DOWNLOAD_COMPLETE happens to be its latest event.
+        $service = new UserActivityService();
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Never Started', 'duration' => 1000]);
+
+        ListeningEvent::query()->create([
+            'id' => 'evt-download',
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'event_type' => 'DOWNLOAD_COMPLETE',
+            'timestamp_ms' => now()->getTimestampMs(),
+            'position_ms' => 0,
+            'metadata' => [],
+            'device_id' => 'device-1',
+            'timezone' => 'UTC',
+            'sync_status' => 'synced',
+            'created_at' => now()->getTimestampMs(),
+            'synced_at' => now()->getTimestampMs(),
+        ]);
+
+        $activity = $service->getUserActivityData((string) $user->id);
+
+        $this->assertSame('Downloaded', $activity['progress'][0]['status']);
+        $this->assertSame(0.0, $activity['progress'][0]['percentage']);
+    }
+
+    #[Test]
+    public function fallsBackToEventMetadataTitleWhenBookNoLongerResolves(): void
+    {
+        // A phantom book_id (client sent an id that was never matched to a real catalog book)
+        // must not display as "Unknown Book" when the event carries a usable title.
+        $service = new UserActivityService();
+        $user = User::factory()->create();
+
+        ListeningEvent::query()->create([
+            'id' => 'evt-phantom',
+            'user_id' => $user->id,
+            'book_id' => 999999999,
+            'event_type' => 'SESSION_END',
+            'timestamp_ms' => now()->getTimestampMs(),
+            'position_ms' => 1000,
+            'metadata' => ['fallbackTitle' => 'A Book Not In The Catalog'],
+            'device_id' => 'device-1',
+            'timezone' => 'UTC',
+            'sync_status' => 'synced',
+            'created_at' => now()->getTimestampMs(),
+            'synced_at' => now()->getTimestampMs(),
+        ]);
+
+        $activity = $service->getUserActivityData((string) $user->id);
+
+        $this->assertSame('A Book Not In The Catalog', $activity['progress'][0]['book_title']);
+    }
+
+    #[Test]
+    public function usesMaterializedPositionOverAStaleZeroPositionLatestEvent(): void
+    {
+        // Regression: a CHAPTER_CHANGE(position=0) fired moments after BOOK_FINISH (an app-
+        // internal state reset) was previously the "latest event" used for progress, hiding a
+        // real completion behind a stale 0%. The materialized book_positions row must win.
+        $service = new UserActivityService();
+        $user = User::factory()->create();
+        $book = Book::factory()->create(['title' => 'Actually Finished', 'duration' => 1000]);
+
+        ListeningEvent::query()->create([
+            'id' => 'evt-finish',
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'event_type' => 'BOOK_FINISH',
+            'timestamp_ms' => now()->subSecond()->getTimestampMs(),
+            'position_ms' => 1000000,
+            'metadata' => [],
+            'device_id' => 'device-1',
+            'timezone' => 'UTC',
+            'sync_status' => 'synced',
+            'created_at' => now()->subSecond()->getTimestampMs(),
+            'synced_at' => now()->subSecond()->getTimestampMs(),
+        ]);
+
+        ListeningEvent::query()->create([
+            'id' => 'evt-chapter-reset',
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'event_type' => 'CHAPTER_CHANGE',
+            'timestamp_ms' => now()->getTimestampMs(),
+            'position_ms' => 0,
+            'metadata' => [],
+            'device_id' => 'device-1',
+            'timezone' => 'UTC',
+            'sync_status' => 'synced',
+            'created_at' => now()->getTimestampMs(),
+            'synced_at' => now()->getTimestampMs(),
+        ]);
+
+        \App\Models\BookPosition::query()->create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'device_id' => 'device-1',
+            'position_ms' => 1000000,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'last_event_timestamp_ms' => now()->subSecond()->valueOf(),
+            'last_event_id' => 'evt-finish',
+        ]);
+
+        $activity = $service->getUserActivityData((string) $user->id);
+
+        $this->assertSame('Finished', $activity['progress'][0]['status']);
+        $this->assertSame(100.0, $activity['progress'][0]['percentage']);
+    }
+
+    #[Test]
+    public function doesNotTrustAPhantomBookIdsCompletedFlag(): void
+    {
+        // Regression: a phantom book_id (never matched to a real catalog book) had its
+        // completed flag set true after only ~27% of a plausible duration — its title
+        // resolved correctly via fallbackTitle, so it displayed as "Finished" under a
+        // legitimate-looking title despite there being no real book to sanity-check the
+        // completion against.
+        $service = new UserActivityService();
+        $user = User::factory()->create();
+
+        ListeningEvent::query()->create([
+            'id' => 'evt-phantom-complete',
+            'user_id' => $user->id,
+            'book_id' => 999999996,
+            'event_type' => 'SESSION_END',
+            'timestamp_ms' => now()->getTimestampMs(),
+            'position_ms' => 1000000,
+            'metadata' => ['fallbackTitle' => 'Some Phantom Book'],
+            'device_id' => 'device-1',
+            'timezone' => 'UTC',
+            'sync_status' => 'synced',
+            'created_at' => now()->getTimestampMs(),
+            'synced_at' => now()->getTimestampMs(),
+        ]);
+
+        \App\Models\BookPosition::query()->create([
+            'user_id' => $user->id,
+            'book_id' => 999999996,
+            'device_id' => 'device-1',
+            'position_ms' => 1000000,
+            'progress_percentage' => 100,
+            'completed' => true,
+            'last_event_timestamp_ms' => now()->valueOf(),
+            'last_event_id' => 'evt-phantom-complete',
+        ]);
+
+        $activity = $service->getUserActivityData((string) $user->id);
+
+        $this->assertSame('Some Phantom Book', $activity['progress'][0]['book_title']);
+        $this->assertNotSame('Finished', $activity['progress'][0]['status']);
+    }
+
+    #[Test]
+    public function findsBookFinishEventForAPhantomIdEvenWhenItIsNotTheLatestEvent(): void
+    {
+        // Regression: real data — a phantom book_id's genuine BOOK_FINISH event was followed
+        // moments later by a CHAPTER_CHANGE(position=0) app-internal reset, which then became
+        // "the latest event" and hid a real completion behind a stale 0%/"In Progress".
+        $service = new UserActivityService();
+        $user = User::factory()->create();
+
+        ListeningEvent::query()->create([
+            'id' => 'evt-phantom-finish',
+            'user_id' => $user->id,
+            'book_id' => 999999995,
+            'event_type' => 'BOOK_FINISH',
+            'timestamp_ms' => now()->subMinute()->getTimestampMs(),
+            'position_ms' => 40877824,
+            'metadata' => ['fallbackTitle' => 'A Finished Phantom Book'],
+            'device_id' => 'device-1',
+            'timezone' => 'UTC',
+            'sync_status' => 'synced',
+            'created_at' => now()->subMinute()->getTimestampMs(),
+            'synced_at' => now()->subMinute()->getTimestampMs(),
+        ]);
+
+        ListeningEvent::query()->create([
+            'id' => 'evt-phantom-chapter-reset',
+            'user_id' => $user->id,
+            'book_id' => 999999995,
+            'event_type' => 'CHAPTER_CHANGE',
+            'timestamp_ms' => now()->getTimestampMs(),
+            'position_ms' => 0,
+            'metadata' => ['fallbackTitle' => 'A Finished Phantom Book'],
+            'device_id' => 'device-1',
+            'timezone' => 'UTC',
+            'sync_status' => 'synced',
+            'created_at' => now()->getTimestampMs(),
+            'synced_at' => now()->getTimestampMs(),
+        ]);
+
+        $activity = $service->getUserActivityData((string) $user->id);
+
+        $this->assertSame('Finished', $activity['progress'][0]['status']);
     }
 }
