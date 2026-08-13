@@ -36,7 +36,15 @@ class LibraryRepairService
                 LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY => $this->scanNumberedSuffixDirectories(),
                 LibraryRepairIssueType::BOGUS_DIRECTORY => $this->scanBogusDirectories($attemptFixes),
                 LibraryRepairIssueType::INVALID_AUDIO => $this->scanInvalidAudio(),
+                LibraryRepairIssueType::PATH_GENRE_MISMATCH => $this->scanPathGenreMismatches(),
+                LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH => $this->scanTitleDirectoryMismatches(),
             };
+        }
+
+        $reconciled = $this->reconcileOutstandingIssues($selected);
+
+        foreach ($reconciled as $issueType => $resolved) {
+            $results[$issueType]['resolved'] += $resolved;
         }
 
         $this->clearStaleIssues();
@@ -63,6 +71,8 @@ class LibraryRepairService
             LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY->value => $this->rescanNumberedSuffixIssue($issue),
             LibraryRepairIssueType::BOGUS_DIRECTORY->value => $this->rescanBogusDirectoryIssue($issue),
             LibraryRepairIssueType::INVALID_AUDIO->value => $this->rescanInvalidAudioIssue($issue),
+            LibraryRepairIssueType::PATH_GENRE_MISMATCH->value => $this->rescanPathGenreMismatchIssue($issue),
+            LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH->value => $this->rescanTitleDirectoryMismatchIssue($issue),
             default => [
                 'status' => 'error',
                 'message' => 'Unsupported issue type.',
@@ -161,14 +171,23 @@ class LibraryRepairService
             ];
         }
 
-        $relativePath = trim((string) ($issue->directory_path ?? $book->directory_path), '/');
+        $currentPath = trim((string) $book->directory_path, '/');
+        $issuePath = trim((string) $issue->directory_path, '/');
 
-        if ($relativePath === '') {
+        if ($currentPath === '' || ($issuePath !== '' && $issuePath !== $currentPath)) {
+            $this->resolveIssueWithNotes(
+                $issue,
+                'Book directory path changed; the current path is scanned separately.',
+                true
+            );
+
             return [
-                'status' => 'error',
-                'message' => 'Book does not have a directory path assigned.',
+                'status' => 'resolved',
+                'message' => 'Book directory path changed.',
             ];
         }
+
+        $relativePath = $currentPath;
 
         $fullPath = $this->buildFullPath($this->bookPathService->getBookRoot(), $relativePath);
 
@@ -267,7 +286,7 @@ class LibraryRepairService
         ];
     }
 
-    private function rescanNestedAudioIssue(LibraryRepairIssue $issue): array
+    private function rescanNestedAudioIssue(LibraryRepairIssue $issue, bool $attemptFix = true): array
     {
         $book = $issue->book;
 
@@ -279,11 +298,18 @@ class LibraryRepairService
         }
 
         $relativePath = trim((string) $book->directory_path, '/');
+        $issuePath = trim((string) $issue->directory_path, '/');
 
-        if ($relativePath === '') {
+        if ($relativePath === '' || ($issuePath !== '' && $issuePath !== $relativePath)) {
+            $this->resolveIssueWithNotes(
+                $issue,
+                'Book directory path changed; the current path is scanned separately.',
+                true
+            );
+
             return [
-                'status' => 'error',
-                'message' => 'Book directory path missing.',
+                'status' => 'resolved',
+                'message' => 'Book directory path changed.',
             ];
         }
 
@@ -306,9 +332,19 @@ class LibraryRepairService
             ];
         }
 
-        $candidate = $this->findSingleNestedAudioDirectory($fullPath);
+        $nestedAudioDirectories = $this->nestedAudioDirectories($fullPath);
+        $candidate = count($nestedAudioDirectories) === 1 ? $nestedAudioDirectories[0] : null;
 
         if ($candidate === null) {
+            if ($nestedAudioDirectories === []) {
+                $this->resolveIssueWithNotes($issue, 'No nested audio directories remain.', true);
+
+                return [
+                    'status' => 'resolved',
+                    'message' => 'No nested audio directories remain.',
+                ];
+            }
+
             return [
                 'status' => 'pending',
                 'message' => 'Audio remains only in nested folders.',
@@ -317,7 +353,7 @@ class LibraryRepairService
 
         $candidateRelative = trim(Str::after($candidate, $root), '/');
 
-        if (!$this->directoryInUseByOtherBook($candidateRelative, $book->id)) {
+        if ($attemptFix && !$this->directoryInUseByOtherBook($candidateRelative, $book->id)) {
             $originalPath = $book->directory_path;
             $book->directory_path = $candidateRelative;
             $book->directory_exists = true;
@@ -424,6 +460,112 @@ class LibraryRepairService
 
         // Also scan for missing books in the sync directory
         $created += $this->scanMissingDirectoriesInSync();
+
+        return [
+            'created' => $created,
+            'resolved' => $resolved,
+            'autoResolved' => 0,
+        ];
+    }
+
+    private function scanPathGenreMismatches(): array
+    {
+        $created = 0;
+        $resolved = 0;
+
+        /** @var EloquentCollection<Book> $books */
+        $books = Book::query()
+            ->with('genres:id,name')
+            ->whereNotNull('directory_path')
+            ->get();
+
+        foreach ($books as $book) {
+            $pathGenre = $this->pathGenre($book->directory_path);
+
+            if ($pathGenre === null) {
+                continue;
+            }
+
+            $assignedGenres = $book->genres->pluck('name')->all();
+            $matchesPathGenre = collect($assignedGenres)
+                ->contains(fn (string $genre) => mb_strtolower(trim($genre)) === mb_strtolower($pathGenre));
+
+            if ($matchesPathGenre) {
+                $resolved += $this->resolveIssueIfExists(
+                    $book->id,
+                    LibraryRepairIssueType::PATH_GENRE_MISMATCH,
+                    'Path genre is now assigned to the book.'
+                );
+                continue;
+            }
+
+            $issue = $this->createOrUpdateIssue(
+                $book,
+                LibraryRepairIssueType::PATH_GENRE_MISMATCH,
+                $book->directory_path,
+                [
+                    'path_genre' => $pathGenre,
+                    'assigned_genres' => $assignedGenres,
+                ]
+            );
+
+            if ($issue->wasRecentlyCreated || $issue->wasChanged()) {
+                $created++;
+            }
+
+            $this->markBookNeedsReview($book, 'path_genre_mismatch');
+        }
+
+        return [
+            'created' => $created,
+            'resolved' => $resolved,
+            'autoResolved' => 0,
+        ];
+    }
+
+    private function scanTitleDirectoryMismatches(): array
+    {
+        $created = 0;
+        $resolved = 0;
+
+        /** @var EloquentCollection<Book> $books */
+        $books = Book::query()
+            ->whereNotNull('directory_path')
+            ->whereNotNull('title')
+            ->get();
+
+        foreach ($books as $book) {
+            $directoryTitle = $this->directoryTitle($book->directory_path);
+
+            if ($directoryTitle === null) {
+                continue;
+            }
+
+            if ($this->titlesMatch((string) $book->title, $directoryTitle)) {
+                $resolved += $this->resolveIssueIfExists(
+                    $book->id,
+                    LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH,
+                    'Directory title now matches the book title.'
+                );
+                continue;
+            }
+
+            $issue = $this->createOrUpdateIssue(
+                $book,
+                LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH,
+                $book->directory_path,
+                [
+                    'book_title' => $book->title,
+                    'directory_title' => $directoryTitle,
+                ]
+            );
+
+            if ($issue->wasRecentlyCreated || $issue->wasChanged()) {
+                $created++;
+            }
+
+            $this->markBookNeedsReview($book, 'title_directory_mismatch');
+        }
 
         return [
             'created' => $created,
@@ -814,7 +956,7 @@ class LibraryRepairService
         return $resolved;
     }
 
-    private function markBookNeedsReview(Book $book): void
+    private function markBookNeedsReview(Book $book, ?string $reason = null): void
     {
         $book->needs_review = true;
         $reasons = collect($book->needs_review_reasons ?? []);
@@ -823,8 +965,51 @@ class LibraryRepairService
             $reasons->push('library_repair');
         }
 
+        if ($reason !== null && !$reasons->contains($reason)) {
+            $reasons->push($reason);
+        }
+
         $book->needs_review_reasons = $reasons->values()->all();
         $book->save();
+    }
+
+    private function pathGenre(?string $directoryPath): ?string
+    {
+        $normalizedPath = str_replace('\\', '/', trim((string) $directoryPath));
+        $pathGenre = trim(explode('/', $normalizedPath, 2)[0]);
+
+        return $pathGenre === '' ? null : $pathGenre;
+    }
+
+    private function directoryTitle(?string $directoryPath): ?string
+    {
+        $normalizedPath = trim(str_replace('\\', '/', (string) $directoryPath), '/');
+
+        if ($normalizedPath === '') {
+            return null;
+        }
+
+        $directoryTitle = trim(ltrim((string) strrchr('/' . $normalizedPath, '/'), '/'));
+
+        return $directoryTitle === '' ? null : $directoryTitle;
+    }
+
+    private function titlesMatch(string $bookTitle, string $directoryTitle): bool
+    {
+        $normalizedBookTitle = $this->normalizeTitleForDirectoryComparison($bookTitle);
+        $normalizedDirectoryTitle = $this->normalizeTitleForDirectoryComparison($directoryTitle);
+
+        return $normalizedBookTitle === $normalizedDirectoryTitle;
+    }
+
+    private function normalizeTitleForDirectoryComparison(string $title): string
+    {
+        $normalized = preg_replace('/^\d+(?:\.\d+)?[\s._-]*/u', '', trim($title)) ?? trim($title);
+        $normalized = preg_replace('/\s*\(\s*\d+\s+of\s+\d+\s*\)/iu', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('/\s*[\[(][^\])]*[\])]/u', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower($normalized)) ?? $normalized;
+
+        return $normalized;
     }
 
     private function directoryInUseByOtherBook(string $directoryPath, int $bookId): bool
@@ -860,20 +1045,26 @@ class LibraryRepairService
             return null;
         }
 
-        $subdirectories = File::directories($directory);
-        $candidates = [];
-
-        foreach ($subdirectories as $subdir) {
-            if ($this->directoryHasAudio($subdir)) {
-                $candidates[] = $subdir;
-            }
-        }
+        $candidates = $this->nestedAudioDirectories($directory);
 
         if (count($candidates) === 1) {
             return $candidates[0];
         }
 
         return null;
+    }
+
+    /** @return array<int,string> */
+    private function nestedAudioDirectories(string $directory): array
+    {
+        if (!File::isDirectory($directory)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            File::directories($directory),
+            fn (string $subdirectory): bool => $this->directoryHasAudio($subdirectory)
+        ));
     }
 
     private function collectDirectoriesWithAudio(string $root, bool $bypassExcludes = false): array
@@ -951,6 +1142,55 @@ class LibraryRepairService
         $issue->resolution_notes = $notes;
         $issue->auto_resolved = $autoResolve;
         $issue->save();
+    }
+
+    /**
+     * @param array<int,LibraryRepairIssueType> $issueTypes
+     *
+     * @return array<string,int>
+     */
+    private function reconcileOutstandingIssues(array $issueTypes): array
+    {
+        $issueTypeValues = array_map(
+            fn (LibraryRepairIssueType $issueType): string => $issueType->value,
+            $issueTypes
+        );
+        $resolved = array_fill_keys($issueTypeValues, 0);
+
+        $issues = LibraryRepairIssue::query()
+            ->whereIn('issue_type', $issueTypeValues)
+            ->where('status', '!=', 'resolved')
+            ->get();
+
+        foreach ($issues as $issue) {
+            $book = $issue->book;
+
+            if (
+                $book !== null
+                && $issue->directory_path !== null
+                && trim((string) $issue->directory_path, '/') !== trim((string) $book->directory_path, '/')
+            ) {
+                $this->resolveIssueWithNotes(
+                    $issue,
+                    'Book directory path changed; the current path is scanned separately.',
+                    true
+                );
+                $resolved[$issue->issue_type]++;
+                continue;
+            }
+
+            if ($issue->issue_type === LibraryRepairIssueType::NESTED_AUDIO->value) {
+                $result = $this->rescanNestedAudioIssue($issue, false);
+            } else {
+                $result = $this->rescanIssue($issue->id);
+            }
+
+            if ($result['status'] === 'resolved') {
+                $resolved[$issue->issue_type]++;
+            }
+        }
+
+        return $resolved;
     }
 
     private function clearStaleIssues(): void
@@ -1684,6 +1924,88 @@ class LibraryRepairService
         ];
     }
 
+    private function rescanPathGenreMismatchIssue(LibraryRepairIssue $issue): array
+    {
+        $book = $issue->book;
+
+        if (!$book) {
+            return [
+                'status' => 'error',
+                'message' => 'Book not found for this issue.',
+            ];
+        }
+
+        $book->loadMissing('genres:id,name');
+        $pathGenre = $this->pathGenre($book->directory_path);
+        $assignedGenres = $book->genres->pluck('name')->all();
+        $matchesPathGenre = $pathGenre !== null && collect($assignedGenres)
+            ->contains(fn (string $genre) => mb_strtolower(trim($genre)) === mb_strtolower($pathGenre));
+
+        if ($matchesPathGenre) {
+            $this->resolveIssueWithNotes($issue, 'Path genre is now assigned to the book.', true);
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Path genre is now assigned to the book.',
+            ];
+        }
+
+        $issue->metadata = [
+            'path_genre' => $pathGenre,
+            'assigned_genres' => $assignedGenres,
+        ];
+        $issue->status = 'pending';
+        $issue->auto_resolved = false;
+        $issue->resolved_at = null;
+        $issue->resolution_notes = null;
+        $issue->save();
+        $this->markBookNeedsReview($book, 'path_genre_mismatch');
+
+        return [
+            'status' => 'pending',
+            'message' => 'Path genre is still not assigned to the book.',
+        ];
+    }
+
+    private function rescanTitleDirectoryMismatchIssue(LibraryRepairIssue $issue): array
+    {
+        $book = $issue->book;
+
+        if (!$book) {
+            return [
+                'status' => 'error',
+                'message' => 'Book not found for this issue.',
+            ];
+        }
+
+        $directoryTitle = $this->directoryTitle($book->directory_path);
+
+        if ($directoryTitle !== null && $this->titlesMatch((string) $book->title, $directoryTitle)) {
+            $this->resolveIssueWithNotes($issue, 'Directory title now matches the book title.', true);
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Directory title now matches the book title.',
+            ];
+        }
+
+        $issue->metadata = [
+            'book_title' => $book->title,
+            'directory_title' => $directoryTitle,
+        ];
+        $issue->status = 'pending';
+        $issue->auto_resolved = false;
+        $issue->resolved_at = null;
+        $issue->resolution_notes = null;
+        $issue->save();
+        $this->markBookNeedsReview($book, 'title_directory_mismatch');
+
+        return [
+            'status' => 'pending',
+            'message' => 'Directory title still does not match the book title.',
+        ];
+    }
+
     private function rescanInvalidAudioIssue(LibraryRepairIssue $issue): array
     {
         $book = $issue->book;
@@ -1740,8 +2062,16 @@ class LibraryRepairService
                     ];
                 }
             }
-        }
+        } else {
+            $extension = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
 
+            if (in_array($extension, $audioExtensions, true) && !$this->isAudioFileValid($fullPath)) {
+                $invalidFiles[] = [
+                    'relativePath' => $book->directory_path,
+                    'error' => 'Failed to analyze - file may be corrupted or not a valid audio file',
+                ];
+            }
+        }
         if (empty($invalidFiles)) {
             $this->resolveIssueWithNotes($issue, 'All audio files are now valid', true);
 

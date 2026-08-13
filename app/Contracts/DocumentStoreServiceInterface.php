@@ -35,6 +35,23 @@ interface DocumentStoreServiceInterface
     public function getAllBooks(?int $limit = null, int $offset = 0): array;
 
     /**
+     * Get one page of series (with their books), grouped by series name.
+     * Paginates at the series level and uses lightweight columns/joins
+     * instead of full book hydration so it stays cheap even when the
+     * library has thousands of books and series.
+     *
+     * @param string|null $search Optional case-insensitive substring filter on series name
+     * @param int $page 1-based page number of series
+     * @param int $perPage Number of series per page
+     *
+     * @return array{
+     *     data: array<string, array<int, array{_id: string, title: string, author: array<int, string>, directoryPath: string, audioFileCount: int}>>,
+     *     total: int
+     * }
+     */
+    public function getBooksGroupedBySeries(?string $search = null, int $page = 1, int $perPage = 25): array;
+
+    /**
      * List books with pagination and optional filtering.
      *
      * @param int $page Page number (1-based)

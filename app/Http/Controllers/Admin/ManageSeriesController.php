@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ManageSeriesController extends Controller
@@ -20,42 +21,25 @@ class ManageSeriesController extends Controller
     public function index(Request $request)
     {
         $search = $request->get('search', '');
+        $page = max(1, (int) $request->get('page', 1));
+        $perPage = 25;
 
-        // Get all books grouped by series
-        $allBooks = $this->documentStore->getAllBooks();
+        // Get one page of series (with their books) using lightweight columns/joins only.
+        // Paginating at the series level (rather than loading every series and every book
+        // in the library at once) is what keeps this page from exhausting php-fpm's memory
+        // limit and crashing/500ing.
+        $result = $this->documentStore->getBooksGroupedBySeries($search ?: null, $page, $perPage);
+        $seriesGroups = $result['data'];
 
-        // Group books by their directory path prefix (likely same book split across directories)
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            array_keys($seriesGroups),
+            $result['total'],
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         $potentialMerges = [];
-        $seriesGroups = [];
-
-        foreach ($allBooks as $book) {
-            $seriesName = '';
-            if (!empty($book['series'])) {
-                if (is_array($book['series'])) {
-                    $seriesName = array_key_first($book['series']);
-                } else {
-                    $seriesName = $book['series'];
-                }
-            }
-
-            if (empty($seriesName)) {
-                continue;
-            }
-
-            // Filter by search if provided
-            if ($search && stripos($seriesName, $search) === false) {
-                continue;
-            }
-
-            if (!isset($seriesGroups[$seriesName])) {
-                $seriesGroups[$seriesName] = [];
-            }
-
-            $seriesGroups[$seriesName][] = $book;
-        }
-
-        // Sort series by name
-        ksort($seriesGroups);
 
         // Get series IDs for each series name
         $seriesIds = [];
@@ -73,7 +57,7 @@ class ManageSeriesController extends Controller
             // Group by common directory prefix
             $pathGroups = [];
             foreach ($books as $book) {
-                $path = $book['directoryPath'] ?? '';
+                $path = $book['directoryPath'];
                 // Get parent directory (remove last segment)
                 $parts = explode('/', $path);
                 array_pop($parts);
@@ -105,6 +89,7 @@ class ManageSeriesController extends Controller
             'potentialMerges' => $potentialMerges,
             'search' => $search,
             'seriesIds' => $seriesIds,
+            'paginator' => $paginator,
         ]);
     }
 
@@ -240,28 +225,17 @@ class ManageSeriesController extends Controller
         }
 
         try {
-            // Get all books in both series
-            $allBooks = $this->documentStore->getAllBooks();
-            $oldSeriesBooks = [];
-            $newSeriesExists = false;
+            // Find only the book IDs involved in either series name, rather than
+            // loading the entire book library into memory.
+            $matchingBooks = DB::table('books')
+                ->join('book_series', 'books.id', '=', 'book_series.book_id')
+                ->join('series', 'series.id', '=', 'book_series.series_id')
+                ->whereIn('series.name', [$oldName, $newName])
+                ->select('books.id as book_id', 'series.name as series_name')
+                ->get();
 
-            foreach ($allBooks as $book) {
-                $seriesName = '';
-
-                if (!empty($book['series'])) {
-                    if (is_array($book['series'])) {
-                        $seriesName = array_key_first($book['series']);
-                    } else {
-                        $seriesName = $book['series'];
-                    }
-                }
-
-                if ($seriesName === $oldName) {
-                    $oldSeriesBooks[] = $book;
-                } elseif ($seriesName === $newName) {
-                    $newSeriesExists = true;
-                }
-            }
+            $oldSeriesBookIds = $matchingBooks->where('series_name', $oldName)->pluck('book_id')->all();
+            $newSeriesExists = $matchingBooks->where('series_name', $newName)->isNotEmpty();
 
             // If new series exists and merge not confirmed, ask for confirmation
             if ($newSeriesExists && !$merge) {
@@ -269,13 +243,18 @@ class ManageSeriesController extends Controller
                     'message' => "A series named '{$newName}' already exists. Do you want to merge '{$oldName}' into it?",
                     'old_name' => $oldName,
                     'new_name' => $newName,
-                    'book_count' => count($oldSeriesBooks),
+                    'book_count' => count($oldSeriesBookIds),
                 ]);
             }
 
             // Perform the rename/merge
             $updated = 0;
-            foreach ($oldSeriesBooks as $book) {
+            foreach ($oldSeriesBookIds as $bookId) {
+                $book = $this->documentStore->getBook((string) $bookId);
+                if (!$book) {
+                    continue;
+                }
+
                 $seriesNumber = null;
 
                 if (is_array($book['series'])) {

@@ -98,9 +98,10 @@
     {{-- All Series Section --}}
     <div class="card">
         <div class="card-header">
-            <h5 class="mb-0">All Series ({{ count($seriesGroups) }})</h5>
+            <h5 class="mb-0">All Series ({{ $paginator->total() }})</h5>
         </div>
         <div class="card-body">
+            {{ $paginator->onEachSide(2)->links('pagination.admin-books') }}
             @if(count($seriesGroups) === 0)
                 <p class="text-muted">No series found.</p>
             @else
@@ -175,6 +176,7 @@
                     </div>
                     @endforeach
                 </div>
+                {{ $paginator->onEachSide(2)->links('pagination.admin-books') }}
             @endif
         </div>
     </div>

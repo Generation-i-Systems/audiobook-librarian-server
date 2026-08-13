@@ -581,6 +581,45 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     // dumpAllBooks method already exists above
 
+    public function getBooksGroupedBySeries(?string $search = null, int $page = 1, int $perPage = 25): array
+    {
+        $seriesGroups = [];
+
+        foreach ($this->books as $book) {
+            $seriesName = '';
+            if (!empty($book['series'])) {
+                $seriesName = is_array($book['series']) ? array_key_first($book['series']) : $book['series'];
+            }
+
+            if (empty($seriesName)) {
+                continue;
+            }
+
+            if ($search !== null && $search !== '' && stripos((string) $seriesName, $search) === false) {
+                continue;
+            }
+
+            $seriesGroups[$seriesName][] = [
+                '_id' => (string) ($book['_id'] ?? ''),
+                'title' => (string) ($book['title'] ?? ''),
+                'author' => is_array($book['author'] ?? null) ? $book['author'] : array_filter([$book['author'] ?? null]),
+                'directoryPath' => (string) ($book['directoryPath'] ?? ''),
+                'audioFileCount' => (int) ($book['audioFileCount'] ?? 0),
+            ];
+        }
+
+        ksort($seriesGroups);
+
+        $total = count($seriesGroups);
+        $pagedNames = array_slice(array_keys($seriesGroups), ($page - 1) * $perPage, $perPage);
+        $pagedGroups = [];
+        foreach ($pagedNames as $name) {
+            $pagedGroups[$name] = $seriesGroups[$name];
+        }
+
+        return ['data' => $pagedGroups, 'total' => $total];
+    }
+
     public function getUserById($identifier)
     {
         return $this->users[$identifier] ?? null;

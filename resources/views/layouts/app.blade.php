@@ -98,9 +98,6 @@
                                     <a class="nav-link" style="color:white" href="{{ route('admin.library-repair.index') }}">Library Repair</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.series.manage') }}">Manage Series</a>
-                                </li>
-                                <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('admin.tags.index') }}">Tags</a>
                                 </li>
                                 <li class="nav-item">

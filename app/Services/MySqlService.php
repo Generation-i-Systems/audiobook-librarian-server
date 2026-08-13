@@ -895,6 +895,76 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         )->toArray();
     }
 
+    public function getBooksGroupedBySeries(?string $search = null, int $page = 1, int $perPage = 25): array
+    {
+        $seriesQuery = DB::table('series')
+            ->whereExists(function ($query): void {
+                $query->select(DB::raw(1))
+                    ->from('book_series')
+                    ->whereColumn('book_series.series_id', 'series.id');
+            });
+
+        if ($search !== null && $search !== '') {
+            $escapedSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+            $seriesQuery->where('series.name', 'like', '%' . $escapedSearch . '%');
+        }
+
+        $total = (clone $seriesQuery)->count();
+
+        $seriesPage = $seriesQuery
+            ->select(['series.id', 'series.name'])
+            ->orderBy('series.name')
+            ->forPage($page, $perPage)
+            ->get();
+
+        if ($seriesPage->isEmpty()) {
+            return ['data' => [], 'total' => $total];
+        }
+
+        // Pre-seed keys so every series on this page appears even without matches below,
+        // and so the result preserves the alphabetical order already applied above.
+        $seriesGroups = [];
+        foreach ($seriesPage as $seriesRow) {
+            $seriesGroups[$seriesRow->name] = [];
+        }
+
+        $rows = DB::table('books')
+            ->join('book_series', 'books.id', '=', 'book_series.book_id')
+            ->join('series', 'series.id', '=', 'book_series.series_id')
+            ->whereIn('series.id', $seriesPage->pluck('id')->all())
+            ->select([
+                'books.id as book_id',
+                'books.title',
+                'books.directory_path',
+                'books.audio_file_count',
+                'series.name as series_name',
+            ])
+            ->get();
+
+        $bookIds = $rows->pluck('book_id')->unique()->values()->all();
+
+        $authorsByBook = DB::table('author_book')
+            ->join('authors', 'authors.id', '=', 'author_book.author_id')
+            ->whereIn('author_book.book_id', $bookIds)
+            ->select('author_book.book_id', 'authors.name')
+            ->orderBy('authors.name')
+            ->get()
+            ->groupBy('book_id')
+            ->map(fn ($group) => $group->pluck('name')->all());
+
+        foreach ($rows as $row) {
+            $seriesGroups[$row->series_name][] = [
+                '_id' => (string) $row->book_id,
+                'title' => $row->title,
+                'author' => $authorsByBook->get($row->book_id, []),
+                'directoryPath' => $row->directory_path,
+                'audioFileCount' => (int) $row->audio_file_count,
+            ];
+        }
+
+        return ['data' => $seriesGroups, 'total' => $total];
+    }
+
     public function dumpAllBooks()
     {
         // This is memory intensive, but matches the existing interface.
