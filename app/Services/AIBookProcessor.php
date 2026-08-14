@@ -500,7 +500,7 @@ class AIBookProcessor
         }
 
         $prompt .= "\nReturn JSON with these fields: title, author, narrator, series{name,number}, genre, " .
-            "year, publisher, language, isbn, confidence (0-100).\n";
+            "year, publisher, language, isbn, tags (array of strings), confidence (0-100).\n";
         $prompt .= "Clean titles (remove file artifacts, bitrates, sizes). Separate authors from narrators. " .
             "Extract series info from patterns.\n";
 
@@ -572,6 +572,17 @@ class AIBookProcessor
             $prompt .= "Analyze the actual story content and choose the most appropriate literary genre.\n";
             $prompt .= "Do NOT use generic terms like 'Audiobook', 'Book', 'Audio'.\n\n";
         }
+
+        $prompt .= "TAGS: Return a \"tags\" array of short freeform content labels for this book " .
+            "(e.g. \"spicy\", \"litrpg\", \"anthology\"). You only have the directory name, file names, " .
+            "and file metadata tags to go on — no actual book text — so only add a tag when the evidence " .
+            "is reasonably strong; otherwise leave the array empty.\n";
+        $prompt .= "Include \"spicy\" specifically when there is clear evidence the book contains explicit " .
+            "sexual content (sex scenes) — e.g. it is tagged/marketed as \"romance\", \"dark romance\", " .
+            "\"reverse harem\", \"why choose\", \"monster romance\", \"RH\", \"MC romance\", \"erotica\", or " .
+            "similar explicit-romance subgenres in the directory name, series name, or file metadata. Do NOT " .
+            "add \"spicy\" for genres that are merely adjacent (e.g. plain fantasy/sci-fi/LitRPG with a minor " .
+            "romantic subplot) — only when the available evidence points to explicit content being central.\n\n";
 
         return $prompt;
     }
@@ -782,12 +793,14 @@ class AIBookProcessor
         $authors = $metadata['author'] ?? ($metadata['authors'] ?? []);
         $narrators = $metadata['narrator'] ?? ($metadata['narrators'] ?? []);
         $genres = $metadata['genre'] ?? ($metadata['genres'] ?? []);
+        $tags = $metadata['tags'] ?? [];
 
         $normalized = [
             'title' => $metadata['title'] ?? 'Unknown Title',
             'author' => $this->normalizeStringOrArray($authors),
             'narrator' => $this->normalizeStringOrArray($narrators),
             'genre' => $this->normalizeStringOrArray($genres),
+            'tags' => $this->normalizeStringOrArray($tags),
             'year' => isset($metadata['year']) ? (int) $metadata['year'] : null,
             'description' => $metadata['description'] ?? null,
             'publisher' => $metadata['publisher'] ?? null,
@@ -1500,7 +1513,8 @@ class AIBookProcessor
             }
 
             $prompt .= "Extract: title, author, narrator, series{name,number}, genre, year, publisher, " .
-                "language, confidence (0-100).\n";
+                "language, tags (array of strings, e.g. \"spicy\" if explicit sexual content is evident), " .
+                "confidence (0-100).\n";
             $prompt .= "This is the beginning of an audiobook where title, author, and narrator are typically " .
                 "announced.\n";
             $prompt .= "Focus on the main book title, not chapter titles. Look for phrases like:\n";
@@ -1535,6 +1549,7 @@ class AIBookProcessor
                 'series' => null,
                 'series_number' => null,
                 'genre' => [],
+                'tags' => [],
                 'year' => null,
                 'publisher' => null,
                 'language' => 'en',

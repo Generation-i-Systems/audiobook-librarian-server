@@ -81,6 +81,52 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function editingTagsFromTheMenuSetsCommaSeparatedTagsTrimmedAndDeduplicated(): void
+    {
+        $metadata = [
+            'title' => 'Test Book',
+            'author' => ['Test Author'],
+            'tags' => ['old-tag'],
+        ];
+
+        $askResponses = [' Spicy , RH , Spicy '];
+        $askInlineCallback = function (string $question, string $default) use (&$askResponses): string {
+            return array_shift($askResponses) ?? $default;
+        };
+
+        // 't' = edit tags, then done.
+        $choices = ['t', '9'];
+        $selectCallback = function (string $question, array $options, string $default) use (&$choices): string {
+            return array_shift($choices) ?? $default;
+        };
+
+        $getFirstNonEmptyCallback = function (array $metadata, array $keys) {
+            foreach ($keys as $key) {
+                if (!empty($metadata[$key] ?? null)) {
+                    return $metadata[$key];
+                }
+            }
+            return null;
+        };
+
+        $result = $this->service->editMetadataFields(
+            $metadata,
+            [],
+            $askInlineCallback,
+            $selectCallback,
+            $getFirstNonEmptyCallback,
+            function (array &$metadata): void {
+            },
+            fn () => ['Other'],
+            function (): void {
+            },
+            fn (array $metadata) => $metadata
+        );
+
+        $this->assertSame(['Spicy', 'RH'], $result['tags']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function editingAnUnrelatedFieldDoesNotRunSeriesNumberExtractionOrTouchTitle(): void
     {
         $metadata = [
@@ -265,6 +311,7 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
             'New Series',
             '2',
             '2021',
+            '',
             '/library/New Title',
         ];
         $askInlineCallback = function (string $question, string $default) use (&$askResponses): string {

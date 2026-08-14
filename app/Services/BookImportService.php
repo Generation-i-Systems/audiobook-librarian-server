@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Author;
 use App\Models\Book;
+use App\Models\BookTag;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Publisher;
@@ -557,6 +558,31 @@ class BookImportService
     }
 
     /**
+     * Write confirmed tags as the book's system-scope tag list (visible to everyone,
+     * same as BookTagService::updateTags(..., 'system', ...) but callable from the
+     * unauthenticated CLI import flow, which has no admin User to check against).
+     * Tags are used exactly as confirmed, only de-duplicated case-insensitively.
+     */
+    private function syncTagsToBook(Book $book, array $metadata): void
+    {
+        if (empty($metadata['tags'])) {
+            return;
+        }
+
+        $tags = is_array($metadata['tags']) ? $metadata['tags'] : [$metadata['tags']];
+        $normalizedTags = app(BookTagService::class)->normalizeTags($tags);
+
+        if ($normalizedTags === []) {
+            return;
+        }
+
+        BookTag::query()->updateOrCreate(
+            ['book_id' => $book->id, 'owner_key' => 'system'],
+            ['scope' => 'system', 'tags' => $normalizedTags]
+        );
+    }
+
+    /**
      * Persist a book from metadata that has already been confirmed — by the user in
      * interactive review, or locked in by auto mode. Nothing in this method may
      * calculate, derive, correct, or otherwise change any field: every value comes
@@ -791,6 +817,8 @@ class BookImportService
                 }
             }
 
+            $this->syncTagsToBook($book, $metadata);
+
             // Seed chapters from metadata.json (or another source that provided a
             // 'chapters' key) — never overwrites chapters a book already has.
             if (!empty($metadata['chapters']) && is_array($metadata['chapters'])) {
@@ -891,6 +919,7 @@ class BookImportService
         $authors = $book->authors->pluck('name')->toArray();
         $narrators = $book->narrators->pluck('name')->toArray();
         $genres = $book->genres->pluck('name')->toArray();
+        $tags = BookTag::query()->where('book_id', $book->id)->where('owner_key', 'system')->value('tags') ?? [];
 
         $series = $book->series->first();
         $seriesName = $series !== null ? ($series->name ?? '') : '';
@@ -905,6 +934,7 @@ class BookImportService
             'author'         => $authors,
             'narrator'       => $narrators,
             'genre'          => $genres[0] ?? '',
+            'tags'           => $tags,
             'series'         => $seriesName,
             'series_number'  => $seriesNumber,
             'year'           => $book->release_date?->year,
@@ -1033,6 +1063,8 @@ class BookImportService
                     $book->unsetRelation('genres');
                 }
             }
+
+            $this->syncTagsToBook($book, $metadata);
 
             // Seed chapters from metadata.json (or another source that provided a
             // 'chapters' key) — never overwrites chapters a book already has.
@@ -3844,6 +3876,7 @@ class BookImportService
             ['Narrator', $arrayToString($metadata['narrator'])],
             ['Series', $displaySeries],
             ['Genre', $arrayToString($metadata['genre'])],
+            ['Tags', $arrayToString($metadata['tags'] ?? [])],
             ['Year', $metadata['year'] ?? 'N/A'],
             ['Publisher', $arrayToString($metadata['publisher'])],
             ['Language', $metadata['language'] ?? 'N/A'],
@@ -5605,6 +5638,13 @@ class BookImportService
                 }
             }
 
+            $currentTags = $metadata['tags'] ?? [];
+            $currentTags = is_array($currentTags) ? $currentTags : [$currentTags];
+            $metadata['tags'] = array_values(array_unique(array_filter(array_map(
+                'trim',
+                explode(',', $askInlineCallback('Tags (comma-separated, e.g. "spicy")', implode(', ', $currentTags)))
+            ))));
+
             $metadata = $this->checkForAlternateSeriesDirectory(
                 $metadata,
                 $selectWithImmediateInterruptCallback,
@@ -5629,7 +5669,7 @@ class BookImportService
             $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
 
             if (!empty($audiobook['is_multi_book_part'])) {
-                foreach (['author', 'narrator', 'genre', 'series'] as $field) {
+                foreach (['author', 'narrator', 'genre', 'series', 'tags'] as $field) {
                     if (!empty($metadata[$field])) {
                         $this->multiBookSharedOverrides[$field] = $metadata[$field];
                     }
@@ -5660,6 +5700,10 @@ class BookImportService
             $currentGenre = $metadata['genre'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
             $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
 
+            $currentTags = $metadata['tags'] ?? [];
+            $currentTags = is_array($currentTags) ? $currentTags : [$currentTags];
+            $displayTags = implode(', ', $currentTags);
+
             $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
             if ($currentDirectory === '') {
                 $currentDirectory = $this->generateDirectoryPath($metadata, [
@@ -5677,6 +5721,7 @@ class BookImportService
                 '6' => 'Year: ' . $currentYear,
                 '7' => 'Genre: ' . $displayGenre,
                 '8' => 'Directory Path: ' . $currentDirectory,
+                't' => 'Tags: ' . $displayTags,
                 'a' => 'Edit all fields (sequential)',
                 'c' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
                 'n' => 'Add narrator to directory name',
@@ -5777,6 +5822,12 @@ class BookImportService
                 case '8':
                     $metadata['custom_directory_path'] = $askInlineCallback('Directory Path', $currentDirectory);
                     break;
+                case 't':
+                    $metadata['tags'] = array_values(array_unique(array_filter(array_map(
+                        'trim',
+                        explode(',', $askInlineCallback('Tags (comma-separated, e.g. "spicy")', $displayTags))
+                    ))));
+                    break;
                 case 'a':
                     $metadata = $this->editMetadataFields(
                         $metadata,
@@ -5840,7 +5891,7 @@ class BookImportService
         }
 
         if (!empty($audiobook['is_multi_book_part'])) {
-            foreach (['author', 'narrator', 'genre', 'series'] as $field) {
+            foreach (['author', 'narrator', 'genre', 'series', 'tags'] as $field) {
                 if (!empty($metadata[$field])) {
                     $this->multiBookSharedOverrides[$field] = $metadata[$field];
                 }

@@ -45,4 +45,39 @@ class AIBookProcessorNormalizeStringOrArrayTest extends TestCase
         $this->assertSame(['Fantasy', 'Action'], $normalized['genre']);
         $this->assertSame(90, $normalized['confidence']);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function normalizeMetadataExtractsTagsArray(): void
+    {
+        $processor = new AIBookProcessor('gemini-2.5-flash-lite');
+
+        $reflection = new \ReflectionClass($processor);
+        $method = $reflection->getMethod('normalizeMetadata');
+        $method->setAccessible(true);
+
+        $normalized = $method->invoke($processor, [
+            'title' => 'Test Book',
+            'tags' => ['spicy', 'litrpg'],
+            'confidence' => 90,
+        ]);
+
+        $this->assertSame(['spicy', 'litrpg'], $normalized['tags']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function normalizeMetadataDefaultsTagsToEmptyArrayWhenAbsent(): void
+    {
+        $processor = new AIBookProcessor('gemini-2.5-flash-lite');
+
+        $reflection = new \ReflectionClass($processor);
+        $method = $reflection->getMethod('normalizeMetadata');
+        $method->setAccessible(true);
+
+        $normalized = $method->invoke($processor, [
+            'title' => 'Test Book',
+            'confidence' => 90,
+        ]);
+
+        $this->assertSame([], $normalized['tags']);
+    }
 }
