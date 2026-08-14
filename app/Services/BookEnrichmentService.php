@@ -530,7 +530,48 @@ class BookEnrichmentService
             return [];
         }
 
-        return $result;
+        $specificGenres = array_values(array_filter(
+            $result,
+            static fn (string $genre): bool => strcasecmp($genre, 'Other') !== 0
+        ));
+
+        return $specificGenres !== [] ? $specificGenres : $result;
+    }
+
+    /**
+     * Build a ladder of Audible search query variants to try in order until one finds
+     * results. Audible's search does not reliably match a title with an embedded series
+     * number (e.g. "Series 04 - Title") even when the book exists — confirmed manually:
+     * the identical search without the number finds it. Progressively drop the number,
+     * then the series name, then try author+title, so a single missed variant doesn't
+     * lose enrichment for the whole book.
+     *
+     * @return array<int, string>
+     */
+    protected function buildAudibleSearchQueryVariants(string $title, string $author): array
+    {
+        $variants = [$title];
+
+        // "Series NN - Title" / "Series NN: Title" -> drop the number, then drop the
+        // series entirely, keeping just the bare title.
+        if (preg_match('/^(.+?)\s+\d+\s*[-:]\s*(.+)$/', $title, $matches)) {
+            $series = trim($matches[1]);
+            $bareTitle = trim($matches[2]);
+
+            if ($series !== '' && $bareTitle !== '') {
+                $variants[] = "{$series} - {$bareTitle}";
+            }
+            if ($bareTitle !== '') {
+                $variants[] = $bareTitle;
+                if ($author !== '') {
+                    $variants[] = "{$bareTitle} {$author}";
+                }
+            }
+        } elseif ($author !== '') {
+            $variants[] = "{$title} {$author}";
+        }
+
+        return array_values(array_unique(array_filter($variants, static fn (string $variant): bool => $variant !== '')));
     }
 
     /**
@@ -543,9 +584,15 @@ class BookEnrichmentService
                 $this->audibleService = app(AudibleService::class);
             }
 
-            $results = $this->audibleService->searchBooksWithFiltering($title, $author, [
-                'limit' => 1,
-            ]);
+            $results = [];
+            foreach ($this->buildAudibleSearchQueryVariants($title, $author) as $queryVariant) {
+                $results = $this->audibleService->searchBooksWithFiltering($queryVariant, $author, [
+                    'limit' => 1,
+                ]);
+                if (!empty($results)) {
+                    break;
+                }
+            }
 
             if (!empty($results) && isset($results[0])) {
                 $bookData = $results[0];

@@ -74,6 +74,31 @@ class TaxonomyService
         return $this->autocompleteSeries($term);
     }
 
+    /**
+     * Book IDs belonging to any of the given series names, without loading the
+     * matched books' full records.
+     *
+     * @param  array<int, string>  $seriesNames
+     * @return array<int, array{book_id: int, series_name: string}>
+     */
+    public function findBookIdsBySeriesNames(array $seriesNames): array
+    {
+        if (empty($seriesNames)) {
+            return [];
+        }
+
+        $series = Series::whereIn('name', $seriesNames)->with('books:id')->get();
+
+        $results = [];
+        foreach ($series as $matchedSeries) {
+            foreach ($matchedSeries->books as $book) {
+                $results[] = ['book_id' => $book->id, 'series_name' => $matchedSeries->name];
+            }
+        }
+
+        return $results;
+    }
+
     public function createAuthor(array $data): Author
     {
         return Author::create($data);

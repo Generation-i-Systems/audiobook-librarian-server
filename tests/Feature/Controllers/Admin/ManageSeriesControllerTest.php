@@ -144,7 +144,7 @@ class ManageSeriesControllerTest extends TestCase
     #[Test]
     public function renameQueriesOnlyTheAffectedSeriesInsteadOfLoadingAllBooks(): void
     {
-        // Real rows so the controller's targeted DB query (books/book_series/series)
+        // Real rows so the controller's targeted lookup (via findBookIdsBySeriesNames)
         // has something to find; the document store itself stays mocked.
         $oldSeries = Series::factory()->create(['name' => 'Old Name']);
         $book = Book::factory()->create(['title' => 'Renamed Book']);
@@ -155,6 +155,11 @@ class ManageSeriesControllerTest extends TestCase
 
         $bookId = (string) $book->id;
         $bookData = ['_id' => $bookId, 'series' => ['Old Name' => 3], 'seriesName' => 'Old Name'];
+
+        $this->documentStoreService->shouldReceive('findBookIdsBySeriesNames')
+            ->once()
+            ->with(['Old Name', 'New Name'])
+            ->andReturn([['book_id' => $book->id, 'series_name' => 'Old Name']]);
 
         $this->documentStoreService->shouldReceive('getBook')
             ->with($bookId)

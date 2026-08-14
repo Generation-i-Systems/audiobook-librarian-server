@@ -37,4 +37,25 @@ class AIBookProcessorPatternHintsTest extends TestCase
 
         $this->assertStringNotContainsString("LEARN THIS DIRECTORY'S FOLDER-NAME-TO-FIELDS PARSING PATTERN", $prompt);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function buildPromptIncludesAuthorDirectoryContext(): void
+    {
+        $processor = new AIBookProcessor('gemini-2.5-flash-lite', false);
+
+        $ref = new \ReflectionClass($processor);
+        $method = $ref->getMethod('buildPrompt');
+        $method->setAccessible(true);
+
+        $prompt = $method->invoke(
+            $processor,
+            '/media/audiobooks/books/Fantasy/D.K. Holmberg/The Dark Ability/07 Rise of the Elder',
+            [],
+            [],
+            null,
+            []
+        );
+
+        $this->assertStringContainsString('Directory: D.K. Holmberg/The Dark Ability/07 Rise of the Elder', $prompt);
+    }
 }

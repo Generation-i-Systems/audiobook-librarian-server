@@ -23,6 +23,20 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 - Book CRUD (admin)
 - Book form: multiple authors/series (autocomplete), Google Books autofill, genre selection, file uploads
+- Import asks the AI for freeform content tags per book (including a `spicy` tag when there is clear evidence of explicit sexual content), shows them on the review summary, allows editing during interactive review, and stores confirmed tags as system-scope book tags. Author/narrator name lists are split on `&`, `/`, and "and" as well as commas, both from the AI response and from ID3 tags.
+- Multi-book split imports give each split-out book its own AI lookup and its own file-tag/filename parsing for author/narrator, rather than inheriting a single whole-folder AI guess that may have been sampled from a different book's files.
+- Audible enrichment search retries a ladder of query variants (drop series number, drop series name, add author) when the exact-title search finds nothing.
+- Library Repair detects path-genre mismatches (the first storage directory is absent from the book's genre assignments) and title-directory mismatches, records repair issues, adds dedicated Needs Review tags, and can filter repair issues by any Needs Review tag. The nightly scan reevaluates every repair type and resolves an issue after it is corrected outside the repair page.
+- `book:import --repair-title-mismatch-date=2025-08-06` reopens the affected import batch through the normal AI, audio-tag, directory, enrichment, and interactive confirmation flow while preserving each existing record ID and its physical audio directory. It requires an expected-count guard before any record is reviewed.
+- Completing or safely skipping a title-mismatch repair clears only that repair reason, resolves its Library Repair issue, and reports the remaining batch count. Import genre lists preserve every valid selection, use `Other` only as the no-specific-genre fallback, and are editable as a complete comma-separated list.
+- The title-mismatch repair uses the normal import progress UI, initialized with the selected repair batch and advanced after every reviewed record.
+- The `bin/import-bk` wrapper recognizes repair options with separate values, so repair mode reaches `book:import` rather than falling through to normal path scanning.
+- Repair expected counts are an upper-bound safety guard: a resumed batch may contain fewer records because earlier confirmed repairs remove their target marker, while empty or larger batches are rejected.
+- For repair proposals with no tag or AI author, the existing library directory's author segment is used as reviewable fallback context before external enrichment.
+- Repair AI context supplies the full library path, and prompt sanitization retains author/series/title context while stripping unrelated leading filesystem segments.
+- Repair files move only after the user confirms a directory different from the original; unchanged paths are in-place metadata updates, and move failure restores the old database path for retry.
+- Cover updates in import review aggregate enrichment, embedded-tag, and all directory-image sources for a user-selected preview; an explicit selection may replace the current cover.
+- Import confirmation treats a source directory already located at the selected library path as metadata-only, avoiding a false destination-file conflict without weakening protection against distinct source/destination collisions.
 - Book form metadata search/autofill supports Audible, Google Books, AudiobookBay, and Hardcover.
   Metadata autofill must preserve any existing selected genre, including genres inferred from the directory path, and may only apply provider genres that match configured genre options when no genre is selected.
 - Authors/series autocomplete via jQuery UI, server-side filtering
@@ -101,7 +115,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - `App\Services\UserTagFilterService` + `UserTagFilter` model: per-user require/ban tag content filter, self-service via `Api\UserTagFilterController` (`/users/me/tag-filters`) and admin-locked via `Api\AdminUserTagFilterController` (`/admin/users/{id}/tag-filters`). Applied inside `MySqlService::listBooks()` unconditionally, so every listing/search/discovery surface respects it automatically.
 - **Web Routes:**
     - `/admin/books` (CRUD)
-    - `/admin/library-repair` (issue triage dashboard)
+- `/admin/library-repair` (issue triage dashboard)
     - `/admin/books/create`, `/admin/books/{book}/edit`
     - `/admin/books/autocomplete/authors` (AJAX autocomplete)
     - `/admin/books/autocomplete/series` (AJAX autocomplete)

@@ -51,6 +51,34 @@ class BookImportServiceFileTagsTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function extractMetadataFromFileTagsSplitsMultipleAuthorsFromSlashDelimitedArtistTag(): void
+    {
+        $fileTags = [
+            'track1.mp3' => [
+                'artist' => 'Dorje Swallow/Sofia Lette',
+            ],
+        ];
+
+        $result = $this->service->extractMetadataFromFileTags($fileTags);
+
+        $this->assertEquals(['Dorje Swallow', 'Sofia Lette'], $result['author']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractMetadataFromFileTagsSplitsMultipleNarratorsFromAmpersandDelimitedNarratorTag(): void
+    {
+        $fileTags = [
+            'track1.mp3' => [
+                'narrator' => 'Dorje Swallow & Sofia Lette',
+            ],
+        ];
+
+        $result = $this->service->extractMetadataFromFileTags($fileTags);
+
+        $this->assertEquals(['Dorje Swallow', 'Sofia Lette'], $result['narrator']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function extractMetadataFromFileTagsSetsNarratorFromWriter(): void
     {
         $fileTags = [

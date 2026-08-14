@@ -92,4 +92,40 @@ class LibraryRepairIssueStoreTest extends TestCase
         $this->assertTrue($book->needs_review);
         $this->assertSame(['metadata_mismatch'], $book->needs_review_reasons);
     }
+
+    #[Test]
+    public function listAndCountLibraryRepairIssuesCanFilterByNeedsReviewReason(): void
+    {
+        $matchingBook = Book::factory()->create([
+            'needs_review' => true,
+            'needs_review_reasons' => ['library_repair', 'path_genre_mismatch'],
+        ]);
+        $otherBook = Book::factory()->create([
+            'needs_review' => true,
+            'needs_review_reasons' => ['library_repair', 'missing_cover'],
+        ]);
+
+        LibraryRepairIssue::query()->create([
+            'book_id' => $matchingBook->id,
+            'issue_type' => 'path_genre_mismatch',
+            'status' => 'pending',
+            'directory_path' => 'Fantasy/Example',
+            'auto_resolved' => false,
+        ]);
+        LibraryRepairIssue::query()->create([
+            'book_id' => $otherBook->id,
+            'issue_type' => 'missing_directory',
+            'status' => 'pending',
+            'directory_path' => 'Other/Example',
+            'auto_resolved' => false,
+        ]);
+
+        $store = new LibraryRepairIssueStore();
+
+        $issues = $store->listIssues(['needs_review_reason' => 'path_genre_mismatch']);
+
+        $this->assertCount(1, $issues);
+        $this->assertSame($matchingBook->id, $issues[0]['book']['id']);
+        $this->assertSame(1, $store->countIssues(['needs_review_reason' => 'path_genre_mismatch']));
+    }
 }

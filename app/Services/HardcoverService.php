@@ -207,8 +207,22 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             return null;
         }
 
+        // Log a trimmed summary rather than the full raw response: Typesense search
+        // results nest highlight/text_match_info nine-plus levels deep, which exceeds
+        // Monolog's default normalize depth and replaces every field with
+        // "Over 9 levels deep, aborting normalization" — making the raw dump useless
+        // for debugging anyway.
+        $hitsSummary = array_map(
+            static fn (array $hit): array => [
+                'id' => $hit['document']['id'] ?? null,
+                'title' => $hit['document']['title'] ?? null,
+                'slug' => $hit['document']['slug'] ?? null,
+            ],
+            $result['data']['search']['results']['hits'] ?? []
+        );
         \Illuminate\Support\Facades\Log::debug('Search request result', [
-            'result' => $result,
+            'found' => $result['data']['search']['results']['found'] ?? null,
+            'hits' => $hitsSummary,
         ]);
 
         // Search endpoint returns results with hits array containing documents

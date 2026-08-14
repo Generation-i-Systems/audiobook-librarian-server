@@ -86,6 +86,97 @@ class LibraryRepairServiceTest extends TestCase
     }
 
     #[Test]
+    public function itRecordsPathGenreMismatchesAndMarksBooksWithASpecificReviewTag(): void
+    {
+        $service = $this->makeService();
+
+        $mismatched = Book::factory()->create([
+            'directory_path' => 'Fantasy/Example/Book',
+            'needs_review' => false,
+            'needs_review_reasons' => [],
+        ]);
+        $matching = Book::factory()->create([
+            'directory_path' => 'Fantasy/Example/Matching Book',
+            'needs_review' => false,
+            'needs_review_reasons' => [],
+        ]);
+
+        $fantasy = \App\Models\Genre::query()->create(['name' => 'Fantasy']);
+        $mismatchedGenre = \App\Models\Genre::query()->create(['name' => 'Science Fiction']);
+        $mismatched->genres()->attach($mismatchedGenre->id);
+        $matching->genres()->attach($fantasy->id);
+
+        $result = $service->scan(false, [LibraryRepairIssueType::PATH_GENRE_MISMATCH]);
+
+        $this->assertSame(1, $result[LibraryRepairIssueType::PATH_GENRE_MISMATCH->value]['created']);
+        $this->assertDatabaseHas('library_repair_issues', [
+            'book_id' => $mismatched->id,
+            'issue_type' => LibraryRepairIssueType::PATH_GENRE_MISMATCH->value,
+            'status' => 'pending',
+        ]);
+        $this->assertSame(
+            ['library_repair', 'path_genre_mismatch'],
+            $mismatched->fresh()->needs_review_reasons
+        );
+        $this->assertFalse($matching->fresh()->needs_review);
+
+        $mismatched->genres()->sync([$fantasy->id]);
+
+        $secondScan = $service->scan(false, [LibraryRepairIssueType::PATH_GENRE_MISMATCH]);
+
+        $this->assertSame(1, $secondScan[LibraryRepairIssueType::PATH_GENRE_MISMATCH->value]['resolved']);
+        $this->assertDatabaseHas('library_repair_issues', [
+            'book_id' => $mismatched->id,
+            'issue_type' => LibraryRepairIssueType::PATH_GENRE_MISMATCH->value,
+            'status' => 'resolved',
+        ]);
+    }
+
+    #[Test]
+    public function itRecordsTitleDirectoryMismatchesAndResolvesThemWhenTheDirectoryIsCorrected(): void
+    {
+        $service = $this->makeService();
+
+        $mismatched = Book::factory()->create([
+            'title' => 'The Correct Title',
+            'directory_path' => 'Fantasy/Example/The Wrong Title',
+            'needs_review' => false,
+            'needs_review_reasons' => [],
+        ]);
+        $matching = Book::factory()->create([
+            'title' => 'Matching Title',
+            'directory_path' => 'Fantasy/Example/01 - Matching Title (Unabridged)',
+            'needs_review' => false,
+            'needs_review_reasons' => [],
+        ]);
+
+        $firstScan = $service->scan(false, [LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH]);
+
+        $this->assertSame(1, $firstScan[LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH->value]['created']);
+        $this->assertDatabaseHas('library_repair_issues', [
+            'book_id' => $mismatched->id,
+            'issue_type' => LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH->value,
+            'status' => 'pending',
+        ]);
+        $this->assertSame(
+            ['library_repair', 'title_directory_mismatch'],
+            $mismatched->fresh()->needs_review_reasons
+        );
+        $this->assertFalse($matching->fresh()->needs_review);
+
+        $mismatched->update(['directory_path' => 'Fantasy/Example/The Correct Title']);
+
+        $secondScan = $service->scan(false, [LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH]);
+
+        $this->assertSame(1, $secondScan[LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH->value]['resolved']);
+        $this->assertDatabaseHas('library_repair_issues', [
+            'book_id' => $mismatched->id,
+            'issue_type' => LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH->value,
+            'status' => 'resolved',
+        ]);
+    }
+
+    #[Test]
     public function it_auto_updates_directory_for_nested_audio_when_safe(): void
     {
         $service = $this->makeService();
@@ -449,6 +540,34 @@ class LibraryRepairServiceTest extends TestCase
         $this->assertArrayHasKey(LibraryRepairIssueType::BOGUS_DIRECTORY->value, $result);
         $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
         $this->assertSame(0, $summary['created']);
+    }
+
+    #[Test]
+    public function itReconcilesPendingInvalidAudioIssuesWhenTheirDirectoryIsRemoved(): void
+    {
+        $service = $this->makeService();
+        $book = Book::factory()->create([
+            'title' => 'Removed Invalid Audio',
+            'directory_path' => 'Fantasy/Example/Removed Invalid Audio',
+        ]);
+
+        LibraryRepairIssue::query()->create([
+            'book_id' => $book->id,
+            'issue_type' => LibraryRepairIssueType::INVALID_AUDIO->value,
+            'directory_path' => $book->directory_path,
+            'metadata' => ['invalid_count' => 1],
+            'status' => 'pending',
+            'auto_resolved' => false,
+        ]);
+
+        $result = $service->scan(false, [LibraryRepairIssueType::INVALID_AUDIO]);
+
+        $this->assertSame(1, $result[LibraryRepairIssueType::INVALID_AUDIO->value]['resolved']);
+        $this->assertDatabaseHas('library_repair_issues', [
+            'book_id' => $book->id,
+            'issue_type' => LibraryRepairIssueType::INVALID_AUDIO->value,
+            'status' => 'resolved',
+        ]);
     }
 
     private function makeService(): LibraryRepairService

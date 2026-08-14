@@ -138,6 +138,13 @@ class LibraryRepairIssueStore
             $query->where('book_id', $filters['book_id']);
         }
 
+        if (!empty($filters['needs_review_reason'])) {
+            $reason = $filters['needs_review_reason'];
+            $query->whereHas('book', function (Builder $bookQuery) use ($reason): void {
+                $bookQuery->whereJsonContains('needs_review_reasons', $reason);
+            });
+        }
+
         $showResolved = $this->normalizeBooleanFilter($filters['show_resolved'] ?? null);
 
         if (!empty($filters['status'])) {

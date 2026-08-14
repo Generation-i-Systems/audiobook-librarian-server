@@ -54,7 +54,7 @@ class BookImportServiceParentDirectoryManualOverridesTest extends TestCase
         $this->assertSame(
             [
                 'author' => ['Brandon Sanderson'],
-                'genre' => 'Fantasy',
+                'genre' => ['Fantasy'],
                 'series' => 'Mistborn',
             ],
             $overrides['/downloads/Mistborn Series']

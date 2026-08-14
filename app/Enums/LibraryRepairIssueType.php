@@ -13,4 +13,6 @@ enum LibraryRepairIssueType: string
     case NUMBERED_SUFFIX_DIRECTORY = 'numbered_suffix_directory';
     case BOGUS_DIRECTORY = 'bogus_directory';
     case INVALID_AUDIO = 'invalid_audio';
+    case PATH_GENRE_MISMATCH = 'path_genre_mismatch';
+    case TITLE_DIRECTORY_MISMATCH = 'title_directory_mismatch';
 }

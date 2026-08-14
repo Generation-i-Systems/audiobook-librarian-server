@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 class LibraryRepairScanCommand extends Command
 {
     protected $signature = 'library:repair-scan
-                            {--issue=* : Limit scan to specific issue types (missing_directory, orphan_directory, duplicate_directory, nested_audio)}
+                            {--issue=* : Limit scan to specific issue types (for example, path_genre_mismatch)}
                             {--no-attempt-fixes : Disable automatic non-interactive fixes}
                             {--json : Output JSON summary instead of table}';
 

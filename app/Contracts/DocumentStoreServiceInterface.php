@@ -368,6 +368,15 @@ interface DocumentStoreServiceInterface
 
     public function searchSeriesByName(string $term): array;
 
+    /**
+     * Book IDs belonging to any of the given series names, without loading the
+     * matched books' full records.
+     *
+     * @param  array<int, string>  $seriesNames
+     * @return array<int, array{book_id: int, series_name: string}>
+     */
+    public function findBookIdsBySeriesNames(array $seriesNames): array;
+
     // AUTHORS
     public function createAuthor(array $data);
 

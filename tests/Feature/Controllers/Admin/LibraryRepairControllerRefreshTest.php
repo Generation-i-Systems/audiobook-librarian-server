@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature\Controllers\Admin;
 
 use App\Auth\DocumentstoreUser;
@@ -36,6 +38,8 @@ class LibraryRepairControllerRefreshTest extends TestCase
             ->andReturn([]);
         $this->documentStoreService->shouldReceive('countLibraryRepairIssues')
             ->andReturn(0);
+        $this->documentStoreService->shouldReceive('listNeedsReviewReasons')
+            ->andReturn([]);
 
         $this->app->instance(DocumentStoreServiceInterface::class, $this->documentStoreService);
     }

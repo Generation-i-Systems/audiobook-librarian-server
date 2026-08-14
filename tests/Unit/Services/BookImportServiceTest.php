@@ -56,6 +56,49 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function postProcessAIResultDropsOtherWhenSpecificGenresAreAvailable(): void
+    {
+        $result = $this->service->postProcessAIResult([
+            'title' => 'Test Book',
+            'genre' => ['Other', 'Fantasy'],
+        ], ['path' => '/tmp/Test Book']);
+
+        $this->assertSame(['Fantasy'], $result['genre']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function buildMetadataFromBookPreservesEveryGenreForEditing(): void
+    {
+        $book = $this->createTempBook();
+        $fantasy = Genre::create(['name' => 'Fantasy']);
+        $litrpg = Genre::create(['name' => 'LitRPG']);
+        $book->genres()->attach([$fantasy->id, $litrpg->id]);
+        $book->load('genres');
+
+        $metadata = $this->service->buildMetadataFromBook($book);
+
+        $this->assertSame(['Fantasy', 'LitRPG'], $metadata['genre']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function prepareCoverSourcesForSelectionIncludesEveryDirectoryImage(): void
+    {
+        $directory = $this->createTempDirectory('cover_sources');
+        File::put($directory . '/cover.jpg', 'cover');
+        File::put($directory . '/alternate.png', 'alternate');
+
+        try {
+            $metadata = ['cover_url' => 'https://example.test/cover.jpg'];
+            $this->service->prepareCoverSourcesForSelection($metadata, ['path' => $directory]);
+
+            $paths = array_column(array_filter($metadata['cover_sources'], fn (array $source): bool => $source['type'] === 'file'), 'path');
+            $this->assertSame([$directory . '/alternate.png', $directory . '/cover.jpg'], $paths);
+        } finally {
+            File::deleteDirectory($directory);
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generateDirectoryPathIncludesSeriesNumberInTitle(): void
     {
         $metadata = [
@@ -241,6 +284,43 @@ class BookImportServiceTest extends TestCase
         $this->assertTrue(
             collect($logs)->contains(fn ($message) => str_contains($message, 'target directory already contains files'))
         );
+
+        File::deleteDirectory($bookRoot);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function reviewAndApproveAcceptsExistingDirectoryWhenItIsTheSourceDirectory(): void
+    {
+        $bookRoot = $this->createTempDirectory('book_root');
+        config(['app.book_root' => $bookRoot, 'filesystems.disks.books.root' => $bookRoot]);
+        File::makeDirectory($bookRoot . '/Existing/Book', 0775, true);
+        File::put($bookRoot . '/Existing/Book/track.mp3', 'existing audio');
+        Genre::create(['name' => 'Science Fiction']);
+
+        $metadata = ['title' => 'Existing Book', 'author' => ['Author'], 'genre' => 'Science Fiction', 'confidence' => 100];
+        $audiobook = ['path' => $bookRoot . '/Existing/Book', 'files' => [$bookRoot . '/Existing/Book/track.mp3']];
+        $inputInterrupted = false;
+
+        $result = $this->service->reviewAndApprove(
+            $metadata,
+            $audiobook,
+            fn ($data) => $data,
+            function (): void {
+            },
+            fn () => '1',
+            fn ($question, $default = '') => $default,
+            fn () => [],
+            fn ($data) => $data,
+            fn ($data) => $data,
+            fn () => null,
+            fn () => $this->service->getValidGenres(),
+            fn () => true,
+            fn () => 'Existing/Book',
+            $inputInterrupted
+        );
+
+        $this->assertTrue($result);
+        $this->assertSame('Existing/Book', $metadata['custom_directory_path']);
 
         File::deleteDirectory($bookRoot);
     }

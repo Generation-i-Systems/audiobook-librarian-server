@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
             opts+=("$1")
             shift
             ;;
-        --directory|--model|--min-confidence|--limit|--collection|--genre|--pattern|--ui)
+        --directory|--model|--min-confidence|--limit|--collection|--genre|--pattern|--repair-title-mismatch-date|--repair-expected|--ui)
             if [[ "$#" -gt 1 && ! "$2" =~ ^- ]]; then
                 opts+=("$1" "$2")
                 shift 2

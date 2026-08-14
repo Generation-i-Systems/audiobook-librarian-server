@@ -127,6 +127,61 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function addingNarratorToDirectoryNameRefreshesTheCurrentBookDetailsPanel(): void
+    {
+        $metadata = [
+            'title' => 'Test Book',
+            'author' => ['Test Author'],
+            'narrator' => ['Great Narrator'],
+            'custom_directory_path' => 'Fiction/Test Author/Test Book',
+        ];
+
+        $askInlineCallback = fn (string $question, string $default): string => $default;
+
+        // 'n' = add narrator to directory name, then done.
+        $choices = ['n', '9'];
+        $selectCallback = function (string $question, array $options, string $default) use (&$choices): string {
+            return array_shift($choices) ?? $default;
+        };
+
+        $uiCalls = [];
+        $uiServiceLogCallback = function ($message, $data = null) use (&$uiCalls): void {
+            $uiCalls[] = [$message, $data];
+        };
+
+        $getFirstNonEmptyCallback = function (array $metadata, array $keys) {
+            foreach ($keys as $key) {
+                if (!empty($metadata[$key] ?? null)) {
+                    return $metadata[$key];
+                }
+            }
+            return null;
+        };
+
+        $result = $this->service->editMetadataFields(
+            $metadata,
+            [],
+            $askInlineCallback,
+            $selectCallback,
+            $getFirstNonEmptyCallback,
+            function (array &$metadata): void {
+            },
+            fn () => ['Other'],
+            $uiServiceLogCallback,
+            fn (array $metadata) => $metadata
+        );
+
+        $this->assertSame('Fiction/Test Author/Test Book (Great Narrator)', $result['custom_directory_path']);
+
+        // The "Current Book Details" panel must be refreshed immediately after the
+        // directory path changes, same as every other edit in this menu.
+        $refreshCalls = array_filter($uiCalls, fn (array $call): bool => $call[0] === 'setCurrentBook');
+        $this->assertNotEmpty($refreshCalls, 'setCurrentBook must be called after updating the directory name');
+        $lastRefresh = end($refreshCalls);
+        $this->assertSame('Fiction/Test Author/Test Book (Great Narrator)', $lastRefresh[1]['custom_directory_path']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function editingAnUnrelatedFieldDoesNotRunSeriesNumberExtractionOrTouchTitle(): void
     {
         $metadata = [
@@ -292,7 +347,7 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function editAllFieldsSequentialUsesTheFilteredSelectCallbackForGenre(): void
+    public function editAllFieldsSequentialKeepsFilteredPrimaryGenreSelectionAndEditsExtras(): void
     {
         $metadata = [
             'title' => 'Old Title',
@@ -311,6 +366,7 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
             'New Series',
             '2',
             '2021',
+            'Fantasy, Other',
             '',
             '/library/New Title',
         ];
@@ -329,7 +385,6 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
         $filteredSelectCalls = [];
         $filteredSelectCallback = function (string $question, array $options, string $default) use (&$filteredSelectCalls): string {
             $filteredSelectCalls[] = $question;
-            // validGenres = ['Fantasy', 'Horror', 'Other'] -> genreOptions '2' = 'Horror'.
             return '2';
         };
 
@@ -357,10 +412,8 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
             selectFilteredCallback: $filteredSelectCallback
         );
 
-        $this->assertSame(1, count($filteredSelectCalls), 'Genre must be selected via the filtered callback exactly once');
-        $this->assertSame('Genre', $filteredSelectCalls[0]);
-        $this->assertNotContains('Genre', $plainSelectCalls, 'The plain (unfiltered) select callback must not be asked about Genre');
-        $this->assertSame('Horror', $result['genre']);
+        $this->assertSame(['Genre'], $filteredSelectCalls);
+        $this->assertSame(['Horror', 'Fantasy'], $result['genre']);
         $this->assertSame('New Title', $result['title']);
         $this->assertSame('/library/New Title', $result['custom_directory_path']);
     }
@@ -386,6 +439,7 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
             'New Series',
             '2',
             '2021',
+            '',
         ];
         $askInlineCallback = function (string $question, string $default) use (&$askResponses, &$askQuestions): string {
             $askQuestions[] = $question;
@@ -397,7 +451,6 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
             return array_shift($menuChoices) ?? $default;
         };
 
-        // Escape cancels the filtered Genre prompt: not a valid option key.
         $filteredSelectCallback = fn (string $question, array $options, string $default): string => '';
 
         $getFirstNonEmptyCallback = function (array $metadata, array $keys) {

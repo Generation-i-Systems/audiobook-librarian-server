@@ -76,8 +76,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('08:00')
             ->appendOutputTo(storage_path('logs/favorite-notifications.log'));
 
-        // Scan audiobook library for directory issues every night at 5:00 AM
-        $schedule->command('library:repair-scan --issue=missing_directory --issue=nested_audio --issue=duplicate_directory --issue=orphan_directory')
+        // Reconcile every repair type nightly; this detects new issues and closes ones fixed outside Library Repair.
+        $schedule->command('library:repair-scan --no-attempt-fixes')
             ->dailyAt('05:00')
             ->appendOutputTo(storage_path('logs/library-repair.log'));
 

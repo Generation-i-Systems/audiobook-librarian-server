@@ -43,6 +43,17 @@
                         <input type="search" id="search" name="search" class="form-control" value="{{ $filters['search'] }}"
                             placeholder="Title or directory" />
                     </div>
+                    <div class="col-md-3">
+                        <label for="needs_review_reason" class="form-label">Needs Review tag</label>
+                        <select id="needs_review_reason" name="needs_review_reason" class="form-select">
+                            <option value="">All tags</option>
+                            @foreach($needsReviewReasons as $reason)
+                                <option value="{{ $reason }}" @selected($filters['needs_review_reason'] === $reason)>
+                                    {{ $reason }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="col-md-2">
                         <label for="limit" class="form-label">Per page</label>
                         <select id="limit" name="limit" class="form-select">
@@ -177,6 +188,21 @@
                                         @elseif($issueType === \App\Enums\LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY->value)
                                             <div class="text-muted">
                                                 Directory ends with a numeric suffix but no base directory exists.
+                                            </div>
+                                        @elseif($issueType === \App\Enums\LibraryRepairIssueType::PATH_GENRE_MISMATCH->value)
+                                            <div>
+                                                <strong>Path genre:</strong> {{ $metadata['path_genre'] ?? 'Unknown' }}
+                                            </div>
+                                            <div>
+                                                <strong>Assigned genres:</strong>
+                                                {{ implode(', ', $metadata['assigned_genres'] ?? []) ?: 'None' }}
+                                            </div>
+                                        @elseif($issueType === \App\Enums\LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH->value)
+                                            <div>
+                                                <strong>Book title:</strong> {{ $metadata['book_title'] ?? 'Unknown' }}
+                                            </div>
+                                            <div>
+                                                <strong>Directory title:</strong> {{ $metadata['directory_title'] ?? 'Unknown' }}
                                             </div>
                                         @endif
                                     </div>

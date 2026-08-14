@@ -326,6 +326,47 @@ class BookEnrichmentServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function buildAudibleSearchQueryVariantsDropsSeriesNumberThenSeriesName(): void
+    {
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAudibleSearchQueryVariants');
+        $method->setAccessible(true);
+
+        $variants = $method->invoke($this->service, "De Bellis Crime Family 04 - A Sinner's Saint", 'Kylie Kent');
+
+        $this->assertSame([
+            "De Bellis Crime Family 04 - A Sinner's Saint",
+            "De Bellis Crime Family - A Sinner's Saint",
+            "A Sinner's Saint",
+            "A Sinner's Saint Kylie Kent",
+        ], $variants);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function buildAudibleSearchQueryVariantsAppendsAuthorWhenTitleHasNoSeriesNumber(): void
+    {
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAudibleSearchQueryVariants');
+        $method->setAccessible(true);
+
+        $variants = $method->invoke($this->service, 'Plain Title', 'Some Author');
+
+        $this->assertSame(['Plain Title', 'Plain Title Some Author'], $variants);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function buildAudibleSearchQueryVariantsDeduplicatesWhenAuthorIsEmpty(): void
+    {
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAudibleSearchQueryVariants');
+        $method->setAccessible(true);
+
+        $variants = $method->invoke($this->service, 'Plain Title', '');
+
+        $this->assertSame(['Plain Title'], $variants);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cleanDescriptionRemovesHtmlTags(): void
     {
         // Use reflection to access protected method

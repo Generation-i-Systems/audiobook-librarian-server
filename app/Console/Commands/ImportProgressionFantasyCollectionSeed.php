@@ -59,6 +59,8 @@ class ImportProgressionFantasyCollectionSeed extends ImportBooksFromDownloads
                             {--collection= : Unused here; declared for the same reason}
                             {--genre= : Unused here; declared for the same reason}
                             {--pattern= : Unused here; declared for the same reason}
+                            {--repair-title-mismatch-date= : Unused here; declared for the same reason}
+                            {--repair-expected= : Unused here; declared for the same reason}
                             {--ui= : Unused here; declared for the same reason}';
 
     protected $description = 'Import the "Progression Fantasy Collection Seed" batch using '

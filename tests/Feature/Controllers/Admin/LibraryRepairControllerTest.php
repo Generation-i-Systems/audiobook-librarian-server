@@ -49,6 +49,9 @@ class LibraryRepairControllerTest extends TestCase
             ->with($this->admin->getAuthIdentifier())
             ->andReturn(true)
         ;
+        $this->documentStoreService->shouldReceive('listNeedsReviewReasons')
+            ->andReturn(['missing_cover', 'path_genre_mismatch'])
+        ;
     }
 
     protected function tearDown(): void
@@ -140,6 +143,7 @@ class LibraryRepairControllerTest extends TestCase
             ->with([
                 'issue_type' => 'orphan_directory',
                 'search' => 'missing',
+                'needs_review_reason' => 'path_genre_mismatch',
                 'show_resolved' => true,
             ], 10, 2)
             ->andReturn([])
@@ -150,6 +154,7 @@ class LibraryRepairControllerTest extends TestCase
             ->with([
                 'issue_type' => 'orphan_directory',
                 'search' => 'missing',
+                'needs_review_reason' => 'path_genre_mismatch',
                 'show_resolved' => true,
             ])
             ->andReturn(0)
@@ -158,6 +163,7 @@ class LibraryRepairControllerTest extends TestCase
         $response = $this->get(route('admin.library-repair.index', [
             'issue_type' => 'orphan_directory',
             'search' => 'missing',
+            'needs_review_reason' => 'path_genre_mismatch',
             'show_resolved' => 1,
             'limit' => 10,
             'page' => 2,

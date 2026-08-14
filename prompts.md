@@ -398,3 +398,65 @@ commit
 ---
 
 update the db save logic to enforce series-number leading-zero normalization going forward while preserving leading zeroes for values below one
+
+---
+
+## 2026-08-12
+
+add a needs review entry for all books whose storage-path genre is not represented in the database genre assignments, and let the Library Repair page filter by any existing Needs Review tag. Add path-genre and title-directory mismatch detection to the nightly repair scan, resolving either issue when a later scan finds it was fixed outside the repair UI. Ensure every repair scan type automatically verifies its outstanding items and resolves those that are no longer valid.
+
+---
+
+build a script to redo the import logic for the titles of those 2071 books using First m4b (or mp3) tags, then directory names and update the db title entry because the import script had a glitch that day
+
+---
+
+this will be very similar to a full re-import under the same directory and using the same db id. so it should go through the full import confirmation flow
+
+---
+
+This needs to be correctly handle cases where the source and destinations are the same and do a metadata only import without attempting to move files
+
+---
+
+the fix is not only needed for these repairs it is also needed for cases where the files are already in the correct directory before importing
+
+---
+
+the repair should normally skip things not marked for repair ie where the title already matches the expected title. Other should not be included in the extra genres. Other is only for the rare case where no genre can be established. I should be able to edit the extra genres. currently only the main genre is updatable
+
+---
+
+the count is not updated for these repairs
+
+---
+
+Progress: [0% (0/0)]
+
+---
+
+that lost the genre selection logic, bad
+
+---
+
+now, no books are found to process
+
+---
+
+Refusing title-mismatch repair: expected 2071 records, found 2066.
+
+---
+
+Why was the author not identified?
+
+---
+
+and that author should have been fed INTO the AI
+
+---
+
+when updating the directory from these fixes the files are not actually moved.
+
+---
+
+when I request updating the cover offer downloading a new cover from the enrichment or from the cover tags in the book or show each image in the dir and let me pick one

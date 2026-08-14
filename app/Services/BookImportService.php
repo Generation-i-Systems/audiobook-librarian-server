@@ -609,6 +609,13 @@ class BookImportService
                     'incoming_title' => $metadata['title'] ?? null,
                     'confirmed_genre' => $metadata['genre'] ?? null,
                     'confirmed_directory_path' => $metadata['custom_directory_path'] ?? null,
+                    'confirmed_author' => $metadata['author'] ?? null,
+                    'confirmed_narrator' => $metadata['narrator'] ?? null,
+                ]);
+                Log::debug('[AUTHOR-TRACE] persistConfirmedBook: reusing existing book, confirmed metadata author/narrator', [
+                    'existing_book_id' => $existingBook->id,
+                    'confirmed_author' => $metadata['author'] ?? null,
+                    'confirmed_narrator' => $metadata['narrator'] ?? null,
                 ]);
 
                 return $this->persistConfirmedBookUpdate($existingBook, $confirmed, $audiobook, $options);
@@ -701,6 +708,13 @@ class BookImportService
             }
 
             $book->save();
+
+            Log::debug('[AUTHOR-TRACE] persistConfirmedBook: about to attach author/narrator to NEW book', [
+                'book_id' => $book->id,
+                'directory_path' => $book->directory_path,
+                'confirmed_author' => $metadata['author'] ?? null,
+                'confirmed_narrator' => $metadata['narrator'] ?? null,
+            ]);
 
             // Handle authors
             if (!empty($metadata['author'])) {
@@ -871,7 +885,7 @@ class BookImportService
 
         $existingCover = $this->findExistingCover($book->directory_path);
 
-        if ($existingCover) {
+        if ($existingCover && empty($metadata['replace_cover'])) {
             // Use existing cover - don't download
             $book->cover_image = $existingCover;
         } elseif (!empty($metadata['cover_data'])) {
@@ -933,7 +947,7 @@ class BookImportService
             'title'          => $book->title ?? '',
             'author'         => $authors,
             'narrator'       => $narrators,
-            'genre'          => $genres[0] ?? '',
+            'genre'          => $genres,
             'tags'           => $tags,
             'series'         => $seriesName,
             'series_number'  => $seriesNumber,
@@ -4090,6 +4104,12 @@ class BookImportService
         foreach (array_values(array_unique(array_filter($candidateDirectories))) as $directoryPath) {
             $existingByDirectory = Book::where('directory_path', $directoryPath)->first();
             if ($existingByDirectory instanceof Book) {
+                Log::debug('[AUTHOR-TRACE] findExistingBook: matched by exact directory_path', [
+                    'incoming_path' => $path,
+                    'candidate_directory' => $directoryPath,
+                    'matched_book_id' => $existingByDirectory->id,
+                    'matched_directory_path' => $existingByDirectory->directory_path,
+                ]);
                 return $existingByDirectory;
             }
 
@@ -4100,6 +4120,12 @@ class BookImportService
                 ->first();
 
             if ($existingByDirectoryName instanceof Book) {
+                Log::debug('[AUTHOR-TRACE] findExistingBook: matched by directory_path LIKE suffix', [
+                    'incoming_path' => $path,
+                    'candidate_directory' => $directoryPath,
+                    'matched_book_id' => $existingByDirectoryName->id,
+                    'matched_directory_path' => $existingByDirectoryName->directory_path,
+                ]);
                 return $existingByDirectoryName;
             }
         }
@@ -4874,8 +4900,9 @@ class BookImportService
                 $fileTags[$firstFile]['genre'] = $openAudibleMetadata['original_genre'];
             }
 
+            $aiDirectoryContext = $audiobook['ai_directory_context'] ?? $audiobook['path'];
             $aiResult = $aiProcessor->processBookDirectory(
-                basename($audiobook['path']),
+                (string) $aiDirectoryContext,
                 $fileNames,
                 $fileTags,
                 $nfoData,
@@ -4883,7 +4910,19 @@ class BookImportService
             );
 
             if ($aiResult) {
+                Log::debug('[AUTHOR-TRACE] processWithAI: raw AI result', [
+                    'path' => $audiobook['path'] ?? null,
+                    'ai_author' => $aiResult['author'] ?? null,
+                    'ai_narrator' => $aiResult['narrator'] ?? null,
+                ]);
+
                 $tagMetadata = $this->extractMetadataFromFileTags($fileTags);
+                Log::debug('[AUTHOR-TRACE] processWithAI: file-tag metadata for this audiobook\'s own files', [
+                    'path' => $audiobook['path'] ?? null,
+                    'file_tag_author' => $tagMetadata['author'] ?? null,
+                    'file_tag_narrator' => $tagMetadata['narrator'] ?? null,
+                    'fileTags_keys' => array_keys($fileTags),
+                ]);
                 $aiResult = $this->mergeMetadataFillMissing($aiResult, $tagMetadata);
 
                 // Tags are authoritative for author and year — override AI guesses when tags are present
@@ -4893,6 +4932,12 @@ class BookImportService
                 if (!empty($tagMetadata['year'])) {
                     $aiResult['year'] = $tagMetadata['year'];
                 }
+
+                Log::debug('[AUTHOR-TRACE] processWithAI: final aiResult after tag-authoritative override', [
+                    'path' => $audiobook['path'] ?? null,
+                    'final_author' => $aiResult['author'] ?? null,
+                    'final_narrator' => $aiResult['narrator'] ?? null,
+                ]);
 
                 // metadata.json is fully authoritative — override AI for all provided fields
                 $metadataJson = $this->readMetadataJson($audiobook['path']);
@@ -5462,7 +5507,8 @@ class BookImportService
         $hint = "Folder \"{$folderName}\" in this directory was mis-parsed by the AI — " .
             implode('; ', $correctionParts) . '.';
 
-        if (isset($diffs['Title'], $diffs['Series'])
+        if (
+            isset($diffs['Title'], $diffs['Series'])
             && $diffs['Title'][0] !== '' && $diffs['Series'][0] !== ''
             && strcasecmp($diffs['Title'][0], $diffs['Series'][1]) === 0
             && strcasecmp($diffs['Series'][0], $diffs['Title'][1]) === 0
@@ -5573,7 +5619,8 @@ class BookImportService
         ?callable $manualEnrichmentCallback = null,
         ?callable $getEnrichmentServiceCallback = null,
         ?callable $generateDirectoryPathCallback = null,
-        ?callable $selectFilteredCallback = null
+        ?callable $selectFilteredCallback = null,
+        ?callable $selectCoverCallback = null
     ): array {
         $selectFilteredCallback ??= $selectWithImmediateInterruptCallback;
         $originalMetadata = [];
@@ -5616,25 +5663,44 @@ class BookImportService
                 $metadata['genre'] = $this->config['genre'];
             } else {
                 $validGenres = $getValidGenresCallback();
-                $genreOptions = [];
-                foreach ($validGenres as $idx => $g) {
-                    $genreOptions[(string) ($idx + 1)] = $g;
-                }
                 $currentGenre = $metadata['genre'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
-                $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
-                $currentGenreIdx = array_search($displayGenre, $validGenres, true);
-                $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
-                $selectedGenreIdx = $selectFilteredCallback('Genre', $genreOptions, $defaultGenreIdx);
-                // An Escape cancel returns a key that isn't in $genreOptions (never a
-                // valid option itself), so this also detects cancellation without the
-                // callback needing a separate out-of-band signal.
-                $genreSelectionCancelled = !array_key_exists($selectedGenreIdx, $genreOptions);
-                $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
-                if (is_array($metadata['genre'] ?? null)) {
-                    $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
-                    $metadata['genre'] = array_values(array_merge([$newGenre], $others));
+                $currentGenres = is_array($currentGenre) ? $currentGenre : [$currentGenre];
+                $primaryGenre = $currentGenres[0] ?? 'Other';
+                $genreOptions = [];
+                foreach ($validGenres as $index => $genre) {
+                    $genreOptions[(string) ($index + 1)] = $genre;
+                }
+                $primaryGenreIndex = array_search($primaryGenre, $validGenres, true);
+                $selectedGenreIndex = $selectFilteredCallback(
+                    'Genre',
+                    $genreOptions,
+                    $primaryGenreIndex === false ? (string) count($validGenres) : (string) ($primaryGenreIndex + 1)
+                );
+                if (!array_key_exists($selectedGenreIndex, $genreOptions)) {
+                    $genreSelectionCancelled = true;
                 } else {
-                    $metadata['genre'] = $newGenre;
+                    $newPrimaryGenre = $genreOptions[$selectedGenreIndex];
+                    $existingExtras = array_values(array_filter(
+                        $currentGenres,
+                        static fn (string $genre): bool => $genre !== $newPrimaryGenre
+                    ));
+                    $enteredExtras = array_values(array_unique(array_filter(array_map(
+                        'trim',
+                        explode(',', $askInlineCallback('Additional genre(s) (comma-separated)', implode(', ', $existingExtras)))
+                    ))));
+                    $invalidGenres = array_values(array_diff($enteredExtras, $validGenres));
+                    if ($invalidGenres !== []) {
+                        $uiServiceLogCallback('⚠️  Unknown additional genre(s): ' . implode(', ', $invalidGenres));
+                        $genreSelectionCancelled = true;
+                    }
+                    if ($invalidGenres === []) {
+                        $genres = array_values(array_unique([$newPrimaryGenre, ...$enteredExtras]));
+                        $specificGenres = array_values(array_filter(
+                            $genres,
+                            fn (string $genre): bool => strcasecmp($genre, 'Other') !== 0
+                        ));
+                        $metadata['genre'] = $specificGenres !== [] ? $specificGenres : $genres;
+                    }
                 }
             }
 
@@ -5698,7 +5764,7 @@ class BookImportService
             }
 
             $currentGenre = $metadata['genre'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
-            $displayGenre = is_array($currentGenre) ? ($currentGenre[0] ?? 'Other') : $currentGenre;
+            $displayGenre = is_array($currentGenre) ? implode(', ', $currentGenre) : $currentGenre;
 
             $currentTags = $metadata['tags'] ?? [];
             $currentTags = is_array($currentTags) ? $currentTags : [$currentTags];
@@ -5719,7 +5785,7 @@ class BookImportService
                 '4' => 'Series: ' . $currentSeries,
                 '5' => 'Series Number: ' . $currentSeriesNumber,
                 '6' => 'Year: ' . $currentYear,
-                '7' => 'Genre: ' . $displayGenre,
+                '7' => 'Genre(s): ' . $displayGenre,
                 '8' => 'Directory Path: ' . $currentDirectory,
                 't' => 'Tags: ' . $displayTags,
                 'a' => 'Edit all fields (sequential)',
@@ -5798,21 +5864,38 @@ class BookImportService
                         break;
                     }
                     $validGenres = $getValidGenresCallback();
+                    $currentGenres = is_array($currentGenre) ? $currentGenre : [$currentGenre];
+                    $primaryGenre = $currentGenres[0] ?? 'Other';
                     $genreOptions = [];
-                    foreach ($validGenres as $idx => $g) {
-                        $genreOptions[(string) ($idx + 1)] = $g;
+                    foreach ($validGenres as $index => $genre) {
+                        $genreOptions[(string) ($index + 1)] = $genre;
                     }
-                    $currentGenreIdx = array_search($displayGenre, $validGenres, true);
-                    $defaultGenreIdx = ($currentGenreIdx !== false) ? (string) ($currentGenreIdx + 1) : (string) count($validGenres);
-                    $selectedGenreIdx = $selectFilteredCallback('Genre', $genreOptions, $defaultGenreIdx);
-                    $newGenre = $genreOptions[$selectedGenreIdx] ?? $displayGenre;
-
-                    if (is_array($metadata['genre'] ?? null)) {
-                        $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
-                        $metadata['genre'] = array_values(array_merge([$newGenre], $others));
-                    } else {
-                        $metadata['genre'] = $newGenre;
+                    $primaryGenreIndex = array_search($primaryGenre, $validGenres, true);
+                    $selectedGenreIndex = $selectFilteredCallback(
+                        'Genre',
+                        $genreOptions,
+                        $primaryGenreIndex === false ? (string) count($validGenres) : (string) ($primaryGenreIndex + 1)
+                    );
+                    if (!array_key_exists($selectedGenreIndex, $genreOptions)) {
+                        break;
                     }
+                    $newPrimaryGenre = $genreOptions[$selectedGenreIndex];
+                    $existingExtras = array_values(array_filter(
+                        $currentGenres,
+                        static fn (string $genre): bool => $genre !== $newPrimaryGenre
+                    ));
+                    $enteredExtras = array_values(array_unique(array_filter(array_map(
+                        'trim',
+                        explode(',', $askInlineCallback('Additional genre(s) (comma-separated)', implode(', ', $existingExtras)))
+                    ))));
+                    $invalidGenres = array_values(array_diff($enteredExtras, $validGenres));
+                    if ($invalidGenres !== []) {
+                        $uiServiceLogCallback('⚠️  Unknown additional genre(s): ' . implode(', ', $invalidGenres));
+                        break;
+                    }
+                    $genres = array_values(array_unique([$newPrimaryGenre, ...$enteredExtras]));
+                    $specificGenres = array_values(array_filter($genres, fn (string $genre): bool => strcasecmp($genre, 'Other') !== 0));
+                    $metadata['genre'] = $specificGenres !== [] ? $specificGenres : $genres;
                     $metadata = $this->checkForAlternateSeriesDirectory(
                         $metadata,
                         $selectWithImmediateInterruptCallback,
@@ -5843,12 +5926,18 @@ class BookImportService
                         $manualEnrichmentCallback,
                         $getEnrichmentServiceCallback,
                         $generateDirectoryPathCallback,
-                        $selectFilteredCallback
+                        $selectFilteredCallback,
+                        $selectCoverCallback
                     );
                     continue 2;
                 case 'c':
-                    $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
-                    $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
+                    if ($selectCoverCallback !== null) {
+                        $selectCoverCallback($metadata, $audiobook);
+                    } else {
+                        $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
+                        $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
+                        $metadata['replace_cover'] = true;
+                    }
                     $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                     continue 2;
                 case 'r':
@@ -5875,6 +5964,7 @@ class BookImportService
                         $base = preg_replace('/\s*\([^)]+\)$/', '', $base);
                         $metadata['custom_directory_path'] = $base . " ({$narratorString})";
                         $uiServiceLogCallback("📁 Directory updated: {$metadata['custom_directory_path']}");
+                        $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                     }
                     continue 2;
             }
@@ -6432,6 +6522,18 @@ class BookImportService
     }
 
     /**
+     * Read a single field out of $this->multiBookSharedOverrides. A plain property/local
+     * read of $this->multiBookSharedOverrides inside processMultiBookSplit() gets narrowed
+     * by PHPStan to "always empty" (the property is reset to [] right before the loop
+     * there, and PHPStan can't see it being populated by editMetadataFields() through the
+     * opaque $processSingleBookCallback) — a separate method call sidesteps that narrowing.
+     */
+    private function getMultiBookSharedOverride(string $field): mixed
+    {
+        return $this->multiBookSharedOverrides[$field] ?? null;
+    }
+
+    /**
      * Process multi-book directory by splitting into individual books
      */
     public function processMultiBookSplit(
@@ -6440,7 +6542,8 @@ class BookImportService
         array $splitGroups,
         array $aiMetadata,
         ?callable $infoCallback = null,
-        ?callable $processSingleBookCallback = null
+        ?callable $processSingleBookCallback = null,
+        ?AIBookProcessor $aiProcessor = null
     ): array {
         if ($infoCallback) {
             $infoCallback("🔄 Processing {$multiBookInfo['series_name']} as split books...");
@@ -6465,6 +6568,10 @@ class BookImportService
                 continue;
             }
 
+            $sharedOverrides = $this->multiBookSharedOverrides;
+            $sharedOverrideAuthor = $this->getMultiBookSharedOverride('author');
+            $sharedOverrideNarrator = $this->getMultiBookSharedOverride('narrator');
+
             $files = array_map(function ($fileInfo) {
                 return $fileInfo['file'];
             }, $fileInfos);
@@ -6480,11 +6587,86 @@ class BookImportService
             // Extract file tags from this book's files to get embedded metadata
             $fileTagMetadata = $this->extractFileTagsFromFiles($files);
 
-            // Start with AI metadata as base, applying shared overrides from previous edits
-            $bookMetadata = array_merge($aiMetadata, $this->multiBookSharedOverrides);
+            Log::debug('[AUTHOR-TRACE] processMultiBookSplit: files bucketed for this book number', [
+                'book_number' => $bookNumber,
+                'files' => array_map('basename', $files),
+            ]);
+
+            // Run a fresh, per-book AI call using ONLY this book's own file — the same
+            // holistic reasoning (e.g. recognizing that an 'artist' tag actually holds
+            // narrator credits, not the author) a normal single-book import gets, instead
+            // of relying on raw filename/tag parsing alone or the unreliable whole-batch
+            // guess (see note below).
+            $partAiMetadata = null;
+            if ($aiProcessor !== null) {
+                $partRawFileTags = [];
+                foreach (array_slice($files, 0, 3) as $partFilePath) {
+                    $rawTags = $this->extractSingleFileTags($partFilePath);
+                    if (!empty($rawTags)) {
+                        $partRawFileTags[basename($partFilePath)] = $rawTags;
+                    }
+                }
+                $partAiMetadata = $aiProcessor->processBookDirectory(
+                    $bookTitle,
+                    [$firstFilename],
+                    $partRawFileTags,
+                    null,
+                    []
+                );
+                Log::debug('[AUTHOR-TRACE] processMultiBookSplit: per-book AI result', [
+                    'book_number' => $bookNumber,
+                    'first_file' => $firstFilename,
+                    'author' => $partAiMetadata['author'] ?? null,
+                    'narrator' => $partAiMetadata['narrator'] ?? null,
+                ]);
+            }
+
+            Log::debug('[AUTHOR-TRACE] processMultiBookSplit: per-book sources before merge', [
+                'book_number' => $bookNumber,
+                'first_file' => $firstFilename,
+                'aiMetadata_author' => $aiMetadata['author'] ?? null,
+                'aiMetadata_narrator' => $aiMetadata['narrator'] ?? null,
+                'multiBookSharedOverrides' => $sharedOverrides,
+                'filenameMetadata_author' => $filenameMetadata['author'] ?? null,
+                'fileTagMetadata_author' => $fileTagMetadata['author'] ?? null,
+                'fileTagMetadata_narrator' => $fileTagMetadata['narrator'] ?? null,
+            ]);
+
+            // Start with AI metadata as base, applying shared overrides from previous edits.
+            // Author/narrator are excluded from this whole-batch seed (unless a sibling
+            // book's user-confirmed edit is propagating them via multiBookSharedOverrides):
+            // $aiMetadata['author']/['narrator'] come from a single upfront AI/tag scan of
+            // this whole (possibly multi-book) source folder, sampling only its first few
+            // files — for a split folder those files may belong to a DIFFERENT book than
+            // the one being built here (confirmed by a real case where the scan sampled
+            // books #1-3's files while book #4 was being processed, misattributing their
+            // narrator/author tags to it), so trusting that guess here would misattribute
+            // one split book's author/narrator to another. Each book gets its own value
+            // from its own filename/tags/metadata.json below, with no fallback to the
+            // whole-batch guess — a book with no source of its own is left without an
+            // author/narrator rather than confidently attributed to the wrong person.
+            $bookMetadata = array_merge($aiMetadata, $sharedOverrides);
+            if (empty($sharedOverrideAuthor)) {
+                unset($bookMetadata['author']);
+            }
+            if (empty($sharedOverrideNarrator)) {
+                unset($bookMetadata['narrator']);
+            }
             $bookMetadata['series'] = $multiBookInfo['series_name'];
             $bookMetadata['series_number'] = $bookNumber;
             unset($bookMetadata['series_original']);
+
+            // The per-book AI result (this book's own file only) takes priority over
+            // raw filename/tag parsing below, same as it would for a normal single-book
+            // import — but still yields to an explicit multiBookSharedOverrides edit.
+            if ($partAiMetadata !== null) {
+                if (empty($sharedOverrideAuthor) && !empty($partAiMetadata['author'])) {
+                    $bookMetadata['author'] = $partAiMetadata['author'];
+                }
+                if (empty($sharedOverrideNarrator) && !empty($partAiMetadata['narrator'])) {
+                    $bookMetadata['narrator'] = $partAiMetadata['narrator'];
+                }
+            }
 
             // Merge filename-parsed metadata (fills in missing fields)
             if (!empty($filenameMetadata)) {
@@ -6506,6 +6688,13 @@ class BookImportService
                 }
             }
 
+            Log::debug('[AUTHOR-TRACE] processMultiBookSplit: bookMetadata after filename+tag merge', [
+                'book_number' => $bookNumber,
+                'first_file' => $firstFilename,
+                'author' => $bookMetadata['author'] ?? null,
+                'narrator' => $bookMetadata['narrator'] ?? null,
+            ]);
+
             // A per-book metadata.json sitting next to THIS book's own audio file
             // (e.g. a "Book N" subfolder) is fully authoritative — same as the
             // single-book import path — and overrides the AI/filename/tag guesses
@@ -6520,6 +6709,19 @@ class BookImportService
                 if (!empty($partMetadataJson['title'])) {
                     $bookTitle = $partMetadataJson['title'];
                 }
+            }
+
+            // Deliberately NO fallback to the whole-batch AI/tag guess here: that guess
+            // was built from an arbitrary sample of this folder's files (which, for a
+            // multi-book split, may belong to a different book entirely — confirmed by
+            // a real case where it was built from books #1-3's files while book #4 was
+            // being processed) and its own AI prompt reflected that same wrong context,
+            // so it cannot be trusted for a book it wasn't actually derived from. A book
+            // with no author/narrator of its own (per-book AI/filename/tags/metadata.json)
+            // is left without one — forcing review — rather than confidently attributed to the
+            // wrong person. Reduce confidence so this book surfaces for review.
+            if (empty($bookMetadata['author'])) {
+                $bookMetadata['confidence'] = min((int) ($bookMetadata['confidence'] ?? 100), 60);
             }
 
             // Non-audio companion files (metadata.json, cover image) living beside
@@ -6837,6 +7039,11 @@ class BookImportService
                 }
             }
 
+            Log::debug('[AUTHOR-TRACE] extractSingleFileTags: raw getID3 tags for file', [
+                'file' => basename($filePath),
+                'tags' => $tags,
+            ]);
+
             return $tags;
         } catch (\Exception $e) {
             return [];
@@ -7151,6 +7358,24 @@ class BookImportService
     /**
      * Extract metadata from audio file tags
      */
+    /**
+     * Split a raw ID3-tag name list into individual names. File tags commonly delimit
+     * multiple authors/narrators with a comma, ampersand, slash, or the word "and"
+     * (e.g. "Dorje Swallow/Sofia Lette", "Jane Doe & John Smith").
+     *
+     * @return array<int, string>
+     */
+    private function splitMultiValueNameTag(string $value): array
+    {
+        $pattern = '/\s*(?:,|&|\/|\band\b)\s*/i';
+
+        if (preg_match($pattern, $value)) {
+            return array_values(array_filter(array_map('trim', preg_split($pattern, $value))));
+        }
+
+        return [$value];
+    }
+
     public function extractMetadataFromFileTags(array $fileTags): array
     {
         if (empty($fileTags)) {
@@ -7201,7 +7426,7 @@ class BookImportService
             if (is_array($firstTags['artist'])) {
                 $metadata['author'] = $firstTags['artist'];
             } else {
-                $metadata['author'] = [(string) $firstTags['artist']];
+                $metadata['author'] = $this->splitMultiValueNameTag((string) $firstTags['artist']);
             }
         }
 
@@ -7217,10 +7442,10 @@ class BookImportService
             if (is_array($firstTags['narrator'])) {
                 $metadata['narrator'] = array_map('strval', $firstTags['narrator']);
             } else {
-                $metadata['narrator'] = [(string) $firstTags['narrator']];
+                $metadata['narrator'] = $this->splitMultiValueNameTag((string) $firstTags['narrator']);
             }
         } elseif (!empty($firstTags['writer']) && is_string($firstTags['writer'])) {
-            $writerParts = array_map('trim', explode(',', $firstTags['writer']));
+            $writerParts = $this->splitMultiValueNameTag($firstTags['writer']);
             $writerParts = array_values(array_filter(
                 $writerParts,
                 static fn ($value) => $value !== '' && strtolower($value) !== 'full cast'
@@ -8035,6 +8260,12 @@ class BookImportService
 
     public function postProcessAIResult(array $aiResult, array $audiobook): array
     {
+        Log::debug('[AUTHOR-TRACE] postProcessAIResult: entry', [
+            'path' => $audiobook['path'] ?? null,
+            'author' => $aiResult['author'] ?? null,
+            'narrator' => $aiResult['narrator'] ?? null,
+        ]);
+
         // Normalize author names (strip "Publisher/Narrator [Actual Author]" patterns,
         // drop "Graphic Audio"/"Full Cast" placeholders, normalize initials) before the
         // review screen is ever shown, so the user confirms the already-clean value —
@@ -8052,6 +8283,11 @@ class BookImportService
         // arrays are left alone here — those are resolved later during disambiguation.
         if (!empty($aiResult['genre']) && is_string($aiResult['genre'])) {
             $aiResult['genre'] = $this->validateAndMapGenre($aiResult['genre']);
+        }
+        if (is_array($aiResult['genre'] ?? null)) {
+            $genres = array_values(array_unique(array_filter(array_map('trim', $aiResult['genre']))));
+            $specificGenres = array_values(array_filter($genres, fn (string $genre): bool => strcasecmp($genre, 'Other') !== 0));
+            $aiResult['genre'] = $specificGenres !== [] ? $specificGenres : $genres;
         }
 
         // Clear a series that's really just the author's name — this must happen here,
@@ -8156,12 +8392,23 @@ class BookImportService
             $aiResult['series'] = $this->removeAuthorFromSeries($aiResult['series'], $aiResult['author'] ?? []);
         }
 
-        // Map AI genre to valid library genre
+        // Map every AI genre to a valid library genre. "Other" is a fallback only,
+        // so never retain it alongside a more specific classification.
         if (!empty($aiResult['genre'])) {
-            $genre = is_array($aiResult['genre']) ? ($aiResult['genre'][0] ?? '') : $aiResult['genre'];
-            if (!empty($genre)) {
-                $aiResult['original_genre'] = $genre;
-                $aiResult['genre'] = $this->genreMappingService->mapToPrimaryGenre($genre);
+            $genres = is_array($aiResult['genre']) ? $aiResult['genre'] : [$aiResult['genre']];
+            $genres = array_values(array_filter($genres, 'is_string'));
+            $mappedGenres = array_values(array_unique(array_filter(array_map(
+                fn (string $genre): string => $this->genreMappingService->mapToPrimaryGenre($genre),
+                $genres
+            ))));
+            $specificGenres = array_values(array_filter(
+                $mappedGenres,
+                static fn (string $genre): bool => strcasecmp($genre, 'Other') !== 0
+            ));
+
+            if ($mappedGenres !== []) {
+                $aiResult['original_genre'] = $genres[0] ?? null;
+                $aiResult['genre'] = $specificGenres !== [] ? $specificGenres : $mappedGenres;
             }
         }
 
@@ -9603,8 +9850,32 @@ class BookImportService
         $coverOptions = [];
         $hasValidLocalSource = false;
 
+        foreach ($metadata['cover_sources'] ?? [] as $source) {
+            if (!is_array($source)) {
+                continue;
+            }
+
+            if (($source['type'] ?? '') === 'embedded' && !empty($source['data'])) {
+                $previewPath = $getEmbeddedCoverTempPathCallback ? $getEmbeddedCoverTempPathCallback($source['data']) : '';
+                $coverOptions[] = [
+                    'type' => 'embedded', 'url' => $previewPath, 'label' => $source['label'] ?? 'Embedded (audio file tags)',
+                    'cover_data' => $source['data'], 'isLocal' => true,
+                ];
+                $hasValidLocalSource = true;
+            } elseif (($source['type'] ?? '') === 'file' && !empty($source['path'])) {
+                $coverOptions[] = [
+                    'type' => 'file', 'url' => $source['path'], 'label' => $source['label'] ?? ('Local file: ' . basename($source['path'])), 'isLocal' => true,
+                ];
+                $hasValidLocalSource = true;
+            } elseif (($source['type'] ?? '') === 'url' && !empty($source['url'])) {
+                $coverOptions[] = [
+                    'type' => 'url', 'url' => $source['url'], 'label' => $source['label'] ?? 'Remote URL', 'isCurrent' => true,
+                ];
+            }
+        }
+
         // Add embedded cover as an option (convert to temp path for preview)
-        if (!empty($metadata['cover_data'])) {
+        if (!empty($metadata['cover_data']) && !$this->coverOptionsContain($coverOptions, 'embedded', '')) {
             $embeddedPreviewPath = null;
             if ($getEmbeddedCoverTempPathCallback) {
                 $embeddedPreviewPath = $getEmbeddedCoverTempPathCallback($metadata['cover_data']);
@@ -9620,7 +9891,7 @@ class BookImportService
         }
 
         // Add local cover file as an option
-        if (!empty($metadata['cover_path']) && file_exists((string) $metadata['cover_path'])) {
+        if (!empty($metadata['cover_path']) && file_exists((string) $metadata['cover_path']) && !$this->coverOptionsContain($coverOptions, 'file', (string) $metadata['cover_path'])) {
             $coverOptions[] = [
                 'type' => 'file',
                 'url' => (string) $metadata['cover_path'],
@@ -9633,7 +9904,7 @@ class BookImportService
         // Add URL-based cover as an option (with quality check)
         $currentCoverUrl = $metadata['cover_url'] ?? '';
         $hasValidUrlCover = false;
-        if (!empty($currentCoverUrl)) {
+        if (!empty($currentCoverUrl) && !$this->coverOptionsContain($coverOptions, 'url', $currentCoverUrl)) {
             $tempCoverPath = null;
             try {
                 $tempCoverPath = tempnam(sys_get_temp_dir(), 'cover_') . '.jpg';
@@ -9767,6 +10038,45 @@ class BookImportService
             $metadata['cover_data'] = null;
             $metadata['cover_path'] = null;
         }
+
+        $metadata['replace_cover'] = true;
+    }
+
+    /** @param array<int, array<string, mixed>> $coverOptions */
+    private function coverOptionsContain(array $coverOptions, string $type, string $url): bool
+    {
+        foreach ($coverOptions as $option) {
+            if (($option['type'] ?? '') === $type && ($url === '' || ($option['url'] ?? '') === $url)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<mixed> $metadata */
+    public function prepareCoverSourcesForSelection(array &$metadata, array $audiobook): void
+    {
+        $sources = $metadata['cover_sources'] ?? [];
+        $sourcePath = (string) ($audiobook['path'] ?? '');
+        if ($sourcePath !== '' && !str_starts_with($sourcePath, '/')) {
+            $sourcePath = rtrim((string) config('filesystems.disks.books.root'), '/') . '/' . ltrim($sourcePath, '/');
+        }
+
+        if (is_dir($sourcePath)) {
+            foreach (File::files($sourcePath) as $file) {
+                if (in_array(strtolower($file->getExtension()), ['jpg', 'jpeg', 'png', 'webp'], true)) {
+                    $sources[] = ['type' => 'file', 'path' => $file->getPathname(), 'label' => 'Directory image: ' . $file->getFilename()];
+                }
+            }
+        }
+        foreach ([$metadata['cover_url'] ?? null, $metadata['audible_raw']['coverImageUrl'] ?? null, $metadata['google_books_raw']['coverImageUrl'] ?? null] as $url) {
+            if (is_string($url) && $url !== '') {
+                $sources[] = ['type' => 'url', 'url' => $url, 'label' => 'Enrichment cover'];
+            }
+        }
+
+        $metadata['cover_sources'] = $sources;
     }
 
     /**
@@ -10499,12 +10809,22 @@ class BookImportService
     protected function directoryPathHasRealConflict(string $relativePath, string $ownCurrentPath = ''): bool
     {
         $relativePath = trim($relativePath, '/');
-        if ($relativePath === '' || $relativePath === trim($ownCurrentPath, '/')) {
+        if ($relativePath === '') {
             return false;
         }
 
         $bookStoragePath = config('filesystems.disks.books.root') ?? config('app.book_root');
         if (!$bookStoragePath) {
+            return false;
+        }
+
+        $ownCurrentPath = str_replace('\\', '/', trim($ownCurrentPath, '/'));
+        $normalizedRoot = str_replace('\\', '/', trim((string) $bookStoragePath, '/'));
+        if (str_starts_with($ownCurrentPath, $normalizedRoot . '/')) {
+            $ownCurrentPath = substr($ownCurrentPath, strlen($normalizedRoot) + 1);
+        }
+
+        if ($relativePath === $ownCurrentPath) {
             return false;
         }
 

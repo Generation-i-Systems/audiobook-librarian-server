@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Book;
+use App\Models\LibraryRepairIssue;
 use App\Models\Narrator;
 use App\Models\Series;
 use App\Support\ConfirmedBookMetadata;
@@ -25,6 +26,7 @@ use Illuminate\Console\Command;
 use App\Traits\IsolatesErrorHandlers;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 class ImportBooksFromDownloads extends Command
 {
@@ -55,7 +57,9 @@ class ImportBooksFromDownloads extends Command
                              {--include-old : Include OpenAudible books_old directory when scanning}
                             {--collection= : Add all imported items to this collection}
                             {--genre= : Set a default genre for all imported items}
-                            {--pattern= : Alternate storage pattern, e.g., "[genre]/VA/[series]/[title] ([author])"}
+                             {--pattern= : Alternate storage pattern, e.g., "[genre]/VA/[series]/[title] ([author])"}
+                            {--repair-title-mismatch-date= : Re-import title-mismatch review records from this creation date, preserving IDs and files}
+                            {--repair-expected=2071 : Required record count for title-mismatch repair mode}
                             {--ui=hybrid : UI layer (prompts|ncurses|plain|hybrid)}';
 
     /**
@@ -455,6 +459,11 @@ class ImportBooksFromDownloads extends Command
             // Initialize persistent cache system
             $this->initializeCache();
 
+            $repairDate = trim((string) $this->option('repair-title-mismatch-date'));
+            if ($repairDate !== '' && ! $this->hasExpectedRepairTargetCount($repairDate)) {
+                return Command::FAILURE;
+            }
+
             // Create a database backup unless --no-backup is specified, and unless a
             // recent-enough backup already exists (avoid re-backing up on every import run).
             if (!$this->option('no-backup')) {
@@ -497,6 +506,10 @@ class ImportBooksFromDownloads extends Command
             } catch (\Exception $e) {
                 $this->uiService->logMessage("❌ Failed to initialize AI processor: " . $e->getMessage());
                 return Command::FAILURE;
+            }
+
+            if ($repairDate !== '') {
+                return $this->repairTitleMismatchImports($repairDate);
             }
 
             // Check for specific paths first (files or folders)
@@ -681,6 +694,270 @@ class ImportBooksFromDownloads extends Command
     protected function processAudiobookDirectory(string $directory): ?array
     {
         return $this->getImportService()->processAudiobookDirectory($directory);
+    }
+
+    /**
+     * Re-run the normal metadata proposal, enrichment, and interactive confirmation
+     * flow for the affected import batch without creating records or moving audio.
+     */
+    protected function repairTitleMismatchImports(string $date): int
+    {
+        $expected = (int) $this->option('repair-expected');
+        $books = Book::withTrashed()
+            ->whereDate('created_at', $date)
+            ->where('needs_review', true)
+            ->where('needs_review_reasons', 'like', '%directoryPath title mismatch%')
+            ->orderBy('id')
+            ->get();
+
+        if ($expected < 1 || $books->isEmpty() || $books->count() > $expected) {
+            $this->uiService?->logMessage(sprintf(
+                'Refusing title-mismatch repair: expected %d records, found %d.',
+                $expected,
+                $books->count()
+            ));
+
+            return Command::FAILURE;
+        }
+
+        $this->uiService?->logMessage(sprintf(
+            'Re-importing %d existing records from %s. Audio files will not be moved or deleted.',
+            $books->count(),
+            $date
+        ));
+        if ($books->count() < $expected) {
+            $this->uiService?->logMessage(sprintf(
+                'Continuing a prior repair pass: %d of the original %d records remain.',
+                $books->count(),
+                $expected
+            ));
+        }
+        $this->totalFound = $books->count();
+        $this->uiService?->updateProgress(0, $this->totalFound);
+        $current = 0;
+
+        foreach ($books as $book) {
+            if ($this->userRequestedQuit) {
+                break;
+            }
+
+            $this->repairExistingBookFromImportFlow($book);
+            $current++;
+            $this->uiService?->updateProgress($current, $this->totalFound);
+        }
+
+        $this->uiService?->logMessage(sprintf(
+            'Remaining title-mismatch repairs for %s: %d.',
+            $date,
+            $this->remainingTitleMismatchRepairCount($date)
+        ));
+
+        return Command::SUCCESS;
+    }
+
+    private function hasExpectedRepairTargetCount(string $date): bool
+    {
+        $expected = (int) $this->option('repair-expected');
+        $actual = Book::withTrashed()
+            ->whereDate('created_at', $date)
+            ->where('needs_review', true)
+            ->where('needs_review_reasons', 'like', '%directoryPath title mismatch%')
+            ->count();
+
+        if ($expected >= 1 && $actual >= 1 && $actual <= $expected) {
+            if ($actual < $expected) {
+                $this->info("Continuing a prior repair pass: {$actual} of the original {$expected} records remain.");
+            }
+
+            return true;
+        }
+
+        $this->error("Refusing title-mismatch repair: expected {$expected} records, found {$actual}.");
+
+        return false;
+    }
+
+    private function repairExistingBookFromImportFlow(Book $book): void
+    {
+        $directoryPath = trim((string) $book->directory_path, '/');
+        if ($directoryPath === '' || ! Storage::disk('books')->exists($directoryPath)) {
+            $this->warn("Skipping book {$book->id}: its library directory is unavailable.");
+
+            return;
+        }
+
+        $audiobook = $this->processAudiobookDirectory(Storage::disk('books')->path($directoryPath));
+        if ($audiobook === null) {
+            $this->warn("Skipping book {$book->id}: no qualifying audio files were found.");
+
+            return;
+        }
+
+        $audiobook['files'] = $this->sortRepairAudioFiles($audiobook['files']);
+        // Keep the absolute path for local tags/NFO/cover access, but send the full
+        // meaningful library hierarchy to AI: genre/author/series/title.
+        $audiobook['ai_directory_context'] = $directoryPath;
+        $metadata = $this->getImportService()->processWithAI($audiobook, $this->aiProcessor);
+        if ($metadata === null) {
+            $this->warn("Skipping book {$book->id}: the import proposal could not be generated.");
+
+            return;
+        }
+        $metadata = $this->applyRepairDirectoryFallbacks($metadata, $directoryPath);
+
+        if ($this->titlesMatchForRepair((string) $book->title, (string) ($metadata['title'] ?? ''))) {
+            $this->resolveTitleMismatchReview($book);
+            $this->info("Skipping book {$book->id}: its title already matches the re-import proposal.");
+
+            return;
+        }
+
+        $enriched = $this->enrichWithExternalData($metadata);
+        if ($enriched !== [] && $this->getEnrichmentService()->isValidEnrichment($metadata, $enriched)) {
+            $metadata = array_merge($metadata, $enriched);
+        }
+
+        // Begin review at the existing location. A user can still confirm a different
+        // directory, in which case the files must move after the confirmed database
+        // update; unchanged source/destination remains metadata-only.
+        $metadata['source_path'] = $audiobook['path'];
+        $metadata['custom_directory_path'] = $book->directory_path;
+
+        $this->info("Reviewing existing book {$book->id}: {$book->title}");
+        $reviewAudiobook = $audiobook;
+        $reviewAudiobook['path'] = $book->directory_path;
+        if (! $this->reviewAndApprove($metadata, $reviewAudiobook)) {
+            $this->info("No changes saved for book {$book->id}.");
+
+            return;
+        }
+
+        $originalDirectoryPath = $book->directory_path;
+        $this->getImportService()->persistConfirmedBookUpdate(
+            $book,
+            ConfirmedBookMetadata::fromConfirmed($metadata),
+            $audiobook
+        );
+
+        if ($this->repairDirectoryChanged($originalDirectoryPath, $book->directory_path)) {
+            $moved = $this->getImportService()->moveFilesToLibrary($audiobook, $book, [
+                'storage_path' => Storage::disk('books')->path(''),
+                'target_directory' => Storage::disk('books')->path((string) $book->directory_path),
+                'operation' => 'move',
+            ]);
+
+            if (! $moved) {
+                $book->directory_path = $originalDirectoryPath;
+                $book->save();
+
+                throw new \RuntimeException(
+                    "Could not move book {$book->id} to its confirmed directory; restored its previous database directory path."
+                );
+            }
+        }
+
+        $this->getImportService()->processCoverImage($book, $metadata);
+        $this->resolveTitleMismatchReview($book);
+        $this->info("Updated existing book {$book->id}: " . ($book->fresh()->title ?? $book->title));
+    }
+
+    /**
+     * @param array<int, string> $files
+     * @return array<int, string>
+     */
+    private function sortRepairAudioFiles(array $files): array
+    {
+        usort($files, static function (string $left, string $right): int {
+            $priority = static function (string $path): int {
+                return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+                    'm4b' => 0,
+                    'mp3' => 1,
+                    default => 2,
+                };
+            };
+
+            $priorityComparison = $priority($left) <=> $priority($right);
+
+            return $priorityComparison !== 0 ? $priorityComparison : strnatcasecmp($left, $right);
+        });
+
+        return $files;
+    }
+
+    private function titlesMatchForRepair(string $currentTitle, string $proposedTitle): bool
+    {
+        $normalize = static fn (string $title): string => preg_replace('/[^a-z0-9]+/', '', strtolower($title)) ?? '';
+
+        return $normalize($currentTitle) !== '' && $normalize($currentTitle) === $normalize($proposedTitle);
+    }
+
+    private function repairDirectoryChanged(?string $originalDirectoryPath, ?string $confirmedDirectoryPath): bool
+    {
+        return trim((string) $originalDirectoryPath, '/') !== trim((string) $confirmedDirectoryPath, '/');
+    }
+
+    /**
+     * The repair input already lives in the library, where the normal path layout is
+     * genre/author/series/title. File tags and a title-only AI proposal may omit the
+     * author, so use that path context only to fill missing values before review.
+     *
+     * @param array<string, mixed> $metadata
+     * @return array<string, mixed>
+     */
+    private function applyRepairDirectoryFallbacks(array $metadata, string $directoryPath): array
+    {
+        $authors = $metadata['author'] ?? [];
+        if (is_string($authors)) {
+            $authors = trim($authors) === '' ? [] : [$authors];
+        }
+
+        if (!is_array($authors) || $authors === []) {
+            $parts = array_values(array_filter(explode('/', trim($directoryPath, '/'))));
+            if (count($parts) >= 4) {
+                $directoryAuthor = trim($parts[count($parts) - 3]);
+                if ($directoryAuthor !== '') {
+                    $metadata['author'] = [$directoryAuthor];
+                }
+            }
+        }
+
+        return $metadata;
+    }
+
+    private function resolveTitleMismatchReview(Book $book): void
+    {
+        $reasons = array_values(array_filter(
+            (array) $book->needs_review_reasons,
+            static fn (string $reason): bool => ! str_starts_with($reason, 'directoryPath title mismatch')
+                && $reason !== 'title_directory_mismatch'
+        ));
+
+        if ($reasons === (array) $book->needs_review_reasons) {
+            return;
+        }
+
+        $book->needs_review_reasons = $reasons === [] ? null : $reasons;
+        $book->needs_review = $reasons !== [];
+        $book->save();
+
+        LibraryRepairIssue::query()
+            ->where('book_id', $book->id)
+            ->where('issue_type', 'title_directory_mismatch')
+            ->where('status', '!=', 'resolved')
+            ->update([
+                'status' => 'resolved',
+                'resolved_at' => now(),
+                'resolution_notes' => 'Resolved by confirmed title-mismatch import repair.',
+            ]);
+    }
+
+    private function remainingTitleMismatchRepairCount(string $date): int
+    {
+        return Book::withTrashed()
+            ->whereDate('created_at', $date)
+            ->where('needs_review', true)
+            ->where('needs_review_reasons', 'like', '%directoryPath title mismatch%')
+            ->count();
     }
 
     /**
@@ -1192,7 +1469,8 @@ class ImportBooksFromDownloads extends Command
                 $splitGroups,
                 $aiMetadata,
                 fn ($message) => $this->info($message),
-                fn ($virtualAudiobook, $bookMetadata) => $this->processSingleBook($virtualAudiobook, $bookMetadata)
+                fn ($virtualAudiobook, $bookMetadata) => $this->processSingleBook($virtualAudiobook, $bookMetadata),
+                $this->aiProcessor
             ),
             fn ($audiobook, $aiMetadata) => $this->handleLowConfidenceMetadata($audiobook, $aiMetadata),
             fn ($audiobook) => $this->getImportService()->processWithAI($audiobook, $this->aiProcessor),
@@ -1419,7 +1697,8 @@ class ImportBooksFromDownloads extends Command
                     $question,
                     $options,
                     $default
-                )
+                ),
+                fn (&$metadata, $audiobook) => $this->selectCoverForEdit($metadata, $audiobook)
             ),
             fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
@@ -1552,7 +1831,8 @@ class ImportBooksFromDownloads extends Command
                     $question,
                     $options,
                     $default
-                )
+                ),
+                fn (&$metadata, $audiobook) => $this->selectCoverForEdit($metadata, $audiobook)
             ),
             fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
@@ -1641,7 +1921,33 @@ class ImportBooksFromDownloads extends Command
                 $question,
                 $options,
                 $default
-            )
+            ),
+            fn (&$metadata, $audiobook) => $this->selectCoverForEdit($metadata, $audiobook)
+        );
+    }
+
+    /** @param array<mixed> $metadata */
+    protected function selectCoverForEdit(array &$metadata, array $audiobook): void
+    {
+        $this->getImportService()->prepareCoverSourcesForSelection($metadata, $audiobook);
+
+        if ($this->uiService) {
+            $this->handleCoverSelectionForUiService($metadata);
+            return;
+        }
+
+        $this->getImportService()->handleCoverSelection(
+            $metadata,
+            fn ($path) => $this->isTextOnWhiteCover($path),
+            fn ($metadata, $limit) => $this->searchAlternativeCovers($metadata, $limit),
+            fn ($message) => $this->warn($message),
+            fn ($message) => $this->line($message),
+            fn ($message) => $this->info($message),
+            fn ($message) => $this->comment($message),
+            fn ($coverOptions, $metadata) => $this->displayCoverOptions($coverOptions, $metadata),
+            fn ($coverOptions) => $this->promptForCoverSelection($coverOptions),
+            true,
+            fn ($coverData) => $this->getEmbeddedCoverTempPath($coverData)
         );
     }
 
@@ -1661,7 +1967,8 @@ class ImportBooksFromDownloads extends Command
             $splitGroups,
             $aiMetadata,
             fn ($message) => $this->info($message),
-            fn ($virtualAudiobook, $bookMetadata) => $this->processSingleBook($virtualAudiobook, $bookMetadata)
+            fn ($virtualAudiobook, $bookMetadata) => $this->processSingleBook($virtualAudiobook, $bookMetadata),
+            $this->aiProcessor
         );
     }
 

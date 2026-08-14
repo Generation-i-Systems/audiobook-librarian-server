@@ -70,10 +70,12 @@ class LibraryRepairController extends Controller
         return view('admin.library-repair.index', [
             'issues' => $paginator,
             'issueTypes' => $this->issueTypeOptions(),
+            'needsReviewReasons' => $this->documentStore->listNeedsReviewReasons(),
             'lastRunDate' => $lastRunDate,
             'filters' => [
                 'issue_type' => $filters['issue_type'] ?? '',
                 'search' => $filters['search'] ?? '',
+                'needs_review_reason' => $filters['needs_review_reason'] ?? '',
                 'limit' => $limit,
                 'show_resolved' => $filters['show_resolved'] ?? false,
             ],
@@ -593,6 +595,10 @@ class LibraryRepairController extends Controller
 
         if ($request->filled('search')) {
             $filters['search'] = $request->input('search');
+        }
+
+        if ($request->filled('needs_review_reason')) {
+            $filters['needs_review_reason'] = $request->input('needs_review_reason');
         }
 
         $filters['show_resolved'] = $request->boolean('show_resolved', false);

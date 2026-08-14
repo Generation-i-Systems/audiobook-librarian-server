@@ -2,6 +2,25 @@
 
 ### Added
 
+- Import now asks the AI to suggest freeform content tags for each book, including a `spicy` tag when there is clear evidence of explicit sexual content, shows the tags on the review summary, allows editing them (comma-separated) during interactive review, and stores confirmed tags as system-scope book tags.
+- The "Current Book Details" panel in the hybrid/ncurses UI now shows Tags, and author/narrator names are now split on `&`, `/`, and the word "and" (previously only commas), both when parsed from the AI response and when read directly from ID3 `artist`/`narrator`/`writer` tags.
+- Multi-book split imports no longer attribute one split-out book's author/narrator to another: each split book now gets its own AI lookup and its own file-tag/filename parsing instead of inheriting the single whole-folder AI guess, which could be sampled from a different book's files entirely.
+- Audible search now retries with a ladder of query variants (dropping an embedded series number, then the series name, then trying author+title) when the first exact-title search finds nothing, since Audible's search does not reliably match a title with an embedded series number even when the book exists.
+- Fixed a pre-existing architecture-boundary violation: `ManageSeriesController::rename()` queried the database directly instead of going through the document-store service; the lookup moved into `TaxonomyService::findBookIdsBySeriesNames()`.
+- Selecting "Add narrator to directory name" during interactive review now refreshes the "Current Book Details" panel immediately, matching every other edit in that menu.
+- Added `book:import --repair-title-mismatch-date=2025-08-06` for the 2025-08-06 import incident. It rebuilds proposals through the normal AI, audio-tag, directory, enrichment, and interactive confirmation flow, then updates the existing record ID without moving or deleting its audio files. The first M4B is preferred over MP3 for tag extraction, and an expected-count guard prevents the wrong batch from being processed.
+- Confirmed and already-correct title-mismatch repairs now clear their targeted Needs Review marker, resolve the corresponding Library Repair issue, and report the remaining repair count. Import enrichment preserves every valid selected genre, omits `Other` whenever a specific genre exists, and lets the review menu edit the complete comma-separated genre list.
+- Title-mismatch repair runs now initialize and advance the shared import progress indicator with the repair batch total.
+- `bin/import-bk` now forwards the repair date and expected-count values as command options instead of misclassifying separate option values as paths to import.
+- A title-mismatch repair can resume with fewer records than its original expected count after earlier repairs have cleared their markers; it still refuses an empty or unexpectedly larger batch.
+- Repair proposals now use the existing library path as a missing-author fallback (`genre/author/series/title`) before enrichment and confirmation, so tagless audio files do not discard an evident directory author.
+- Repair mode now feeds the full library directory hierarchy into the AI prompt; AI path display retains the final author/series/title segments instead of reducing an absolute path to series/title.
+- A repair that confirms a different directory now moves the audiobook files into that directory; unchanged source and destination remain metadata-only. A failed move restores the record's former directory path and leaves the repair unresolved.
+- The review cover action now presents enrichment URLs, embedded audio-tag art, and every image in the audiobook directory for preview and selection, and an explicit selection replaces the existing cover.
+- Import confirmation now recognizes when an absolute source path already resolves to the selected library directory, treating it as metadata-only instead of rejecting its own audio files as a destination conflict.
+
+- Library Repair now detects books whose first storage-path folder is not assigned as a database genre and whose title does not match the final directory name, flags them with dedicated Needs Review tags, and supports filtering repair issues by any existing Needs Review tag. The nightly repair scan now reevaluates every repair type and resolves issues corrected outside the repair page without applying non-interactive fixes.
+
 - Require & Ban Tag Filtering (`tag` / `-tag`) supported across all book search and listing API endpoints (`GET /books`, `GET /genres/{genre}/books`, `GET /authors/{author}/books`, `GET /series/{series}/books`).
 - Autofill book metadata modal on the edit book page now replaces description unconditionally with updated provider metadata and supports selecting an entry by clicking anywhere on the result row.
 - Path-to-fields parsing now normalizes series numbers to strip leading zeros (e.g. `"01"` -> `"1"`).

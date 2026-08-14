@@ -2039,6 +2039,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $this->getTaxonomyService()->searchSeriesByName($term);
     }
 
+    public function findBookIdsBySeriesNames(array $seriesNames): array
+    {
+        return $this->getTaxonomyService()->findBookIdsBySeriesNames($seriesNames);
+    }
+
     public function createAuthor(array $data)
     {
         return $this->getTaxonomyService()->createAuthor($data);

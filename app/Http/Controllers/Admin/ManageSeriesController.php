@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ManageSeriesController extends Controller
@@ -227,12 +226,7 @@ class ManageSeriesController extends Controller
         try {
             // Find only the book IDs involved in either series name, rather than
             // loading the entire book library into memory.
-            $matchingBooks = DB::table('books')
-                ->join('book_series', 'books.id', '=', 'book_series.book_id')
-                ->join('series', 'series.id', '=', 'book_series.series_id')
-                ->whereIn('series.name', [$oldName, $newName])
-                ->select('books.id as book_id', 'series.name as series_name')
-                ->get();
+            $matchingBooks = collect($this->documentStore->findBookIdsBySeriesNames([$oldName, $newName]));
 
             $oldSeriesBookIds = $matchingBooks->where('series_name', $oldName)->pluck('book_id')->all();
             $newSeriesExists = $matchingBooks->where('series_name', $newName)->isNotEmpty();

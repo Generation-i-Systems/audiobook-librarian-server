@@ -1124,6 +1124,22 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return array_values($this->series);
     }
 
+    public function findBookIdsBySeriesNames(array $seriesNames): array
+    {
+        $results = [];
+
+        foreach ($this->books as $id => $book) {
+            foreach ($book['series'] ?? [] as $series) {
+                $name = is_array($series) ? ($series['seriesName'] ?? $series['name'] ?? '') : $series;
+                if (in_array($name, $seriesNames, true)) {
+                    $results[] = ['book_id' => $book['id'] ?? $id, 'series_name' => $name];
+                }
+            }
+        }
+
+        return $results;
+    }
+
     public function searchSeriesByName(string $term): array
     {
         $results = [];
