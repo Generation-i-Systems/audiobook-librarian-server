@@ -439,13 +439,13 @@ class AIBookProcessor
         $prompt = "Extract audiobook metadata from this data and return JSON only:\n\n";
 
         // Strip leading filesystem noise (e.g. /media/lyra_data1/audiobooks/unsorted) so the AI
-        // only sees the meaningful part of the path (e.g. "The Messenger/01 The Messenger").
-        // Keep up to the last 2 path segments to preserve series/title context.
+        // only sees the meaningful part of the path (e.g. "Author/The Messenger/01 The Messenger").
+        // Keep up to the last 3 path segments to preserve author/series/title context.
         $displayPath = $directoryPath;
         if (str_starts_with($directoryPath, '/')) {
             $parts = array_filter(explode('/', $directoryPath), fn ($p) => $p !== '');
-            if (count($parts) > 2) {
-                $displayPath = implode('/', array_slice(array_values($parts), -2));
+            if (count($parts) > 3) {
+                $displayPath = implode('/', array_slice(array_values($parts), -3));
             }
         }
         $prompt .= "Directory: {$displayPath}\n";
@@ -797,8 +797,8 @@ class AIBookProcessor
 
         $normalized = [
             'title' => $metadata['title'] ?? 'Unknown Title',
-            'author' => $this->normalizeStringOrArray($authors),
-            'narrator' => $this->normalizeStringOrArray($narrators),
+            'author' => $this->normalizeStringOrArray($authors, splitMultipleNames: true),
+            'narrator' => $this->normalizeStringOrArray($narrators, splitMultipleNames: true),
             'genre' => $this->normalizeStringOrArray($genres),
             'tags' => $this->normalizeStringOrArray($tags),
             'year' => isset($metadata['year']) ? (int) $metadata['year'] : null,
@@ -884,12 +884,16 @@ class AIBookProcessor
     /**
      * Normalize string or array fields
      */
-    protected function normalizeStringOrArray($value): array
+    protected function normalizeStringOrArray($value, bool $splitMultipleNames = false): array
     {
         if (is_string($value)) {
-            // If it's a comma-separated string, split it into an array
-            if (strpos($value, ',') !== false) {
-                return array_filter(array_map('trim', explode(',', $value)));
+            // Names lists (author/narrator) may be delimited by comma, ampersand, slash,
+            // or the word "and" (e.g. "Dorje Swallow/Sofia Lette", "Jane Doe & John Smith").
+            // Other fields (genre, tags) only split on comma — '&' and '/' can be part of
+            // a legitimate single value there (e.g. genre "Science Fiction & Fantasy").
+            $pattern = $splitMultipleNames ? '/\s*(?:,|&|\/|\band\b)\s*/i' : '/\s*,\s*/';
+            if (preg_match($pattern, $value)) {
+                return array_values(array_filter(array_map('trim', preg_split($pattern, $value))));
             }
             return [$value];
         }

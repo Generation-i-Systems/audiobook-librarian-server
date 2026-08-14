@@ -1095,6 +1095,7 @@ class ImportUIService implements ImportUIInterface
             'Narrator' => $this->stringifyForDisplay($this->currentBook['narrator'] ?? null) ?: 'N/A',
             'Series' => ($this->stringifyForDisplay($this->currentBook['series'] ?? null) ?: 'N/A') . $seriesSuffix,
             'Genre' => $this->stringifyForDisplay($this->currentBook['genre'] ?? null) ?: 'N/A',
+            'Tags' => $this->stringifyForDisplay($this->currentBook['tags'] ?? null) ?: 'N/A',
             'Year' => $year,
             'Publisher' => $publisher,
             'Confidence' => $confidenceLabel,
