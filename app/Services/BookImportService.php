@@ -427,6 +427,52 @@ class BookImportService
     }
 
     /**
+     * @param array<int, string|\SplFileInfo> $files
+     */
+    private function assertSufficientDiskSpace(string $targetDir, array $files, int $bookId): void
+    {
+        $totalBytes = 0;
+        foreach ($files as $file) {
+            $path = $file instanceof \SplFileInfo ? $file->getPathname() : $file;
+            $size = @filesize($path);
+            if ($size !== false) {
+                $totalBytes += $size;
+            }
+        }
+
+        $freeBytesRaw = @disk_free_space($targetDir);
+        if ($freeBytesRaw === false) {
+            $freeBytesRaw = @disk_free_space(dirname($targetDir));
+        }
+        if ($freeBytesRaw === false) {
+            // Can't determine free space (e.g. unsupported filesystem) — proceed and let
+            // the actual copy fail loudly if it's going to fail.
+            return;
+        }
+        $freeBytes = (int) $freeBytesRaw;
+
+        // Leave a safety margin rather than cutting it exactly to zero.
+        $safetyMarginBytes = 100 * 1024 * 1024;
+        if ($freeBytes < $totalBytes + $safetyMarginBytes) {
+            $message = sprintf(
+                'Insufficient disk space to move book ID %d to %s: needs %s, only %s free.',
+                $bookId,
+                $targetDir,
+                $this->formatBytes($totalBytes),
+                $this->formatBytes($freeBytes)
+            );
+            Log::error($message, [
+                'book_id' => $bookId,
+                'target_dir' => $targetDir,
+                'needed_bytes' => $totalBytes,
+                'free_bytes' => $freeBytes,
+            ]);
+
+            throw new \Exception($message);
+        }
+    }
+
+    /**
      * firstOrCreate() by name that also finds and restores a soft-deleted match. Author,
      * Narrator, Series, and Genre all use SoftDeletes, so a plain firstOrCreate() excludes
      * soft-deleted rows from its lookup — if a name was previously soft-deleted, it can never
@@ -1668,6 +1714,18 @@ class BookImportService
 
             // Check if this is a multi-book part - only move specific files
             $isMultiBookPart = !empty($audiobook['is_multi_book_part']) && !empty($audiobook['multi_book_files_only']);
+
+            // A same-filesystem 'move' is a rename — it needs no extra space. Anything else
+            // (an explicit 'copy', or a 'move' across filesystems, which falls back to
+            // copy+delete) needs room for the full source size at the target first. Checking
+            // this upfront turns a disk-full failure into one clear message instead of a
+            // generic "failed to copy file" — or worse, a partially-copied book if a later
+            // file in the same directory happens to fit.
+            $needsSpaceCheck = $operation === 'copy' || !$this->areOnSameFileSystem($sourcePath, $targetDir);
+            if ($needsSpaceCheck) {
+                $filesForSpaceCheck = $isMultiBookPart ? $audiobook['multi_book_files_only'] : File::allFiles($sourcePath);
+                $this->assertSufficientDiskSpace($targetDir, $filesForSpaceCheck, $book->id);
+            }
 
             if ($isMultiBookPart) {
                 // Multi-book part: only move the specific files for this book
@@ -6428,9 +6486,35 @@ class BookImportService
             $book = $createBookFromMetadataCallback($metadata, $audiobook);
 
             if ($book) {
-                $moveFilesToLibraryCallback($audiobook, $book, [
+                $moved = $moveFilesToLibraryCallback($audiobook, $book, [
                     'operation' => $getFileOperationCallback(),
                 ]);
+
+                // moveFilesToLibrary() already logs the specific failure (disk full,
+                // permissions, a destination sanity check, etc.) and returns false rather
+                // than throwing — but that result was previously discarded here, so a
+                // failed move (files never actually left the source directory) still got
+                // reported as a successful import with a book DB record pointing at an
+                // empty/partial target directory. Never claim success or process the
+                // cover for a move that didn't happen.
+                if (!$moved) {
+                    if ($infoCallback) {
+                        $infoCallback(
+                            "❌ Failed to move files for {$book->title} (ID: {$book->id}) — check disk space "
+                            . "and permissions; see the log for the exact error. The database record was "
+                            . "created but its files were not moved; use books:repair-phantom-book-ids "
+                            . "once the underlying issue is fixed."
+                        );
+                    }
+                    if ($skippedBooks !== null) {
+                        $skippedBooks[] = [
+                            'path' => $audiobook['path'],
+                            'reason' => "Failed to move files to library for book ID {$book->id} (see logs)",
+                        ];
+                    }
+
+                    return $book;
+                }
 
                 // createBookFromMetadata() explicitly defers cover processing until after
                 // the files (and thus the target directory) exist, to avoid the premature
