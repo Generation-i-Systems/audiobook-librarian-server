@@ -1723,7 +1723,15 @@ class BookImportService
             // file in the same directory happens to fit.
             $needsSpaceCheck = $operation === 'copy' || !$this->areOnSameFileSystem($sourcePath, $targetDir);
             if ($needsSpaceCheck) {
-                $filesForSpaceCheck = $isMultiBookPart ? $audiobook['multi_book_files_only'] : File::allFiles($sourcePath);
+                if ($isMultiBookPart) {
+                    $filesForSpaceCheck = $audiobook['multi_book_files_only'];
+                } elseif (File::isFile($sourcePath)) {
+                    // $sourcePath is a loose single audio file (not organized into its own
+                    // directory) — File::allFiles() requires a directory and throws otherwise.
+                    $filesForSpaceCheck = [$sourcePath];
+                } else {
+                    $filesForSpaceCheck = File::allFiles($sourcePath);
+                }
                 $this->assertSufficientDiskSpace($targetDir, $filesForSpaceCheck, $book->id);
             }
 
@@ -6364,7 +6372,7 @@ class BookImportService
         $targetDir = rtrim($bookStoragePath, '/') . '/' . ltrim($existingBook->directory_path, '/');
 
         $operation = $getFileOperationCallback();
-        $this->moveFilesToLibrary(
+        $moved = $this->moveFilesToLibrary(
             $audiobook,
             $book,
             [
@@ -6373,6 +6381,20 @@ class BookImportService
                 'target_directory' => $targetDir,
             ]
         );
+
+        // moveFilesToLibrary() already logs the specific failure (disk full,
+        // permissions, a destination sanity check, etc.) and returns false rather
+        // than throwing. Throwing here — instead of silently continuing as if the
+        // merge succeeded — lets every caller's existing per-book error handling
+        // (they already catch \Exception around this call) report it as a failed
+        // merge instead of a success, and skip cover processing for files that
+        // were never actually moved.
+        if (!$moved) {
+            throw new \Exception(
+                "Failed to move files while merging into existing book ID {$book->id}; "
+                . "see the log for the exact error (commonly disk space or permissions)."
+            );
+        }
 
         $this->processCoverImage($book, $mergedMetadata);
 

@@ -837,6 +837,40 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function moveFilesToLibraryHandlesALooseAudioFileNotInItsOwnDirectory(): void
+    {
+        // Regression test: audiobook['path'] can be a single loose audio file sitting
+        // directly in a parent folder (e.g. "William Goldman/1969 - Some Title.mp3"),
+        // not organized into its own subdirectory. The disk-space check must not assume
+        // it's always a directory — File::allFiles() throws when given a file path.
+        $sourceDir = $this->createTempDirectory('book_import_source');
+        $targetDir = $this->createTempDirectory('book_import_target');
+
+        try {
+            $sourceFile = $sourceDir . '/1969 - Loose Track.mp3';
+            file_put_contents($sourceFile, 'audio');
+
+            $book = $this->createTempBook();
+
+            $audiobook = [
+                'path' => $sourceFile,
+                'files' => [$sourceFile],
+            ];
+
+            $result = $this->service->moveFilesToLibrary($audiobook, $book, [
+                'operation' => 'copy',
+                'target_directory' => $targetDir,
+            ]);
+
+            $this->assertTrue($result);
+            $this->assertFileExists($targetDir . '/1969 - Loose Track.mp3');
+        } finally {
+            File::deleteDirectory($sourceDir);
+            File::deleteDirectory($targetDir);
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function moveFilesToLibraryInPlaceReturnsFalseWhenSourceDirectoryHasNoAudioFiles(): void
     {
         $sourceDir = $this->createTempDirectory('book_import_source');
