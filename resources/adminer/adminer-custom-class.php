@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Adminer;
 
 /**
@@ -7,6 +9,14 @@ namespace Adminer;
  */
 class AdminerCustom extends Adminer
 {
+    /** @var array<object> */
+    private array $plugins;
+
+    public function __construct(object ...$plugins)
+    {
+        $this->plugins = $plugins;
+    }
+
     /**
      * Set the name displayed in the Adminer interface.
      */
@@ -50,5 +60,23 @@ class AdminerCustom extends Adminer
     public function loginForm()
     {
         return "";
+    }
+
+    public function headers()
+    {
+        foreach ($this->plugins as $plugin) {
+            if (method_exists($plugin, 'headers')) {
+                $plugin->headers();
+            }
+        }
+    }
+
+    public function sqlPrintAfter()
+    {
+        foreach ($this->plugins as $plugin) {
+            if (method_exists($plugin, 'sqlPrintAfter')) {
+                $plugin->sqlPrintAfter();
+            }
+        }
     }
 }

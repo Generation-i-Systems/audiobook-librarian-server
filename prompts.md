@@ -4,6 +4,12 @@ This file contains the text of prompts sent to the AI assistant.
 
 ---
 
+## 2026-08-16
+
+Fix the embedded Adminer page failing with `Cannot instantiate abstract class Adminer\\Plugin` on `GET /admin/adminer`.
+
+---
+
 ## 2026-08-08
 
 pm notice run vite build
