@@ -14,14 +14,18 @@ use App\Models\UserBookStatus;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use App\Services\BookCompletionService;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
+use App\Services\ListeningActivityService;
 
 class ListeningGoalController extends Controller
 {
-    public function __construct(private readonly BookCompletionService $bookCompletionService)
-    {
+    public function __construct(
+        private readonly BookCompletionService $bookCompletionService,
+        private readonly ListeningActivityService $listeningActivityService
+    ) {
     }
 
     private const METRICS = 'total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours,books_finished,series_hours,author_hours,book_hours,book_completion';
@@ -299,10 +303,73 @@ class ListeningGoalController extends Controller
             return $this->bookCompletionProgressMinutes($goal);
         }
 
-        $seconds = $this->scopedListeningQuery($goal, $periodStart, $periodEnd)
-            ->sum('listening_statistics.seconds_listened');
+        return $this->sumSessionMinutes($goal, $periodStart, $periodEnd);
+    }
+
+    /**
+     * `listening_statistics` (the table this used to query) is no longer written by any current
+     * client - real listening activity lives in the event-sourced `listening_events` table,
+     * already reconstructed into session-shaped rows by ListeningActivityService for streaks/
+     * badges. getSessions(userId) with no device id already aggregates across every device the
+     * user has ever synced from (goals must reflect that, not just the requesting device).
+     */
+    private function sumSessionMinutes(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd): int
+    {
+        if ($goal->metric === 'book_hours' && $goal->book_id === null) {
+            // Local-only book (title/author identity, no catalog book_id) - listening_events has
+            // no title/author columns to match against, only a numeric book_id.
+            return 0;
+        }
+
+        $bookIdFilter = $this->resolveMatchingBookIds($goal);
+        $seconds = $this->sessionsInRange(Auth::id(), $periodStart, $periodEnd, $bookIdFilter)
+            ->sum('seconds_listened');
 
         return (int) round($seconds / 60);
+    }
+
+    /**
+     * Sessions within [periodStart, periodEnd], optionally restricted to a book_id set.
+     *
+     * @return Collection<int, (object{book_id: int, user_id: int, device_id: string,
+     *   listening_date: string, seconds_listened: int, session_start: Carbon,
+     *   metadata: array{playback_speed: mixed}}&\stdClass)>
+     */
+    private function sessionsInRange(int $userId, Carbon $periodStart, Carbon $periodEnd, ?Collection $bookIdFilter): Collection
+    {
+        $rangeStart = $periodStart->copy()->startOfDay();
+        $rangeEnd = $periodEnd->copy()->endOfDay();
+
+        return $this->listeningActivityService->getSessions($userId)
+            ->filter(function (object $session) use ($rangeStart, $rangeEnd, $bookIdFilter): bool {
+                $date = Carbon::parse($session->listening_date);
+                if ($date->lt($rangeStart) || $date->gt($rangeEnd)) {
+                    return false;
+                }
+
+                return $bookIdFilter === null || $bookIdFilter->contains($session->book_id);
+            });
+    }
+
+    /** @return Collection<int, int>|null null means "no book restriction" (total_hours) */
+    private function resolveMatchingBookIds(ListeningGoal $goal): ?Collection
+    {
+        return match ($goal->metric) {
+            'genre_hours' => Book::whereHas(
+                'genres',
+                fn ($q) => $q->where('genres.id', $goal->genre_id)->whereNull('genres.deleted_at')
+            )->pluck('id'),
+            'fiction_hours' => Book::whereHas('genres', fn ($q) => $q->where('genres.is_fiction', true))->pluck('id'),
+            'nonfiction_hours' => Book::whereHas('genres', fn ($q) => $q->where('genres.is_fiction', false))->pluck('id'),
+            'playlist_hours' => UserBookStatus::where('user_id', Auth::id())
+                ->where('playlist_id', $goal->playlist_id)
+                ->whereNotNull('book_id')
+                ->pluck('book_id'),
+            'series_hours' => ControllerDatabase::table('book_series')->where('series_id', $goal->series_id)->pluck('book_id'),
+            'author_hours' => ControllerDatabase::table('author_book')->where('author_id', $goal->author_id)->pluck('book_id'),
+            'book_hours' => $goal->book_id !== null ? collect([$goal->book_id]) : collect(),
+            default => null,
+        };
     }
 
     /**
@@ -357,80 +424,6 @@ class ListeningGoalController extends Controller
         return min($goal->target_minutes, (int) round($furthestPositionSeconds / 60));
     }
 
-    private function scopedListeningQuery(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd)
-    {
-        $userId = Auth::id();
-        $deviceIds = ControllerDatabase::table('devices')
-            ->where('user_id', $userId)
-            ->pluck('device_id');
-
-        $query = ControllerDatabase::table('listening_statistics')
-            ->where(function ($statsQuery) use ($userId, $deviceIds): void {
-                $statsQuery->where('listening_statistics.user_id', $userId);
-
-                if ($deviceIds->isNotEmpty()) {
-                    $statsQuery->orWhereIn('listening_statistics.device_id', $deviceIds);
-                }
-            })
-            ->where('listening_statistics.listening_date', '>=', $periodStart->toDateString())
-            ->where('listening_statistics.listening_date', '<=', $periodEnd->toDateString());
-
-        switch ($goal->metric) {
-            case 'genre_hours':
-                $query->join('books', 'books.id', '=', 'listening_statistics.book_id')
-                    ->join('book_genre', 'book_genre.book_id', '=', 'books.id')
-                    ->join('genres', function ($join) {
-                        $join->on('genres.id', '=', 'book_genre.genre_id')
-                            ->whereNull('genres.deleted_at');
-                    })
-                    ->where('book_genre.genre_id', $goal->genre_id);
-                break;
-            case 'fiction_hours':
-                $query->join('books', 'books.id', '=', 'listening_statistics.book_id')
-                    ->join('book_genre', 'book_genre.book_id', '=', 'books.id')
-                    ->join('genres', function ($join) {
-                        $join->on('genres.id', '=', 'book_genre.genre_id')
-                            ->whereNull('genres.deleted_at');
-                    })
-                    ->where('genres.is_fiction', true);
-                break;
-            case 'nonfiction_hours':
-                $query->join('books', 'books.id', '=', 'listening_statistics.book_id')
-                    ->join('book_genre', 'book_genre.book_id', '=', 'books.id')
-                    ->join('genres', function ($join) {
-                        $join->on('genres.id', '=', 'book_genre.genre_id')
-                            ->whereNull('genres.deleted_at');
-                    })
-                    ->where('genres.is_fiction', false);
-                break;
-            case 'playlist_hours':
-                $query->join('user_book_status', function ($join) use ($userId, $goal) {
-                    $join->on('user_book_status.book_id', '=', 'listening_statistics.book_id')
-                        ->where('user_book_status.user_id', $userId)
-                        ->where('user_book_status.playlist_id', $goal->playlist_id);
-                });
-                break;
-            case 'series_hours':
-                $query->join('book_series', 'book_series.book_id', '=', 'listening_statistics.book_id')
-                    ->where('book_series.series_id', $goal->series_id);
-                break;
-            case 'author_hours':
-                $query->join('author_book', 'author_book.book_id', '=', 'listening_statistics.book_id')
-                    ->where('author_book.author_id', $goal->author_id);
-                break;
-            case 'book_hours':
-                if ($goal->book_id !== null) {
-                    $query->where('listening_statistics.book_id', $goal->book_id);
-                } else {
-                    $query->where('listening_statistics.title', $goal->book_title ?? '__no_match__')
-                        ->where('listening_statistics.author', $goal->book_author ?? '__no_match__');
-                }
-                break;
-        }
-
-        return $query;
-    }
-
     /** @return array<int, array{type:string,book_id:int,title:string,finished_at:string}> */
     private function booksFinishedEntries(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd): array
     {
@@ -466,34 +459,31 @@ class ListeningGoalController extends Controller
     /** @return array<int, array{type:string,date:string,minutes:int,books:array<int,array{book_id:int,title:string,minutes:int}>}> */
     private function hourEntries(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd): array
     {
-        $rows = $this->scopedListeningQuery($goal, $periodStart, $periodEnd)
-            ->join('books', 'books.id', '=', 'listening_statistics.book_id')
-            ->selectRaw(
-                'DATE(listening_statistics.listening_date) as listening_day, ' .
-                'listening_statistics.book_id as book_id, ' .
-                'books.title as title, ' .
-                'SUM(listening_statistics.seconds_listened) as secs'
-            )
-            ->groupBy('listening_day', 'listening_statistics.book_id', 'books.title')
-            ->orderByDesc('listening_day')
-            ->get();
+        $bookIdFilter = $this->resolveMatchingBookIds($goal);
+        $sessions = $this->sessionsInRange(Auth::id(), $periodStart, $periodEnd, $bookIdFilter);
+        $bookTitles = Book::whereIn('id', $sessions->pluck('book_id')->unique())->pluck('title', 'id');
 
-        $byDate = $rows->groupBy('listening_day');
+        return $sessions->groupBy('listening_date')
+            ->map(function (Collection $dayRows, string $date) use ($bookTitles): array {
+                $books = $dayRows->groupBy('book_id')
+                    ->map(fn (Collection $rows, int $bookId): array => [
+                        'book_id' => $bookId,
+                        'title'   => (string) ($bookTitles[$bookId] ?? 'Unknown'),
+                        'minutes' => (int) round($rows->sum('seconds_listened') / 60),
+                    ])
+                    ->values()
+                    ->all();
 
-        return $byDate->map(function ($dayRows, $date): array {
-            $books = $dayRows->map(fn ($row): array => [
-                'book_id' => (int) $row->book_id,
-                'title'   => (string) $row->title,
-                'minutes' => (int) round($row->secs / 60),
-            ])->values()->all();
-
-            return [
-                'type'    => 'day',
-                'date'    => (string) $date,
-                'minutes' => array_sum(array_column($books, 'minutes')),
-                'books'   => $books,
-            ];
-        })->sortByDesc('date')->values()->all();
+                return [
+                    'type'    => 'day',
+                    'date'    => $date,
+                    'minutes' => array_sum(array_column($books, 'minutes')),
+                    'books'   => $books,
+                ];
+            })
+            ->sortByDesc('date')
+            ->values()
+            ->all();
     }
 
     private function progressPercent(ListeningGoal $goal, int $progressAmount): float

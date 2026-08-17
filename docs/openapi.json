@@ -14543,6 +14543,41 @@
                 }
             }
         },
+        "/goals/listening/history": {
+            "get": {
+                "tags": ["Goals"],
+                "summary": "List past (expired or inactive) custom-period listening goals",
+                "operationId": "listListeningGoalHistory",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of past listening goals",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "goals": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ListeningGoal"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
         "/goals/listening/{goal}": {
             "put": {
                 "tags": ["Goals"],
