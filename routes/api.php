@@ -125,6 +125,7 @@ Route::prefix('v1')->group(function () {
         // Listening Goals Routes
         Route::prefix('goals/listening')->group(function () {
             Route::get('/', [ListeningGoalController::class, 'index']);
+            Route::get('/history', [ListeningGoalController::class, 'history']);
             Route::post('/', [ListeningGoalController::class, 'store']);
             Route::put('/{goal}', [ListeningGoalController::class, 'update']);
             Route::delete('/{goal}', [ListeningGoalController::class, 'destroy']);
