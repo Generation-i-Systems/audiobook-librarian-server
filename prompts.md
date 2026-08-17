@@ -6,6 +6,12 @@ This file contains the text of prompts sent to the AI assistant.
 
 ## 2026-08-16
 
+Update the Skin and Theme navigation links to go directly to their pages on `www.ablibrarian.com`.
+
+---
+
+## 2026-08-16
+
 Fix the embedded Adminer page failing with `Cannot instantiate abstract class Adminer\\Plugin` on `GET /admin/adminer`.
 
 ---

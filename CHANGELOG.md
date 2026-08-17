@@ -65,6 +65,7 @@
 
 ### Fixed
 
+- Skin and Theme navigation links now go directly to their canonical www gallery pages instead of first loading a local redirect route.
 - The embedded Adminer database console now instantiates the configured Adminer subclass and delegates its Gemini SQL helper hooks, instead of attempting to instantiate Adminer's abstract plugin base class.
 - Stabilized API tests by giving completed-position fixtures an explicit matching duration and accepting whole-number JSON percentages as numeric. Documented the existing `GET /tags/all` endpoint in OpenAPI so the route-coverage gate passes.
 - Saving tags from an admin book-edit page no longer reloads the page and discards unsaved cover or metadata edits.

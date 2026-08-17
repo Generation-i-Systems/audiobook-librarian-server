@@ -115,10 +115,10 @@
                                     <a class="nav-link" style="color:white" href="{{ route('admin.database') }}">Database Admin</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.skins.index') }}">Skins</a>
+                                    <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/skins">Skins</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.themes.index') }}">Themes</a>
+                                    <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/themes">Themes</a>
                                 </li>
                             @else
                                 <!-- Public Links (Show on public pages) -->
@@ -128,11 +128,11 @@
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white"
-                                        href="{{ route('gallery.skins.index') }}">{{ __('Skins') }}</a>
+                                        href="https://www.ablibrarian.com/gallery/skins">{{ __('Skins') }}</a>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white"
-                                        href="{{ route('gallery.themes.index') }}">{{ __('Themes') }}</a>
+                                        href="https://www.ablibrarian.com/gallery/themes">{{ __('Themes') }}</a>
                                 </li>
                                 <li class="nav-item dropdown">
                                     <a id="libraryDropdown" class="nav-link dropdown-toggle" href="#" role="button"
