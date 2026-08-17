@@ -7,11 +7,16 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Jobs\CreateImportJobsForDirectory;
+use App\Jobs\ImportBookFromDirectoryJob;
 use App\Traits\BookImportTrait;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Redis;
+use Throwable;
 
 class QueueController extends Controller
 {
@@ -19,20 +24,17 @@ class QueueController extends Controller
 
     protected DocumentStoreServiceInterface $documentStoreService;
 
-
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
-
 
     public function index()
     {
         return view('admin.queue.index');
     }
 
-
-    public function list(Request $request)
+    public function list(Request $request): JsonResponse
     {
         $typeFilter = $request->query('type');
         $allJobs = $this->documentStoreService->getJobs();
@@ -46,7 +48,7 @@ class QueueController extends Controller
             $dir = $job['data']['directoryPath'] ?? null;
 
             $jobTypeCounts[$jobType] = ($jobTypeCounts[$jobType] ?? 0) + 1;
-            if (!in_array($jobType, $jobTypes)) {
+            if (!in_array($jobType, $jobTypes, true)) {
                 $jobTypes[] = $jobType;
             }
 
@@ -56,8 +58,8 @@ class QueueController extends Controller
                 'directory' => $dir,
                 'status' => $job['status'] ?? '',
                 'attempts' => $job['data']['attempts'] ?? 0,
-                'availableAt' => $job['startedAt'] ?? '',
-                'createdAt' => $job['startedAt'] ?? '',
+                'available_at' => $job['startedAt'] ?? '',
+                'created_at' => $job['startedAt'] ?? '',
                 'message' => $job['data']['message'] ?? '',
             ]);
         }
@@ -68,30 +70,27 @@ class QueueController extends Controller
 
         return response()->json([
             'jobs' => $jobs,
-            'jobTypeCounts' => $jobTypeCounts,
-            'jobTypes' => $jobTypes,
-            'selectedType' => $typeFilter,
+            'job_type_counts' => $jobTypeCounts,
+            'job_types' => $jobTypes,
+            'selected_type' => $typeFilter,
         ]);
     }
 
-
-    public function remove($id)
+    public function remove(string|int $id): JsonResponse
     {
-        $job = $this->documentStoreService->getJob($id);
+        $job = $this->documentStoreService->getJob((string) $id);
         if ($job) {
-            $this->documentStoreService->updateJob($id, ['status' => 'deleted']);
+            $this->documentStoreService->updateJob((string) $id, ['status' => 'deleted']);
         }
 
         return response()->json(['success' => true]);
     }
 
-
-    public function retry($id)
+    public function retry(string|int $id): JsonResponse
     {
-        $job = $this->documentStoreService->getJob($id);
+        $job = $this->documentStoreService->getJob((string) $id);
         if ($job) {
-            // Reset job status to pending for retry
-            $this->documentStoreService->updateJob($id, [
+            $this->documentStoreService->updateJob((string) $id, [
                 'status' => 'pending',
                 'data' => array_merge($job['data'] ?? [], ['attempts' => 0]),
             ]);
@@ -100,73 +99,199 @@ class QueueController extends Controller
         return response()->json(['success' => true]);
     }
 
-
-    public function status()
+    private function getHorizonStatus(): string
     {
-        // Check for running worker (simple: look for process, or use a cache heartbeat)
-        $running = Cache::get('queue_worker_heartbeat') ? true : false;
-        $pending = $this->documentStoreService->getJobCount();
+        try {
+            Artisan::call('horizon:status');
+            $output = Artisan::output();
+            if (str_contains($output, 'running')) {
+                return 'running';
+            }
+            if (str_contains($output, 'paused')) {
+                return 'paused';
+            }
+        } catch (Throwable $e) {
+            Log::debug('Failed to get Horizon status', ['error' => $e->getMessage()]);
+        }
 
-        return response()->json(['workerRunning' => $running, 'pendingJobs' => $pending]);
+        return 'inactive';
     }
 
-
-    public function startWorker()
+    public function status(): JsonResponse
     {
-        // Start worker in background (simple, naive approach)
-        $output = null;
-        $result = null;
-        exec('php artisan queue:work --daemon > /dev/null 2>&1 &', $output, $result);
-        // Optionally set a cache heartbeat
+        $horizonStatus = $this->getHorizonStatus();
+        $workerRunning = $horizonStatus === 'running' || ($horizonStatus !== 'inactive' && (bool) Cache::get('queue_worker_heartbeat'));
+        $pendingJobs = $this->documentStoreService->getJobCount();
+
+        $embeddingsCount = 0;
+        $defaultCount = 0;
+        $recommendationsCount = 0;
+
+        try {
+            $embeddingsCount = (int) Redis::llen('queues:embeddings');
+            $defaultCount = (int) Redis::llen('queues:default');
+            $recommendationsCount = (int) Redis::llen('queues:recommendations');
+        } catch (Throwable $e) {
+            Log::debug('Redis queue inspection skipped', ['error' => $e->getMessage()]);
+        }
+
+        $failedJobs = 0;
+        try {
+            $failedJobs = DB::table('failed_jobs')->count();
+        } catch (Throwable $e) {
+            Log::debug('Failed jobs table check skipped', ['error' => $e->getMessage()]);
+        }
+
+        return response()->json([
+            'status' => $horizonStatus,
+            'workerRunning' => $workerRunning,
+            'worker_running' => $workerRunning,
+            'pendingJobs' => $pendingJobs,
+            'pending_jobs' => $pendingJobs,
+            'failed_jobs' => $failedJobs,
+            'queues' => [
+                'embeddings' => $embeddingsCount,
+                'default' => $defaultCount,
+                'recommendations' => $recommendationsCount,
+            ],
+        ]);
+    }
+
+    public function startWorker(): JsonResponse
+    {
+        try {
+            Artisan::call('horizon:continue');
+        } catch (Throwable $e) {
+            Log::debug('Horizon continue command failed', ['error' => $e->getMessage()]);
+        }
+
+        $artisan = escapeshellarg(base_path('artisan'));
+        $php = escapeshellarg(PHP_BINARY);
+        exec("nohup {$php} {$artisan} horizon > /dev/null 2>&1 &");
         Cache::put('queue_worker_heartbeat', true, 60);
 
-        return response()->json(['started' => true]);
+        usleep(300000);
+        $status = $this->getHorizonStatus();
+
+        return response()->json([
+            'started' => true,
+            'status' => $status,
+            'message' => $status === 'running' ? 'Horizon worker started successfully.' : 'Horizon worker start initiated.',
+        ]);
     }
 
-
-    public function clear(Request $request)
+    public function stopWorker(): JsonResponse
     {
-        if (! $request->boolean('confirm')) {
+        try {
+            Artisan::call('horizon:pause');
+            Artisan::call('horizon:terminate');
+        } catch (Throwable $e) {
+            Log::warning('Failed to pause/terminate Horizon worker', ['error' => $e->getMessage()]);
+        }
+
+        Cache::forget('queue_worker_heartbeat');
+
+        return response()->json(['stopped' => true, 'message' => 'Horizon worker paused and terminated.']);
+    }
+
+    public function pauseQueue(Request $request): JsonResponse
+    {
+        $supervisor = $request->input('supervisor');
+
+        try {
+            if ($supervisor) {
+                Artisan::call('horizon:pause-supervisor', ['name' => $supervisor]);
+            } else {
+                Artisan::call('horizon:pause');
+            }
+            return response()->json(['success' => true, 'message' => 'Queue paused successfully.']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function resumeQueue(Request $request): JsonResponse
+    {
+        $supervisor = $request->input('supervisor');
+
+        try {
+            if ($supervisor) {
+                Artisan::call('horizon:continue-supervisor', ['name' => $supervisor]);
+            } else {
+                Artisan::call('horizon:continue');
+            }
+            return response()->json(['success' => true, 'message' => 'Queue resumed successfully.']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function retryFailed(Request $request, string|int|null $id = null): JsonResponse
+    {
+        try {
+            if ($id) {
+                Artisan::call('queue:retry', ['id' => [$id]]);
+            } else {
+                Artisan::call('queue:retry', ['id' => ['all']]);
+            }
+            return response()->json(['success' => true, 'message' => 'Failed jobs queued for retry.']);
+        } catch (Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function clear(Request $request): JsonResponse
+    {
+        if (!$request->boolean('confirm')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Confirmation is required to clear jobs.',
             ], 422);
         }
 
-        $success = $this->documentStoreService->clearJobs(true);
+        $queue = $request->input('queue');
+        if ($queue) {
+            try {
+                Artisan::call('horizon:clear', ['--queue' => $queue]);
+            } catch (Throwable $e) {
+                try {
+                    Redis::del('queues:' . $queue);
+                } catch (Throwable $re) {
+                    Log::warning('Failed to clear queue via Redis', ['queue' => $queue, 'error' => $re->getMessage()]);
+                }
+            }
+        } else {
+            $this->documentStoreService->clearJobs(true);
+            try {
+                Redis::del('queues:embeddings');
+                Redis::del('queues:default');
+                Redis::del('queues:recommendations');
+            } catch (Throwable $e) {
+                Log::warning('Failed to clear Redis queues', ['error' => $e->getMessage()]);
+            }
+        }
 
-        return response()->json(['success' => $success]);
+        return response()->json(['success' => true, 'message' => 'Queue cleared successfully.']);
     }
 
-
-    /**
-     * Bulk import all book directories under a given path, using jobs collection for deduplication.
-     */
-    public function bulkImportBooks(Request $request)
+    public function bulkImportBooks(Request $request): JsonResponse
     {
         $root = $request->input('dir');
         $storagePath = config('filesystems.disks.books.root') ?? config('app.book_root');
-        $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
+        $absRoot = rtrim((string) $storagePath, '/') . '/' . ltrim((string) $root, '/');
         if (!is_dir($absRoot)) {
             return response()->json([
                 'error' => 'Invalid directory path.',
             ], 422);
         }
 
-        // Use BookImportTrait's findBookDirectories
         $bookDirs = $this->findBookDirectories($absRoot);
         $queued = [];
 
-        // Get all jobs for checking duplicates
-        $allJobs = $this->documentStoreService->getJobs();
-
         foreach ($bookDirs as $dir) {
-            $relDir = ltrim(str_replace($storagePath, '', $dir), '/');
+            $relDir = ltrim(str_replace((string) $storagePath, '', $dir), '/');
 
-            // Check if job already exists for this directory
             $alreadyQueued = $this->documentStoreService->jobExistsByDirectoryPath($relDir);
-
-            // Check if book already exists with this directory path
             $bookExists = $this->documentStoreService->bookExistsByDirectoryPath($relDir);
 
             if ($bookExists) {
@@ -174,7 +299,7 @@ class QueueController extends Controller
             }
 
             if (!$alreadyQueued) {
-                \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
+                ImportBookFromDirectoryJob::dispatch($relDir);
                 $queued[] = $relDir;
             }
         }
@@ -185,18 +310,13 @@ class QueueController extends Controller
                 'skipped' => count($bookDirs) - count($queued),
                 'queued_dirs' => $queued,
             ],
-            200,
+            200
         );
     }
 
-
-    /**
-     * Bulk import all book directories from a specific directory (recursive, queued)
-     */
-    public function bulkImportBooksFromDir(Request $request)
+    public function bulkImportBooksFromDir(Request $request): JsonResponse
     {
         $dir = $request->input('dir');
-        // Dispatch a single job that will queue all the import jobs
 
         Log::info("Bulk importing books from directory: $dir");
 
@@ -207,7 +327,7 @@ class QueueController extends Controller
             [
                 'message' => 'Queued job to scan and import all book directories.',
             ],
-            200,
+            200
         );
     }
 }

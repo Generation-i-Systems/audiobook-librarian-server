@@ -581,10 +581,14 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // Queue management (admin only)
     Route::middleware(['auth', 'admin'])->group(function (): void {
         Route::get('/queue', [Admin\QueueController::class, 'index'])->name('queue.index');
-        Route::get('/queue/list', [Admin\QueueController::class, 'list']);
-        Route::post('/queue/remove/{id}', [Admin\QueueController::class, 'remove']);
-        Route::get('/queue/status', [Admin\QueueController::class, 'status']);
-        Route::post('/queue/start', [Admin\QueueController::class, 'startWorker']);
+        Route::get('/queue/list', [Admin\QueueController::class, 'list'])->name('queue.list');
+        Route::post('/queue/remove/{id}', [Admin\QueueController::class, 'remove'])->name('queue.remove');
+        Route::get('/queue/status', [Admin\QueueController::class, 'status'])->name('queue.status');
+        Route::post('/queue/start', [Admin\QueueController::class, 'startWorker'])->name('queue.start');
+        Route::post('/queue/stop', [Admin\QueueController::class, 'stopWorker'])->name('queue.stop');
+        Route::post('/queue/pause', [Admin\QueueController::class, 'pauseQueue'])->name('queue.pause');
+        Route::post('/queue/resume', [Admin\QueueController::class, 'resumeQueue'])->name('queue.resume');
+        Route::post('/queue/retry/{id?}', [Admin\QueueController::class, 'retryFailed'])->name('queue.retry');
         Route::post('/queue/clear', [Admin\QueueController::class, 'clear'])->name('queue.clear');
     });
 
