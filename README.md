@@ -115,6 +115,10 @@ current codebase live in [docs/legacy](docs/legacy/) for historical reference on
 
 ## License
 
-MIT
+[GNU AGPL-3.0](LICENSE)
 
-Genre icons are sourced from OpenMoji SVG artwork and stored locally under `public/images/genres`.
+### Third-party assets
+
+Genre icons under `public/images/genres` are sourced from [OpenMoji](https://openmoji.org) SVG
+artwork (CC BY-SA 4.0) and stored locally; they are not covered by this project's own AGPL-3.0
+license.

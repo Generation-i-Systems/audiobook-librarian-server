@@ -149,4 +149,4 @@ php artisan test tests/Feature/BookDirectoryParserTest.php
 
 ## License
 
-This project is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is licensed under the [GNU AGPL-3.0](../LICENSE).
