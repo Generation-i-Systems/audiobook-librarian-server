@@ -5,6 +5,8 @@ namespace Tests\Feature\Admin;
 use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Admin\BookController;
 use App\Services\AudioFileAnalyzer;
+use App\Services\Embeddings\EmbeddingPipeline;
+use App\Services\Search\SemanticBookSearchService;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +35,8 @@ class BookControllerUpdateNarratorSeriesTest extends TestCase
         $this->controller = new BookController(
             $this->documentStoreService,
             $this->createStub(\App\Services\ExternalCoverService::class),
-            new AudioFileAnalyzer()
+            new AudioFileAnalyzer(),
+            new SemanticBookSearchService(new EmbeddingPipeline())
         );
 
         $this->user = new DocumentstoreUser([

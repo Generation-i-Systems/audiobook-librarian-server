@@ -16,6 +16,7 @@ use App\Services\BookTagService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\HardcoverService;
+use App\Services\Search\SemanticBookSearchService;
 use App\Traits\BookImportTrait;
 use App\Traits\HandlesLibraryJson;
 use App\Traits\ProcessesBookData;
@@ -51,14 +52,18 @@ class BookController extends Controller
 
     protected AudioFileAnalyzer $audioFileAnalyzer;
 
+    protected SemanticBookSearchService $semanticBookSearchService;
+
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
         ExternalCoverService $externalCoverService,
-        AudioFileAnalyzer $audioFileAnalyzer
+        AudioFileAnalyzer $audioFileAnalyzer,
+        SemanticBookSearchService $semanticBookSearchService
     ) {
         $this->documentStoreService = $documentStoreService;
         $this->externalCoverService = $externalCoverService;
         $this->audioFileAnalyzer = $audioFileAnalyzer;
+        $this->semanticBookSearchService = $semanticBookSearchService;
     }
 
     public function index(Request $request)
@@ -182,6 +187,15 @@ class BookController extends Controller
                     $sort = 'created_at';
                     $order = 'desc';
                     break;
+            }
+
+            if ($request->boolean('semantic') && !empty($filters['search'])) {
+                $rankedIds = $this->semanticBookSearchService->rankedBookIds($filters['search']);
+                if (!empty($rankedIds)) {
+                    $filters['book_ids'] = $rankedIds;
+                    unset($filters['search']);
+                    $sort = 'relevance';
+                }
             }
 
             // Get paginated and filtered books from the document store service
@@ -521,8 +535,8 @@ class BookController extends Controller
             if ($request->hasFile('cover')) {
                 Log::debug('BookController@store: Processing cover image', ['type' => gettype($request->file('cover'))]);
                 try {
-                    $validated['cover'] = $this->storeCoverImage($request->file('cover'), $id);
-                    Log::debug('BookController@store: Cover image processed successfully', ['cover' => $validated['cover']]);
+                    $validated['coverImage'] = $this->storeCoverImage($request->file('cover'), $id);
+                    Log::debug('BookController@store: Cover image processed successfully', ['coverImage' => $validated['coverImage']]);
                 } catch (\Exception $e) {
                     Log::error('BookController@store: Error processing cover image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                     throw $e;
@@ -530,8 +544,8 @@ class BookController extends Controller
             } elseif ($request->filled('coverImageSource')) {
                 Log::debug('BookController@store: Processing cover image', ['type' => gettype($request->input('coverImageSource'))]);
                 try {
-                    $validated['cover'] = $this->storeCoverImage($request->input('coverImageSource'), $id);
-                    Log::debug('BookController@store: Cover image processed successfully', ['cover' => $validated['cover']]);
+                    $validated['coverImage'] = $this->storeCoverImage($request->input('coverImageSource'), $id);
+                    Log::debug('BookController@store: Cover image processed successfully', ['coverImage' => $validated['coverImage']]);
                 } catch (\Exception $e) {
                     Log::error('BookController@store: Error processing cover image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                     throw $e;
@@ -539,8 +553,8 @@ class BookController extends Controller
             } elseif ($request->filled('coverImage')) {
                 Log::debug('BookController@store: Processing cover image', ['type' => gettype($request->input('coverImage'))]);
                 try {
-                    $validated['cover'] = $this->storeCoverImage($request->input('coverImage'), $id);
-                    Log::debug('BookController@store: Cover image processed successfully', ['cover' => $validated['cover']]);
+                    $validated['coverImage'] = $this->storeCoverImage($request->input('coverImage'), $id);
+                    Log::debug('BookController@store: Cover image processed successfully', ['coverImage' => $validated['coverImage']]);
                 } catch (\Exception $e) {
                     Log::error('BookController@store: Error processing cover image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                     throw $e;
@@ -552,7 +566,7 @@ class BookController extends Controller
             $authors = collect($validated['authors'] ?? []);
             $narrators = collect($validated['narrators'] ?? []);
             $genres = collect($validated['genres'] ?? []);
-            Log::debug('BookController@store: Processing authors', ['authors' => $validated['authors']]);
+            Log::debug('BookController@store: Processing authors', ['authors' => $authors->all()]);
             try {
                 $validated['authors'] = $this->documentStoreService->findOrCreateMany('authors', $authors->all());
                 Log::debug('BookController@store: Authors processed successfully', ['authors' => $validated['authors']]);
@@ -560,7 +574,7 @@ class BookController extends Controller
                 Log::error('BookController@store: Error processing authors', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                 throw $e;
             }
-            Log::debug('BookController@store: Processing narrators', ['narrators' => $validated['narrators']]);
+            Log::debug('BookController@store: Processing narrators', ['narrators' => $narrators->all()]);
             try {
                 $validated['narrators'] = $this->documentStoreService->findOrCreateMany('narrators', $narrators->all());
                 Log::debug('BookController@store: Narrators processed successfully', ['narrators' => $validated['narrators']]);
@@ -568,7 +582,7 @@ class BookController extends Controller
                 Log::error('BookController@store: Error processing narrators', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                 throw $e;
             }
-            Log::debug('BookController@store: Processing genres', ['genres' => $validated['genres']]);
+            Log::debug('BookController@store: Processing genres', ['genres' => $genres->all()]);
             try {
                 $validated['genres'] = $this->documentStoreService->findOrCreateMany('genres', $genres->all());
                 Log::debug('BookController@store: Genres processed successfully', ['genres' => $validated['genres']]);

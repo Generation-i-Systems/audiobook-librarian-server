@@ -5,6 +5,8 @@ namespace Tests\Web\Feature\Admin;
 use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Admin\BookController;
 use App\Services\AudioFileAnalyzer;
+use App\Services\Embeddings\EmbeddingPipeline;
+use App\Services\Search\SemanticBookSearchService;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -48,7 +50,8 @@ class BookControllerUpdateTest extends TestCase
         $this->controller = new BookController(
             $this->documentStoreService,
             $this->externalCoverService,
-            new AudioFileAnalyzer()
+            new AudioFileAnalyzer(),
+            new SemanticBookSearchService(new EmbeddingPipeline())
         );
 
         // Create a test user with admin role

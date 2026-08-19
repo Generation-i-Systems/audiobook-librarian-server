@@ -7,8 +7,10 @@ namespace Tests\Web\Feature\Admin;
 use App\Auth\DocumentstoreUser;
 use App\Models\Book;
 use App\Models\Genre;
+use App\Services\Search\SemanticBookSearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -48,5 +50,33 @@ class BookControllerIndexNameTokenTest extends TestCase
         $response->assertOk();
         $response->assertSee('Mistborn');
         $response->assertDontSee('Other Book');
+    }
+
+    #[Test]
+    public function indexSupportsSemanticFlag(): void
+    {
+        $first = Book::factory()->create(['title' => 'Alpha Result']);
+        $second = Book::factory()->create(['title' => 'Beta Result']);
+        Book::factory()->create(['title' => 'Not Ranked']);
+
+        $semanticService = Mockery::mock(SemanticBookSearchService::class);
+        $semanticService->shouldReceive('rankedBookIds')
+            ->once()
+            ->with('space adventure')
+            ->andReturn([$second->id, $first->id]);
+        $this->app->instance(SemanticBookSearchService::class, $semanticService);
+
+        $response = $this->get(
+            '/admin/books?search=' . urlencode('space adventure') . '&semantic=true'
+        );
+
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertLessThan(
+            strpos($content, 'Alpha Result'),
+            strpos($content, 'Beta Result'),
+            'Expected Beta Result (ranked first) to appear before Alpha Result in the response'
+        );
+        $response->assertDontSee('Not Ranked');
     }
 }

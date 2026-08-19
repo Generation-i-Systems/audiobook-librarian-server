@@ -27,6 +27,13 @@
                 </select>
                 <button class="btn btn-outline-secondary" type="submit">Search</button>
             </div>
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="semantic" name="semantic" value="1"
+                    {{ request('semantic') ? 'checked' : '' }}>
+                <label class="form-check-label" for="semantic" title="Ranks results by meaning, not just exact word match — may be slower">
+                    Smart search (rank by meaning, not just exact word match)
+                </label>
+            </div>
         </form>
 
         <div class="mb-3">

@@ -23,6 +23,10 @@
     <ini name="memory_limit" value="-1"/>
     <server name="APP_ENV" value="testing"/>
     <server name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
+    <!-- This checkout is the live production server; isolate the compiled-view cache so
+         test runs never write into storage/framework/views (which the live webserver
+         process owns) and cause ownership-mismatch touch() failures for real traffic. -->
+    <server name="VIEW_COMPILED_PATH" value="storage/framework/testing-views"/>
     <server name="BCRYPT_ROUNDS" value="4"/>
     <server name="CACHE_STORE" value="array"/>
     <server name="DB_CONNECTION" value="sqlite"/>

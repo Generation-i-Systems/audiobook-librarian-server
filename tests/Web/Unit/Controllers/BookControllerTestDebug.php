@@ -4,6 +4,8 @@ namespace Tests\Web\Unit\Controllers;
 
 use App\Http\Controllers\Admin\BookController;
 use App\Services\AudioFileAnalyzer;
+use App\Services\Embeddings\EmbeddingPipeline;
+use App\Services\Search\SemanticBookSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
@@ -31,7 +33,8 @@ class BookControllerTestDebug extends TestCase
         $this->controller = new BookController(
             $this->documentStore,
             $mockExternalCoverService,
-            new AudioFileAnalyzer()
+            new AudioFileAnalyzer(),
+            new SemanticBookSearchService(new EmbeddingPipeline())
         );
 
         // Set up storage
@@ -83,9 +86,11 @@ class BookControllerTestDebug extends TestCase
 
         if (!empty($booksArray)) {
             $book = $booksArray[0];
-            // Assert that cover image was processed
+            // Assert that cover image was processed. store() generates a random filename
+            // (Laravel's UploadedFile::store() never preserves the original name), so only
+            // the extension is checked here.
             $this->assertArrayHasKey('coverImage', $book, 'Book is missing coverImage key');
-            $this->assertEquals('cover.jpg', $book['coverImage'], 'Cover image name does not match');
+            $this->assertStringEndsWith('.jpg', $book['coverImage'], 'Cover image extension does not match');
         }
     }
 }

@@ -11,6 +11,8 @@ use App\Http\Controllers\Admin\ImportFileController;
 use App\Services\AudibleService;
 use App\Services\BookImportService;
 use App\Services\AudioFileAnalyzer;
+use App\Services\Embeddings\EmbeddingPipeline;
+use App\Services\Search\SemanticBookSearchService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
@@ -126,7 +128,8 @@ class BookControllerTest extends TestCase
         $this->controller = new BookController(
             $this->documentStore,
             $this->externalCoverService,
-            new AudioFileAnalyzer()
+            new AudioFileAnalyzer(),
+            new SemanticBookSearchService(new EmbeddingPipeline())
         );
 
         $this->importController = new BookImportController(

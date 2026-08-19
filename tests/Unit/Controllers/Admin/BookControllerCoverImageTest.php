@@ -4,6 +4,8 @@ namespace Tests\Unit\Controllers\Admin;
 
 use App\Http\Controllers\Admin\BookController;
 use App\Services\AudioFileAnalyzer;
+use App\Services\Embeddings\EmbeddingPipeline;
+use App\Services\Search\SemanticBookSearchService;
 use App\Services\ExternalCoverService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -31,7 +33,8 @@ class BookControllerCoverImageTest extends TestCase
         $this->controller = new BookController(
             $this->documentStore,
             $externalCoverService,
-            new AudioFileAnalyzer()
+            new AudioFileAnalyzer(),
+            new SemanticBookSearchService(new EmbeddingPipeline())
         );
 
         // Ensure the controller uses our mock document store

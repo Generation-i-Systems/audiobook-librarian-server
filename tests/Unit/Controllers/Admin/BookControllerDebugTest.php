@@ -4,6 +4,8 @@ namespace Tests\Unit\Controllers\Admin;
 
 use App\Http\Controllers\Admin\BookController;
 use App\Services\AudioFileAnalyzer;
+use App\Services\Embeddings\EmbeddingPipeline;
+use App\Services\Search\SemanticBookSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
@@ -29,7 +31,8 @@ class BookControllerDebugTest extends TestCase
         $this->controller = new BookController(
             $this->documentStore,
             $this->createStub(\App\Services\ExternalCoverService::class),
-            new AudioFileAnalyzer()
+            new AudioFileAnalyzer(),
+            new SemanticBookSearchService(new EmbeddingPipeline())
         );
 
         // Set up storage
@@ -90,7 +93,8 @@ class BookControllerDebugTest extends TestCase
         $this->controller = new BookController(
             $this->documentStore,
             $this->createStub(\App\Services\ExternalCoverService::class),
-            new AudioFileAnalyzer()
+            new AudioFileAnalyzer(),
+            new SemanticBookSearchService(new EmbeddingPipeline())
         );
 
         // Call the store method
