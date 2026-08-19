@@ -4,6 +4,14 @@ This file contains the text of prompts sent to the AI assistant.
 
 ---
 
+## 2026-08-18
+
+update the web search and the api search to support searching by tag and by the elements in qdrant and update searches by genre, author, or series to support searching by name or the element
+
+(Clarified: "elements in qdrant" = an opt-in semantic similarity search reusing the existing per-book embedding pipeline; "name or the element" for genre/author/series = extending the inline search-token syntax to accept `genre:Name`/`author:Name`/`series:Name` alongside the existing `genreId:N`/`authorId:N`/`seriesId:N` id tokens.)
+
+---
+
 ## 2026-08-16
 
 Update the Skin and Theme navigation links to go directly to their pages on `www.ablibrarian.com`.

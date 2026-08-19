@@ -64,7 +64,11 @@ class EmbeddingPipeline
         };
     }
 
-    public function resolveVectorStore(): VectorStoreInterface
+    /**
+     * @param int|null $topKOverride Override the configured topK (e.g. for a paginated search
+     *   feature that needs more candidates than the "N similar books" recommendation default).
+     */
+    public function resolveVectorStore(?int $topKOverride = null): VectorStoreInterface
     {
         $name = config('neuron.store.default', 'file');
 
@@ -73,18 +77,19 @@ class EmbeddingPipeline
         }
 
         $config = config("neuron.store.{$name}", []);
+        $topK = $topKOverride ?? (int) ($config['topK'] ?? 5);
 
         return match ($name) {
             'file' => new FileVectorStore(
                 directory: $config['directory'] ?? storage_path('neuron'),
-                topK: (int) ($config['topK'] ?? 5),
+                topK: $topK,
                 name: $config['name'] ?? 'neuron',
                 ext: $config['ext'] ?? '.store'
             ),
             'qdrant' => new QdrantVectorStore(
                 collectionUrl: $config['collectionUrl'] ?? 'http://localhost:6333/collections/audiobook-librarian/',
                 key: $config['key'] ?? null,
-                topK: (int) ($config['topK'] ?? 5),
+                topK: $topK,
                 dimension: (int) ($config['dimension'] ?? 3072)
             ),
         };

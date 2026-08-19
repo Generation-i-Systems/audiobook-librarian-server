@@ -532,7 +532,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $query->where('title', 'like', '%' . $filters['title'] . '%');
         }
 
-        if (!empty($filters['book_id'])) {
+        if (!empty($filters['book_ids']) && is_array($filters['book_ids'])) {
+            $query->whereIn('books.id', $filters['book_ids']);
+        } elseif (!empty($filters['book_id'])) {
             $query->where('books.id', $filters['book_id']);
         }
 
@@ -703,6 +705,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 break;
             case 'random':
                 $query->inRandomOrder();
+                break;
+            case 'relevance':
+                if (!empty($filters['book_ids']) && is_array($filters['book_ids'])) {
+                    // $filters['book_ids'] is always built internally from int vector-store
+                    // metadata (see SemanticBookSearchService), never raw user input, so
+                    // interpolating the id list here is safe. A portable CASE expression is
+                    // used instead of MySQL's FIELD() so this also works against the sqlite
+                    // connection the test suite runs on.
+                    $ids = array_map('intval', $filters['book_ids']);
+                    $cases = [];
+                    foreach ($ids as $position => $id) {
+                        $cases[] = "WHEN {$id} THEN {$position}";
+                    }
+                    $query->orderByRaw('CASE books.id ' . implode(' ', $cases) . ' ELSE ' . count($ids) . ' END');
+                } else {
+                    $query->orderBy('title', $order);
+                }
                 break;
             case 'title':
             default:

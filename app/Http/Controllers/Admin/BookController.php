@@ -91,14 +91,20 @@ class BookController extends Controller
             if ($tokens['author_id']) {
                 $filters['author_id'] = $tokens['author_id'];
                 unset($filters['author']);
+            } elseif ($tokens['author_name']) {
+                $filters['author'] = $tokens['author_name'];
             }
             if ($tokens['genre_id']) {
                 $filters['genre_id'] = $tokens['genre_id'];
                 unset($filters['genre']);
+            } elseif ($tokens['genre_name']) {
+                $filters['genre'] = $tokens['genre_name'];
             }
             if ($tokens['series_id']) {
                 $filters['series_id'] = $tokens['series_id'];
                 unset($filters['series']);
+            } elseif ($tokens['series_name']) {
+                $filters['series'] = $tokens['series_name'];
             }
             if ($tokens['book_id']) {
                 $filters['book_id'] = $tokens['book_id'];

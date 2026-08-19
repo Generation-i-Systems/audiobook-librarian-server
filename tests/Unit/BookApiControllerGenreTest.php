@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Http\Controllers\Api\BookApiController;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\Search\SemanticBookSearchService;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
@@ -76,7 +77,8 @@ class BookApiControllerGenreTest extends TestCase
     private function getControllerInstance()
     {
         $documentStoreMock = $this->createStub(DocumentStoreServiceInterface::class);
-        return new BookApiController($documentStoreMock);
+        $semanticBookSearchServiceMock = $this->createStub(SemanticBookSearchService::class);
+        return new BookApiController($documentStoreMock, $semanticBookSearchServiceMock);
     }
 
     /**

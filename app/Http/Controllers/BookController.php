@@ -7,6 +7,7 @@ use App\Models\Book;
 use App\Models\User;
 use App\Services\BookTagService;
 use App\Services\GoogleBooksApiService;
+use App\Services\Search\SemanticBookSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -23,17 +24,21 @@ class BookController extends Controller
 
     protected BookTagService $bookTagService;
 
+    protected SemanticBookSearchService $semanticBookSearchService;
+
     /**
      * BookController constructor.
      */
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
         GoogleBooksApiService $googleBooksApiService,
-        BookTagService $bookTagService
+        BookTagService $bookTagService,
+        SemanticBookSearchService $semanticBookSearchService
     ) {
         $this->documentStoreService = $documentStoreService;
         $this->googleBooksApiService = $googleBooksApiService;
         $this->bookTagService = $bookTagService;
+        $this->semanticBookSearchService = $semanticBookSearchService;
     }
 
     /**
@@ -65,26 +70,53 @@ class BookController extends Controller
         if ($request->has('series') && !empty($request->series)) {
             $filters['series'] = $request->series;
         }
+        if ($request->filled('tag')) {
+            $filters['tag'] = $request->input('tag');
+        }
+        if ($request->filled('tags')) {
+            $filters['tags'] = $request->input('tags');
+        }
 
         $tokens = $this->parseSearchTokens($request->input('search', ''));
         if ($tokens['author_id']) {
             $filters['author_id'] = $tokens['author_id'];
             unset($filters['author']);
+        } elseif ($tokens['author_name']) {
+            $filters['author'] = $tokens['author_name'];
         }
         if ($tokens['genre_id']) {
             $filters['genre_id'] = $tokens['genre_id'];
             unset($filters['genre']);
+        } elseif ($tokens['genre_name']) {
+            $filters['genre'] = $tokens['genre_name'];
         }
         if ($tokens['series_id']) {
             $filters['series_id'] = $tokens['series_id'];
             unset($filters['series']);
+        } elseif ($tokens['series_name']) {
+            $filters['series'] = $tokens['series_name'];
+        }
+        if ($tokens['tag']) {
+            $filters['tag'] = $tokens['tag'];
         }
         if ($tokens['search'] !== '') {
             $filters['search'] = $tokens['search'];
         }
 
+        $sort = $request->input('sort', 'title');
+        $order = $request->input('order', 'asc');
+
+        if ($request->boolean('semantic') && !empty($filters['search'])) {
+            $rankedIds = $this->semanticBookSearchService->rankedBookIds($filters['search']);
+            if (!empty($rankedIds)) {
+                $filters['book_ids'] = $rankedIds;
+                unset($filters['search']);
+                $sort = 'relevance';
+            }
+        }
+
         // Get paginated and filtered books with minimal relations
-        $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true);
+        $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, false, Auth::id());
         $books = $result['data'];
 
         Log::debug(sprintf(
@@ -243,18 +275,34 @@ class BookController extends Controller
             $filters['series_id'] = $request->input('series_id');
         }
 
+        if ($request->filled('tag')) {
+            $filters['tag'] = $request->input('tag');
+        }
+        if ($request->filled('tags')) {
+            $filters['tags'] = $request->input('tags');
+        }
+
         $tokens = $this->parseSearchTokens($request->input('search', ''));
         if ($tokens['author_id']) {
             $filters['author_id'] = $tokens['author_id'];
             unset($filters['author']);
+        } elseif ($tokens['author_name']) {
+            $filters['author'] = $tokens['author_name'];
         }
         if ($tokens['genre_id']) {
             $filters['genre_id'] = $tokens['genre_id'];
             unset($filters['genre']);
+        } elseif ($tokens['genre_name']) {
+            $filters['genre'] = $tokens['genre_name'];
         }
         if ($tokens['series_id']) {
             $filters['series_id'] = $tokens['series_id'];
             unset($filters['series']);
+        } elseif ($tokens['series_name']) {
+            $filters['series'] = $tokens['series_name'];
+        }
+        if ($tokens['tag']) {
+            $filters['tag'] = $tokens['tag'];
         }
         if ($tokens['search'] !== '') {
             $filters['search'] = $tokens['search'];
@@ -264,8 +312,19 @@ class BookController extends Controller
         $sort = $request->input('sort', 'title');
         $order = $request->input('order', 'asc');
 
-        // Get paginated and filtered books from the document store service
-        $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order);
+        if ($request->boolean('semantic') && !empty($filters['search'])) {
+            $rankedIds = $this->semanticBookSearchService->rankedBookIds($filters['search']);
+            if (!empty($rankedIds)) {
+                $filters['book_ids'] = $rankedIds;
+                unset($filters['search']);
+                $sort = 'relevance';
+            }
+        }
+
+        // Get paginated and filtered books from the document store service.
+        // $userId is passed so per-user tag ban/require rules (UserTagFilterService)
+        // are enforced here too, matching the API's Api\BookApiController behavior.
+        $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, false, Auth::id());
         $books = $result['data'];
 
         // Ensure all book fields are properly formatted

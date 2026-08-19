@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
+use App\Services\Search\SemanticBookSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,9 +18,14 @@ class BookApiController extends Controller
 
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    protected SemanticBookSearchService $semanticBookSearchService;
+
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        SemanticBookSearchService $semanticBookSearchService
+    ) {
         $this->documentStoreService = $documentStoreService;
+        $this->semanticBookSearchService = $semanticBookSearchService;
     }
 
     /**
@@ -166,10 +172,45 @@ class BookApiController extends Controller
             }
         }
 
+        // Inline search tokens (author:/genre:/series:/tag:/authorId:/genreId:/seriesId:)
+        // take precedence over the enhanced-mode alias params above when both are present.
+        $tokens = $this->parseSearchTokens($filters['search']);
+        if ($tokens['author_id']) {
+            $filters['author_id'] = $tokens['author_id'];
+            unset($filters['author']);
+        } elseif ($tokens['author_name']) {
+            $filters['author'] = $tokens['author_name'];
+        }
+        if ($tokens['genre_id']) {
+            $filters['genre_id'] = $tokens['genre_id'];
+            unset($filters['genre']);
+        } elseif ($tokens['genre_name']) {
+            $filters['genre'] = $tokens['genre_name'];
+        }
+        if ($tokens['series_id']) {
+            $filters['series_id'] = $tokens['series_id'];
+            unset($filters['series']);
+        } elseif ($tokens['series_name']) {
+            $filters['series'] = $tokens['series_name'];
+        }
+        if ($tokens['tag']) {
+            $filters['tag'] = $filters['tag'] ? $filters['tag'] . ',' . $tokens['tag'] : $tokens['tag'];
+        }
+        $filters['search'] = $tokens['search'];
+
         $filters['include_needs_review'] = $includeNeedsReview;
         $userId = Auth::id();
 
         [$sort, $order] = $this->resolveSortParams($request);
+
+        if ($request->boolean('semantic') && !empty($filters['search'])) {
+            $rankedIds = $this->semanticBookSearchService->rankedBookIds($filters['search']);
+            if (!empty($rankedIds)) {
+                $filters['book_ids'] = $rankedIds;
+                unset($filters['search']);
+                $sort = 'relevance';
+            }
+        }
 
         $booksData = $this->documentStoreService->listBooks(
             $page,
@@ -390,8 +431,40 @@ class BookApiController extends Controller
             'include_needs_review' => $includeNeedsReview,
         ];
 
-        $userId    = Auth::id();
-        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters, true, 'title', 'asc', false, $userId);
+        // This endpoint's filter set has never supported genre; only author/series/tag
+        // tokens are merged here, matching that narrower surface (genre: tokens are ignored).
+        $tokens = $this->parseSearchTokens($filters['search']);
+        if ($tokens['author_id']) {
+            $filters['author_id'] = $tokens['author_id'];
+            unset($filters['author']);
+        } elseif ($tokens['author_name']) {
+            $filters['author'] = $tokens['author_name'];
+        }
+        if ($tokens['series_id']) {
+            $filters['series_id'] = $tokens['series_id'];
+            unset($filters['series']);
+        } elseif ($tokens['series_name']) {
+            $filters['series'] = $tokens['series_name'];
+        }
+        if ($tokens['tag']) {
+            $filters['tag'] = $filters['tag'] ? $filters['tag'] . ',' . $tokens['tag'] : $tokens['tag'];
+        }
+        $filters['search'] = $tokens['search'];
+
+        $userId = Auth::id();
+        $sort   = 'title';
+        $order  = 'asc';
+
+        if ($request->boolean('semantic') && !empty($filters['search'])) {
+            $rankedIds = $this->semanticBookSearchService->rankedBookIds($filters['search']);
+            if (!empty($rankedIds)) {
+                $filters['book_ids'] = $rankedIds;
+                unset($filters['search']);
+                $sort = 'relevance';
+            }
+        }
+
+        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, false, $userId);
         $books     = $booksData['data'];
         $total     = $booksData['total'];
 

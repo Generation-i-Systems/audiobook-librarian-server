@@ -86,6 +86,38 @@ class EmbeddingPipelineTest extends TestCase
         $pipeline->resolveVectorStore();
     }
 
+    public function testResolveVectorStoreUsesConfigTopKWhenNoOverrideGiven(): void
+    {
+        $dir = sys_get_temp_dir() . '/neuron-test-' . uniqid();
+        config([
+            'neuron.store.default' => 'file',
+            'neuron.store.file' => ['directory' => $dir, 'topK' => 7, 'name' => 'neuron', 'ext' => '.store'],
+        ]);
+
+        $pipeline = new EmbeddingPipeline();
+        $store = $pipeline->resolveVectorStore();
+
+        $ref = new \ReflectionProperty(FileVectorStore::class, 'topK');
+        $ref->setAccessible(true);
+        $this->assertSame(7, $ref->getValue($store));
+    }
+
+    public function testResolveVectorStoreUsesOverrideTopKWhenGiven(): void
+    {
+        $dir = sys_get_temp_dir() . '/neuron-test-' . uniqid();
+        config([
+            'neuron.store.default' => 'file',
+            'neuron.store.file' => ['directory' => $dir, 'topK' => 7, 'name' => 'neuron', 'ext' => '.store'],
+        ]);
+
+        $pipeline = new EmbeddingPipeline();
+        $store = $pipeline->resolveVectorStore(50);
+
+        $ref = new \ReflectionProperty(FileVectorStore::class, 'topK');
+        $ref->setAccessible(true);
+        $this->assertSame(50, $ref->getValue($store));
+    }
+
     public function testResolveVectorStoreAttemptsQdrantInitializationWhenConfigured(): void
     {
         config([

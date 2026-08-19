@@ -6518,11 +6518,21 @@
                     {
                         "name": "search",
                         "in": "query",
-                        "description": "Search term to filter books",
+                        "description": "Search term to filter books. Supports inline tokens: authorId:N, genreId:N, seriesId:N, bookId:N (exact ID match) and author:NAME, genre:NAME, series:NAME, tag:NAME (name match; quote multi-word values, e.g. author:\"Brandon Sanderson\"). Inline tokens take precedence over the enhanced-mode alias params (genre_id, author_name, etc.) when both are present.",
                         "required": false,
                         "schema": {
                             "type": "string",
                             "example": "harry potter"
+                        }
+                    },
+                    {
+                        "name": "semantic",
+                        "in": "query",
+                        "description": "Rank results by AI semantic similarity to the search text instead of exact/partial text match, reusing the same embedding pipeline as the recommendation engine. Falls back to normal search if no embedding provider is configured or the vector search fails.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     },
                     {
@@ -6583,7 +6593,8 @@
                                 "last_listened_asc",
                                 "last_listened_desc",
                                 "queue_order_asc",
-                                "queue_order_desc"
+                                "queue_order_desc",
+                                "relevance"
                             ],
                             "default": "title",
                             "example": "title_asc"
@@ -6638,6 +6649,16 @@
                         "schema": {
                             "type": "string",
                             "example": "Favorites"
+                        }
+                    },
+                    {
+                        "name": "tags",
+                        "in": "query",
+                        "description": "Filter by multiple user tags. Comma-separated tag names; prefix a tag with '-' to exclude/ban it, e.g. \"Favorites,-Spicy\".",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Favorites,-Spicy"
                         }
                     },
                     {
@@ -7015,11 +7036,21 @@
                     {
                         "name": "search",
                         "in": "query",
-                        "description": "Search term (matches title, description, authors, narrators, series)",
+                        "description": "Search term (matches title, description, authors, narrators, series). Supports inline tokens: authorId:N, seriesId:N, bookId:N (exact ID match) and author:NAME, series:NAME, tag:NAME (name match; quote multi-word values, e.g. author:\"Brandon Sanderson\"). Note: this endpoint does not support genre filtering, so genre: tokens are ignored.",
                         "required": false,
                         "schema": {
                             "type": "string",
                             "example": "Tolkien"
+                        }
+                    },
+                    {
+                        "name": "semantic",
+                        "in": "query",
+                        "description": "Rank results by AI semantic similarity to the search text instead of exact/partial text match. Sort is otherwise fixed to title/asc; overridden to relevance order only when semantic search actually returns candidates. Falls back to normal search if no embedding provider is configured or the vector search fails.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     },
                     {
@@ -7056,6 +7087,16 @@
                         "required": false,
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tags",
+                        "in": "query",
+                        "description": "Filter by multiple user tags. Comma-separated tag names; prefix a tag with '-' to exclude/ban it, e.g. \"Favorites,-Spicy\".",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Favorites,-Spicy"
                         }
                     },
                     {

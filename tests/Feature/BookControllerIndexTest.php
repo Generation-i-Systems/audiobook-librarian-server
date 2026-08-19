@@ -115,7 +115,7 @@ class BookControllerIndexTest extends TestCase
             // Mock the DocumentStoreService to return our test data
             $this->mockDocumentStoreService->shouldReceive('listBooks')
                 ->once()
-                ->with(1, 12, [], true)
+                ->with(1, 12, [], true, 'title', 'asc', false, $this->user->id)
                 ->andReturn([
                     'data' => $testBooks,
                     'total' => 2,
@@ -220,7 +220,7 @@ class BookControllerIndexTest extends TestCase
 
         $this->mockDocumentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, [], true)
+            ->with(1, 12, [], true, 'title', 'asc', false, $this->user->id)
             ->andReturn([
                 'data' => $testBooks,
                 'total' => 1,
@@ -269,7 +269,7 @@ class BookControllerIndexTest extends TestCase
 
         $this->mockDocumentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, [], true)
+            ->with(1, 12, [], true, 'title', 'asc', false, $user->id)
             ->andReturn([
                 'data' => [],
                 'total' => 0,

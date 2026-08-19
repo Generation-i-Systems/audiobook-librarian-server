@@ -397,6 +397,22 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                     <a href="{{ route('books.index') }}" class="btn btn-secondary">Reset</a>
                 </div>
             </div>
+            <div class="row g-3 align-items-end mt-1">
+                <div class="col-md-3">
+                    <label for="tag" class="form-label">Tag:</label>
+                    <input type="text" class="form-control" id="tag" name="tag"
+                        value="{{ request('tag') }}" placeholder="Filter by tag">
+                </div>
+                <div class="col-md-9 d-flex align-items-center">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="semantic" name="semantic" value="1"
+                            {{ request('semantic') ? 'checked' : '' }}>
+                        <label class="form-check-label" for="semantic" title="Ranks results by meaning, not just exact word match — may be slower">
+                            Smart search (rank by meaning, not just exact word match)
+                        </label>
+                    </div>
+                </div>
+            </div>
         </form>
 
         @if(!$isLibrivoxMode)
@@ -675,7 +691,9 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                 "search": '{{ request()->input("search", "") }}',
                 "genre": '{{ request()->input("genre", "") }}',
                 "author": '{{ request()->input("author", "") }}',
-                "series": '{{ request()->input("series", "") }}'
+                "series": '{{ request()->input("series", "") }}',
+                "tag": '{{ request()->input("tag", "") }}',
+                "semantic": '{{ request()->boolean("semantic") ? "1" : "" }}'
             };
 
             function hasCoverImage(book) {
@@ -996,7 +1014,9 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                     "search": $('#search').val(),
                     "genre": $('#genre').val(),
                     "author": $('#author').val(),
-                    "series": $('#series').val()
+                    "series": $('#series').val(),
+                    "tag": $('#tag').val(),
+                    "semantic": $('#semantic').is(':checked') ? '1' : ''
                 };
 
                 // Reset to first page
