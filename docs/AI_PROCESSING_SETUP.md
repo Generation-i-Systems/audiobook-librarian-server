@@ -357,7 +357,7 @@ The system includes comprehensive error handling:
 
 The AI processing integrates seamlessly with:
 - Existing book management system
-- MongoDB and MySQL data stores
+- MySQL data store
 - Cover image processing
 - Title cleanup commands
 

@@ -8,10 +8,10 @@ To make `import-bk` available system-wide, create a symlink in a directory that'
 
 ```bash
 # Example: Link to ~/bin (make sure ~/bin is in your PATH)
-ln -s /home/eric-22/PhpstormProjects/ab5/bin/import-bk ~/bin/import-bk
+ln -s $(pwd)/bin/import-bk ~/bin/import-bk
 
 # Or link to /usr/local/bin (requires sudo)
-sudo ln -s /home/eric-22/PhpstormProjects/ab5/bin/import-bk /usr/local/bin/import-bk
+sudo ln -s $(pwd)/bin/import-bk /usr/local/bin/import-bk
 ```
 
 ## Usage
@@ -246,4 +246,4 @@ done
 ## See Also
 
 - [OpenAudible Import](./openaudible-import.md) - For importing from OpenAudible
-- [Parse Books Command](./parse-books.md) - For scanning the entire library
+- [Book Parser](./book-parser.md) - For scanning the entire library

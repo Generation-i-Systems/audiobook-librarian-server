@@ -20,14 +20,8 @@ This documentation is organized into the following sections:
 
 ### OpenAPI Specification
 
-- **YAML Format**: [`openapi.yaml`](./openapi.yaml) - The complete OpenAPI specification in YAML format
-- **JSON Format**: [`openapi.json`](./openapi.json) - The OpenAPI specification in JSON format
-- **Public URL**: `https://books.thelin.org/api-docs/openapi.json` - Use this URL for API client generation
-
-### Resources
-
-- **Interactive API Documentation**: [Swagger UI](https://books.thelin.org/api/docs)
-- **Main Application**: [Audiobook Librarian](https://books.thelin.org)
+- **JSON Format**: [`openapi.json`](./openapi.json) - The complete OpenAPI specification (source of truth)
+- **Public URL**: `https://<your-server>/api-docs/openapi.json` - Use this URL for API client generation on your instance
 
 ## Getting Started
 

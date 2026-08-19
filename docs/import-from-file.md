@@ -77,7 +77,7 @@ When a book is imported using this feature, additional metadata is stored with t
 
 ### Series Data Handling
 
-Series information is stored with the `seriesName` field (not `name`) to match the MongoDB schema. For example:
+Series information is stored with the `seriesName` field (not `name`). For example:
 
 ```json
 "series": [

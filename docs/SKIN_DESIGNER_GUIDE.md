@@ -42,10 +42,6 @@ Creating a custom skin for Librarian Player is straightforward:
 12. [Testing and Debugging](#testing-and-debugging)
 13. [Best Practices](#best-practices)
 
-**📚 See also**: [Skin Layout System Guide](SKIN_LAYOUT_GUIDE.md) for detailed examples and migration guide
-
----
-
 ## Understanding the Basics
 
 ### What is a Skin?

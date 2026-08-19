@@ -6,17 +6,16 @@ This document provides information about the Audiobook Librarian API and its Ope
 
 The Audiobook Librarian API is documented using the [OpenAPI Specification](https://swagger.io/specification/) (formerly known as Swagger).
 
-### Specification Files
+### Specification File
 
-- `openapi.yaml`: The complete OpenAPI specification in YAML format
-- `openapi.json`: The OpenAPI specification in JSON format (same content as YAML, different format)
+- `docs/openapi.json`: The complete OpenAPI specification (source of truth; update after any API change)
 
-### Public API Documentation URL
+### API Documentation URL
 
-The OpenAPI JSON specification is publicly available at:
+Every running instance serves its own OpenAPI JSON at:
 
 ```
-https://books.thelin.org/api-docs/openapi.json
+https://<your-server>/api-docs/openapi.json
 ```
 
 This URL can be used with OpenAPI client generators and documentation tools like Swagger UI, Redoc, Postman, etc.
@@ -38,13 +37,13 @@ The API includes the following main resource categories:
 
 #### Series
 
-Important note: Series documents use `seriesName` (not `name`) for the series title field. All code, queries, and data operations must use `seriesName` when referring to the series title.
+Important note: series records use `seriesName` (not `name`) for the series title field. All code, queries, and data operations must use `seriesName` when referring to the series title.
 
-Example series document:
+Example series record:
 
 ```json
 {
-  "_id": "507f1f77bcf86cd799439011",
+  "id": 42,
   "seriesName": "Super Powereds",
   "description": "College for Supers",
   "books": [...]
@@ -67,7 +66,7 @@ Login supports either `email` + `password` or `username` + `password`.
 
 #### OAuth Authentication
 
-Google OAuth authentication will soon be available through the `/api/v1/auth/google` endpoint. This will allow users to authenticate using their Google accounts.
+Google OAuth authentication is available through the `/api/v1/auth/google` endpoint, allowing users to authenticate using their Google accounts.
 
 - Bearer token authentication
 - OAuth2 (Google login endpoint)
@@ -107,5 +106,5 @@ You can generate API clients for various programming languages using the OpenAPI
 Example using OpenAPI Generator:
 
 ```bash
-openapi-generator generate -i https://books.thelin.org/api-docs/openapi.json -g javascript -o ./client
+openapi-generator generate -i https://<your-server>/api-docs/openapi.json -g javascript -o ./client
 ```

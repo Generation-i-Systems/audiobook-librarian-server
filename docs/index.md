@@ -21,7 +21,7 @@ Welcome to the comprehensive documentation for the Audiobook Librarian API and s
 
 ### For Developers
 
-- **Base URL**: `https://books.thelin.org/api/v1`
+- **Base URL**: `https://<your-server>/api/v1`
 - **Local URL**: `http://localhost:8000/api/v1`
 - **Authentication**: Bearer Token
 - **Format**: JSON
@@ -45,12 +45,12 @@ Welcome to the comprehensive documentation for the Audiobook Librarian API and s
 
 ```bash
 # Login
-curl -X POST https://books.thelin.org/api/v1/login \
+curl -X POST https://<your-server>/api/v1/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"password"}'
 
 # Use returned token
-curl -X GET https://books.thelin.org/api/v1/books \
+curl -X GET https://<your-server>/api/v1/books \
   -H "Authorization: Bearer {token}" \
   -H "Accept: application/json"
 ```
@@ -140,4 +140,4 @@ The [OpenAPI specification](openapi.json) can be used with code generators like:
 
 **API Version**: 1.0.0
 **Last Updated**: August 2025
-**Base URL**: `https://books.thelin.org/api/v1`
+**Base URL**: `https://<your-server>/api/v1`

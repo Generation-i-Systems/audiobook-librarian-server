@@ -2,7 +2,7 @@
 
 ## Overview
 
-Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporting admin CRUD, user management, Google Books autofill, and Firestore-backed autocomplete for authors and series. The backend also provides a REST API that supports integration with an Android app client. Recent hardening ensures all automated tests run exclusively against SQLite in-memory via a bootstrap database safety check; any misconfiguration aborts immediately to prevent production MySQL wipes.
+Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporting admin CRUD, user management, Google Books autofill, and MySQL-backed autocomplete for authors and series. The backend also provides a REST API that supports integration with an Android app client. Recent hardening ensures all automated tests run exclusively against SQLite in-memory via a bootstrap database safety check; any misconfiguration aborts immediately to prevent production MySQL wipes.
 
 The API now supports host-based library profile resolution in a single runtime: incoming host name selects an active library profile (for example `main` vs `librivox`) and switches database connection plus book storage roots at request time while preserving the same API routes and response contract.
 
@@ -69,7 +69,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - Legacy formats (string, key-value, separate objects) are not supported.
 - Migration: update any old data to this format.
 
-### Book Document (Firestore)
+### Book Record (MySQL, via Eloquent)
 
 ```json
 {
@@ -79,20 +79,21 @@ See `docs/requirements/reading-progress-and-stats.md`.
     { "seriesName": "Stormlight Archive", "number": 1 },
     { "seriesName": "Cosmere", "number": 15 }
   ],
-    "Cosmere": 15
-  },
   "description": "Epic fantasy novel...",
   "coverImage": "covers/way-of-kings.jpg",
   "directoryPath": "audiobooks/way-of-kings",
   "genre": ["Fantasy", "Epic"],
   "createdAt": "2025-05-20T14:00:00Z",
-  "updatedAt": "2025-05-20T14:00:00Z",
-  // ...other metadata fields
+  "updatedAt": "2025-05-20T14:00:00Z"
 }
 ```
 
+Authors, series, and genres are normalized MySQL tables joined through `author_book`, `book_series`,
+and `book_genre` pivot tables (see [API Documentation](docs/API.md) and
+[librarian.json Format Reference](docs/librarian-json-format.md)); this is the API-facing shape.
+
 - **Authors:** Array of strings, each an author name.
-- **Series:** Map of series name to series number (int or null).
+- **Series:** Array of `{ seriesName, number }` objects (see Series Field above).
 - **Genre:** Array of strings.
 - **Cover image:** Path or URL to image.
 - **Directory path:** Path to audiobook files.
@@ -104,7 +105,6 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - `Admin\BookController`: CRUD, autocomplete endpoints, REST API endpoints
 - `Admin\BookFilesystemController`: admin filesystem AJAX endpoints (rename/move directory path helpers, directory browser helpers)
 - `BookFilesystemService`: filesystem operations for book directories (rename/list/browse) with document store updates
-- `FirestoreService`: list/search authors/series
 - `LibraryRepairService`: nightly scanner that detects missing/orphan/duplicate/nested/numbered-suffix directories, auto-fixes safe cases, and records issues with minimal metadata
 - `BookImportService`: preserves detected series numbering from enrichment and directory names, including validated trailing-number names such as `Magic Eater 5`
 - `LibraryRepairScanCommand` (`library:repair-scan`): CLI entry point for manual or scheduled scans (JSON mode, selective issue filters, optional auto-fixes)
@@ -123,17 +123,14 @@ See `docs/requirements/reading-progress-and-stats.md`.
     - `/admin/books/autocomplete/series` (AJAX autocomplete)
     - `/admin/books/import-from-title` (Google Books autofill)
 - **REST API Routes:**
-    - `GET /api/books` — List books
-    - `GET /api/books/{id}` — Get book detail
-    - `POST /api/books` — Create book
-    - `PUT /api/books/{id}` — Update book
-    - `DELETE /api/books/{id}` — Delete book
+    - `GET /api/v1/books` — List books
+    - `GET /api/v1/books/{id}` — Get book detail
     - `POST /api/v1/auth/google` — Google Sign-In
     - `POST /api/v1/auth/facebook` — Facebook Sign-In
     - `POST /api/v1/auth/apple` — Apple Sign-In
-    - `GET /api/authors` — List authors
-    - `GET /api/series` — List series
-    - (additional endpoints for Android app support)
+    - `GET /api/v1/authors` — List authors
+    - `GET /api/v1/series/{seriesId}` — Series detail
+    - (additional endpoints for Android app support; see [API Documentation](docs/API.md) and `docs/openapi.json` for the full, authoritative list)
 
 ## 5. Frontend Integration
 
@@ -148,7 +145,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 ## 6. Design Decisions
 
 - Server-side filtering for autocomplete
-- Firestore as source of truth
+- MySQL (via Eloquent) as source of truth
 - All dynamic logic in external JS
 - Modern UX with jQuery UI
 
@@ -168,15 +165,13 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 ## 9. How to Extend
 
-- **Add autocomplete:** endpoint in BookController/FirestoreService, route, field, JS
-- **Add book metadata:** update Firestore, form, validation, display
+- **Add autocomplete:** endpoint in BookController/MySqlService, route, field, JS
+- **Add book metadata:** update MySQL model/migration, form, validation, display
 
 ## 10. Contributors & Structure
 
 - **Controllers:** `app/Http/Controllers/Admin/BookController.php`
-- **Firebase Cloud Functions:** All Firebase backend automation, API endpoints, and event-driven logic are located in the `/functions` directory. Reference this for any Firebase-related backend code or extensions.
-
-- **Services:** `app/Services/FirestoreService.php`
+- **Services:** `app/Services/MySqlService.php` (primary `DocumentStoreServiceInterface` implementation)
 - **Views:** `resources/views/admin/books/form.blade.php`, `layouts/app.blade.php`
 - **JS:** `public/js/admin/books/form.js`
 

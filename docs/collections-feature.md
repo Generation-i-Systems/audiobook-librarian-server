@@ -252,5 +252,5 @@ Collections are searchable like regular series through the series filter.
 ## Related Documentation
 
 - [Directory Validation System](directory-validation-system.md)
-- [Book Import Process](book-import.md)
-- [Series Management](series-management.md)
+- [Unified Import Architecture](unified-import-architecture.md)
+- [API Documentation](API.md) (series data model & endpoints)

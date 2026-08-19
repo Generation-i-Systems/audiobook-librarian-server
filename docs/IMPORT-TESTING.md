@@ -303,7 +303,7 @@ If tests are failing and you're stuck:
 
 1. Check test output for specific error
 2. Review recent changes to import code
-3. Check `docs/IMPORT-FIXES-SUMMARY.md` for context
+3. Check `docs/legacy/IMPORT-FIXES-SUMMARY.md` for context
 4. Ask for help with specific test failure
 
 **Remember**: Tests are there to help you, not block you. If a test is failing, there's likely a real issue that needs fixing!

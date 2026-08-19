@@ -35,3 +35,8 @@ tmp_old_form.js
 /bootstrap/cache/*.php
 .claude/settings.local.json
 /archive/firestore
+books.json
+
+# Files pending review/deletion, not part of the project
+/deleted/
+coverage-html/

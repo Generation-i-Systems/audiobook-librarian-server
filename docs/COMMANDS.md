@@ -1,171 +1,91 @@
 # Console Commands & Jobs
 
-This document provides a comprehensive list of all Artisan console commands available in the Audiobook Librarian application, along with their descriptions and usage.
+This covers the Artisan commands a server admin is likely to run directly. The application ships
+with many more one-off data-repair commands (`books:fix-*`, `books:repair-*`, etc.) used during
+development; run `php artisan list` to see the full set, and `php artisan help <command>` for any
+command's exact options.
 
-## Application-Specific Commands
+## Importing books
 
-### `php artisan backup:database`
-Create a backup of the MySQL database.
-- **Signature:** `backup:database {--verify : Verify backup integrity after creation}`
-- **Description:** Create a backup of the MySQL database.
-- **Options:**
-  - `--verify`: Verify backup integrity after creation.
+### `php artisan book:import`
 
-### `php artisan app:benchmark-database-performance`
-Run a series of queries against database services to benchmark their performance.
-- **Signature:** `app:benchmark-database-performance {driver=all : The driver to benchmark (mysql, mongo, all)}`
-- **Description:** Run a series of queries against database services to benchmark their performance.
-- **Arguments:**
-  - `driver`: The database driver to benchmark (`mysql`, `mongo`, `firestore`, or `all`). Default is `all`.
+Import audiobooks from a downloads directory using AI processing and external metadata enrichment
+(Audible, Google Books). Creates a database backup first unless `--no-backup` is passed.
 
-### `php artisan cover:check`
-Checks for inconsistencies in book cover images and attempts to fix them.
-- **Signature:** `cover:check`
-- **Description:** Checks for inconsistencies in book cover images and attempts to fix them.
+```bash
+# Free-tier AI processing, manual review of low-confidence matches
+php artisan book:import --model=gemini-2.5-flash-lite
 
-### `php artisan app:compare-book-data`
-Compare book data between MongoDB and MySQL.
-- **Signature:** `app:compare-book-data {title?} {--id=} {--list : List all books in MySQL} {--all : Compare all fields including JSON data}`
-- **Description:** Compare book data between MongoDB and MySQL.
-- **Arguments:**
-  - `title`: (Optional) Title of the book to compare.
-- **Options:**
-  - `--id`: MongoDB ID of the book to compare.
-  - `--list`: List all books in MySQL.
-  - `--all`: Compare all fields including JSON data.
+# Fully automated, no manual review
+php artisan book:import --auto --min-confidence=80
+```
 
-### `php artisan app:compare-mongo-mysql-books`
-Compares MongoDB book _ids with MySQL book mongo_ids to find unmigrated books.
-- **Signature:** `app:compare-mongo-mysql-books`
-- **Description:** Compares MongoDB book _ids with MySQL book mongo_ids to find unmigrated books.
+Key options: `--directory=`, `--model=`, `--min-confidence=`, `--auto`, `--dry-run`, `--limit=`,
+`--force`, `--copy-files`, `--collection=`, `--genre=`.
 
-### `php artisan app:create-admin-user`
-Create an admin user if one does not exist.
-- **Signature:** `app:create-admin-user`
-- **Description:** Create an admin user if one does not exist.
+### `import-bk` / `bkmv`
 
-### `php artisan firestore:books-dump`
-Dump the entire Firestore books collection as JSON for MongoDB import.
-- **Signature:** `firestore:books-dump {--output= : Output file (default: stdout)} {--import-to-mongo : Import directly into MongoDB using .env credentials} {--collection= : Firestore/MongoDB collection name (default: books)} {--one-by-one : Export/import one record at a time} {--direction=firestore-to-mongo : Sync direction (firestore-to-mongo|mongo-to-firestore)}`
-- **Description:** Dump the entire Firestore books collection as JSON for MongoDB import.
-- **Options:**
-  - `--output`: Output file (default: stdout).
-  - `--import-to-mongo`: Import directly into MongoDB using .env credentials.
-  - `--collection`: Firestore/MongoDB collection name (default: books).
-  - `--one-by-one`: Export/import one record at a time.
-  - `--direction`: Sync direction (`firestore-to-mongo` or `mongo-to-firestore`). Default is `firestore-to-mongo`.
+See [Import Book Documentation](import-book.md) for the standalone `import-bk` CLI tool, and
+`php artisan bkmv` (alias of `books:move`) for moving a single book directory and updating all
+database references (`--dry-run`, `--force`, `--import`).
 
-### `php artisan books:fix-duplicates-and-review-flags`
-Remove duplicate books by directoryPath and flag books for review with needsReviewReasons.
-- **Signature:** `books:fix-duplicates-and-review-flags {--dry-run} {--ids=}`
-- **Description:** Remove duplicate books by directoryPath and flag books for review with needsReviewReasons.
-- **Options:**
-  - `--dry-run`: Show what would be processed without making changes.
-  - `--ids`: Comma-separated list of book IDs to process.
-
-### `php artisan books:import-downloads`
-Import audiobooks from download directories using AI processing and external data enrichment.
-- **Signature:** `books:import-downloads {--directory=* : Custom directories to scan (defaults to /media/download and /media/download/audiobooks)} {--model=gemini-2.5-flash-lite : AI model to use for processing} {--min-confidence=80 : Minimum AI confidence for auto-import} {--auto : Fully automated mode - no manual review} {--dry-run : Show what would be imported without making changes} {--limit=10 : Maximum number of books to process per run} {--force : Skip confirmation prompts} {--skip-enrichment : Skip external data enrichment (Audible, Google Books)} {--copy-files : Copy files after successful import instead of moving (default is move)}`
-- **Description:** Import audiobooks from download directories using AI processing and external data enrichment.
-- **Options:**
-  - `--directory`: Custom directories to scan (defaults to `/media/download` and `/media/download/audiobooks`).
-  - `--model`: AI model to use for processing (e.g., `gemini-2.5-flash-lite`, `gpt-4o-mini`, `claude-3-5-haiku`).
-  - `--min-confidence`: Minimum AI confidence for auto-import (default: 80).
-  - `--auto`: Fully automated mode - no manual review.
-  - `--dry-run`: Show what would be imported without making changes.
-  - `--limit`: Maximum number of books to process per run (default: 10).
-  - `--force`: Skip confirmation prompts.
-  - `--skip-enrichment`: Skip external data enrichment (Audible, Google Books).
-  - `--copy-files`: Copy files after successful import instead of moving (default is move).
-
-### `php artisan books:migrate-camelcase`
-Migrate all book records in Firestore from snake_case to camelCase and remove snake_case fields.
-- **Signature:** `books:migrate-camelcase`
-- **Description:** Migrate all book records in Firestore from snake_case to camelCase and remove snake_case fields.
-
-### `php artisan app:migrate-mongo-to-mysql`
-Migrate data from MongoDB to MySQL.
-- **Signature:** `app:migrate-mongo-to-mysql {--force : Skip confirmation prompt} {--limit=0 : Limit the number of books to process (0 for no limit)}`
-- **Description:** Migrate data from MongoDB to MySQL.
-- **Options:**
-  - `--force`: Skip confirmation prompt.
-  - `--limit`: Limit the number of books to process (0 for no limit). Default is 0.
-
-### `php artisan books:migrate-series-format`
-Normalize the series field for all books in both MongoDB and Firestore to the canonical format.
-- **Signature:** `books:migrate-series-format`
-- **Description:** Normalize the series field for all books in both MongoDB and Firestore to the canonical format.
-
-### `php artisan mongo:test`
-Test MongoDB integration: insert a record into books and count records.
-- **Signature:** `mongo:test`
-- **Description:** Test MongoDB integration: insert a record into books and count records.
-
-### `php artisan books:parse`
-Parse book directories and output metadata for each book.
-- **Signature:** `books:parse {paths* : One or more directory paths to scan for books. Supports shell wildcards} {--output= : Output format (json, table, csv, sql, array). Default: table} {--limit=0 : Maximum number of books to process (0 for no limit)} {--extensions= : Comma-separated list of file extensions to include} {--min-size= : Minimum file size in bytes} {--max-depth= : Maximum directory depth to scan} {--dry-run : Show what would be done without making any changes} {--sort : Sort output by author, series, series number, and title} {--save-json : Save output JSON into each book directory} {--json-filename= : Filename for saved JSON (default: librarian.json)} {--enrich : Lookup and enrich metadata from selected APIs} {--apis= : Comma-separated list of APIs for --enrich (google,audible,abbay,hardcover)} {--store : Store parsed book data to Documentstore} {--update-existing : Update existing books in Documentstore instead of skipping them}`
-- **Description:** Parse book directories and output metadata for each book.
-- **Arguments:**
-  - `paths`: One or more directory paths to scan for books. Supports shell wildcards.
-- **Options:**
-  - `--output`: Output format (`json`, `table`, `csv`, `sql`, `array`). Default: `table`.
-  - `--limit`: Maximum number of books to process (0 for no limit). Default: 0.
-  - `--extensions`: Comma-separated list of file extensions to include.
-  - `--min-size`: Minimum file size in bytes.
-  - `--max-depth`: Maximum directory depth to scan.
-  - `--dry-run`: Show what would be done without making any changes.
-  - `--sort`: Sort output by author, series, series number, and title.
-  - `--save-json`: Save output JSON into each book directory.
-  - `--json-filename`: Filename for saved JSON (default: `librarian.json`).
-  - `--enrich`: Lookup and enrich metadata from selected APIs.
-  - `--apis`: Comma-separated list of APIs for `--enrich` (`google`, `audible`, `abbay`, `hardcover`).
-  - `--store`: Store parsed book data to Documentstore.
-  - `--update-existing`: Update existing books in Documentstore instead of skipping them.
+## AI metadata processing
 
 ### `php artisan books:process-ai`
-Processes books using AI to extract and improve metadata from directory paths, filenames, and audio tags.
-- **Signature:** `books:process-ai {--book=* : Process specific book IDs} {--limit=10 : Limit number of books to process (default 10 for free tier)} {--min-confidence=70 : Minimum confidence level to auto-apply changes} {--force : Skip confirmation prompts} {--dry-run : Show what would be processed without making changes} {--reprocess : Process books even if already AI-processed} {--model=gemini-2.5-flash-lite : Model to use (gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.5-pro, claude-3-5-haiku, claude-3-5-sonnet, claude-4-sonnet, claude-4-opus, gpt-4o-mini, gpt-4o, gpt-4-turbo, gpt-3.5-turbo)} {--paid-tier : Use paid tier limits and pricing (requires billing setup)}`
-- **Description:** Processes books using AI to extract and improve metadata from directory paths, filenames, and audio tags.
-- **Options:**
-  - `--book`: Process specific book IDs (can be used multiple times).
-  - `--limit`: Limit number of books to process (default: 10 for free tier).
-  - `--min-confidence`: Minimum confidence level to auto-apply changes (default: 70).
-  - `--force`: Skip confirmation prompts.
-  - `--dry-run`: Show what would be processed without making changes.
-  - `--reprocess`: Process books even if already AI-processed.
-  - `--model`: AI model to use (e.g., `gemini-2.5-flash-lite`, `gpt-4o-mini`, `claude-3-5-haiku`).
-  - `--paid-tier`: Use paid tier limits and pricing (requires billing setup).
 
-### `php artisan books:process-titles-interactive`
-Interactively process book titles to clean up formatting, extract series info, narrators, and years.
-- **Signature:** `books:process-titles-interactive {--force : Skip confirmation prompts}`
-- **Description:** Interactively process book titles to clean up formatting, extract series info, narrators, and years.
-- **Options:**
-  - `--force`: Skip confirmation prompts.
+Re-run AI metadata extraction/enrichment against existing books.
 
-### `php artisan books:repair`
-Repair book metadata including covers and series numbers.
-- **Signature:** `books:repair {book_id? : The ID of the book to repair} {--cover : Repair book covers} {--series : Repair series numbers} {--all : Repair both covers and series} {--force : Skip confirmation prompts}`
-- **Description:** Repair book metadata including covers and series numbers.
-- **Arguments:**
-  - `book_id`: (Optional) The ID of the book to repair.
-- **Options:**
-  - `--cover`: Repair book covers.
-  - `--series`: Repair series numbers.
-  - `--all`: Repair both covers and series.
-  - `--force`: Skip confirmation prompts.
+```bash
+php artisan books:process-ai --model=gemini-2.5-flash-lite --limit=50
+```
 
-### `php artisan books:repair-no-audio`
-Find (and optionally delete) books whose directory contains no audio files.
-- **Signature:** `books:repair-no-audio {parent_path?} {--delete : Delete books with no audio files} {--interactive : Interactively review each book with no audio files}`
-- **Description:** Find (and optionally delete) books whose directory contains no audio files.
-- **Arguments:**
-  - `parent_path`: (Optional) Only consider books under this directory path.
-- **Options:**
-  - `--delete`: Delete books with no audio files.
-  - `--interactive`: Interactively review each book with no audio files.
+Key options: `--book=` (repeatable), `--limit=`, `--min-confidence=`, `--dry-run`, `--reprocess`,
+`--model=`, `--paid-tier`. See [AI Processing Documentation](AI_PROCESSING_SETUP.md).
 
-### `php artisan narrators:normalize-names`
-Update the normalized_name field for all narrators.
-- **Signature:** `narrators:normalize-names`
-- **Description:** Update the normalized_name field for all narrators.
+## Library maintenance
+
+### `php artisan library:repair-scan`
+
+Scans audiobook directories for missing/duplicate/orphaned directories and nested-audio issues,
+recording results for the `/admin/library-repair` UI. Runs nightly via the scheduler; see
+[Cross-platform installation](INSTALLATION.md#required-background-processes).
+
+Options: `--issue=` (repeatable), `--no-attempt-fixes`, `--json`.
+
+### `php artisan cover:check`
+
+Validates each book's `cover_image` against files on disk and can fetch a missing cover from
+Audible.
+
+```bash
+php artisan cover:check --attempt-audible --limit=50
+```
+
+Options: `--attempt-audible`, `--dry-run`, `--limit=`.
+
+### `php artisan app:optimize-m4b-faststart`
+
+Rewrites M4B/M4A files so the `moov` atom is at the start of the file, enabling progressive
+playback in the web/mobile players. Options: `--book=`, `--dry-run`.
+
+## Recommendations & embeddings
+
+Only relevant if the recommendation engine is enabled; see
+[Vector Database & Recommendation Pipeline](../README.md#vector-database--recommendation-pipeline).
+
+- `php artisan books:backfill-embeddings [--force]` — queue embedding generation for books missing one.
+- `php artisan books:refresh-recommendations` — queue recommendation-shelf recompute for every user.
+
+## Accounts
+
+- `php artisan app:create-admin-user [--no-backup]` — create an admin user if one doesn't already exist.
+- `php artisan accounts:purge-scheduled-deletions` — permanently delete accounts whose cancellation period has expired (scheduled nightly).
+
+## Backup & queues
+
+- `php artisan backup:database [--verify] [--suffix=]` — MySQL backup; see [Backup System](BACKUP_SYSTEM.md).
+- `php artisan queue:work --queue=embeddings,recommendations,default --tries=3` — standard queue worker.
+- `php artisan horizon` — Redis-backed queue supervisor/dashboard.
+
+See [Worker Management & Queue Monitoring](../README.md#worker-management--queue-monitoring) for
+the full picture, including Horizon and Supervisor configuration.
