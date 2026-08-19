@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Mail\AccountDeletionScheduledMail;
+use App\Models\User;
+use App\Services\AccountDeletionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class ProfileController extends Controller
 {
@@ -133,6 +137,50 @@ class ProfileController extends Controller
         return back()->with('error', 'Failed to send admin request. Please try again.');
     }
 
+
+    /**
+     * Web-based, session-authenticated account deletion. This is the "delete your account
+     * without needing the app" path required by app store account-deletion policies (Amazon,
+     * Google Play) — mirrors AuthController::deleteAccount()'s scheduling/email behavior, but
+     * doesn't need its own OTP re-verification since the user already proved email ownership
+     * via the OTP login that established this session.
+     */
+    public function destroy(Request $request, AccountDeletionService $accountDeletionService)
+    {
+        $userId = Auth::id();
+        $user = $userId === null ? null : User::find($userId);
+
+        if ($user === null) {
+            return back()->with('error', 'Unable to verify your account.');
+        }
+
+        $request->validate([
+            'confirm_email' => 'required|string',
+        ]);
+
+        if (strcasecmp((string) $request->input('confirm_email'), (string) $user->email) !== 0) {
+            return back()->withErrors(['confirm_email' => 'Enter your account email exactly to confirm deletion.']);
+        }
+
+        $cancellationToken = $accountDeletionService->schedule($user);
+        $scheduledFor = now()->addDays(AccountDeletionService::RETENTION_DAYS);
+
+        Mail::to($user->email)->send(new AccountDeletionScheduledMail(
+            cancellationUrl: url('/account-deletion/cancel/' . $cancellationToken),
+            recipientName: $user->name,
+            scheduledFor: $scheduledFor->toFormattedDateString(),
+        ));
+
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect('/account-deletion/scheduled')->with(
+            'status',
+            'Your account is scheduled for deletion on ' . $scheduledFor->toFormattedDateString()
+                . '. Check your email for a link to cancel if you change your mind.',
+        );
+    }
 
     /**
      * Normalize document data to array

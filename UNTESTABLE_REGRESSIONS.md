@@ -30,7 +30,7 @@ cannot be verified by the test suite — only by live calls.
 | **AudioBook Bay scraper** | `app/Services/AudiobookBayApiService.php`, `AudiobookBayCategoryScraperService.php` | XPath selectors break if site HTML changes; login/session |
 | **Google Custom Image Search** | `app/Services/GoogleImageSearchService.php` | API key scopes, result quality filtering |
 | **External cover image fetch** | `app/Services/ExternalCoverService.php` | Binary download, timeout handling, file caching |
-| **Embedding provider APIs (OpenAI/Gemini/Voyage/Mistral text embeddings)** | `app/Services/Embeddings/EmbeddingPipeline.php::resolveEmbeddingProvider()`, `NeuronAI\RAG\Embeddings\*` (vendor package) | These call the real embedding endpoint per provider; response shape (vector length matching the configured `dimensions`, rate limits) can only be confirmed live. `EmbedBookJob` treats an embedding-call failure as an uncaught exception (job retry), which is also unverified against real API error responses. |
+| **Embedding provider APIs (OpenAI/Gemini/Voyage/Mistral text embeddings)** | `app/Services/Embeddings/EmbeddingPipeline.php::resolveEmbeddingProvider()`, `NeuronAI\RAG\Embeddings\*` (vendor package) | These call the real embedding endpoint per provider; response shape (vector length matching the configured `dimensions`, rate limits) can only be confirmed live. `EmbedBookJob` treats an embedding-call failure as an uncaught exception (job retry), which is also unverified against real API error responses. `App\Services\Search\SemanticBookSearchService::rankedBookIds()` (used by the opt-in `semantic=true` param on `GET /books`, `GET /books/search`, and the web book-search page's "Smart search" toggle) calls the same `embedText()` + `resolveVectorStore()->similaritySearch()` pair at query time; automated tests mock `EmbeddingPipeline` (same pattern as `AbstractSimilarityStrategy`'s tests), so real provider latency/rate limits and actual nearest-neighbor result quality for a raw query embedding (as opposed to a whole-book embedding) are unverified by the suite. Manually verify: run a real `semantic=true` search against a populated vector store and confirm result ordering looks reasonable. |
 | **AI ranking fallback for discovery shelves** | `app/Services/Recommendations/Strategies/AbstractSimilarityStrategy.php::rankWithAi()` | Used by `SimilarToRecentBooksStrategy`/`NewForYouStrategy` when the vector store has no usable data yet: sends a candidate-book catalog to whichever provider is configured via `completeStructured()` and expects a `{"book_ids": [...]}` JSON response. Tests substitute a fake `AIProviderInterface` via the `aiProvider()` extension point (never make a real call), so the real provider's actual willingness/ability to follow this schema instruction is unverified — a bad response is designed to degrade to plain SQL recency order rather than error, but that degradation path itself has only been proven with a fake failure response, not a real malformed one. |
 
 ---
@@ -226,6 +226,16 @@ and OTP arrival timing cannot be verified.
   `generateLoginQr()`) share this same real-arrival-timing risk — tests can only verify the
   DB record and mail-fake dispatch, not that a real inbox receives it in time.
 - **Password reset emails** (`PasswordResetController`).
+- **Web-based account deletion** (`ProfileController::destroy()`) — reuses the same
+  `AccountDeletionScheduledMail` as the app's API-based deletion flow (`AuthController::
+  deleteAccount()`), but is reached via the existing OTP web-login session
+  (`EmailOtpController::verifyCodeWeb()`) rather than a bearer token, so it also inherits that
+  OTP flow's real-inbox-arrival-timing risk. This is the app-store-required "delete your
+  account without the app" path (Amazon/Google Play) — tests cover the scheduling/mail-fake
+  dispatch and DB state, but the full "receive OTP email, log in, click delete" journey has
+  only been exercised end-to-end for the *existing* login flow it builds on, not this
+  specific delete-after-login path, and only manually against a real inbox/SMTP setup can
+  confirm the whole chain works for a real user with no app installed.
 - **Hardcover token expiry notification** (`HardcoverTokenExpiring` Mailable).
 - **Daily favourite book notifications** (`SendDailyFavoriteNotifications` scheduled command).
 - **New user registration notification**.

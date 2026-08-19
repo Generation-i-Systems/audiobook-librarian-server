@@ -2,6 +2,7 @@
 
 ### Added
 
+- Web-based, session-authenticated account deletion (`DELETE /profile`, `ProfileController::destroy()`). Fulfils the app-store requirement (Amazon/Google Play) that account deletion be reachable from a web page without needing the app installed: users log in via the existing email-OTP web flow (`/login`), then delete from their Profile page. Reuses `AccountDeletionService`'s existing 30-day scheduled-deletion/cancellation-email flow — same behavior as the app's in-app deletion, just session-authenticated instead of bearer-token-authenticated.
 - Import now asks the AI to suggest freeform content tags for each book, including a `spicy` tag when there is clear evidence of explicit sexual content, shows the tags on the review summary, allows editing them (comma-separated) during interactive review, and stores confirmed tags as system-scope book tags.
 - The "Current Book Details" panel in the hybrid/ncurses UI now shows Tags, and author/narrator names are now split on `&`, `/`, and the word "and" (previously only commas), both when parsed from the AI response and when read directly from ID3 `artist`/`narrator`/`writer` tags.
 - Multi-book split imports no longer attribute one split-out book's author/narrator to another: each split book now gets its own AI lookup and its own file-tag/filename parsing instead of inheriting the single whole-folder AI guess, which could be sampled from a different book's files entirely.

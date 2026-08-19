@@ -210,7 +210,11 @@ Route::middleware(['auth'])->group(function (): void {
         ->name('profile.changePassword');
     Route::post('/profile/request-admin', [ProfileController::class, 'requestAdminPermissions'])
         ->name('profile.requestAdminPermissions');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+Route::get('/account-deletion/scheduled', fn () => view('account-deletion.scheduled'))
+    ->name('account-deletion.scheduled');
 
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 

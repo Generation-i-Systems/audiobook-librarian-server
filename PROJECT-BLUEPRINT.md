@@ -21,6 +21,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 ## 2. Core Features
 
+- Book search (web book list, `GET /books`, `GET /books/search`) supports inline name tokens (`genre:Fantasy`, `author:"Name"`, `series:Name`, `tag:Name`) alongside the existing id tokens (`genreId:N`, `authorId:N`, `seriesId:N`, `bookId:N`), and an opt-in `semantic=true` toggle that ranks results by AI semantic similarity via the recommendation engine's embedding pipeline instead of exact/partial text match (falls back to normal search when no embedding provider is configured).
 - Book CRUD (admin)
 - Book form: multiple authors/series (autocomplete), Google Books autofill, genre selection, file uploads
 - Import asks the AI for freeform content tags per book (including a `spicy` tag when there is clear evidence of explicit sexual content), shows them on the review summary, allows editing during interactive review, and stores confirmed tags as system-scope book tags. Author/narrator name lists are split on `&`, `/`, and "and" as well as commas, both from the AI response and from ID3 tags.
@@ -43,7 +44,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - Google Books API integration for autofill
 - Admin/user management
 - The admin database page embeds Adminer behind the existing authenticated admin route. Its Laravel-configured Adminer subclass supplies connection defaults and delegates the bundled Gemini SQL-helper UI hooks.
-- Account deletion with email verification, immediate access revocation, a 30-day cancellation period, and scheduled permanent erasure
+- Account deletion with email verification, immediate access revocation, a 30-day cancellation period, and scheduled permanent erasure. Reachable two ways: in-app (bearer-token API, `AuthController::deleteAccount()`, its own OTP re-verification) and via the web without the app installed (`ProfileController::destroy()`, session-authenticated via the existing email-OTP login at `/login`) — the latter exists specifically to satisfy app-store account-deletion requirements (Amazon/Google Play) for users who no longer have the app.
 - Mobile clients connect to self-hosted servers only through publicly trusted HTTPS endpoints; Docker HTTP listeners remain loopback-only behind a TLS reverse proxy. Storage, import, backup, and Librivox paths are environment-configurable and default to portable application-storage locations.
 - Production installs require the Laravel scheduler plus a queue worker. Docker runs both under supervisor; native installs must configure `schedule:work` or a one-minute `schedule:run` cron and a managed `queue:work` service. `docs/INSTALLATION.md` documents required and optional scheduled jobs, including low-load chunk-hash precomputation.
 - The login page includes a locally bundled QR code generator for the mobile server-connection link, avoiding a runtime dependency on a third-party CDN.
