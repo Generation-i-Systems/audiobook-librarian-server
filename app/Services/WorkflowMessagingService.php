@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\FailedJob;
 use App\Models\Job;
 use App\Models\Message;
 use App\Models\User;
@@ -46,6 +47,11 @@ class WorkflowMessagingService
     public function getJobCount(): int
     {
         return Job::count();
+    }
+
+    public function getFailedJobCount(): int
+    {
+        return FailedJob::count();
     }
 
     public function createJob(array $data): bool

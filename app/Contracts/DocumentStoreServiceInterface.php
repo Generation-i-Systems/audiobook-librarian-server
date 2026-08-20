@@ -628,6 +628,13 @@ interface DocumentStoreServiceInterface
     public function getJobCount(): int;
 
     /**
+     * Get the number of failed queue jobs.
+     *
+     * @return int Number of failed jobs
+     */
+    public function getFailedJobCount(): int;
+
+    /**
      * Delete all jobs.
      *
      * @return bool Success status

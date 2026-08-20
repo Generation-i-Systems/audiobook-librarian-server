@@ -248,14 +248,12 @@ else
     handle_failure "Composer security audit" "Update vulnerable packages or review security advisories"
 fi
 
-# NPM audit (moderate and above)
+# NPM audit (moderate and above) - matches .github/workflows/ci.yml's unconditional block
 echo -e "${YELLOW}Running NPM security audit...${NC}"
 if npm audit --audit-level=moderate 2>&1; then
     handle_success "NPM security audit"
 else
-    echo -e "${YELLOW}⚠️  NPM audit found vulnerabilities${NC}"
-    echo -e "${YELLOW}💡 Run 'npm audit fix' to attempt automatic fixes${NC}"
-    # Don't block on npm audit as many vulns are dev dependencies
+    handle_failure "NPM security audit" "Run 'npm audit fix' to attempt automatic fixes, or update package.json overrides"
 fi
 
 # =============================================================================

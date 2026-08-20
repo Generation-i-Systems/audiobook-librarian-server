@@ -1626,6 +1626,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     /**
      * @inheritDoc
      */
+    public function getFailedJobCount(): int
+    {
+        return 0;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function updateGenre(string $id, array $data): bool
     {
         if (isset($this->genres[$id])) {

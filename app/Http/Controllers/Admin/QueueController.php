@@ -13,7 +13,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Throwable;
@@ -120,7 +119,7 @@ class QueueController extends Controller
     public function status(): JsonResponse
     {
         $horizonStatus = $this->getHorizonStatus();
-        $workerRunning = $horizonStatus === 'running' || ($horizonStatus !== 'inactive' && (bool) Cache::get('queue_worker_heartbeat'));
+        $workerRunning = $horizonStatus === 'running' || (bool) Cache::get('queue_worker_heartbeat');
         $pendingJobs = $this->documentStoreService->getJobCount();
 
         $embeddingsCount = 0;
@@ -137,7 +136,7 @@ class QueueController extends Controller
 
         $failedJobs = 0;
         try {
-            $failedJobs = DB::table('failed_jobs')->count();
+            $failedJobs = $this->documentStoreService->getFailedJobCount();
         } catch (Throwable $e) {
             Log::debug('Failed jobs table check skipped', ['error' => $e->getMessage()]);
         }

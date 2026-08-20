@@ -2010,6 +2010,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $this->getWorkflowMessagingService()->getJobCount();
     }
 
+    public function getFailedJobCount(): int
+    {
+        return $this->getWorkflowMessagingService()->getFailedJobCount();
+    }
+
     public function clearJobs(bool $confirmed = false): bool
     {
         return $this->getWorkflowMessagingService()->clearJobs($confirmed);
