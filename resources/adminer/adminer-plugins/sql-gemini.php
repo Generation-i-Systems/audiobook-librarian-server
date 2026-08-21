@@ -14,13 +14,13 @@ class AdminerSqlGemini extends Adminer\Plugin
     private $model;
 
     /**
-    * @param string $apiKey The default key is shared with all users and may run out of quota; get your own API key at: https://aistudio.google.com/apikey
-    * @param string $model Available models: https://ai.google.dev/gemini-api/docs/models#available-models
+    * @param ?string $apiKey Defaults to config('services.gemini.api_key') (GEMINI_API_KEY in .env).
+    * @param ?string $model Defaults to config('services.gemini.model'). Available models: https://ai.google.dev/gemini-api/docs/models#available-models
     */
-    public function __construct($apiKey = 'AIzaSyARgkhV-dqdcHzv4x2iEPy4-tPZr3Sa2u4', $model = "gemini-2.0-flash")
+    public function __construct(?string $apiKey = null, ?string $model = null)
     {
-        $this->apiKey = $apiKey;
-        $this->model = $model;
+        $this->apiKey = $apiKey ?? \config('services.gemini.api_key');
+        $this->model = $model ?? \config('services.gemini.model');
     }
 
     public function headers()
