@@ -104,6 +104,19 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
   confidence prompts, cover selection menu.
 - Any change to callback signatures in `processAudiobook()` (25+ callbacks) may silently
   break the interactive flow.
+- **Review-time Accept directory-conflict resolution** — `BookImportService::resolveReviewDirectoryConflict()`,
+  invoked from `attemptAcceptFromReview()` when `directoryPathHasRealConflict()` finds the
+  proposed target directory already has real content. Previously Accept just blocked with a
+  warning telling the user to fix the path manually via the edit menu; it now shows an
+  interactive menu (replace/rename existing/rename new/merge/cancel, reusing
+  `resolveDirectoryConflictChoice()` — the same logic `handleDirectoryConflict()` uses at
+  move time), a narrator-suffix quick option when a narrator is set, and lets the user play
+  both copies via `playAudioFiles()` (mpv/mplayer) or list their contents
+  (`listDirectoryContents()`) before deciding. The select loop and its wiring into
+  `attemptAcceptFromReview()` are unit-tested (`BookImportServiceReviewDirectoryConflictTest`),
+  but actually reaching and driving this menu from a live `book:import` run cannot be — verify
+  manually: get Accept blocked by a directory conflict, confirm all the listed options work,
+  and confirm the narrator option only appears when a narrator is set.
 - **`ReviewProgressionFantasyDuplicates` command** (`app/Console/Commands/ReviewProgressionFantasyDuplicates.php`)
   — interactive menu driven by `$this->ask()`, and shells out to the external `mplayer` binary
   via `passthru()` to play audio for manual A/B comparison. Neither the TTY menu loop nor the
@@ -141,6 +154,36 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
   should edit the prefilled default text, Enter should submit whatever's currently in the field,
   and Escape should discard any edits and leave the field's original value untouched (not blank
   it out, and not quit the import).
+- **Ctrl-C during a raw-TTY character read** — `readLineWithEditableDefault()`, `selectWithArrowKeys()`,
+  and `selectFilteredWithArrowKeys()` in `ImportUIService.php` all read one raw character at a time
+  from `/dev/tty` while `setupSignalHandlers()` (`ImportBooksFromDownloads.php`) has a `pcntl_signal(SIGINT, ...)`
+  handler registered via `pcntl_async_signals(true)`. A plain blocking `fgetc()` at that point can
+  silently swallow SIGINT — glibc's `SA_RESTART` auto-resumes the interrupted `read()` syscall before
+  PHP's async dispatch ever gets control back to run the handler, so Ctrl-C appears to do nothing
+  (reproduced live: `book:import` hung with no visible way to cancel, confirmed by sending SIGINT
+  directly to the process and it not terminating). Fixed by routing all three call sites through
+  `ImportUIService::readCharInterruptible()`, which polls via `stream_select()` instead of blocking
+  directly, giving `$this->interrupted` a chance to be observed. This can't be driven by PHPUnit
+  (no real signal delivery mid-syscall in the test runner) — verify manually by starting `book:import`,
+  letting it reach any of these three prompts, and pressing Ctrl-C: it must exit promptly instead of
+  hanging. If a future raw-TTY read is added to `ImportUIService`, use `readCharInterruptible()` rather
+  than a bare `fgetc()`.
+- **Automatic cover-source selection appears frozen in `--ui=hybrid`** — `handleCoverSelection()`
+  (`BookImportService.php`) automatically prompts via `selectCoverWithPreview()` /
+  `selectWithArrowKeys()` whenever a book has more than one cover source (e.g. an embedded cover
+  *and* a standalone `cover.jpg` next to the audio file — reproduced live with exactly that layout).
+  That prompt is a raw-TTY method, not a Laravel Prompts one: it populates `$this->promptLines`
+  directly and depends on `drawPrompt()` to draw it. `HybridUIService::drawPrompt()` used to be an
+  unconditional no-op (correct for `ask()`/`select()`/`selectFiltered()`/`confirm()`, which render
+  via Laravel Prompts and never touch `$this->promptLines` — but wrong for this one raw-TTY caller):
+  the menu was computed and the loop correctly sat waiting for input, but nothing was ever drawn, so
+  the very first prompt for any such book looked identical to a genuine hang — confirmed live via a
+  captured PHP call stack showing `HybridUIService` inside `selectWithArrowKeys()`. Fixed by having
+  `HybridUIService::drawPrompt()` fall back to `parent::drawPrompt()` whenever `$this->promptLines`
+  is non-empty. Covered by `HybridUIServiceDrawPromptTest` at the `drawPrompt()`/`Screen` level, but
+  the end-to-end "does the actual cover-picker prompt appear and work in a real terminal" behavior
+  can't be driven by PHPUnit — verify manually with a book whose directory has both an embedded
+  cover and a standalone `cover.*`/`folder.*` file.
 
 ## 6. Browser / JavaScript UI
 
@@ -178,6 +221,16 @@ rendering or real user interactions.
   by this repo's test suite. Any new element property (e.g. `foregroundImage`) can silently render
   correctly here but differently — or not at all — on the other two, with no automated check
   across repos. Verify new rendering properties manually in all three places.
+- **Skin manifest content passes through unvalidated** — `SkinController::store()` never parses
+  `manifest.json` out of the uploaded ZIP; it only validates the multipart upload's top-level
+  fields (`name`/`author`/`version`/`file` mime+size) and proxies the raw file to
+  `audiobook-librarian-www`, which is the actual source of truth for manifest structure (see the
+  class docblock). This applies to the whole schema, not just the new per-element `animations`
+  field (engines/triggers/keyframes/`contentAnimation`/`stateBinding`, added to the Android client
+  and to `audiobook-librarian-www`'s `SkinValidationService`) — a malformed or malicious manifest
+  is only ever caught by www's validation or by the Android client's own `SkinValidator`, never
+  here. No PHPUnit test in this repo exercises manifest-shape validation because there is none to
+  exercise.
 
 ---
 
