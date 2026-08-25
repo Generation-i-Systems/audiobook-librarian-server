@@ -106,6 +106,24 @@ class AIBookProcessor
                 'output_tokens_per_million' => 0.40,  // Official: $0.40 per 1M output tokens
             ],
         ],
+        'gemini-flash-3.5-lite' => [
+            'free' => [
+                'requests_per_minute' => 10,    // Same limits as gemini-2.5-flash
+                'requests_per_day' => 250,
+                'tokens_per_minute' => 250000,
+                'max_output_tokens' => 8192,
+            ],
+            'paid' => [
+                'requests_per_minute' => 1000,
+                'requests_per_day' => null,
+                'tokens_per_minute' => 4000000,
+                'max_output_tokens' => 8192,
+            ],
+            'pricing' => [
+                'input_tokens_per_million' => 0.30,   // User-supplied
+                'output_tokens_per_million' => 2.50,  // User-supplied
+            ],
+        ],
         'gemini-2.5-pro' => [
             'free' => [
                 'requests_per_minute' => 5,     // Official: 5 RPM

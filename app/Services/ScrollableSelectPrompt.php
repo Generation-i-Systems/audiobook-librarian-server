@@ -16,6 +16,8 @@ class ScrollableSelectPrompt extends SelectPrompt
 
     private bool $needsReposition = false;
 
+    private int|string|null $lastNotifiedHighlight = null;
+
     /**
      * @param  array<int|string, string>|Collection<int|string, string>  $options
      */
@@ -27,6 +29,7 @@ class ScrollableSelectPrompt extends SelectPrompt
         private readonly int $cursorRow = 1,
         private readonly ?Closure $onScrollUp = null,
         private readonly ?Closure $onScrollDown = null,
+        private readonly ?Closure $onHighlightChange = null,
     ) {
         parent::__construct(
             label: $label,
@@ -35,6 +38,8 @@ class ScrollableSelectPrompt extends SelectPrompt
             scroll: $scroll,
         );
 
+        $this->lastNotifiedHighlight = $this->highlightedValue();
+
         $this->on('key', function (string $key): void {
             if ($key === Key::PAGE_UP && $this->onScrollUp !== null) {
                 $this->needsReposition = true;
@@ -42,6 +47,17 @@ class ScrollableSelectPrompt extends SelectPrompt
             } elseif ($key === Key::PAGE_DOWN && $this->onScrollDown !== null) {
                 $this->needsReposition = true;
                 ($this->onScrollDown)();
+            }
+
+            // Runs after SelectPrompt's own 'key' listener (registered first, in its
+            // constructor) has already updated $highlighted, so this sees the new value.
+            if ($this->onHighlightChange !== null) {
+                $current = $this->highlightedValue();
+                if ($current !== $this->lastNotifiedHighlight) {
+                    $this->lastNotifiedHighlight = $current;
+                    $this->needsReposition = true;
+                    ($this->onHighlightChange)($current);
+                }
             }
         });
     }

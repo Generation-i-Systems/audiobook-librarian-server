@@ -449,6 +449,30 @@ class ImportUIService implements ImportUIInterface
         return @stream_select($read, $write, $except, 0, 30_000) > 0;
     }
 
+    /**
+     * Blocking single-character read that polls in short slices instead of one long fgetc().
+     *
+     * A plain fgetc() on the raw TTY stream can silently swallow SIGINT: on delivery, glibc's
+     * SA_RESTART auto-resumes the interrupted read() syscall before PHP's async signal dispatch
+     * (pcntl_async_signals) ever gets control back to run the handler, so Ctrl-C during this read
+     * would appear to do nothing. Polling via stream_select() with a short timeout (morePendingOn)
+     * gives $this->interrupted a chance to be observed between slices instead.
+     *
+     * @phpstan-impure $this->interrupted can flip to true asynchronously (SIGINT handler ->
+     *                  requestInterrupt()) while this method is polling, so callers must not
+     *                  assume it is still false after this returns.
+     */
+    protected function readCharInterruptible(mixed $stream): string|false
+    {
+        while (!$this->interrupted) {
+            if ($this->morePendingOn($stream)) {
+                return fgetc($stream);
+            }
+        }
+
+        return false;
+    }
+
     protected function parseTerminalKeySequence(string $char): array
     {
         $rawBytes = $char;
@@ -737,8 +761,11 @@ class ImportUIService implements ImportUIInterface
                     return '';
                 }
 
-                $char = fgetc($stream);
+                $char = $this->readCharInterruptible($stream);
                 if ($char === false) {
+                    if ($this->interrupted) {
+                        return '';
+                    }
                     return (string) ($state['buffer'] ?? '');
                 }
 
@@ -901,8 +928,11 @@ class ImportUIService implements ImportUIInterface
                 $this->promptLines = $lines;
                 $this->renderFull();
 
-                $char = fgetc($stream);
+                $char = $this->readCharInterruptible($stream);
                 if ($char === false || $char === '') {
+                    if ($this->interrupted) {
+                        continue;
+                    }
                     if (feof($stream)) {
                         break;
                     }
@@ -1902,8 +1932,11 @@ class ImportUIService implements ImportUIInterface
                 $this->promptLines = $lines;
                 $this->renderFull();
 
-                $char = fgetc($stream);
+                $char = $this->readCharInterruptible($stream);
                 if ($char === false || $char === '') {
+                    if ($this->interrupted) {
+                        continue;
+                    }
                     if (feof($stream)) {
                         break;
                     }
@@ -2047,12 +2080,13 @@ class ImportUIService implements ImportUIInterface
         $output = $this->screen->output();
         echo rtrim($output, "\n");
 
-        // Always force re-render for embedded covers to ensure they update properly
-        $coverUrl = $this->stringifyForDisplay($this->currentBook['cover_url'] ?? null);
-        $isTempFile = $coverUrl && strpos($coverUrl, sys_get_temp_dir()) === 0;
-        $forceRender = $isTempFile;
-
-        $this->renderCoverInline($forceRender);
+        // renderCoverInline() already skips redundant redraws via its own
+        // renderedCoverUrl/signature cache, now that getEmbeddedCoverTempPath() returns a
+        // stable path for unchanged cover data (see its docblock) instead of a fresh tempnam()
+        // path on every call. No need to force a re-render here — doing so unconditionally for
+        // any temp-file cover meant every screen redraw (every keystroke in the review UI)
+        // re-ran a blocking `kitten icat` subprocess and re-transferred the full image.
+        $this->renderCoverInline();
 
         if (function_exists('ob_flush')) {
             @ob_flush();
@@ -2108,6 +2142,14 @@ class ImportUIService implements ImportUIInterface
         $cmd = $kittenPath . ' icat --place=' . escapeshellarg($place) . ' ';
         $cmd .= escapeshellarg($this->cachedCoverTempFile);
         $cmd .= ' 2>/dev/null';
+
+        // `kitten icat` inherits our real stdin unchanged and itself reads from it (to get the
+        // terminal's reply to its own capability queries, e.g. pixel size). Any keystroke the
+        // user already typed while this book's AI/enrichment step was finishing sits buffered on
+        // that same fd — without draining it first, kitten's read() can consume it instead of our
+        // own prompt loop, making the very next keypress silently vanish right when the review
+        // menu first appears for this book.
+        $this->drainPendingInput(STDIN);
 
         @system($cmd);
 

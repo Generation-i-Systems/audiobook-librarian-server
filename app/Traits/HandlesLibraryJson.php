@@ -65,7 +65,12 @@ trait HandlesLibraryJson
 
             @exec($fixPermsTool . ' ' . implode(' ', $args));
         } else {
+            // No SUID helper available (e.g. scripts/fix_perms missing) — chgrp() still works
+            // here without elevated privileges as long as the process owner is a member of the
+            // target group (true for both the CLI user and www-data on this deployment), same
+            // as the existing precedent in BookDeletionService.
             foreach ($validPaths as $path) {
+                @chgrp($path, 'audio');
                 @chmod($path, is_dir($path) ? 0775 : 0664);
             }
         }

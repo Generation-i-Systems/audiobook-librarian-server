@@ -88,7 +88,15 @@ class HybridUIService extends ImportUIService
 
     protected function drawPrompt(): void
     {
-        // No-op: the area below the outer box is left empty for Laravel Prompts to render into.
+        // Normally a no-op: the area below the outer box is left empty for Laravel Prompts to
+        // render into (ask()/select()/selectFiltered()/confirm() never populate $this->promptLines).
+        // But a few raw-TTY prompts (e.g. selectCoverWithPreview(), used for automatic cover-source
+        // selection) bypass Prompts entirely and rely on the base class's drawPrompt() to draw
+        // $this->promptLines directly — silencing it unconditionally left that menu computed and
+        // waiting for input, but never actually drawn, making the screen look frozen.
+        if (!empty($this->promptLines)) {
+            parent::drawPrompt();
+        }
     }
 
     protected function drawLogs(): void
@@ -243,6 +251,80 @@ class HybridUIService extends ImportUIService
             // real option key is ever an empty string, so this reliably no-ops.
             return '';
         }
+
+        return (string) $response;
+    }
+
+    /**
+     * Like select(), but updates the inline cover preview as the user navigates between
+     * options — used for automatic cover-source selection when a book has more than one
+     * cover candidate (e.g. an embedded cover and a standalone cover.jpg). Previously this
+     * always fell through to the raw-TTY ImportUIService::selectCoverWithPreview() (a
+     * horizontal grid layout), regardless of UI mode, instead of matching the vertical
+     * Laravel Prompts style every other Hybrid menu uses.
+     */
+    public function selectCoverWithPreview(string $question, array $options, string $default, array $coverPathByKey): string
+    {
+        $this->renderFull();
+
+        $cursorY = $this->getPromptCursorY();
+
+        if (empty($options)) {
+            return '';
+        }
+
+        $formattedOptions = [];
+        foreach ($options as $key => $label) {
+            $formattedOptions[(string) $key] = $label;
+        }
+
+        $defaultKey = (string) array_key_first($formattedOptions);
+        if ($default !== '' && isset($formattedOptions[$default])) {
+            $defaultKey = $default;
+        }
+
+        $layout = $this->computeLayout();
+        $scroll = max(5, min(count($formattedOptions), $layout['menuHeight'] - 4));
+
+        $savedBook = $this->currentBook;
+
+        $updatePreview = function (int|string|null $key) use ($coverPathByKey, $savedBook): void {
+            $path = $coverPathByKey[(string) $key] ?? null;
+            $updated = $savedBook;
+            if ($path !== null && $path !== '') {
+                $updated['cover_url'] = $path;
+                $updated['cover_is_local_file'] = true;
+            } else {
+                unset($updated['cover_url']);
+            }
+            // Update inline cover without a full book context reset
+            $this->currentBook = $updated;
+            $this->cacheCoverForCurrentBook();
+            $this->renderedCoverUrl = null;
+            $this->renderFull();
+        };
+
+        $prompt = new ScrollableSelectPrompt(
+            label: $question,
+            options: $formattedOptions,
+            default: $defaultKey,
+            scroll: $scroll,
+            cursorRow: $cursorY,
+            onScrollUp: function (): void {
+                $this->scrollLog('up');
+            },
+            onScrollDown: function (): void {
+                $this->scrollLog('down');
+            },
+            onHighlightChange: $updatePreview,
+        );
+
+        // Show the default selection's cover before any key is pressed.
+        $updatePreview($defaultKey);
+
+        $response = $prompt->prompt();
+
+        $this->renderFull();
 
         return (string) $response;
     }

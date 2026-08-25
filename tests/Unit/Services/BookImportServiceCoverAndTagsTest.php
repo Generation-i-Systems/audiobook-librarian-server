@@ -40,6 +40,12 @@ class BookImportServiceCoverAndTagsTest extends TestCase
         return $method->invoke($this->service, $path);
     }
 
+    private function callFindAllCoversInSource(string $path): array
+    {
+        $method = new ReflectionMethod(BookImportService::class, 'findAllCoversInSourceDirectory');
+        return $method->invoke($this->service, $path);
+    }
+
     // --- extractMetadataFromFileTags: series from title tag ---
 
     public function testExtractsSeriesFromTitleTagWithBookPattern(): void
@@ -215,5 +221,64 @@ class BookImportServiceCoverAndTagsTest extends TestCase
     {
         $result = $this->callFindCoverInSource('/nonexistent/path/that/does/not/exist');
         $this->assertNull($result);
+    }
+
+    // --- findAllCoversInSourceDirectory ---
+
+    public function testFindsEveryImageInDirectoryNotJustOne(): void
+    {
+        $dir = sys_get_temp_dir() . '/cover_test_' . uniqid();
+        mkdir($dir);
+        touch($dir . '/cover.jpg');
+        touch($dir . '/bonus-story-art.png');
+
+        try {
+            $result = $this->callFindAllCoversInSource($dir);
+            $this->assertCount(2, $result);
+            $this->assertContains($dir . '/cover.jpg', $result);
+            $this->assertContains($dir . '/bonus-story-art.png', $result);
+        } finally {
+            unlink($dir . '/cover.jpg');
+            unlink($dir . '/bonus-story-art.png');
+            rmdir($dir);
+        }
+    }
+
+    public function testSortsPreferredCoverNameBeforeArbitraryImageNames(): void
+    {
+        $dir = sys_get_temp_dir() . '/cover_test_' . uniqid();
+        mkdir($dir);
+        touch($dir . '/The Messenger.jpg');
+        touch($dir . '/cover.jpg');
+
+        try {
+            $result = $this->callFindAllCoversInSource($dir);
+            $this->assertSame([$dir . '/cover.jpg', $dir . '/The Messenger.jpg'], $result);
+        } finally {
+            unlink($dir . '/The Messenger.jpg');
+            unlink($dir . '/cover.jpg');
+            rmdir($dir);
+        }
+    }
+
+    public function testReturnsEmptyArrayWhenNoImageExists(): void
+    {
+        $dir = sys_get_temp_dir() . '/cover_test_' . uniqid();
+        mkdir($dir);
+        touch($dir . '/audiobook.m4b');
+
+        try {
+            $result = $this->callFindAllCoversInSource($dir);
+            $this->assertSame([], $result);
+        } finally {
+            unlink($dir . '/audiobook.m4b');
+            rmdir($dir);
+        }
+    }
+
+    public function testReturnsEmptyArrayForNonExistentDirectory(): void
+    {
+        $result = $this->callFindAllCoversInSource('/nonexistent/path/that/does/not/exist');
+        $this->assertSame([], $result);
     }
 }

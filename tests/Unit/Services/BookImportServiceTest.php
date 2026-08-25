@@ -250,9 +250,10 @@ class BookImportServiceTest extends TestCase
         ];
 
         $logs = [];
-        // '1' (try accept — should be rejected due to conflict), then '2' (edit) to
-        // change the directory, then '1' again (accept the now-clear path).
-        $selectResponses = ['1', '2', '1'];
+        // '1' (try accept — hits the conflict), '5' (cancel out of the new interactive
+        // conflict-resolution menu instead of resolving it), '2' (edit) to change the
+        // directory, then '1' again (accept the now-clear path).
+        $selectResponses = ['1', '5', '2', '1'];
         $inputInterrupted = false;
 
         $result = $this->service->reviewAndApprove(
@@ -281,8 +282,13 @@ class BookImportServiceTest extends TestCase
 
         $this->assertTrue($result);
         $this->assertEquals('Clear/Book', $metadata['custom_directory_path']);
+        // Confirms the new interactive conflict-resolution menu was actually reached
+        // (see resolveReviewDirectoryConflict()) rather than accept silently succeeding.
         $this->assertTrue(
-            collect($logs)->contains(fn ($message) => str_contains($message, 'target directory already contains files'))
+            collect($logs)->contains(fn ($message) => str_contains($message, 'Target already has'))
+        );
+        $this->assertTrue(
+            collect($logs)->contains(fn ($message) => str_contains($message, 'Directory conflict not resolved'))
         );
 
         File::deleteDirectory($bookRoot);

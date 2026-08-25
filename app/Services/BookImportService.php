@@ -28,6 +28,14 @@ class BookImportService
     protected array $multiBookSharedOverrides = [];
     protected array $parentDirectoryManualOverrides = [];
 
+    /**
+     * Cache of embedded-cover temp file paths keyed by cover data hash, so repeated
+     * getEmbeddedCoverTempPath() calls for the same unchanged cover (e.g. once per
+     * interactive review-loop redraw) reuse one file instead of tempnam()-ing a fresh,
+     * uniquely-named one every time. See getEmbeddedCoverTempPath() for why that mattered.
+     */
+    protected array $embeddedCoverTempPaths = [];
+
     private const AUDIO_EXTENSIONS = [
         'mp3',
         'm4a',
@@ -1853,7 +1861,6 @@ class BookImportService
                 throw new \Exception("Failed to copy file: {$source} to {$targetFile}");
             }
 
-            chmod($targetFile, 0664);
             $this->setFileOwnership($targetFile);
 
             $this->copyMatchingPdfFile($source, $target);
@@ -1897,7 +1904,6 @@ class BookImportService
             File::copy($file->getPathname(), $targetFile);
 
             // Set file permissions after copying
-            chmod($targetFile, 0664);
             $this->setFileOwnership($targetFile);
         }
     }
@@ -1938,7 +1944,7 @@ class BookImportService
                 File::delete($source);
             }
 
-            chmod($targetFile, 0664);
+            $this->setFileOwnership($targetFile);
 
             $this->moveMatchingPdfFile($source, $target);
             $this->moveMatchingEbookFile($source, $target);
@@ -1995,8 +2001,8 @@ class BookImportService
                 File::delete($file->getPathname());
             }
 
-            // Set file permissions after move/copy
-            chmod($targetFile, 0664);
+            // Set file ownership and permissions after move/copy
+            $this->setFileOwnership($targetFile);
         }
 
         // Remove empty directories from source
@@ -2048,7 +2054,6 @@ class BookImportService
                 $filesToDelete[] = $filePath;
             }
 
-            chmod($targetFile, 0664);
             $this->setFileOwnership($targetFile);
 
             // Also move matching PDF/ebook if they exist
@@ -2101,7 +2106,6 @@ class BookImportService
                 throw new \Exception("Failed to copy file: {$filePath} to {$targetFile}");
             }
 
-            chmod($targetFile, 0664);
             $this->setFileOwnership($targetFile);
 
             // Also copy matching PDF/ebook if they exist
@@ -2123,7 +2127,7 @@ class BookImportService
 
             try {
                 if (File::copy($pdfPath, $targetPdfPath)) {
-                    chmod($targetPdfPath, 0664);
+                    $this->setFileOwnership($targetPdfPath);
                     Log::info("Copied matching PDF file", [
                         'pdf' => $pdfPath,
                         'target' => $targetPdfPath,
@@ -2154,14 +2158,14 @@ class BookImportService
             try {
                 if ($sameFileSystem) {
                     if (File::move($pdfPath, $targetPdfPath)) {
-                        chmod($targetPdfPath, 0664);
+                        $this->setFileOwnership($targetPdfPath);
                         Log::info("Moved matching PDF file", [
                             'pdf' => $pdfPath,
                             'target' => $targetPdfPath,
                         ]);
                     }
                 } elseif (File::copy($pdfPath, $targetPdfPath)) {
-                    chmod($targetPdfPath, 0664);
+                    $this->setFileOwnership($targetPdfPath);
                     File::delete($pdfPath);
                     Log::info("Moved matching PDF file", [
                         'pdf' => $pdfPath,
@@ -2217,7 +2221,7 @@ class BookImportService
 
             try {
                 if (File::copy($ebookPath, $targetEbookPath)) {
-                    chmod($targetEbookPath, 0664);
+                    $this->setFileOwnership($targetEbookPath);
                     Log::info("Copied matching ebook file", [
                         'ebook' => $ebookPath,
                         'target' => $targetEbookPath,
@@ -2248,14 +2252,14 @@ class BookImportService
             try {
                 if ($sameFileSystem) {
                     if (File::move($ebookPath, $targetEbookPath)) {
-                        chmod($targetEbookPath, 0664);
+                        $this->setFileOwnership($targetEbookPath);
                         Log::info("Moved matching ebook file", [
                             'ebook' => $ebookPath,
                             'target' => $targetEbookPath,
                         ]);
                     }
                 } elseif (File::copy($ebookPath, $targetEbookPath)) {
-                    chmod($targetEbookPath, 0664);
+                    $this->setFileOwnership($targetEbookPath);
                     File::delete($ebookPath);
                     Log::info("Moved matching ebook file", [
                         'ebook' => $ebookPath,
@@ -2455,6 +2459,52 @@ class BookImportService
     }
 
     /**
+     * Find every image file in a source (import) directory, so the user can pick between
+     * them (e.g. a book with both a cover.jpg and separate art for a bonus story) instead of
+     * only ever being offered the single best-guess match findCoverInSourceDirectory() finds.
+     * Preferred names (cover.*, folder.*) sort first; the rest follow alphabetically.
+     *
+     * @return list<string> absolute paths
+     */
+    protected function findAllCoversInSourceDirectory(string $absolutePath): array
+    {
+        if (!is_dir($absolutePath)) {
+            return [];
+        }
+
+        $files = scandir($absolutePath);
+        if ($files === false) {
+            return [];
+        }
+
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+        $preferredNames = ['cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp', 'folder.jpg', 'folder.jpeg', 'folder.png', 'folder.webp'];
+
+        $matches = [];
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (in_array($ext, $imageExtensions, true)) {
+                $matches[] = $file;
+            }
+        }
+
+        usort($matches, static function (string $a, string $b) use ($preferredNames): int {
+            $aPreferred = array_search(strtolower($a), $preferredNames, true);
+            $bPreferred = array_search(strtolower($b), $preferredNames, true);
+            if ($aPreferred !== false || $bPreferred !== false) {
+                return ($aPreferred === false ? PHP_INT_MAX : $aPreferred) <=> ($bPreferred === false ? PHP_INT_MAX : $bPreferred);
+            }
+
+            return strcasecmp($a, $b);
+        });
+
+        return array_map(static fn (string $file): string => $absolutePath . '/' . $file, $matches);
+    }
+
+    /**
      * Apply the best default cover source to $metadata based on priority.
      * When metadata.json is present, the local cover file is preferred (curated).
      * Otherwise, embedded cover takes priority.
@@ -2543,7 +2593,6 @@ class BookImportService
             $filePath = "{$absoluteDir}/{$filename}";
 
             if (file_put_contents($filePath, $coverData)) {
-                chmod($filePath, 0664);
                 $this->setFileOwnership($filePath);
                 return $filename;
             }
@@ -2600,7 +2649,7 @@ class BookImportService
                 return null;
             }
 
-            @chmod($targetPath, 0664);
+            $this->setFileOwnership($targetPath);
         } catch (\Throwable $e) {
             Log::warning('Failed to download cover image', [
                 'error' => $e->getMessage(),
@@ -3102,6 +3151,17 @@ class BookImportService
 
         $choice = $selectCallback("Target directory conflict - choose action", $options, '1');
 
+        return $this->resolveDirectoryConflictChoice($choice, $targetDir, $log);
+    }
+
+    /**
+     * Apply the standard directory-conflict choice (replace/rename existing/rename new/
+     * merge/cancel) shared by handleDirectoryConflict() (move-time) and
+     * resolveReviewDirectoryConflict() (review-time Accept). $log receives progress
+     * messages; returns the directory path to proceed with, or 'cancel'.
+     */
+    private function resolveDirectoryConflictChoice(string $choice, string $targetDir, callable $log): string
+    {
         switch ($choice) {
             case '1':
                 // Replace: move existing directory to trash
@@ -5027,8 +5087,7 @@ class BookImportService
                     }
                 }
 
-                $sourceCover = $this->findCoverInSourceDirectory($audiobook['path']);
-                if ($sourceCover !== null) {
+                foreach ($this->findAllCoversInSourceDirectory($audiobook['path']) as $sourceCover) {
                     $coverSources[] = [
                         'type' => 'file',
                         'path' => $sourceCover,
@@ -5439,19 +5498,31 @@ class BookImportService
      */
     public function getEmbeddedCoverTempPath(string $coverData): ?string
     {
+        // Reuse the temp file from a previous call with this exact cover data instead of
+        // creating a new one every time. tempnam() always appends its own random suffix
+        // (the hash prefix below doesn't dedupe anything on its own), so without this cache,
+        // every call — e.g. once per interactive review-loop redraw via buildUiMetadata() —
+        // produced a *new* path for an unchanged cover. That defeated ImportUIService's
+        // cover-unchanged render cache, forcing a fresh blocking `kitten icat` subprocess
+        // (full image re-transfer) on every keystroke in the review UI.
+        $coverHash = md5($coverData);
+        if (isset($this->embeddedCoverTempPaths[$coverHash]) && file_exists($this->embeddedCoverTempPaths[$coverHash])) {
+            return $this->embeddedCoverTempPaths[$coverHash];
+        }
+
         $binary = base64_decode($coverData, true);
         if (!is_string($binary)) {
             $binary = $coverData;
         }
 
-        // Create unique temp file name using cover data hash to avoid collisions
-        $coverHash = substr(md5($coverData), 0, 8);
-        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_' . $coverHash . '_');
+        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_' . substr($coverHash, 0, 8) . '_');
         if ($tempFile === false) {
             return null;
         }
 
         file_put_contents($tempFile, $binary);
+
+        $this->embeddedCoverTempPaths[$coverHash] = $tempFile;
 
         return $tempFile;
     }
@@ -10953,19 +11024,116 @@ class BookImportService
     }
 
     /**
+     * Interactive directory-conflict resolution for the review-time Accept action, when
+     * directoryPathHasRealConflict() finds the proposed target directory already has real
+     * content. Previously this just blocked Accept with a warning telling the user to fix
+     * the path manually; this instead reuses the same resolution actions as the move-time
+     * conflict handler (handleDirectoryConflict()) — replace/rename existing/rename new/
+     * merge/cancel, via the shared resolveDirectoryConflictChoice() — adds a narrator-suffix
+     * quick option (when a narrator is set) for disambiguating same-title books, and lets
+     * the user listen to both copies (playAudioFiles()) or list their contents before
+     * deciding. Raw-TTY interactive loop — can't be exercised by PHPUnit, see
+     * UNTESTABLE_REGRESSIONS.md.
+     *
+     * Returns the book-root-relative directory path to accept into, or null if the user
+     * backed out (cancel) and review should continue unchanged.
+     */
+    private function resolveReviewDirectoryConflict(
+        array $metadata,
+        array $audiobook,
+        string $currentDirectoryPath,
+        callable $selectCallback,
+        callable $logMessageCallback
+    ): ?string {
+        $bookStoragePath = rtrim((string) (config('filesystems.disks.books.root') ?? config('app.book_root')), '/');
+        $relativePath = trim($currentDirectoryPath, '/');
+        $targetDir = $bookStoragePath . '/' . $relativePath;
+        $sourcePath = (string) ($audiobook['path'] ?? '');
+
+        $sourceInfo = $this->getDirectoryInfo($sourcePath);
+        $targetInfo = $this->getDirectoryInfo($targetDir);
+        $logMessageCallback(sprintf(
+            '📁 Target already has %d file(s) (%s); source has %d file(s) (%s)',
+            $targetInfo['count'] ?? 0,
+            $this->formatFileSize((int) ($targetInfo['total_size'] ?? 0)),
+            $sourceInfo['count'] ?? 0,
+            $this->formatFileSize((int) ($sourceInfo['total_size'] ?? 0))
+        ));
+
+        $narrators = $metadata['narrator'] ?? null;
+        $narratorString = is_array($narrators) ? implode(', ', array_filter($narrators)) : (string) ($narrators ?? '');
+        $narratorString = trim($narratorString);
+
+        $options = [
+            '1' => 'Replace existing directory with new files',
+            '2' => 'Rename existing directory (add _01 suffix)',
+            '3' => 'Rename new import (add _01 suffix)',
+            '4' => 'Merge directories',
+            '5' => 'Cancel — go back to review',
+        ];
+        if ($narratorString !== '') {
+            $options['n'] = "Add narrator to directory name (\"{$narratorString}\")";
+        }
+        $options['p'] = 'Play source audio (mpv/mplayer)';
+        $options['e'] = 'Play existing audio (mpv/mplayer)';
+        $options['l'] = 'List source contents';
+        $options['x'] = 'List existing contents';
+
+        $sourceAudioFiles = File::isFile($sourcePath) ? [$sourcePath] : $this->findAudioFilesInDirectory($sourcePath);
+
+        while (true) {
+            $choice = strtolower(trim($selectCallback('Target directory conflict - choose action', $options, '5')));
+
+            switch ($choice) {
+                case 'p':
+                    $this->playAudioFiles($sourceAudioFiles, $logMessageCallback);
+                    continue 2;
+                case 'e':
+                    $this->playAudioFiles($this->findAudioFilesInDirectory($targetDir), $logMessageCallback);
+                    continue 2;
+                case 'l':
+                    $this->listDirectoryContents($sourcePath, $logMessageCallback);
+                    continue 2;
+                case 'x':
+                    $this->listDirectoryContents($targetDir, $logMessageCallback);
+                    continue 2;
+                case 'n':
+                    $base = (string) preg_replace('/\s*\([^)]+\)$/', '', $relativePath);
+
+                    return $base . " ({$narratorString})";
+            }
+
+            $resolved = $this->resolveDirectoryConflictChoice($choice, $targetDir, $logMessageCallback);
+            if ($resolved === 'cancel') {
+                return null;
+            }
+
+            // Strip the book-storage root back off so the caller gets a relative path,
+            // matching what custom_directory_path expects elsewhere.
+            if (str_starts_with($resolved, $bookStoragePath . '/')) {
+                return substr($resolved, strlen($bookStoragePath) + 1);
+            }
+
+            return $relativePath;
+        }
+    }
+
+    /**
      * Validate and lock in the currently-displayed directory path/genre as
      * accepted, logging the confirmed metadata. Shared by reviewAndApprove()'s
      * own Accept choice and the edit menu's "Accept and Import" shortcut so both
      * paths apply the exact same checks. Returns false (and logs a warning
-     * explaining why) if genre is invalid or the directory has a real conflict —
-     * the caller is expected to keep the review loop going in that case.
+     * explaining why) if genre is invalid — the caller is expected to keep the
+     * review loop going in that case. A real directory conflict is resolved
+     * interactively via resolveReviewDirectoryConflict() instead of blocking.
      */
     private function attemptAcceptFromReview(
         array &$metadata,
         string $currentDirectoryPath,
         bool $isGenreValid,
         array $audiobook,
-        callable $uiServiceLogCallback
+        callable $uiServiceLogCallback,
+        callable $selectWithImmediateInterruptCallback
     ): bool {
         if (!$isGenreValid) {
             $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first (Option 2 → Genre)');
@@ -10973,9 +11141,21 @@ class BookImportService
             return false;
         }
         if ($this->directoryPathHasRealConflict($currentDirectoryPath, (string) ($audiobook['path'] ?? ''))) {
-            $uiServiceLogCallback('⚠️  Cannot accept: target directory already contains files - please choose a different directory (Option 2 → Directory Path)');
+            $resolvedPath = $this->resolveReviewDirectoryConflict(
+                $metadata,
+                $audiobook,
+                $currentDirectoryPath,
+                $selectWithImmediateInterruptCallback,
+                $uiServiceLogCallback
+            );
 
-            return false;
+            if ($resolvedPath === null) {
+                $uiServiceLogCallback('↩️  Directory conflict not resolved — back to review.');
+
+                return false;
+            }
+
+            $currentDirectoryPath = $resolvedPath;
         }
 
         // Lock in the exact path shown at approval time so the file is moved
@@ -11089,7 +11269,7 @@ class BookImportService
 
             $choice = strtolower(trim($choice));
             if (in_array($choice, ['1', 'a', 'accept'], true)) {
-                if ($this->attemptAcceptFromReview($metadata, $currentDirectoryPath, $isGenreValid, $audiobook, $uiServiceLogCallback)) {
+                if ($this->attemptAcceptFromReview($metadata, $currentDirectoryPath, $isGenreValid, $audiobook, $uiServiceLogCallback, $selectWithImmediateInterruptCallback)) {
                     return true;
                 }
                 continue;
@@ -11134,7 +11314,7 @@ class BookImportService
                 // (with whatever warning attemptAcceptFromReview logged) if it can't.
                 if (($metadata['_action'] ?? null) === 'accept_and_import') {
                     unset($metadata['_action']);
-                    if ($this->attemptAcceptFromReview($metadata, $currentDirectoryPath, $isGenreValid, $audiobook, $uiServiceLogCallback)) {
+                    if ($this->attemptAcceptFromReview($metadata, $currentDirectoryPath, $isGenreValid, $audiobook, $uiServiceLogCallback, $selectWithImmediateInterruptCallback)) {
                         return true;
                     }
                 }
