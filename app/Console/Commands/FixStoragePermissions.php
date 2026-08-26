@@ -36,16 +36,25 @@ class FixStoragePermissions extends Command
         $errors = [];
         $changes = [];
 
-        // Define permission settings
+        // Define permission settings.
+        //
+        // Directories use 775 (not 755): storage/ and bootstrap/cache are shared
+        // between the CLI user and www-data via POSIX ACLs (see
+        // scripts/fix-permissions.sh), which grant the www-data group an
+        // explicit rwx ACL entry. A plain chmod() recalculates the ACL mask to
+        // match the requested mode's group bits — chmod'ing to 755 (group r-x)
+        // caps that mask to r-x and silently disables www-data's write access
+        // regardless of its ACL entry. Using 775 (group rwx) keeps the mask
+        // compatible with the ACL grants instead of overriding them.
         $permissions = [
-            // General storage directories - 755 (rwxr-xr-x)
-            $storagePath => 0755,
-            $storagePath . '/app' => 0755,
-            $storagePath . '/app/public' => 0755,
-            $storagePath . '/framework' => 0755,
-            $storagePath . '/framework/cache' => 0755,
-            $storagePath . '/framework/sessions' => 0755,
-            $storagePath . '/framework/views' => 0755,
+            // General storage directories - 775 (rwxrwxr-x)
+            $storagePath => 0775,
+            $storagePath . '/app' => 0775,
+            $storagePath . '/app/public' => 0775,
+            $storagePath . '/framework' => 0775,
+            $storagePath . '/framework/cache' => 0775,
+            $storagePath . '/framework/sessions' => 0775,
+            $storagePath . '/framework/views' => 0775,
 
             // Logs directory - 777 (rwxrwxrwx) for world-writable access
             $storagePath . '/logs' => 0777,
@@ -84,10 +93,13 @@ class FixStoragePermissions extends Command
         // Fix log files permissions (world writable)
         $this->fixLogFilePermissions($storagePath . '/logs', $dryRun, $verbose, $changes, $errors);
 
-        // Recursively fix permissions for cache and other subdirectories
-        $this->fixRecursivePermissions($storagePath . '/framework/cache', 0755, 0644, $dryRun, $verbose, $changes, $errors);
-        $this->fixRecursivePermissions($storagePath . '/framework/sessions', 0755, 0666, $dryRun, $verbose, $changes, $errors); // Session files need to be writable
-        $this->fixRecursivePermissions($storagePath . '/framework/views', 0755, 0644, $dryRun, $verbose, $changes, $errors);
+        // Recursively fix permissions for cache and other subdirectories.
+        // Directories use 775 and files use 664 (not 755/644) for the same
+        // ACL-mask reason documented above: group write must stay enabled so
+        // www-data's ACL grant remains effective.
+        $this->fixRecursivePermissions($storagePath . '/framework/cache', 0775, 0664, $dryRun, $verbose, $changes, $errors);
+        $this->fixRecursivePermissions($storagePath . '/framework/sessions', 0775, 0664, $dryRun, $verbose, $changes, $errors);
+        $this->fixRecursivePermissions($storagePath . '/framework/views', 0775, 0664, $dryRun, $verbose, $changes, $errors);
 
         // Display results
         if (!empty($changes)) {
