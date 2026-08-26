@@ -144,6 +144,69 @@ class BookImportServiceProcessSingleBookCoverTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function processSingleBookForcesConfiguredAuthorNarratorSeriesAndTags(): void
+    {
+        $bookRoot = sys_get_temp_dir() . '/book_root_' . uniqid('', true);
+        File::makeDirectory($bookRoot, 0775, true);
+        config(['app.book_root' => $bookRoot]);
+        config(['filesystems.disks.books.root' => $bookRoot]);
+
+        Genre::create(['name' => 'Science Fiction']);
+
+        $this->service->setConfig([
+            'author' => 'Forced Author',
+            'narrator' => 'Forced Narrator',
+            'series' => 'Forced Series',
+            'tags' => ['forced-tag'],
+        ]);
+
+        $metadata = [
+            'title' => 'Config Override Test Book',
+            'author' => ['Original Author'],
+            'narrator' => 'Original Narrator',
+            'series' => 'Original Series',
+            'tags' => ['original-tag'],
+            'genre' => 'Science Fiction',
+            'confidence' => 100,
+        ];
+
+        $audiobook = [
+            'path' => '/tmp/source-book',
+            'files' => [],
+        ];
+
+        $book = $this->service->processSingleBook(
+            $audiobook,
+            $metadata,
+            fn ($metadata) => null,
+            fn ($metadata, $enrichedData) => false,
+            fn ($metadata) => $this->service->generateDirectoryPath($metadata),
+            fn ($metadata, $audiobook) => $this->service->createBookFromMetadata($metadata, $audiobook),
+            fn ($audiobook, $book, $options) => true,
+            fn () => 'copy',
+            null,
+            null,
+            null,
+            null,
+            skipEnrichment: true,
+            isAutoMode: true,
+        );
+
+        $this->assertNotNull($book);
+        $this->assertSame(['Forced Author'], $book->authors->pluck('name')->all());
+        $this->assertSame(['Forced Narrator'], $book->narrators->pluck('name')->all());
+        $this->assertSame(['Forced Series'], $book->series->pluck('name')->all());
+
+        $systemTags = \App\Models\BookTag::query()
+            ->where('book_id', $book->id)
+            ->where('owner_key', 'system')
+            ->first();
+        $this->assertNotNull($systemTags);
+        $this->assertContains('forced-tag', $systemTags->tags);
+        $this->assertContains('original-tag', $systemTags->tags);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function processCoverImageNoOpsForABookWithNoDirectoryPathYet(): void
     {
         // Regression test: processSingleBook() unconditionally calls

@@ -58,6 +58,9 @@ class ImportProgressionFantasyCollectionSeed extends ImportBooksFromDownloads
                             {--include-old : Unused here; declared for the same reason}
                             {--collection= : Unused here; declared for the same reason}
                             {--genre= : Unused here; declared for the same reason}
+                            {--author= : Unused here; declared for the same reason}
+                            {--narrator= : Unused here; declared for the same reason}
+                            {--tags=* : Unused here; declared for the same reason}
                             {--pattern= : Unused here; declared for the same reason}
                             {--repair-title-mismatch-date= : Unused here; declared for the same reason}
                             {--repair-expected= : Unused here; declared for the same reason}

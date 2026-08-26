@@ -6507,10 +6507,29 @@ class BookImportService
             }
         }
 
-        // Force genre from config if provided - do this after potential enrichment calls
-        // to ensure it takes priority.
+        // Force genre/author/narrator/series from config if provided - do this after
+        // potential enrichment calls to ensure it takes priority.
         if (!empty($this->config['genre'])) {
             $metadata['genre'] = $this->config['genre'];
+        }
+
+        if (!empty($this->config['author'])) {
+            $metadata['author'] = $this->config['author'];
+        }
+
+        if (!empty($this->config['narrator'])) {
+            $metadata['narrator'] = $this->config['narrator'];
+        }
+
+        if (!empty($this->config['series'])) {
+            $metadata['series'] = $this->config['series'];
+        }
+
+        if (!empty($this->config['tags'])) {
+            $metadata['tags'] = array_values(array_unique(array_merge(
+                is_array($metadata['tags'] ?? null) ? $metadata['tags'] : [],
+                $this->config['tags']
+            )));
         }
 
         // Clean series name from title before display

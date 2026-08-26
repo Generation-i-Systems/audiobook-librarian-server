@@ -57,6 +57,10 @@ class ImportBooksFromDownloads extends Command
                              {--include-old : Include OpenAudible books_old directory when scanning}
                             {--collection= : Add all imported items to this collection}
                             {--genre= : Set a default genre for all imported items}
+                            {--author= : Set a default author for all imported items}
+                            {--narrator= : Set a default narrator for all imported items}
+                            {--series= : Set a default series for all imported items}
+                            {--tags=* : Add these tags to all imported items (comma-separated or repeatable)}
                              {--pattern= : Alternate storage pattern, e.g., "[genre]/VA/[series]/[title] ([author])"}
                             {--repair-title-mismatch-date= : Re-import title-mismatch review records from this creation date, preserving IDs and files}
                             {--repair-expected=2071 : Required record count for title-mismatch repair mode}
@@ -116,6 +120,27 @@ class ImportBooksFromDownloads extends Command
     protected function getFileOperation(): string
     {
         return $this->getImportService()->getFileOperation(fn () => $this->option('copy-files'));
+    }
+
+    /**
+     * Normalize the repeatable/comma-separated --tags option into a flat, deduplicated list.
+     *
+     * @param array<int, string> $rawTags
+     * @return array<int, string>
+     */
+    protected function parseTagsOption(array $rawTags): array
+    {
+        $tags = [];
+        foreach ($rawTags as $rawTag) {
+            foreach (explode(',', (string) $rawTag) as $tag) {
+                $tag = trim($tag);
+                if ($tag !== '') {
+                    $tags[] = $tag;
+                }
+            }
+        }
+
+        return array_values(array_unique($tags));
     }
 
     protected function extractMetadataFromFileTags(array $fileTags): array
@@ -447,6 +472,10 @@ class ImportBooksFromDownloads extends Command
             'include_narrator' => (bool) $this->option('include-narrator'),
             'collection' => $this->option('collection'),
             'genre' => $this->option('genre'),
+            'author' => $this->option('author'),
+            'narrator' => $this->option('narrator'),
+            'series' => $this->option('series'),
+            'tags' => $this->parseTagsOption($this->option('tags')),
             'directory_pattern' => $this->option('pattern'),
         ]);
 
