@@ -45,10 +45,12 @@ return Application::configure(basePath: dirname(__DIR__))
             ->daily()
             ->appendOutputTo(storage_path('logs/log-cleanup.log'));
 
-        // Fix storage permissions every hour to ensure proper access
-        $schedule->command('storage:fix-permissions')
-            ->hourly()
-            ->appendOutputTo(storage_path('logs/permissions-fix.log'));
+        // NOTE: storage:fix-permissions is intentionally NOT scheduled here.
+        // It must run as root (to chmod files owned by www-data), but
+        // Laravel's scheduler always runs as whoever's crontab invokes
+        // `php artisan schedule:run` (eric on this host). It is instead run
+        // hourly directly from root's crontab. See app/Console/Commands/
+        // FixStoragePermissions.php and root crontab entry.
 
         // Validate book directories daily at 3:00 AM
         $schedule->command('books:validate-directories')
