@@ -54,6 +54,73 @@ class MetadataExtractionTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function it_extracts_narrator_from_read_by_comment_tag(): void
+    {
+        $this->aiBookProcessorMock->method('extractFileTags')
+            ->willReturn([
+                'artist' => 'Greg Egan',
+                'title' => 'Reasons to Be Cheerful',
+                'comment' => 'Read by Richard Hauenstein',
+            ]);
+
+        $audiobook = [
+            'name' => 'Reasons to Be Cheerful',
+            'path' => '/test/path',
+            'files' => ['/test/path/audio.mp3'],
+        ];
+
+        $result = $this->service->processWithoutAI($audiobook);
+
+        $this->assertNotNull($result);
+        $this->assertContains('Richard Hauenstein', $result['narrator']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_extracts_narrator_from_narrated_by_comment_tag(): void
+    {
+        $this->aiBookProcessorMock->method('extractFileTags')
+            ->willReturn([
+                'artist' => 'Greg Egan',
+                'title' => 'Reasons to Be Cheerful',
+                'comment' => 'Narrated by Richard Hauenstein.',
+            ]);
+
+        $audiobook = [
+            'name' => 'Reasons to Be Cheerful',
+            'path' => '/test/path',
+            'files' => ['/test/path/audio.mp3'],
+        ];
+
+        $result = $this->service->processWithoutAI($audiobook);
+
+        $this->assertNotNull($result);
+        $this->assertContains('Richard Hauenstein', $result['narrator']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_prefers_explicit_narrator_tag_over_comment_tag(): void
+    {
+        $this->aiBookProcessorMock->method('extractFileTags')
+            ->willReturn([
+                'artist' => 'Greg Egan',
+                'title' => 'Reasons to Be Cheerful',
+                'narrator' => 'Explicit Narrator Tag',
+                'comment' => 'Read by Richard Hauenstein',
+            ]);
+
+        $audiobook = [
+            'name' => 'Reasons to Be Cheerful',
+            'path' => '/test/path',
+            'files' => ['/test/path/audio.mp3'],
+        ];
+
+        $result = $this->service->processWithoutAI($audiobook);
+
+        $this->assertNotNull($result);
+        $this->assertContains('Explicit Narrator Tag', $result['narrator']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_placeholder(): void
     {
         $this->expectNotToPerformAssertions();

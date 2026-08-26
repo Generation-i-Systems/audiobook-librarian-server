@@ -58,6 +58,14 @@ class MetadataProcessingService
                                 }
                             }
 
+                            // Extract narrator from comment field if present (e.g., "Read by Richard Hauenstein")
+                            if (!empty($tags['comment']) && empty($tags['narrator'])) {
+                                $narratorFromComment = $this->extractNarratorFromComment((string) $tags['comment']);
+                                if ($narratorFromComment !== null) {
+                                    $tags['narrator'] = $narratorFromComment;
+                                }
+                            }
+
                             $fileTags = array_merge($fileTags, $tags);
                         }
                     }
@@ -132,6 +140,11 @@ class MetadataProcessingService
                             }
                             if (!empty($tags['narrator']) && empty($metadata['narrator'])) {
                                 $metadata['narrator'] = is_array($tags['narrator']) ? $tags['narrator'] : [$tags['narrator']];
+                            } elseif (!empty($tags['comment'])) {
+                                $narratorFromComment = $this->extractNarratorFromComment((string) $tags['comment']);
+                                if ($narratorFromComment !== null) {
+                                    $metadata['narrator'] = [$narratorFromComment];
+                                }
                             }
                             if (!empty($tags['genre']) && empty($metadata['genre'])) {
                                 $metadata['genre'] = is_array($tags['genre']) ? $tags['genre'] : [$tags['genre']];
@@ -311,6 +324,19 @@ class MetadataProcessingService
     }
 
     /**
+     * Extract a narrator name from a Comment tag value like "Read by Richard Hauenstein"
+     * or "Narrated by Richard Hauenstein".
+     */
+    protected function extractNarratorFromComment(string $comment): ?string
+    {
+        if (preg_match('/(?:Read|Narrated)\s+by\s+([^.]+)/i', $comment, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return null;
+    }
+
+    /**
      * Apply ID3 tag mappings to the result metadata
      * CRITICAL: File tags are AUTHORITATIVE - they override AI results
      */
@@ -334,6 +360,8 @@ class MetadataProcessingService
         if (!empty($fileTags['composer'])) {
             $composer = is_array($fileTags['composer']) ? (string) $fileTags['composer'][0] : (string) $fileTags['composer'];
             $result['narrator'] = $composer;
+        } elseif (!empty($fileTags['narrator'])) {
+            $result['narrator'] = is_array($fileTags['narrator']) ? (string) $fileTags['narrator'][0] : (string) $fileTags['narrator'];
         }
 
         // YEAR from date (first 4 digits)

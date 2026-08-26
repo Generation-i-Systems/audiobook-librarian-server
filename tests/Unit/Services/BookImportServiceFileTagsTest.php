@@ -92,4 +92,64 @@ class BookImportServiceFileTagsTest extends TestCase
 
         $this->assertEquals(['Michael Kramer', 'Kate Reading'], $result['narrator']);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractMetadataFromFileTagsSetsNarratorFromReadByCommentTag(): void
+    {
+        $fileTags = [
+            'track1.mp3' => [
+                'artist' => 'Greg Egan',
+                'title' => 'Reasons to Be Cheerful',
+                'comment' => 'Read by Richard Hauenstein',
+            ],
+        ];
+
+        $result = $this->service->extractMetadataFromFileTags($fileTags);
+
+        $this->assertEquals(['Richard Hauenstein'], $result['narrator']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractMetadataFromFileTagsSetsNarratorFromNarratedByCommentTag(): void
+    {
+        $fileTags = [
+            'track1.mp3' => [
+                'comment' => 'Narrated by Richard Hauenstein.',
+            ],
+        ];
+
+        $result = $this->service->extractMetadataFromFileTags($fileTags);
+
+        $this->assertEquals(['Richard Hauenstein'], $result['narrator']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractMetadataFromFileTagsPrefersNarratorTagOverCommentTag(): void
+    {
+        $fileTags = [
+            'track1.mp3' => [
+                'narrator' => 'Explicit Narrator Tag',
+                'comment' => 'Read by Richard Hauenstein',
+            ],
+        ];
+
+        $result = $this->service->extractMetadataFromFileTags($fileTags);
+
+        $this->assertEquals(['Explicit Narrator Tag'], $result['narrator']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractMetadataFromFileTagsPrefersWriterTagOverCommentTag(): void
+    {
+        $fileTags = [
+            'track1.mp3' => [
+                'writer' => 'Michael Kramer, Kate Reading',
+                'comment' => 'Read by Richard Hauenstein',
+            ],
+        ];
+
+        $result = $this->service->extractMetadataFromFileTags($fileTags);
+
+        $this->assertEquals(['Michael Kramer', 'Kate Reading'], $result['narrator']);
+    }
 }

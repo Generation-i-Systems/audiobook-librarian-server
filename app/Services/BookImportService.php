@@ -7630,6 +7630,10 @@ class BookImportService
             if (!empty($writerParts)) {
                 $metadata['narrator'] = $writerParts;
             }
+        } elseif (!empty($firstTags['comment']) && is_string($firstTags['comment'])) {
+            if (preg_match('/(?:Read|Narrated)\s+by\s+([^.]+)/i', $firstTags['comment'], $matches)) {
+                $metadata['narrator'] = $this->splitMultiValueNameTag(trim($matches[1]));
+            }
         }
 
         return $metadata;
