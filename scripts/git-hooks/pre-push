@@ -226,8 +226,8 @@ fi
 # =============================================================================
 print_section "8/8 PHP Tests (PHPUnit)"
 
-echo -e "${YELLOW}Running API and Core tests...${NC}"
-if ./vendor/bin/phpunit tests/Api tests/Core; then
+echo -e "${YELLOW}Running full PHP test suite (matches CI's unfiltered 'vendor/bin/phpunit')...${NC}"
+if ./vendor/bin/phpunit; then
     handle_success "PHP tests passed"
 else
     handle_failure "PHP tests failed" "Run: composer test to see all failures"
