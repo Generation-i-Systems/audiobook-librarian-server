@@ -67,6 +67,8 @@
 
 ### Fixed
 
+- The admin book list and `GET /api/v1/books/search` now honor inline `genre:` and `genreId:`
+  tokens when combined with a negative tag token such as `genreId:1 tag:-spicy`.
 - Skin and Theme navigation links now go directly to their canonical www gallery pages instead of first loading a local redirect route.
 - The embedded Adminer database console now instantiates the configured Adminer subclass and delegates its Gemini SQL helper hooks, instead of attempting to instantiate Adminer's abstract plugin base class.
 - Stabilized API tests by giving completed-position fixtures an explicit matching duration and accepting whole-number JSON percentages as numeric. Documented the existing `GET /tags/all` endpoint in OpenAPI so the route-coverage gate passes.

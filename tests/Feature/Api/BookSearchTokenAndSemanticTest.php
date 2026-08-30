@@ -125,4 +125,28 @@ class BookSearchTokenAndSemanticTest extends ApiTestCase
         $this->assertContains('Tokened Series Book', $titles);
         $this->assertNotContains('Unrelated', $titles);
     }
+
+    #[Test]
+    public function searchEndpointCombinesGenreIdAndBannedTagTokens(): void
+    {
+        $fantasy = Genre::factory()->create(['name' => 'Fantasy']);
+        $safeFantasy = Book::factory()->create(['title' => 'Safe Fantasy']);
+        $spicyFantasy = Book::factory()->create(['title' => 'Spicy Fantasy']);
+        $safeOtherGenre = Book::factory()->create(['title' => 'Safe Other Genre']);
+
+        $fantasy->books()->attach([$safeFantasy->id, $spicyFantasy->id]);
+
+        BookTag::create([
+            'book_id' => $spicyFantasy->id,
+            'scope' => 'system',
+            'owner_key' => 'system',
+            'tags' => ['spicy'],
+        ]);
+
+        $response = $this->getJson('/api/v1/books/search?search=' . urlencode('genreId:' . $fantasy->id . ' tag:-spicy'));
+
+        $response->assertOk();
+        $titles = array_column($response->json('data'), 'title');
+        $this->assertSame(['Safe Fantasy'], $titles);
+    }
 }

@@ -418,6 +418,7 @@ class BookApiController extends Controller
         $filters = [
             'search'           => $request->input('search'),
             'title'            => $request->input('title'),
+            'genre'            => $request->input('genre'),
             'author'           => $request->input('author'),
             'series'           => $request->input('series'),
             'tag'              => $request->input('tag'),
@@ -431,9 +432,13 @@ class BookApiController extends Controller
             'include_needs_review' => $includeNeedsReview,
         ];
 
-        // This endpoint's filter set has never supported genre; only author/series/tag
-        // tokens are merged here, matching that narrower surface (genre: tokens are ignored).
         $tokens = $this->parseSearchTokens($filters['search']);
+        if ($tokens['genre_id']) {
+            $filters['genre_id'] = $tokens['genre_id'];
+            unset($filters['genre']);
+        } elseif ($tokens['genre_name']) {
+            $filters['genre'] = $tokens['genre_name'];
+        }
         if ($tokens['author_id']) {
             $filters['author_id'] = $tokens['author_id'];
             unset($filters['author']);

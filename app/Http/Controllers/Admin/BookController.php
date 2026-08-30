@@ -91,6 +91,12 @@ class BookController extends Controller
             } elseif ($request->filled('genre_id')) {
                 $filters['genre_id'] = $request->input('genre_id');
             }
+            if ($request->filled('tag')) {
+                $filters['tag'] = $request->input('tag');
+            }
+            if ($request->filled('tags')) {
+                $filters['tags'] = $request->input('tags');
+            }
 
             $tokens = $this->parseSearchTokens($request->input('search', ''));
             if ($tokens['author_id']) {
@@ -113,6 +119,11 @@ class BookController extends Controller
             }
             if ($tokens['book_id']) {
                 $filters['book_id'] = $tokens['book_id'];
+            }
+            if ($tokens['tag']) {
+                $filters['tag'] = isset($filters['tag'])
+                    ? $filters['tag'] . ',' . $tokens['tag']
+                    : $tokens['tag'];
             }
             if ($tokens['search'] !== '') {
                 $filters['search'] = $tokens['search'];

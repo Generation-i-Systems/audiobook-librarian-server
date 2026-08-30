@@ -21,7 +21,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 ## 2. Core Features
 
-- Book search (web book list, `GET /books`, `GET /books/search`) supports inline name tokens (`genre:Fantasy`, `author:"Name"`, `series:Name`, `tag:Name`) alongside the existing id tokens (`genreId:N`, `authorId:N`, `seriesId:N`, `bookId:N`), and an opt-in `semantic=true` toggle that ranks results by AI semantic similarity via the recommendation engine's embedding pipeline instead of exact/partial text match (falls back to normal search when no embedding provider is configured).
+- Book search (web book list, `GET /books`, `GET /books/search`, `GET /admin/books`, and `GET /api/v1/books/search`) supports inline name tokens (`genre:Fantasy`, `author:"Name"`, `series:Name`, `tag:Name`) alongside the existing id tokens (`genreId:N`, `authorId:N`, `seriesId:N`, `bookId:N`), including combined positive genre and negative tag filters such as `genreId:1 tag:-spicy`. An opt-in `semantic=true` toggle ranks results by AI semantic similarity via the recommendation engine's embedding pipeline instead of exact/partial text match (falls back to normal search when no embedding provider is configured).
 - Book CRUD (admin)
 - Book form: multiple authors/series (autocomplete), Google Books autofill, genre selection, file uploads
 - Import asks the AI for freeform content tags per book (including a `spicy` tag when there is clear evidence of explicit sexual content), shows them on the review summary, allows editing during interactive review, and stores confirmed tags as system-scope book tags. Author/narrator name lists are split on `&`, `/`, and "and" as well as commas, both from the AI response and from ID3 tags.
