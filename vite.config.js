@@ -37,6 +37,7 @@ export default defineConfig({
                 "resources/js/admin/books/init-book-form.js",
                 "resources/js/admin/jobs/index.js",
                 "resources/js/admin/users/login-qr.js",
+                "resources/js/admin/badges/rule-builder.js",
                 "resources/js/ai-query.js",
                 "resources/js/global-ajax-auth.js",
             ],

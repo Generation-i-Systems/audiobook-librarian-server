@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property-read string $display_name
  * @property-read int $tier_weight
+ * @property bool|null $can_force_delete
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBadge> $userBadges
  * @property-read int|null $user_badges_count
  * @method static Builder<static>|Badge active()
@@ -67,6 +68,8 @@ class Badge extends Model
         'is_active',
         'is_repeatable',
         'sort_order',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [
@@ -261,11 +264,27 @@ class Badge extends Model
     }
 
     /**
+     * Operators supported by the version-2 (multi-condition) rule engine.
+     */
+    public const RULE_OPERATORS = [
+        '>=' => 'At least',
+        '<=' => 'At most',
+        '>' => 'More than',
+        '<' => 'Less than',
+        '==' => 'Exactly',
+        'between' => 'Between',
+    ];
+
+    /**
      * Check if this badge's criteria are met for given statistics
      */
     public function evaluateCriteria(array $userStats): bool
     {
         $criteria = $this->criteria;
+
+        if ($this->isConditionGroup($criteria)) {
+            return $this->evaluateConditionGroup($criteria, $userStats);
+        }
 
         foreach ($criteria as $type => $requirement) {
             if (! $this->checkSingleCriterion($type, $requirement, $userStats)) {
@@ -274,6 +293,74 @@ class Badge extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Determine whether a criteria array uses the version-2 condition-group format.
+     */
+    protected function isConditionGroup(array $criteria): bool
+    {
+        return isset($criteria['conditions']) && is_array($criteria['conditions']);
+    }
+
+    /**
+     * Recursively evaluate a version-2 AND/OR condition group.
+     *
+     * @param array{logic?: string, conditions: array} $group
+     */
+    protected function evaluateConditionGroup(array $group, array $userStats): bool
+    {
+        $logic = strtoupper((string) ($group['logic'] ?? 'AND'));
+        $conditions = $group['conditions'];
+
+        if (empty($conditions)) {
+            return true;
+        }
+
+        foreach ($conditions as $node) {
+            if ($this->isConditionGroup($node)) {
+                $result = $this->evaluateConditionGroup($node, $userStats);
+            } else {
+                $result = $this->evaluateCondition($node, $userStats);
+            }
+
+            if ($logic === 'OR') {
+                if ($result) {
+                    return true;
+                }
+            } elseif (! $result) {
+                return false;
+            }
+        }
+
+        return $logic !== 'OR';
+    }
+
+    /**
+     * Evaluate a single leaf condition, e.g. {"stat": "books_completed", "operator": ">=", "value": 10}.
+     */
+    protected function evaluateCondition(array $condition, array $userStats): bool
+    {
+        $stat = $condition['stat'] ?? null;
+        $operator = $condition['operator'] ?? '>=';
+        $target = $condition['value'] ?? null;
+
+        if ($stat === null || $target === null) {
+            return false;
+        }
+
+        $value = $userStats[$stat] ?? 0;
+
+        return match ($operator) {
+            '>=' => $value >= $target,
+            '<=' => $value <= $target,
+            '>' => $value > $target,
+            '<' => $value < $target,
+            '==' => $value == $target,
+            'between' => is_array($target) && count($target) === 2
+                && $value >= $target[0] && $value <= $target[1],
+            default => false,
+        };
     }
 
     /**
@@ -308,6 +395,23 @@ class Badge extends Model
     public function getProgressPercentage(array $userStats): int
     {
         $criteria = $this->criteria;
+
+        if ($this->isConditionGroup($criteria)) {
+            $leaves = [];
+            $this->collectLeafConditions($criteria, $leaves);
+
+            if (empty($leaves)) {
+                return 100;
+            }
+
+            $progress = 0.0;
+            foreach ($leaves as $leaf) {
+                $progress += $this->getConditionProgress($leaf, $userStats);
+            }
+
+            return (int) floor(($progress / count($leaves)) * 100);
+        }
+
         $totalCriteria = count($criteria);
 
         if ($totalCriteria === 0) {
@@ -323,6 +427,50 @@ class Badge extends Model
         return (int) floor(($progress / $totalCriteria) * 100);
     }
 
+    /**
+     * Flatten a version-2 condition group into its leaf conditions (ignoring AND/OR structure),
+     * matching the existing "average of criteria" progress semantic used for the legacy format.
+     */
+    protected function collectLeafConditions(array $node, array &$leaves): void
+    {
+        if ($this->isConditionGroup($node)) {
+            foreach ($node['conditions'] as $child) {
+                $this->collectLeafConditions($child, $leaves);
+            }
+            return;
+        }
+
+        $leaves[] = $node;
+    }
+
+    protected function getConditionProgress(array $condition, array $userStats): float
+    {
+        $stat = $condition['stat'] ?? null;
+        $operator = $condition['operator'] ?? '>=';
+        $target = $condition['value'] ?? null;
+
+        if ($stat === null || $target === null) {
+            return 0.0;
+        }
+
+        $value = (float) ($userStats[$stat] ?? 0);
+
+        if ($operator === 'between' && is_array($target) && count($target) === 2) {
+            [$min, $max] = [(float) $target[0], (float) $target[1]];
+            if ($value > $max) {
+                return 0.0;
+            }
+            return $min > 0.0 ? min(1.0, max(0.0, $value / $min)) : 1.0;
+        }
+
+        if (in_array($operator, ['>=', '>', '=='], true) && is_numeric($target)) {
+            $target = (float) $target;
+            return $target > 0.0 ? min(1.0, max(0.0, $value / $target)) : 1.0;
+        }
+
+        return $this->evaluateCondition($condition, $userStats) ? 1.0 : 0.0;
+    }
+
     protected function getSingleCriterionProgress(string $type, $requirement, array $userStats): float
     {
         $value = $userStats[$type] ?? 0;
@@ -336,12 +484,8 @@ class Badge extends Model
         }
 
         if (is_array($requirement)) {
-            $min = isset($requirement['min']) && is_numeric($requirement['min'])
-                ? (float) $requirement['min']
-                : null;
-            $max = isset($requirement['max']) && is_numeric($requirement['max'])
-                ? (float) $requirement['max']
-                : null;
+            $min = isset($requirement['min']) && is_numeric($requirement['min']) ? (float) $requirement['min'] : null;
+            $max = isset($requirement['max']) && is_numeric($requirement['max']) ? (float) $requirement['max'] : null;
 
             if ($min !== null && $max !== null) {
                 if ($value < $min) {

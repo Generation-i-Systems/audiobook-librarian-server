@@ -564,8 +564,12 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'bulkImportBooksFromDir',
     ])->name('books.bulkImportDir');
 
+    // Badge management
+    Route::resource('badges', Admin\BadgeController::class)->except(['show']);
+    Route::post('badges/{badge}/activate', [Admin\BadgeController::class, 'activate'])->name('badges.activate');
+    Route::delete('badges/{badge}/force', [Admin\BadgeController::class, 'forceDestroy'])->name('badges.forceDestroy');
+
     // User management
-    Route::get('/badges', [Admin\BadgeController::class, 'index'])->name('badges.index');
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
         ->name('users.verify');

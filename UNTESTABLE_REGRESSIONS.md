@@ -91,6 +91,12 @@ These features require real directory trees and file contents on disk.
   they cannot verify that the actual production mounts (e.g. `/media/audiobooks/books`) are
   mounted, readable, or have sufficient free space.
 - **`AppRefreshCommand`** (`app:refresh`) — recursively updates filesystem permissions of all storage/cache directories on disk, runs database migrations, restarts queue workers, resets SAPI/CLI OPcaches, and reloads SAPI `php-fpm` via systemd (`systemctl reload`). Automated tests run in an isolated sandbox where real system privileges, group ownerships, SAPI process state, and systemctl commands are stubbed/skipped, so tests cannot verify SAPI reload or permissions updates in production.
+- **Admin badge image upload** (`Admin\BadgeController::storeUploadedImage()`) — writes to
+  `storage/app/public/badges` on the `public` disk. Tests use `Storage::fake('public')`, which
+  proves the controller logic but not that the real `public/storage` symlink exists, is
+  writable by the web server user, or that uploaded files are actually served at the resulting
+  `image_url` in production. A missing/broken symlink or permission mismatch on the real
+  deployment silently produces badges with broken image links.
 
 ---
 
