@@ -486,3 +486,15 @@ when I request updating the cover offer downloading a new cover from the enrichm
 ## 2026-08-30
 
 as part of the verification add the ability to require or ban tags for the user. also support adding tags to the user either to be limited or ignored as part of user edit.
+
+---
+
+the search genreId:1 tag:-spicy should be showing Fantasy books that do NOT have spicy tag
+
+---
+
+the import isn't taking the tags from the commandline. I am passing "--tags=spicy" but Tags: N/A
+
+---
+
+when parsing a title if removing the series name leaves "The Complete Series" or someting like that put the series name back

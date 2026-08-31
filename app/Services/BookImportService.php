@@ -7773,7 +7773,13 @@ class BookImportService
             foreach ($patterns as $pattern) {
                 $cleaned = preg_replace($pattern, '', $title);
                 if ($cleaned !== $title) {
-                    return trim($cleaned, ' ,-');
+                    $trimmed = trim($cleaned, ' ,-');
+                    // If stripping leaves only a generic label like "The Complete Series",
+                    // the series name was doing the real identifying work — keep it.
+                    if ($this->isGenericSeriesLeftoverTitle($trimmed)) {
+                        return $title;
+                    }
+                    return $trimmed;
                 }
             }
 
@@ -7789,8 +7795,9 @@ class BookImportService
                 $cleaned = preg_replace($pattern, '', $title);
                 if ($cleaned !== $title) {
                     $trimmed = trim($cleaned, ' ,-');
-                    // If stripping leaves only numbers, the series name is part of the real title
-                    if (preg_match('/^\d+$/', $trimmed)) {
+                    // If stripping leaves only numbers, or a generic label like "The Complete
+                    // Series", the series name is part of the real title — keep it.
+                    if (preg_match('/^\d+$/', $trimmed) || $this->isGenericSeriesLeftoverTitle($trimmed)) {
                         return $title;
                     }
                     return $trimmed;
@@ -7809,7 +7816,11 @@ class BookImportService
             $trailingPattern = '/\s*[\-,]\s*' . $seriesEscaped . '$/i';
             $cleaned = preg_replace($trailingPattern, '', $strippedTitle);
             if ($cleaned !== $title) {
-                return trim($cleaned, ' ,-');
+                $trimmed = trim($cleaned, ' ,-');
+                if ($this->isGenericSeriesLeftoverTitle($trimmed)) {
+                    return $title;
+                }
+                return $trimmed;
             }
         }
 
@@ -7840,6 +7851,21 @@ class BookImportService
         }
 
         return $title;
+    }
+
+    /**
+     * True when a series name has been stripped from a title and what's left is a generic
+     * label ("The Complete Series", "Boxed Set", "Trilogy", ...) rather than a real title —
+     * meaningless without the series name that identified it, so it should not be stripped.
+     */
+    private function isGenericSeriesLeftoverTitle(string $title): bool
+    {
+        $normalized = trim($title);
+
+        return $normalized !== '' && preg_match(
+            '/^(the\s+)?(complete\s+|entire\s+|full\s+)?(series|collection|trilogy|duology|quartet|saga|omnibus|anthology|box\s*set|boxed\s*set)$/i',
+            $normalized
+        ) === 1;
     }
 
     /**
@@ -10839,10 +10865,29 @@ class BookImportService
             }
         }
 
-        // Force genre from config if provided - do this after enrichment
-        // so it overrides anything found externally
+        // Force genre/author/narrator/series/tags from config if provided - do this after
+        // enrichment so it overrides anything found externally.
         if (!empty($this->config['genre'])) {
             $aiMetadata['genre'] = $this->config['genre'];
+        }
+
+        if (!empty($this->config['author'])) {
+            $aiMetadata['author'] = $this->config['author'];
+        }
+
+        if (!empty($this->config['narrator'])) {
+            $aiMetadata['narrator'] = $this->config['narrator'];
+        }
+
+        if (!empty($this->config['series'])) {
+            $aiMetadata['series'] = $this->config['series'];
+        }
+
+        if (!empty($this->config['tags'])) {
+            $aiMetadata['tags'] = array_values(array_unique(array_merge(
+                is_array($aiMetadata['tags'] ?? null) ? $aiMetadata['tags'] : [],
+                $this->config['tags']
+            )));
         }
 
         // Last-resort fallback: if enrichment still left a weak genre, use the author's DB history.

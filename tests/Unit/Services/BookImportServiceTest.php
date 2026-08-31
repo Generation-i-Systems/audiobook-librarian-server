@@ -941,4 +941,17 @@ class BookImportServiceTest extends TestCase
         $result = $this->service->removeSeriesFromTitle('Roverpowered The Final Journey', 'Roverpowered');
         $this->assertSame('The Final Journey', $result);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function removeSeriesFromTitleKeepsSeriesWhenStrippingLeavesOnlyAGenericLabel(): void
+    {
+        $result = $this->service->removeSeriesFromTitle('Foundation: The Complete Series', 'Foundation');
+        $this->assertSame('Foundation: The Complete Series', $result);
+
+        $result = $this->service->removeSeriesFromTitle('Foundation - Boxed Set', 'Foundation');
+        $this->assertSame('Foundation - Boxed Set', $result);
+
+        $result = $this->service->removeSeriesFromTitle('The Complete Trilogy - Foundation', 'Foundation');
+        $this->assertSame('The Complete Trilogy - Foundation', $result);
+    }
 }
