@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\BookCompletionService;
 use App\Services\BookDataTransformer;
 use App\Services\Recommendations\FavoredGenreResolver;
+use App\Services\UserBlockFilterService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,6 +39,7 @@ class DiscoveryController extends Controller
     public function __construct(
         private readonly BookDataTransformer $transformer,
         private readonly FavoredGenreResolver $favoredGenres,
+        private readonly UserBlockFilterService $blockFilter,
     ) {
     }
 
@@ -45,12 +47,19 @@ class DiscoveryController extends Controller
     {
         $userId = Auth::id();
         $previewSize = min(self::MAX_SHELF_PREVIEW_SIZE, max(1, (int) $request->input('per_page', self::DEFAULT_SHELF_PREVIEW_SIZE)));
+        $visibleBooks = function (Builder $bookQuery) use ($userId): void {
+            $this->blockFilter->applyToBookQuery($bookQuery, $userId);
+        };
 
         $shelves = RecommendationShelf::where('user_id', $userId)
             ->orderBy('sort_order')
-            ->withCount('shelfBooks')
-            ->with(['shelfBooks' => function ($query) use ($previewSize): void {
-                $query->limit($previewSize)->with(['book.authors', 'book.narrators', 'book.series', 'book.genres']);
+            ->withCount(['shelfBooks as shelf_books_count' => function (Builder $query) use ($visibleBooks): void {
+                $query->whereHas('book', $visibleBooks);
+            }])
+            ->with(['shelfBooks' => function ($query) use ($previewSize, $visibleBooks): void {
+                $query->whereHas('book', $visibleBooks)
+                    ->limit($previewSize)
+                    ->with(['book.authors', 'book.narrators', 'book.series', 'book.genres']);
             }])
             ->get();
 
@@ -82,8 +91,12 @@ class DiscoveryController extends Controller
             ]);
         }
 
-        $total = $shelf->shelfBooks()->count();
+        $visibleBooks = function (Builder $bookQuery) use ($userId): void {
+            $this->blockFilter->applyToBookQuery($bookQuery, $userId);
+        };
+        $total = $shelf->shelfBooks()->whereHas('book', $visibleBooks)->count();
         $shelfBooks = $shelf->shelfBooks()
+            ->whereHas('book', $visibleBooks)
             ->with(['book.authors', 'book.narrators', 'book.series', 'book.genres'])
             ->forPage($page, $perPage)
             ->get();
@@ -121,10 +134,12 @@ class DiscoveryController extends Controller
 
         $book = null;
         if ($favoredGenreIds->isNotEmpty()) {
-            $book = $this->pickFirstInSeriesCandidate($excluded, $favoredGenreIds);
+            $book = $this->pickFirstInSeriesCandidate($excluded, $favoredGenreIds, $userId);
         }
-        $book ??= $this->pickFirstInSeriesCandidate($excluded, null);
-        $book ??= Book::query()->whereNotIn('id', $excluded ?: [0])->inRandomOrder()->first();
+        $book ??= $this->pickFirstInSeriesCandidate($excluded, null, $userId);
+        $fallback = Book::query()->whereNotIn('id', $excluded ?: [0]);
+        $this->blockFilter->applyToBookQuery($fallback, $userId);
+        $book ??= $fallback->inRandomOrder()->first();
 
         if (!$book) {
             return response()->json(['data' => null]);
@@ -137,13 +152,15 @@ class DiscoveryController extends Controller
      * @param array<int, int> $excludedBookIds
      * @param Collection<int, int>|null $genreIds null means "no genre constraint"
      */
-    private function pickFirstInSeriesCandidate(array $excludedBookIds, ?Collection $genreIds): ?Book
+    private function pickFirstInSeriesCandidate(array $excludedBookIds, ?Collection $genreIds, ?int $userId): ?Book
     {
         for ($attempt = 0; $attempt < self::SURPRISE_MAX_ATTEMPTS; $attempt++) {
-            $candidates = Book::query()
+            $candidatesQuery = Book::query()
                 ->whereNotIn('id', $excludedBookIds ?: [0])
                 ->when($genreIds !== null, fn (Builder $q) => $q->whereHas('genres', fn ($g) => $g->whereIn('genres.id', $genreIds)))
-                ->with('series')
+                ->with('series');
+            $this->blockFilter->applyToBookQuery($candidatesQuery, $userId);
+            $candidates = $candidatesQuery
                 ->inRandomOrder()
                 ->limit(self::SURPRISE_CANDIDATE_BATCH)
                 ->get();

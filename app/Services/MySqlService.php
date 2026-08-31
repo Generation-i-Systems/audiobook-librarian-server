@@ -478,9 +478,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $query->withExistingDirectories();
         }
 
-        // Exclude books flagged for review from API listings by default
-        // Allow override via filters['include_needs_review'] === true
-        $includeNeedsReview = (bool) ($filters['include_needs_review'] ?? false);
+        // needs_review is maintenance metadata, never an availability restriction.
+        // Keep the opt-out for internal tooling, but include review-needed books by default.
+        $includeNeedsReview = (bool) ($filters['include_needs_review'] ?? true);
 
         if (!$includeNeedsReview) {
             $query->where('needs_review', false);
@@ -577,6 +577,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         // content-filter rules apply to every listing, not just when they search by tag.
         if ($userId) {
             app(UserTagFilterService::class)->applyToBookQuery($query, $userId);
+            app(UserBlockFilterService::class)->applyToBookQuery($query, $userId);
         }
 
         if (!empty($filters['series_id'])) {
