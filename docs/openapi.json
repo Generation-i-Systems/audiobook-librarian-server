@@ -3010,6 +3010,68 @@
                     }
                 }
             },
+            "UserList": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "is_default": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "integer",
+                        "description": "Epoch milliseconds"
+                    },
+                    "updated_at": {
+                        "type": "integer",
+                        "description": "Epoch milliseconds"
+                    }
+                }
+            },
+            "UserListItem": {
+                "type": "object",
+                "properties": {
+                    "book_id": {
+                        "type": "integer"
+                    },
+                    "added_at": {
+                        "type": "integer",
+                        "description": "Epoch milliseconds"
+                    }
+                }
+            },
+            "BlockedEntity": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "entity_type": {
+                        "type": "string",
+                        "enum": ["BOOK", "AUTHOR", "SERIES", "TAG"]
+                    },
+                    "entity_ref_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "entity_value": {
+                        "type": "string"
+                    },
+                    "entity_label": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "integer",
+                        "description": "Epoch milliseconds"
+                    }
+                }
+            },
             "ListeningGoal": {
                 "type": "object",
                 "properties": {
@@ -6786,11 +6848,11 @@
                     {
                         "name": "includeNeedsReview",
                         "in": "query",
-                        "description": "Include books flagged for review (default false)",
+                        "description": "Books flagged for maintenance review are always included.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
-                            "default": false
+                            "default": true
                         }
                     }
                 ],
@@ -7207,11 +7269,11 @@
                     {
                         "name": "includeNeedsReview",
                         "in": "query",
-                        "description": "Include books flagged for review (default false)",
+                        "description": "Books flagged for maintenance review are always included.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
-                            "default": false
+                            "default": true
                         }
                     }
                 ],
@@ -7321,11 +7383,11 @@
                     {
                         "name": "includeNeedsReview",
                         "in": "query",
-                        "description": "Include book even if flagged for review (default false)",
+                        "description": "Books flagged for maintenance review are always included.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
-                            "default": false
+                            "default": true
                         }
                     }
                 ],
@@ -8590,11 +8652,11 @@
                     {
                         "name": "includeNeedsReview",
                         "in": "query",
-                        "description": "Include authors whose books are flagged for review",
+                        "description": "Authors with books flagged for maintenance review are always included.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
-                            "default": false
+                            "default": true
                         }
                     }
                 ],
@@ -8692,9 +8754,11 @@
                     {
                         "name": "includeNeedsReview",
                         "in": "query",
+                        "description": "Authors with books flagged for maintenance review are always included.",
                         "required": false,
                         "schema": {
-                            "type": "boolean"
+                            "type": "boolean",
+                            "default": true
                         }
                     }
                 ],
@@ -8933,11 +8997,11 @@
                     {
                         "name": "includeNeedsReview",
                         "in": "query",
-                        "description": "Include series whose books are flagged for review",
+                        "description": "Series with books flagged for maintenance review are always included.",
                         "required": false,
                         "schema": {
                             "type": "boolean",
-                            "default": false
+                            "default": true
                         }
                     }
                 ],
@@ -9972,9 +10036,11 @@
                     {
                         "name": "includeNeedsReview",
                         "in": "query",
+                        "description": "Series with books flagged for maintenance review are always included.",
                         "required": false,
                         "schema": {
-                            "type": "boolean"
+                            "type": "boolean",
+                            "default": true
                         }
                     }
                 ],
@@ -14120,6 +14186,299 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        "/lists": {
+            "get": {
+                "tags": ["Lists"],
+                "summary": "List the user's book lists",
+                "operationId": "listUserLists",
+                "security": [{ "BearerAuth": [] }],
+                "responses": {
+                    "200": {
+                        "description": "Lists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "lists": {
+                                            "type": "array",
+                                            "items": { "$ref": "#/components/schemas/UserList" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" }
+                }
+            },
+            "post": {
+                "tags": ["Lists"],
+                "summary": "Create a book list, or update it if string_id already exists",
+                "operationId": "createUserList",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["string_id", "name", "created_at", "updated_at"],
+                                "properties": {
+                                    "string_id": { "type": "string", "format": "uuid" },
+                                    "name": { "type": "string" },
+                                    "is_default": { "type": "boolean" },
+                                    "created_at": { "type": "integer" },
+                                    "updated_at": { "type": "integer" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "List created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": { "list": { "$ref": "#/components/schemas/UserList" } }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
+        "/lists/{list}": {
+            "patch": {
+                "tags": ["Lists"],
+                "summary": "Rename a book list",
+                "operationId": "renameUserList",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "list", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["name"],
+                                "properties": { "name": { "type": "string" } }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "List renamed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": { "list": { "$ref": "#/components/schemas/UserList" } }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden - not the owner" },
+                    "404": { "$ref": "#/components/responses/NotFound" }
+                }
+            },
+            "delete": {
+                "tags": ["Lists"],
+                "summary": "Delete a book list",
+                "operationId": "deleteUserList",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "list", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "responses": {
+                    "200": { "description": "List deleted" },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden - not the owner" },
+                    "404": { "$ref": "#/components/responses/NotFound" }
+                }
+            }
+        },
+        "/lists/{list}/items": {
+            "get": {
+                "tags": ["Lists"],
+                "summary": "List the books in a list",
+                "operationId": "listUserListItems",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "list", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Items",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": { "$ref": "#/components/schemas/UserListItem" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden - not the owner" },
+                    "404": { "$ref": "#/components/responses/NotFound" }
+                }
+            },
+            "post": {
+                "tags": ["Lists"],
+                "summary": "Add a book to a list, or refresh added_at if already present",
+                "operationId": "addUserListItem",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "list", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["book_id", "added_at"],
+                                "properties": {
+                                    "book_id": { "type": "integer" },
+                                    "added_at": { "type": "integer" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Item added",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": { "item": { "$ref": "#/components/schemas/UserListItem" } }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden - not the owner" },
+                    "404": { "$ref": "#/components/responses/NotFound" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
+        "/lists/{list}/items/{bookId}": {
+            "delete": {
+                "tags": ["Lists"],
+                "summary": "Remove a book from a list",
+                "operationId": "removeUserListItem",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "list", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "bookId", "in": "path", "required": true, "schema": { "type": "integer" } }
+                ],
+                "responses": {
+                    "200": { "description": "Item removed" },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden - not the owner" }
+                }
+            }
+        },
+        "/blocks": {
+            "get": {
+                "tags": ["Blocks"],
+                "summary": "List the user's blocked books/authors/series/tags",
+                "operationId": "listBlockedEntities",
+                "security": [{ "BearerAuth": [] }],
+                "responses": {
+                    "200": {
+                        "description": "Blocked entities",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "blocks": {
+                                            "type": "array",
+                                            "items": { "$ref": "#/components/schemas/BlockedEntity" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" }
+                }
+            },
+            "post": {
+                "tags": ["Blocks"],
+                "summary": "Block a book/author/series/tag, or refresh it if string_id already exists",
+                "operationId": "createBlockedEntity",
+                "security": [{ "BearerAuth": [] }],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["string_id", "entity_type", "entity_value", "entity_label", "created_at"],
+                                "properties": {
+                                    "string_id": { "type": "string", "format": "uuid" },
+                                    "entity_type": { "type": "string", "enum": ["BOOK", "AUTHOR", "SERIES", "TAG"] },
+                                    "entity_ref_id": { "type": "integer", "nullable": true },
+                                    "entity_value": { "type": "string" },
+                                    "entity_label": { "type": "string" },
+                                    "created_at": { "type": "integer" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Block created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": { "block": { "$ref": "#/components/schemas/BlockedEntity" } }
+                                }
+                            }
+                        }
+                    },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "422": { "$ref": "#/components/responses/ValidationError" }
+                }
+            }
+        },
+        "/blocks/{block}": {
+            "delete": {
+                "tags": ["Blocks"],
+                "summary": "Unblock a book/author/series/tag",
+                "operationId": "deleteBlockedEntity",
+                "security": [{ "BearerAuth": [] }],
+                "parameters": [
+                    { "name": "block", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+                ],
+                "responses": {
+                    "200": { "description": "Block removed" },
+                    "401": { "$ref": "#/components/responses/Unauthorized" },
+                    "403": { "description": "Forbidden - not the owner" }
                 }
             }
         },

@@ -40,7 +40,9 @@ use App\Http\Controllers\Api\RecommendationController;
 use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\SkinController;
 use App\Http\Controllers\Api\ListeningGoalController;
+use App\Http\Controllers\Api\BlockedEntityController;
 use App\Http\Controllers\Api\PlaylistController;
+use App\Http\Controllers\Api\UserListController;
 use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
@@ -120,6 +122,24 @@ Route::prefix('v1')->group(function () {
             Route::post('/{playlist}/books', [PlaylistController::class, 'addBook']);
             Route::delete('/{playlist}/books/{bookId}', [PlaylistController::class, 'removeBook']);
             Route::post('/{playlist}/reorder', [PlaylistController::class, 'reorder']);
+        });
+
+        // User-created book lists (e.g. the client's default "Read Queue")
+        Route::prefix('lists')->group(function () {
+            Route::get('/', [UserListController::class, 'index']);
+            Route::post('/', [UserListController::class, 'store']);
+            Route::patch('/{list}', [UserListController::class, 'update']);
+            Route::delete('/{list}', [UserListController::class, 'destroy']);
+            Route::get('/{list}/items', [UserListController::class, 'items']);
+            Route::post('/{list}/items', [UserListController::class, 'addItem']);
+            Route::delete('/{list}/items/{bookId}', [UserListController::class, 'removeItem']);
+        });
+
+        // Blocked books/authors/series/tags (hidden from browse/search/discovery/library)
+        Route::prefix('blocks')->group(function () {
+            Route::get('/', [BlockedEntityController::class, 'index']);
+            Route::post('/', [BlockedEntityController::class, 'store']);
+            Route::delete('/{block}', [BlockedEntityController::class, 'destroy']);
         });
 
         // Listening Goals Routes
