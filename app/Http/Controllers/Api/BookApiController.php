@@ -135,10 +135,6 @@ class BookApiController extends Controller
             : (int) $request->input('per_page', 15);
         $withCover    = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        $includeNeedsReview = $request->boolean(
-            'includeNeedsReview',
-            $request->boolean('include_needs_review', false)
-        );
 
         $filters = [
             'search'           => $request->input('search'),
@@ -198,7 +194,7 @@ class BookApiController extends Controller
         }
         $filters['search'] = $tokens['search'];
 
-        $filters['include_needs_review'] = $includeNeedsReview;
+        $filters['include_needs_review'] = true;
         $userId = Auth::id();
 
         [$sort, $order] = $this->resolveSortParams($request);
@@ -226,10 +222,6 @@ class BookApiController extends Controller
         $transformedBooks = [];
         if (isset($booksData['data']) && is_array($booksData['data'])) {
             $booksArray = array_filter($booksData['data'], 'is_array');
-            if (!$includeNeedsReview) {
-                $booksArray = array_filter($booksArray, fn ($book) => empty($book['needs_review']));
-            }
-
             $transformedBooks = array_map(
                 fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers, $enhanced),
                 $booksArray
@@ -316,17 +308,6 @@ class BookApiController extends Controller
             ], 404);
         }
 
-        $includeNeedsReview = $request->boolean(
-            'includeNeedsReview',
-            $request->boolean('include_needs_review', false)
-        );
-        if ((!empty($book['needs_review']) || !empty($book['needsReview'])) && !$includeNeedsReview) {
-            return response()->json([
-                'error'   => 'Book not available',
-                'message' => 'This book is pending review',
-            ], 404);
-        }
-
         return response()->json(
             $this->getBookWithCover($book, $request->boolean('with_cover', true), $request->boolean('inlineCovers', false), $request->boolean('enhanced', false))
         );
@@ -410,10 +391,6 @@ class BookApiController extends Controller
         $page         = (int) $request->input('page', 1);
         $withCover    = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        $includeNeedsReview = $request->boolean(
-            'includeNeedsReview',
-            $request->boolean('include_needs_review', false)
-        );
 
         $filters = [
             'search'           => $request->input('search'),
@@ -429,7 +406,7 @@ class BookApiController extends Controller
             'is_recommended'   => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
             'is_completed'     => $request->has('is_completed') ? $request->boolean('is_completed') : null,
             'device_id'        => $request->input('device_id'),
-            'include_needs_review' => $includeNeedsReview,
+            'include_needs_review' => true,
         ];
 
         $tokens = $this->parseSearchTokens($filters['search']);

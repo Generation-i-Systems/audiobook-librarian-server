@@ -59,7 +59,6 @@ class BookSeriesGenreController extends Controller
         $sort = $request->input('sort', 'name_asc');
         $search = $request->input('search');
         $since = $request->input('since') ? (int) $request->input('since') : null;
-        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
         $isFavorite = $request->boolean('favorites', false);
         $userId = Auth::id();
 
@@ -91,10 +90,6 @@ class BookSeriesGenreController extends Controller
 
         if ($since) {
             $query->where('series.updated_at', '>=', date('Y-m-d H:i:s', $since));
-        }
-
-        if (!$includeNeedsReview) {
-            $query->where('books.needs_review', false);
         }
 
         $tagSpec = array_filter([$request->input('tag'), $request->input('tags')]);
@@ -158,10 +153,6 @@ class BookSeriesGenreController extends Controller
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
 
-        if (!$includeNeedsReview) {
-            $countQuery->where('books.needs_review', false);
-        }
-
         if (!empty($parsedTags['required']) || !empty($parsedTags['banned'])) {
             $countQuery->whereHas('books', function ($b) use ($tagService, $tagSpec, $userId) {
                 $tagService->applyRequestTagFilters($b, $tagSpec, $userId);
@@ -223,25 +214,19 @@ class BookSeriesGenreController extends Controller
         $series = $query->offset($offset)->limit($perPage)->get();
 
         // Get authors for each series if needed for response
-        $seriesWithAuthors = $series->map(function ($series) use ($includeNeedsReview, $tagService, $tagSpec, $userId) {
+        $seriesWithAuthors = $series->map(function ($series) use ($tagService, $tagSpec, $userId) {
             $series->authors = $series->books()
                 ->join('author_book', 'books.id', '=', 'author_book.book_id')
                 ->join('authors', 'author_book.author_id', '=', 'authors.id')
                 ->select('authors.name')
                 ->distinct()
-                ->when(!$includeNeedsReview, function ($q) {
-                    $q->where('books.needs_review', false);
-                })
                 ->pluck('name')
                 ->toArray();
 
-            // Compute total book count for this series respecting needs_review filter
+            // Compute the total book count for this series.
             $totalBookCount = \App\Models\Book::query()
                 ->join('book_series', 'books.id', '=', 'book_series.book_id')
                 ->where('book_series.series_id', $series->id)
-                ->when(!$includeNeedsReview, function ($q) {
-                    $q->where('books.needs_review', false);
-                })
                 ->tap(function ($q) use ($tagService, $tagSpec, $userId) {
                     $tagService->applyRequestTagFilters($q, $tagSpec, $userId);
                 })
@@ -256,11 +241,7 @@ class BookSeriesGenreController extends Controller
                 'book_count_by_author' => $series->book_count_by_author ?? $series->book_count,
                 'authors' => $series->authors,
                 'isFavorite' => (bool) $series->isFavorite,
-                'cover_urls' => $this->seriesCoverUrls($series, function ($q) use ($includeNeedsReview) {
-                    if (!$includeNeedsReview) {
-                        $q->where('books.needs_review', false);
-                    }
-                }),
+                'cover_urls' => $this->seriesCoverUrls($series),
             ];
         });
 
@@ -279,7 +260,6 @@ class BookSeriesGenreController extends Controller
 
     public function seriesDetails(Request $request, int $seriesId)
     {
-        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
         $userId = Auth::id();
 
         /** @var \App\Models\Series|null $series */
@@ -295,16 +275,10 @@ class BookSeriesGenreController extends Controller
         $totalBookCount = \App\Models\Book::query()
             ->join('book_series', 'books.id', '=', 'book_series.book_id')
             ->where('book_series.series_id', $seriesId)
-            ->when(!$includeNeedsReview, function ($q) {
-                $q->where('books.needs_review', false);
-            })
             ->distinct('books.id')
             ->count('books.id');
 
         $authors = $series->books()
-            ->when(!$includeNeedsReview, function ($q) {
-                $q->where('books.needs_review', false);
-            })
             ->join('author_book', 'books.id', '=', 'author_book.book_id')
             ->join('authors', 'author_book.author_id', '=', 'authors.id')
             ->select('authors.name')
@@ -384,7 +358,7 @@ class BookSeriesGenreController extends Controller
     }
 
     /**
-     * The distinct genres across a series' non-needs_review books, for the series-detail
+     * The distinct genres across a series' books, for the series-detail
      * screen's genre filter chips. Always the full set, regardless of any genre_ids filter
      * applied to the book list itself, so the chip row doesn't shrink as chips are selected.
      *
@@ -394,8 +368,7 @@ class BookSeriesGenreController extends Controller
     {
         return \App\Models\Genre::query()
             ->whereHas('books', function ($q) use ($seriesId): void {
-                $q->whereHas('series', fn ($s) => $s->where('series.id', $seriesId))
-                    ->where('books.needs_review', false);
+                $q->whereHas('series', fn ($s) => $s->where('series.id', $seriesId));
             })
             ->orderBy('name')
             ->get(['id', 'name'])
@@ -427,9 +400,6 @@ class BookSeriesGenreController extends Controller
 
         if (!empty($parsedTags['required']) || !empty($parsedTags['banned'])) {
             $matchingBookQuery = \App\Models\Book::query();
-            if (!$request->boolean('includeNeedsReview', false)) {
-                $matchingBookQuery->where('needs_review', false);
-            }
             $tagService->applyRequestTagFilters($matchingBookQuery, $tagSpec, Auth::id());
             $matchingBookIds = $matchingBookQuery->pluck('id')->all();
 
@@ -655,10 +625,7 @@ class BookSeriesGenreController extends Controller
         $tagSpec = array_filter([$request->input('tag'), $request->input('tags')]);
         $tagService = app(\App\Services\UserTagFilterService::class);
 
-        // Excludes needs_review books, matching listBooks()'s default and the series-detail
-        // screen's book list, so the count shown here matches what opening the series shows.
         $inGenre = fn ($q) => $q->whereHas('genres', fn ($g) => $g->where('genres.id', $genreId))
-            ->where('books.needs_review', false)
             ->tap(fn ($b) => $tagService->applyRequestTagFilters($b, $tagSpec, Auth::id()));
 
         $query = Series::query()
@@ -713,16 +680,16 @@ class BookSeriesGenreController extends Controller
 
     /**
      * The cover URLs of the first four books of a series (matching the given scope, e.g. a
-     * genre + needs_review filter), in series-number order where known, for the client's
+     * genre scope), in series-number order where known, for the client's
      * hybrid cover mosaic.
      *
-     * @param \Closure(\Illuminate\Database\Eloquent\Builder<Book>): void $scope
+     * @param null|\Closure(\Illuminate\Database\Eloquent\Builder<Book>): void $scope
      * @return list<string>
      */
-    private function seriesCoverUrls(Series $s, \Closure $scope): array
+    private function seriesCoverUrls(Series $s, ?\Closure $scope = null): array
     {
         $books = $s->books()
-            ->when(true, $scope)
+            ->when($scope, $scope)
             ->orderByRaw('CAST(book_series.series_number AS DECIMAL(10,2)) ASC')
             ->limit(4)
             ->get();

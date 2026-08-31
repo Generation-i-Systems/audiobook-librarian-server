@@ -12,7 +12,7 @@ class BookIndexNeedsReviewFilterTest extends ApiTestCase
     use RefreshDatabase;
 
     #[Test]
-    public function it_excludes_needs_review_books_from_index(): void
+    public function it_includes_needs_review_books_in_the_index(): void
     {
         Storage::fake('books');
 
@@ -24,8 +24,8 @@ class BookIndexNeedsReviewFilterTest extends ApiTestCase
             'needs_review' => false,
         ]);
 
-        $excluded = Book::factory()->create([
-            'title' => 'Excluded Book',
+        Book::factory()->create([
+            'title' => 'Needs Review Book',
             'needs_review' => true,
         ]);
 
@@ -37,6 +37,6 @@ class BookIndexNeedsReviewFilterTest extends ApiTestCase
 
         $titles = array_map(fn ($b) => $b['title'] ?? '', $data);
         $this->assertContains('Included Book', $titles);
-        $this->assertNotContains('Excluded Book', $titles);
+        $this->assertContains('Needs Review Book', $titles);
     }
 }

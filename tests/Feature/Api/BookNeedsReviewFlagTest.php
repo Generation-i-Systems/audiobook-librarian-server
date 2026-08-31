@@ -32,7 +32,7 @@ class BookNeedsReviewFlagTest extends ApiTestCase
     }
 
     #[Test]
-    public function show_returns_404_by_default_for_needs_review(): void
+    public function show_returns_needs_review_book_without_an_opt_in_parameter(): void
     {
         Storage::fake('books');
         $this->withoutMiddleware();
@@ -40,8 +40,8 @@ class BookNeedsReviewFlagTest extends ApiTestCase
         $book = Book::factory()->create(['needs_review' => true]);
 
         $this->getJson('/api/v1/books/' . $book->id)
-            ->assertStatus(404)
-            ->assertJsonFragment(['error' => 'Book not available']);
+            ->assertOk()
+            ->assertJsonFragment(['id' => $book->id]);
     }
 
     #[Test]
@@ -61,7 +61,7 @@ class BookNeedsReviewFlagTest extends ApiTestCase
     }
 
     #[Test]
-    public function download_manifest_is_404_by_default_for_needs_review(): void
+    public function download_manifest_returns_needs_review_book_without_an_opt_in_parameter(): void
     {
         Storage::fake('books');
         $this->withoutMiddleware();
@@ -73,7 +73,8 @@ class BookNeedsReviewFlagTest extends ApiTestCase
         Storage::disk('books')->put('books/abc/01 - test.mp3', 'audio');
 
         $this->getJson('/api/v1/books/' . $book->id . '/download')
-            ->assertStatus(404);
+            ->assertOk()
+            ->assertJsonFragment(['book_id' => (int) $book->id]);
     }
 
     #[Test]

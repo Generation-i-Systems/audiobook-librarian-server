@@ -10,7 +10,7 @@ use App\Models\Series;
 
 class SeriesNeedsReviewFilterTest extends ApiTestCase
 {
-    public function test_series_excludes_needs_review_books_and_series_by_default(): void
+    public function test_series_includes_needs_review_books_and_series_by_default(): void
     {
         $author = Author::factory()->create();
 
@@ -40,14 +40,13 @@ class SeriesNeedsReviewFilterTest extends ApiTestCase
         $data = $response->json();
 
         $seriesNames = array_column($data['series'], 'name');
-        $this->assertNotContains('NR Only Series', $seriesNames);
+        $this->assertContains('NR Only Series', $seriesNames);
         $this->assertContains('Mixed Series', $seriesNames);
         $this->assertContains('OK Series', $seriesNames);
 
-        // book_count should exclude needs_review books for mixed series
         $mixed = collect($data['series'])->firstWhere('name', 'Mixed Series');
         $this->assertNotNull($mixed);
-        $this->assertEquals(1, $mixed['book_count']);
+        $this->assertEquals(2, $mixed['book_count']);
     }
 
     public function test_series_include_needs_review_when_flag_is_set(): void

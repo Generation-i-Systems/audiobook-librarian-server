@@ -33,11 +33,9 @@ class BookAuthorController extends Controller
     /**
      * @return array{imageUrl: ?string, sampleTitles: array<int, string>}
      */
-    private function authorImageAndSampleTitles(Author $author, bool $includeNeedsReview): array
+    private function authorImageAndSampleTitles(Author $author): array
     {
-        $books = $author->books()
-            ->when(!$includeNeedsReview, fn ($q) => $q->where('books.needs_review', false))
-            ->get(['books.id', 'books.title', 'books.cover_image', 'books.directory_path']);
+        $books = $author->books()->get(['books.id', 'books.title', 'books.cover_image', 'books.directory_path']);
 
         $coverBook = $books->first(fn ($book) => !empty($book->cover_image));
 
@@ -66,7 +64,6 @@ class BookAuthorController extends Controller
         $sort = $request->input('sort', 'name_asc');
         $search = $request->input('search');
         $since = $request->input('since') ? (int) $request->input('since') : null;
-        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
 
         // Validate sort parameter
         $allowedSorts = ['name_asc', 'name_desc', 'book_count_asc', 'book_count_desc'];
@@ -84,13 +81,10 @@ class BookAuthorController extends Controller
                 'authors.name',
             ])
             ->selectRaw('MAX(authors.updated_at) as updated_at')
-            ->selectSub(function ($q) use ($includeNeedsReview) {
+            ->selectSub(function ($q) {
                 $q->from('author_book')
                     ->join('books', 'author_book.book_id', '=', 'books.id')
                     ->whereColumn('author_book.author_id', 'authors.id');
-                if (!$includeNeedsReview) {
-                    $q->where('books.needs_review', false);
-                }
                 $q->selectRaw('COUNT(DISTINCT books.id)');
             }, 'book_count')
             ->selectRaw('EXISTS(SELECT 1 FROM user_author_favorites WHERE user_id = ? AND author_id = authors.id) as isFavorite', [$userId])
@@ -107,11 +101,6 @@ class BookAuthorController extends Controller
 
         if ($since) {
             $query->where('authors.updated_at', '>=', date('Y-m-d H:i:s', $since));
-        }
-
-        // Exclude needs_review books unless explicitly included
-        if (!$includeNeedsReview) {
-            $query->where('books.needs_review', false);
         }
 
         $tagSpec = array_filter([$request->input('tag'), $request->input('tags')]);
@@ -178,10 +167,6 @@ class BookAuthorController extends Controller
             ->join('author_book', 'authors.id', '=', 'author_book.author_id')
             ->join('books', 'author_book.book_id', '=', 'books.id');
 
-        if (!$includeNeedsReview) {
-            $countQuery->where('books.needs_review', false);
-        }
-
         if (!empty($parsedTags['required']) || !empty($parsedTags['banned'])) {
             $countQuery->whereHas('books', function ($b) use ($tagService, $tagSpec, $userId) {
                 $tagService->applyRequestTagFilters($b, $tagSpec, $userId);
@@ -246,12 +231,9 @@ class BookAuthorController extends Controller
         $authors = $query->offset($offset)->limit($perPage)->get();
 
         // Get genres and series for each author
-        $authorsWithDetails = $authors->map(function (\App\Models\Author $author) use ($includeNeedsReview, $tagService, $tagSpec, $userId) {
+        $authorsWithDetails = $authors->map(function (\App\Models\Author $author) use ($tagService, $tagSpec, $userId) {
             // Get genres for this author
             $authorBooksQuery = $author->books();
-            if (!$includeNeedsReview) {
-                $authorBooksQuery->where('books.needs_review', false);
-            }
             $author->genres = $authorBooksQuery
                 ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
                 ->join('genres', function ($join) {
@@ -267,9 +249,6 @@ class BookAuthorController extends Controller
             $totalBookCount = \App\Models\Book::query()
                 ->join('author_book', 'books.id', '=', 'author_book.book_id')
                 ->where('author_book.author_id', $author->id)
-                ->when(!$includeNeedsReview, function ($q) {
-                    $q->where('books.needs_review', false);
-                })
                 ->tap(function ($q) use ($tagService, $tagSpec, $userId) {
                     $tagService->applyRequestTagFilters($q, $tagSpec, $userId);
                 })
@@ -284,9 +263,6 @@ class BookAuthorController extends Controller
                 ->join('books', 'book_series.book_id', '=', 'books.id')
                 ->join('author_book', 'books.id', '=', 'author_book.book_id')
                 ->where('author_book.author_id', $author->id)
-                ->when(!$includeNeedsReview, function ($q) {
-                    $q->where('books.needs_review', false);
-                })
                 ->groupBy('series.id', 'series.name')
                 ->get()
                 ->map(function ($series) {
@@ -297,7 +273,7 @@ class BookAuthorController extends Controller
                     ];
                 });
 
-            $imageAndTitles = $this->authorImageAndSampleTitles($author, $includeNeedsReview);
+            $imageAndTitles = $this->authorImageAndSampleTitles($author);
 
             return [
                 'id' => $author->id,
@@ -351,7 +327,6 @@ class BookAuthorController extends Controller
 
     public function authorDetails(Request $request, int $authorId)
     {
-        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
         $userId = Auth::id();
 
         /** @var \App\Models\Author|null $author */
@@ -367,16 +342,10 @@ class BookAuthorController extends Controller
         $totalBookCount = \App\Models\Book::query()
             ->join('author_book', 'books.id', '=', 'author_book.book_id')
             ->where('author_book.author_id', $authorId)
-            ->when(!$includeNeedsReview, function ($q) {
-                $q->where('books.needs_review', false);
-            })
             ->distinct('books.id')
             ->count('books.id');
 
         $genres = $author->books()
-            ->when(!$includeNeedsReview, function ($q) {
-                $q->where('books.needs_review', false);
-            })
             ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
             ->join('genres', function ($join) {
                 $join->on('book_genre.genre_id', '=', 'genres.id')
@@ -395,9 +364,6 @@ class BookAuthorController extends Controller
             ->join('books', 'book_series.book_id', '=', 'books.id')
             ->join('author_book', 'books.id', '=', 'author_book.book_id')
             ->where('author_book.author_id', $authorId)
-            ->when(!$includeNeedsReview, function ($q) {
-                $q->where('books.needs_review', false);
-            })
             ->groupBy('series.id', 'series.name')
             ->orderBy('series.name')
             ->get()
@@ -421,7 +387,7 @@ class BookAuthorController extends Controller
                 ->exists();
         }
 
-        $imageAndTitles = $this->authorImageAndSampleTitles($author, $includeNeedsReview);
+        $imageAndTitles = $this->authorImageAndSampleTitles($author);
 
         return response()->json([
             'id' => $author->id,

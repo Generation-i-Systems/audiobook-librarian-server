@@ -195,16 +195,6 @@ class BookDownloadController extends Controller
             ], 404);
         }
 
-        // Hide needs_review books unless explicitly requested
-        $includeNeedsReview = request()->boolean('includeNeedsReview', request()->boolean('include_needs_review', false));
-        $isNeedsReview = !empty($book['needs_review']) || !empty($book['needsReview']);
-        if ($isNeedsReview && !$includeNeedsReview) {
-            return response()->json([
-                'error' => 'File not found',
-                'message' => 'Files not available for a book pending review',
-            ], 404);
-        }
-
         if (($book['source'] ?? null) === 'librivox') {
             return $this->librivoxManifest($id, $book);
         }

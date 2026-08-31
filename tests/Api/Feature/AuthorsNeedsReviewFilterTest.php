@@ -10,7 +10,7 @@ use App\Models\Genre;
 
 class AuthorsNeedsReviewFilterTest extends ApiTestCase
 {
-    public function test_authors_excludes_needs_review_books_and_authors_by_default(): void
+    public function test_authors_include_needs_review_books_and_authors_by_default(): void
     {
         // Author with only needs_review books
         $nrAuthor = Author::factory()->create(['name' => 'Needs Review Only']);
@@ -36,14 +36,13 @@ class AuthorsNeedsReviewFilterTest extends ApiTestCase
         $data = $response->json();
 
         $authorNames = array_column($data['authors'], 'name');
-        $this->assertNotContains('Needs Review Only', $authorNames, 'Authors with only needs_review books should be excluded');
-        $this->assertContains('Mixed Author', $authorNames, 'Authors with at least one non-needs_review book should be included');
+        $this->assertContains('Needs Review Only', $authorNames);
+        $this->assertContains('Mixed Author', $authorNames);
         $this->assertContains('Normal Author', $authorNames);
 
-        // book_count should exclude needs_review books
         $mixed = collect($data['authors'])->firstWhere('name', 'Mixed Author');
         $this->assertNotNull($mixed);
-        $this->assertEquals(1, $mixed['book_count']);
+        $this->assertEquals(2, $mixed['book_count']);
     }
 
     public function test_authors_include_needs_review_when_flag_is_set(): void
@@ -60,7 +59,7 @@ class AuthorsNeedsReviewFilterTest extends ApiTestCase
         $this->assertContains('Needs Review Only', $authorNames, 'includeNeedsReview should include authors whose books are needs_review');
     }
 
-    public function test_genre_filter_respects_needs_review_filtering(): void
+    public function test_genre_filter_includes_needs_review_books(): void
     {
         $genre = Genre::factory()->create(['name' => 'Fantasy']);
 
@@ -80,6 +79,6 @@ class AuthorsNeedsReviewFilterTest extends ApiTestCase
 
         $authorNames = array_column($data['authors'], 'name');
         $this->assertContains('Fantasy Mixed', $authorNames);
-        $this->assertNotContains('Fantasy NR Only', $authorNames);
+        $this->assertContains('Fantasy NR Only', $authorNames);
     }
 }
