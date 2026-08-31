@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\UserTagFilter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -45,6 +46,49 @@ class UserTagFilterService
         }
 
         $filter->delete();
+    }
+
+    /**
+     * Replace administrator-managed filters without disturbing a user's own filters.
+     *
+     * @param array<int, string> $requiredTags
+     * @param array<int, string> $bannedTags
+     */
+    public function replaceAdminFilters(User $target, array $requiredTags, array $bannedTags): void
+    {
+        $filters = [];
+        foreach ($requiredTags as $tag) {
+            $filters[trim($tag)] = UserTagFilter::MODE_REQUIRE;
+        }
+        foreach ($bannedTags as $tag) {
+            $filters[trim($tag)] = UserTagFilter::MODE_BAN;
+        }
+        unset($filters['']);
+
+        DB::transaction(function () use ($target, $filters): void {
+            $existingFilters = UserTagFilter::where('user_id', $target->id)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('tag');
+
+            UserTagFilter::where('user_id', $target->id)
+                ->where('locked_by_admin', true)
+                ->when(
+                    $filters !== [],
+                    fn (Builder $query) => $query->whereNotIn('tag', array_keys($filters))
+                )
+                ->delete();
+
+            foreach ($filters as $tag => $mode) {
+                $filter = $existingFilters->get($tag) ?? new UserTagFilter([
+                    'user_id' => $target->id,
+                    'tag' => $tag,
+                ]);
+                $filter->mode = $mode;
+                $filter->locked_by_admin = true;
+                $filter->save();
+            }
+        });
     }
 
     /**
@@ -143,6 +187,20 @@ class UserTagFilterService
             'required' => array_values(array_unique($required)),
             'banned' => array_values(array_unique($banned)),
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function parseTagList(?string $rawTags): array
+    {
+        if ($rawTags === null || trim($rawTags) === '') {
+            return [];
+        }
+
+        $tags = array_map('trim', explode(',', $rawTags));
+
+        return array_values(array_unique(array_filter($tags, fn (string $tag): bool => $tag !== '')));
     }
 
     /**

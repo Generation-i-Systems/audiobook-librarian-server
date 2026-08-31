@@ -480,3 +480,9 @@ when updating the directory from these fixes the files are not actually moved.
 ---
 
 when I request updating the cover offer downloading a new cover from the enrichment or from the cover tags in the book or show each image in the dir and let me pick one
+
+---
+
+## 2026-08-30
+
+as part of the verification add the ability to require or ban tags for the user. also support adding tags to the user either to be limited or ignored as part of user edit.

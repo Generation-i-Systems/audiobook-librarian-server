@@ -8,6 +8,7 @@ use App\Mail\EmailOtpMail;
 use App\Mail\WelcomeMail;
 use App\Models\EmailOtp;
 use App\Models\User;
+use App\Models\UserTagFilter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -32,6 +33,88 @@ class UserControllerOtpTest extends TestCase
         $response->assertSee('Send login email');
         $response->assertSee('Show QR code');
         $response->assertSee('login-qr-modal', false);
+    }
+
+    public function test_edit_page_displays_and_updates_admin_tag_filters(): void
+    {
+        $this->actingAs($this->admin());
+        $target = User::factory()->create([
+            'name' => 'Tag Target',
+            'username' => 'tag-target',
+            'email' => 'tag-target@example.com',
+            'role' => 'user',
+        ]);
+        UserTagFilter::create([
+            'user_id' => $target->id,
+            'tag' => 'existing-required',
+            'mode' => UserTagFilter::MODE_REQUIRE,
+            'locked_by_admin' => true,
+        ]);
+        UserTagFilter::create([
+            'user_id' => $target->id,
+            'tag' => 'personal-tag',
+            'mode' => UserTagFilter::MODE_BAN,
+            'locked_by_admin' => false,
+        ]);
+
+        $this->get('/admin/users/' . $target->id . '/edit')
+            ->assertOk()
+            ->assertSee('Required Tags')
+            ->assertSee('Ignored Tags')
+            ->assertSee('existing-required');
+
+        $response = $this->put('/admin/users/' . $target->id, [
+            'name' => 'Tag Target',
+            'username' => 'tag-target',
+            'email' => 'tag-target@example.com',
+            'role' => 'user',
+            'required_tags' => 'cozy, short',
+            'ignored_tags' => 'spoilers, gore',
+        ]);
+
+        $response->assertRedirect(route('admin.users.index'));
+        $this->assertDatabaseHas('user_tag_filters', [
+            'user_id' => $target->id,
+            'tag' => 'cozy',
+            'mode' => UserTagFilter::MODE_REQUIRE,
+            'locked_by_admin' => true,
+        ]);
+        $this->assertDatabaseHas('user_tag_filters', [
+            'user_id' => $target->id,
+            'tag' => 'gore',
+            'mode' => UserTagFilter::MODE_BAN,
+            'locked_by_admin' => true,
+        ]);
+        $this->assertDatabaseMissing('user_tag_filters', [
+            'user_id' => $target->id,
+            'tag' => 'existing-required',
+        ]);
+        $this->assertDatabaseHas('user_tag_filters', [
+            'user_id' => $target->id,
+            'tag' => 'personal-tag',
+            'mode' => UserTagFilter::MODE_BAN,
+            'locked_by_admin' => false,
+        ]);
+    }
+
+    public function test_user_edit_rejects_tag_that_is_both_required_and_ignored(): void
+    {
+        $this->actingAs($this->admin());
+        $target = User::factory()->create();
+
+        $response = $this->from('/admin/users/' . $target->id . '/edit')
+            ->put('/admin/users/' . $target->id, [
+                'name' => $target->name,
+                'username' => $target->username,
+                'email' => $target->email,
+                'role' => $target->role,
+                'required_tags' => 'mature',
+                'ignored_tags' => 'mature',
+            ]);
+
+        $response->assertRedirect('/admin/users/' . $target->id . '/edit');
+        $response->assertSessionHasErrors('ignored_tags');
+        $this->assertDatabaseMissing('user_tag_filters', ['user_id' => $target->id]);
     }
 
     public function test_send_otp_route_delegates_and_flashes_success(): void

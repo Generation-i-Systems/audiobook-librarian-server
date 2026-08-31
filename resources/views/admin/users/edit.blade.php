@@ -120,6 +120,24 @@
             <label for="password_confirmation" class="form-label">Confirm Password</label>
             <input type="password" name="password_confirmation" id="password_confirmation" class="form-control">
         </div>
+        <div class="border-top pt-3 mt-4">
+            <h6>Content Tag Filters</h6>
+            <p class="text-muted small">Comma-separated tags. These administrator-managed filters apply to every book listing for this user.</p>
+            <div class="mb-3">
+                <label for="required_tags" class="form-label">Required Tags</label>
+                <input type="text" name="required_tags" id="required_tags" class="form-control"
+                       value="{{ old('required_tags', ($adminTagFilters[\App\Models\UserTagFilter::MODE_REQUIRE] ?? collect())->pluck('tag')->implode(', ')) }}"
+                       placeholder="cozy, short">
+                <div class="form-text">Only books with all of these tags are shown.</div>
+            </div>
+            <div class="mb-3">
+                <label for="ignored_tags" class="form-label">Ignored Tags</label>
+                <input type="text" name="ignored_tags" id="ignored_tags" class="form-control"
+                       value="{{ old('ignored_tags', ($adminTagFilters[\App\Models\UserTagFilter::MODE_BAN] ?? collect())->pluck('tag')->implode(', ')) }}"
+                       placeholder="spoilers, gore">
+                <div class="form-text">Books with any of these tags are hidden.</div>
+            </div>
+        </div>
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center">
                 <div>

@@ -1,21 +1,28 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Models\UserTagFilter;
+use App\Services\UserTagFilterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use App\Contracts\DocumentStoreServiceInterface;
 
 class UserController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        private readonly UserTagFilterService $userTagFilterService,
+    ) {
         $this->documentStoreService = $documentStoreService;
     }
 
@@ -89,8 +96,13 @@ class UserController extends Controller
         }
 
         $activityData = $this->documentStoreService->getUserActivityData($id);
+        $adminTagFilters = UserTagFilter::query()
+            ->where('user_id', $id)
+            ->where('locked_by_admin', true)
+            ->get()
+            ->groupBy('mode');
 
-        return view('admin.users.edit', compact('user', 'activityData'));
+        return view('admin.users.edit', compact('user', 'activityData', 'adminTagFilters'));
     }
 
     public function show($id)
@@ -127,7 +139,17 @@ class UserController extends Controller
             'email' => 'required|email',
             'role' => 'required|string',
             'password' => 'nullable|string|min:6|confirmed',
+            'required_tags' => 'nullable|string|max:2000',
+            'ignored_tags' => 'nullable|string|max:2000',
         ]);
+
+        $requiredTags = UserTagFilterService::parseTagList($validated['required_tags'] ?? null);
+        $ignoredTags = UserTagFilterService::parseTagList($validated['ignored_tags'] ?? null);
+        if (array_intersect($requiredTags, $ignoredTags) !== []) {
+            return back()
+                ->withInput()
+                ->withErrors(['ignored_tags' => 'A tag cannot be both required and ignored.']);
+        }
 
         Log::info('UserController update called', [
             'user_id' => $id,
@@ -150,6 +172,7 @@ class UserController extends Controller
         } else {
             unset($validated['password']);
         }
+        unset($validated['required_tags'], $validated['ignored_tags']);
 
         Log::info('UserController update before updateUser', [
             'user_id' => $id,
@@ -157,6 +180,11 @@ class UserController extends Controller
         ]);
 
         $this->documentStoreService->updateUser($id, $validated);
+        $this->userTagFilterService->replaceAdminFilters(
+            User::findOrFail($id),
+            $requiredTags,
+            $ignoredTags,
+        );
 
         $updatedUser = $this->documentStoreService->getUserById($id);
         Log::info('UserController update after updateUser call', [
