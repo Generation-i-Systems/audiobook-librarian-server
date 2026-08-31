@@ -25,6 +25,8 @@ class FeedbackController extends Controller
             'relatedData.deviceName'             => 'nullable|string',
             'relatedData.appVersion'             => 'nullable|string',
             'relatedData.platformOs'             => 'nullable|string',
+            'relatedData.backendType'            => 'nullable|string',
+            'relatedData.backendUrl'             => 'nullable|string|max:2048',
             'relatedData.bookSnapshot'           => 'nullable|array',
             'relatedData.sessionErrors'          => 'nullable|array',
             'relatedData.recentActivity'         => 'nullable|array',
@@ -82,6 +84,8 @@ class FeedbackController extends Controller
             $lines[] = "Device Name: " . ($rd['deviceName'] ?? 'n/a');
             $lines[] = "App Version: " . ($rd['appVersion'] ?? 'n/a');
             $lines[] = "Platform: " . ($rd['platformOs'] ?? 'n/a');
+            $lines[] = "Backend Type: " . ($rd['backendType'] ?? 'n/a');
+            $lines[] = "Backend URL: " . ($rd['backendUrl'] ?? 'n/a');
 
             if (!empty($rd['bookSnapshot'])) {
                 $book = $rd['bookSnapshot'];
