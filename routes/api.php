@@ -268,6 +268,7 @@ Route::prefix('v1')->group(function () {
 
         // Discovery (recommendation shelves) Routes
         Route::get('/discovery/shelves', [DiscoveryController::class, 'shelves']);
+        Route::delete('/discovery/shelves/{shelfKey}', [DiscoveryController::class, 'dismissShelf']);
         Route::get('/discovery/shelves/{shelfKey}/books', [DiscoveryController::class, 'shelfBooks']);
         Route::get('/discovery/surprise', [DiscoveryController::class, 'surprise']);
 

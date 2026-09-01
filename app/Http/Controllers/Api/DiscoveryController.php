@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Book;
 use App\Models\RecommendationShelf;
 use App\Models\RecommendationShelfBook;
+use App\Models\RecommendationShelfDismissal;
 use App\Models\Series;
 use App\Models\User;
 use App\Services\BookCompletionService;
@@ -115,6 +116,16 @@ class DiscoveryController extends Controller
                 'last_page' => max(1, (int) ceil($total / $perPage)),
             ],
         ]);
+    }
+
+    /** Permanently hide this recommendation row for the current user, including after recomputes. */
+    public function dismissShelf(string $shelfKey): JsonResponse
+    {
+        $userId = Auth::id();
+        RecommendationShelfDismissal::firstOrCreate(['user_id' => $userId, 'shelf_key' => $shelfKey]);
+        RecommendationShelf::where('user_id', $userId)->where('shelf_key', $shelfKey)->delete();
+
+        return response()->json(['message' => 'Recommendation dismissed']);
     }
 
     /**

@@ -105,6 +105,27 @@ class DiscoveryControllerTest extends TestCase
         $response->assertOk()->assertJson(['data' => [], 'meta' => ['total' => 0]]);
     }
 
+    public function testUserCanDismissARecommendationShelf(): void
+    {
+        $shelf = RecommendationShelf::create([
+            'user_id' => $this->user->id,
+            'shelf_key' => 'genre_affinity:1',
+            'title' => 'More in Fantasy',
+            'sort_order' => 0,
+            'computed_at' => now(),
+        ]);
+
+        $this->deleteJson('/api/v1/discovery/shelves/' . $shelf->shelf_key)
+            ->assertOk()
+            ->assertJson(['message' => 'Recommendation dismissed']);
+
+        $this->assertDatabaseHas('recommendation_shelf_dismissals', [
+            'user_id' => $this->user->id,
+            'shelf_key' => $shelf->shelf_key,
+        ]);
+        $this->assertDatabaseMissing('recommendation_shelves', ['id' => $shelf->id]);
+    }
+
     public function testDiscoveryAndGenreBooksExcludeAllOfTheUsersBlockedBookMatches(): void
     {
         $genre = Genre::factory()->create();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Recommendations;
 
 use App\Models\RecommendationShelf;
+use App\Models\RecommendationShelfDismissal;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -57,6 +58,9 @@ class RecommendationEngine
                 ]);
             }
         }
+
+        $dismissedKeys = RecommendationShelfDismissal::where('user_id', $user->id)->pluck('shelf_key')->all();
+        $shelves = array_values(array_filter($shelves, fn (array $entry): bool => !in_array($entry['result']->shelfKey, $dismissedKeys, true)));
 
         DB::transaction(function () use ($user, $shelves): void {
             RecommendationShelf::where('user_id', $user->id)->delete();
