@@ -11568,6 +11568,42 @@
                 }
             }
         },
+        "/discovery/shelves/{shelfKey}": {
+            "delete": {
+                "tags": ["Discovery"],
+                "summary": "Dismiss a discovery shelf",
+                "description": "Permanently hides this recommendation shelf for the current user, including after recommendation recomputes.",
+                "parameters": [
+                    {
+                        "name": "shelfKey",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Recommendation dismissed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Recommendation dismissed"
+                                        }
+                                    },
+                                    "required": ["message"]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/discovery/shelves/{shelfKey}/books": {
             "get": {
                 "tags": ["Discovery"],

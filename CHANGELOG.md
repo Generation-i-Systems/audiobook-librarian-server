@@ -68,6 +68,8 @@
 
 ### Fixed
 
+- Documented discovery-shelf dismissal and aligned series-book API coverage with the current
+  contract: Needs Review books and their genres remain available to API clients.
 - `removeSeriesFromTitle()` no longer strips the series name when doing so would leave only a generic, meaningless label like "The Complete Series", "Boxed Set", or "Trilogy" — the series name is kept in the title in that case.
 - `book:import --author`/`--narrator`/`--series`/`--tags` were silently ignored on the main (non-split) import path — `BookImportService::processAudiobook()` only ever force-applied `--genre` from config, so e.g. `--tags=spicy` still showed "Tags: N/A" on the confirmation screen. `processSingleBook()` (used for multi-book splits) already applied all five correctly; `processAudiobook()` now does too.
 - The admin book list and `GET /api/v1/books/search` now honor inline `genre:` and `genreId:`

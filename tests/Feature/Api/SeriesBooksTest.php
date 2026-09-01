@@ -17,7 +17,7 @@ class SeriesBooksTest extends ApiTestCase
         $response->assertStatus(404);
     }
 
-    public function testBooksBySeriesExcludesNeedsReviewBooks(): void
+    public function testBooksBySeriesIncludesNeedsReviewBooks(): void
     {
         $series = Series::factory()->create();
 
@@ -32,7 +32,7 @@ class SeriesBooksTest extends ApiTestCase
         $response->assertOk();
         $ids = array_column($response->json('data'), 'id');
         $this->assertContains($reviewed->id, $ids);
-        $this->assertNotContains($pendingReview->id, $ids);
+        $this->assertContains($pendingReview->id, $ids);
     }
 
     public function testBooksBySeriesReturnsDistinctGenresAcrossItsBooks(): void
@@ -49,7 +49,7 @@ class SeriesBooksTest extends ApiTestCase
         $bookB->genres()->attach($fantasy->id);
         $series->books()->attach($bookB->id, ['series_number' => '2']);
 
-        // A needs_review book's genre must not appear, since it's excluded from the list too.
+        // Needs Review books remain available in API listings, including their genres.
         $onlyOnPendingBook = Genre::factory()->create(['name' => 'Horror']);
         $pendingReview = Book::factory()->create(['needs_review' => true]);
         $pendingReview->genres()->attach($onlyOnPendingBook->id);
@@ -59,7 +59,7 @@ class SeriesBooksTest extends ApiTestCase
 
         $response->assertOk();
         $genreNames = array_column($response->json('genres'), 'name');
-        $this->assertSame(['Action', 'Fantasy'], $genreNames);
+        $this->assertSame(['Action', 'Fantasy', 'Horror'], $genreNames);
     }
 
     public function testBooksBySeriesFiltersByGenreIdsWithOrSemantics(): void
