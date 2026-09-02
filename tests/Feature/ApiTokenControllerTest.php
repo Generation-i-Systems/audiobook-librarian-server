@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\ApiTokenController;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,13 +16,26 @@ class ApiTokenControllerTest extends TestCase
     public function testProfilePageRendersTokenSection(): void
     {
         $user = User::factory()->create();
-        $user->createToken('ABB Bridge');
+        $user->createToken('ABB Bridge', [ApiTokenController::SERVICE_TOKEN_ABILITY]);
 
         $response = $this->actingAs($user)->get('/profile');
 
         $response->assertOk();
         $response->assertSee('API / Service Tokens');
         $response->assertSee('ABB Bridge');
+    }
+
+    public function testProfilePageDoesNotListNonServiceTokens(): void
+    {
+        $user = User::factory()->create();
+        $user->createToken('debug-check');
+        $user->createToken('api-service-client-temp', ['*']);
+
+        $response = $this->actingAs($user)->get('/profile');
+
+        $response->assertOk();
+        $response->assertDontSee('debug-check');
+        $response->assertDontSee('api-service-client-temp');
     }
 
     public function testUserCanCreateAndSeeANewToken(): void
@@ -43,10 +57,10 @@ class ApiTokenControllerTest extends TestCase
         ]);
     }
 
-    public function testUserCanRevokeTheirOwnToken(): void
+    public function testUserCanRevokeTheirOwnServiceToken(): void
     {
         $user = User::factory()->create();
-        $token = $user->createToken('ABB Bridge');
+        $token = $user->createToken('ABB Bridge', [ApiTokenController::SERVICE_TOKEN_ABILITY]);
 
         $response = $this->actingAs($user)->delete('/profile/tokens/' . $token->accessToken->id);
 
@@ -56,11 +70,24 @@ class ApiTokenControllerTest extends TestCase
         ]);
     }
 
+    public function testUserCannotRevokeANonServiceToken(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('debug-check', ['*']);
+
+        $response = $this->actingAs($user)->delete('/profile/tokens/' . $token->accessToken->id);
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('personal_access_tokens', [
+            'id' => $token->accessToken->id,
+        ]);
+    }
+
     public function testUserCannotRevokeAnotherUsersToken(): void
     {
         $owner = User::factory()->create();
         $otherUser = User::factory()->create();
-        $token = $owner->createToken('ABB Bridge');
+        $token = $owner->createToken('ABB Bridge', [ApiTokenController::SERVICE_TOKEN_ABILITY]);
 
         $response = $this->actingAs($otherUser)->delete('/profile/tokens/' . $token->accessToken->id);
 

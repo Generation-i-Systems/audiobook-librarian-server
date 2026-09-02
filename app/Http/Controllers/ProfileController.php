@@ -37,7 +37,13 @@ class ProfileController extends Controller
 
         $activityData = $this->documentStoreService->getUserActivityData($userId);
 
-        $apiTokens = User::findOrFail($userId)->tokens()->latest()->get();
+        // Only tokens minted through the self-serve UI (ApiTokenController) - not every
+        // Sanctum token that's ever touched this account (debug tools, internal service
+        // clients, etc. also mint tokens for the same user and would otherwise flood this list).
+        $apiTokens = User::findOrFail($userId)->tokens()
+            ->whereJsonContains('abilities', ApiTokenController::SERVICE_TOKEN_ABILITY)
+            ->latest()
+            ->get();
 
         return view('profile.index', compact('user', 'activityData', 'apiTokens'));
     }

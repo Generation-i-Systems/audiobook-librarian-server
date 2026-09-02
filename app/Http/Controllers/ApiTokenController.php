@@ -11,6 +11,14 @@ use Laravel\Sanctum\PersonalAccessToken;
 class ApiTokenController extends Controller
 {
     /**
+     * Ability tag stamped on every token created through this self-serve UI,
+     * so the profile page can list/manage only these - not every Sanctum
+     * token that's ever touched the account (debug tools, internal service
+     * clients, etc. also mint tokens for the same user).
+     */
+    public const SERVICE_TOKEN_ABILITY = 'service-token';
+
+    /**
      * Create a new personal access token for the current user, e.g. for use
      * by the ABB bridge browser extension or other personal automation.
      */
@@ -21,7 +29,7 @@ class ApiTokenController extends Controller
         ]);
 
         $user = User::findOrFail(Auth::id());
-        $token = $user->createToken($request->input('name'));
+        $token = $user->createToken($request->input('name'), [self::SERVICE_TOKEN_ABILITY]);
 
         return back()->with('new_token', $token->plainTextToken)
             ->with('new_token_name', $request->input('name'));
@@ -34,7 +42,10 @@ class ApiTokenController extends Controller
     {
         $user = User::findOrFail(Auth::id());
 
-        if ($token->tokenable_id !== $user->id || $token->tokenable_type !== User::class) {
+        $isOwnToken = $token->tokenable_id === $user->id && $token->tokenable_type === User::class;
+        $isServiceToken = in_array(self::SERVICE_TOKEN_ABILITY, $token->abilities ?? [], true);
+
+        if (!$isOwnToken || !$isServiceToken) {
             abort(403);
         }
 
