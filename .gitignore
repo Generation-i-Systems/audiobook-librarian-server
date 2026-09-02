@@ -40,3 +40,5 @@ books.json
 # Files pending review/deletion, not part of the project
 /deleted/
 coverage-html/
+
+graphify-out/
