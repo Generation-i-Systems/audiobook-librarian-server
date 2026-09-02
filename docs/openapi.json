@@ -6184,6 +6184,448 @@
                 }
             }
         },
+        "/pending-downloads": {
+            "post": {
+                "tags": ["PendingDownloads"],
+                "summary": "Register a pending download",
+                "description": "Called by the ABB bridge browser extension when a magnet link is sent to the torrent client, so the import pipeline can later pre-fill metadata for the downloaded folder.",
+                "operationId": "createPendingDownload",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["magnet_uri", "abb_url", "books"],
+                                "properties": {
+                                    "magnet_uri": {
+                                        "type": "string"
+                                    },
+                                    "abb_url": {
+                                        "type": "string"
+                                    },
+                                    "abb_category": {
+                                        "type": "string"
+                                    },
+                                    "release_name": {
+                                        "type": "string"
+                                    },
+                                    "books": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": ["title"],
+                                            "properties": {
+                                                "title": {
+                                                    "type": "string"
+                                                },
+                                                "authors": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "genre": {
+                                                    "type": "string"
+                                                },
+                                                "tags": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "description": {
+                                                    "type": "string"
+                                                },
+                                                "cover_url": {
+                                                    "type": "string"
+                                                },
+                                                "series_name": {
+                                                    "type": "string"
+                                                },
+                                                "series_number": {
+                                                    "type": "string"
+                                                },
+                                                "narrator": {
+                                                    "type": "string"
+                                                },
+                                                "abb_url": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pending download created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation failed"
+                    }
+                }
+            },
+            "get": {
+                "tags": ["PendingDownloads"],
+                "summary": "List pending downloads",
+                "operationId": "listPendingDownloads",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "magnet_infohash",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "release_name",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of pending downloads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pending-downloads/{pendingDownload}": {
+            "get": {
+                "tags": ["PendingDownloads"],
+                "summary": "Get a pending download",
+                "operationId": "getPendingDownload",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "pendingDownload",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pending download with books",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found"
+                    }
+                }
+            }
+        },
+        "/pending-downloads/{pendingDownload}/consume": {
+            "post": {
+                "tags": ["PendingDownloads"],
+                "summary": "Mark a pending download consumed",
+                "description": "Manual-correction/debug tool. The import pipeline consumes pending downloads automatically when it creates the matching book(s).",
+                "operationId": "consumePendingDownload",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "pendingDownload",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["matches"],
+                                "properties": {
+                                    "matches": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": ["pending_download_book_id", "book_id"],
+                                            "properties": {
+                                                "pending_download_book_id": {
+                                                    "type": "integer"
+                                                },
+                                                "book_id": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "matched_directory": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pending download marked consumed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation failed"
+                    }
+                }
+            }
+        },
+        "/download-candidates": {
+            "get": {
+                "tags": ["DownloadCandidates"],
+                "summary": "List discovered download candidates",
+                "description": "New releases discovered by the abb:discover-candidates job for authors/series you've favorited, awaiting review.",
+                "operationId": "listDownloadCandidates",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "default": "pending"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of download candidates",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/download-candidates/{downloadCandidate}/approve": {
+            "post": {
+                "tags": ["DownloadCandidates"],
+                "summary": "Approve a download candidate",
+                "description": "Creates the corresponding pending-download record (the same one the browser extension registers manually) and returns its magnet link for the extension to send to Deluge.",
+                "operationId": "approveDownloadCandidate",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "downloadCandidate",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Candidate approved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "candidate": {
+                                                    "type": "object"
+                                                },
+                                                "magnet_uri": {
+                                                    "type": "string"
+                                                },
+                                                "pending_download_id": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Candidate is not pending, or no magnet link could be found"
+                    }
+                }
+            }
+        },
+        "/download-candidates/{downloadCandidate}/reject": {
+            "post": {
+                "tags": ["DownloadCandidates"],
+                "summary": "Reject a download candidate",
+                "operationId": "rejectDownloadCandidate",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "downloadCandidate",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Candidate rejected"
+                    },
+                    "422": {
+                        "description": "Candidate is not pending"
+                    }
+                }
+            }
+        },
+        "/download-candidates/{downloadCandidate}/mark-sent": {
+            "post": {
+                "tags": ["DownloadCandidates"],
+                "summary": "Mark an approved candidate as sent to the torrent client",
+                "description": "Called by the browser extension after Deluge confirms the magnet from an approved candidate was added.",
+                "operationId": "markDownloadCandidateSent",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "downloadCandidate",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Candidate marked sent"
+                    },
+                    "422": {
+                        "description": "Candidate has not been approved yet"
+                    }
+                }
+            }
+        },
         "/authors/search": {
             "get": {
                 "tags": ["Imports"],

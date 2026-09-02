@@ -37,7 +37,9 @@ class ProfileController extends Controller
 
         $activityData = $this->documentStoreService->getUserActivityData($userId);
 
-        return view('profile.index', compact('user', 'activityData'));
+        $apiTokens = User::findOrFail($userId)->tokens()->latest()->get();
+
+        return view('profile.index', compact('user', 'activityData', 'apiTokens'));
     }
 
 

@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\BookmarkSyncController;
 use App\Http\Controllers\Api\BookMatchController;
 use App\Http\Controllers\Api\BookRequestApiController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\DownloadCandidateController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\ExternalReadApiController;
 use App\Http\Controllers\Api\FollowApiController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\Api\AdminUserTagFilterController;
 use App\Http\Controllers\Api\UserTagFilterController;
 use App\Http\Controllers\Api\EmailOtpController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\PendingDownloadController;
 use App\Http\Controllers\Api\PositionSyncController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
@@ -423,6 +425,22 @@ Route::prefix('v1')->group(function () {
             Route::get('/queue/pending', [BookImportApiController::class, 'getPendingImports']);
             Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
             Route::get('/genres', [BookImportApiController::class, 'getGenres']);
+        });
+
+        // Pending Download Routes (for the ABB bridge browser extension)
+        Route::prefix('pending-downloads')->group(function () {
+            Route::post('/', [PendingDownloadController::class, 'store']);
+            Route::get('/', [PendingDownloadController::class, 'index']);
+            Route::get('/{pendingDownload}', [PendingDownloadController::class, 'show']);
+            Route::post('/{pendingDownload}/consume', [PendingDownloadController::class, 'consume']);
+        });
+
+        // Download Candidate Routes (discovery/approval queue for the ABB bridge extension)
+        Route::prefix('download-candidates')->group(function () {
+            Route::get('/', [DownloadCandidateController::class, 'index']);
+            Route::post('/{downloadCandidate}/approve', [DownloadCandidateController::class, 'approve']);
+            Route::post('/{downloadCandidate}/reject', [DownloadCandidateController::class, 'reject']);
+            Route::post('/{downloadCandidate}/mark-sent', [DownloadCandidateController::class, 'markSent']);
         });
 
         // Book Contribution Routes

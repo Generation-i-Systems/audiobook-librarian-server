@@ -181,6 +181,10 @@ class ResolveLibraryProfileFromHost
 
         $normalizedPath = rtrim($bookStoragePath, '/');
 
+        if (config('filesystems.disks.books.root') === $normalizedPath) {
+            return;
+        }
+
         config([
             'filesystems.disks.books.root' => $normalizedPath,
             'app.book_root' => $normalizedPath,

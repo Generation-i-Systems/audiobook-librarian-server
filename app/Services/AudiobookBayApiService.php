@@ -426,6 +426,7 @@ class AudiobookBayApiService
             'categories' => [],
             'metadata' => [],
             'language' => null,
+            'magnetUri' => null,
         ];
         // Extract title from main H1 if present
         $title = '';
@@ -530,6 +531,11 @@ class AudiobookBayApiService
             if (!str_contains($coverUrl, '/images/search.gif')) {
                 $book['coverImageUrl'] = $coverUrl;
             }
+        }
+
+        $magnetNode = $xpath->query('//a[starts-with(@href, "magnet:")]')->item(0);
+        if ($magnetNode instanceof \DOMElement) {
+            $book['magnetUri'] = $magnetNode->getAttribute('href');
         }
 
         return $book;

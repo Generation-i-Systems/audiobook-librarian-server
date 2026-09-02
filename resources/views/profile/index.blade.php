@@ -75,6 +75,61 @@
 
             <hr>
 
+            <h2>API / Service Tokens</h2>
+            <p class="text-muted">
+                Use these to connect personal tools (like the ABB bridge browser extension) to
+                this server's API. Each token acts as you, so treat it like a password.
+            </p>
+
+            @if(session('new_token'))
+                <div class="alert alert-success">
+                    <p><strong>New token "{{ session('new_token_name') }}" created.</strong>
+                    Copy it now &mdash; it will not be shown again:</p>
+                    <code style="user-select: all; word-break: break-all;">{{ session('new_token') }}</code>
+                </div>
+            @endif
+
+            @if($apiTokens->isNotEmpty())
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Created</th>
+                            <th>Last Used</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($apiTokens as $apiToken)
+                            <tr>
+                                <td>{{ $apiToken->name }}</td>
+                                <td>{{ $apiToken->created_at->format('Y-m-d') }}</td>
+                                <td>{{ $apiToken->last_used_at?->format('Y-m-d H:i') ?? 'Never' }}</td>
+                                <td>
+                                    <form action="{{ route('profile.tokens.destroy', $apiToken) }}" method="POST"
+                                        onsubmit="return confirm('Revoke this token? Anything using it will stop working immediately.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-danger">Revoke</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+
+            <form action="{{ route('profile.tokens.store') }}" method="POST" class="form-inline">
+                @csrf
+                <div class="form-group">
+                    <label for="token_name">Token name:</label>
+                    <input type="text" class="form-control" id="token_name" name="name" placeholder="ABB Bridge" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Token</button>
+            </form>
+
+            <hr>
+
             <h2>Delete Account</h2>
             <p>
                 This permanently deletes your account and library data. You'll have

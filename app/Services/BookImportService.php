@@ -7,6 +7,7 @@ use App\Models\Book;
 use App\Models\BookTag;
 use App\Models\Genre;
 use App\Models\Narrator;
+use App\Models\PendingDownloadBook;
 use App\Models\Publisher;
 use App\Models\Series;
 use App\Support\ConfirmedBookMetadata;
@@ -23,6 +24,7 @@ class BookImportService
 
     protected GenreMappingService $genreMappingService;
     protected SourceTrashService $sourceTrashService;
+    protected ?PendingDownloadService $pendingDownloadService = null;
     protected ?OpenAudibleParser $openAudibleParser = null;
     protected array $config = [];
     protected array $multiBookSharedOverrides = [];
@@ -53,10 +55,12 @@ class BookImportService
     public function __construct(
         GenreMappingService $genreMappingService,
         SourceTrashService $sourceTrashService,
+        ?PendingDownloadService $pendingDownloadService = null,
         ?OpenAudibleParser $openAudibleParser = null
     ) {
         $this->genreMappingService = $genreMappingService;
         $this->sourceTrashService = $sourceTrashService;
+        $this->pendingDownloadService = $pendingDownloadService ?? app(PendingDownloadService::class);
         $this->openAudibleParser = $openAudibleParser ?? app(OpenAudibleParser::class);
     }
 
@@ -4203,6 +4207,54 @@ class BookImportService
         }
 
         $metadata['confidence'] = $confidence;
+    }
+
+    /**
+     * Create an additional Book record for a pending-download bundle entry
+     * whose audio files haven't been split out of the primary book's
+     * directory yet. Flags the book for manual review rather than guessing
+     * at a file split.
+     */
+    public function createAdditionalBundleBook(PendingDownloadBook $pendingBook, string $sharedDirectoryPath): Book
+    {
+        $book = new Book();
+        $book->title = $pendingBook->title;
+        $book->description = $pendingBook->description;
+        $book->language = 'en';
+        $book->source = 'import';
+        $book->directory_path = $sharedDirectoryPath;
+        $book->needs_review = true;
+        $book->needs_review_reasons = ['Multi-book bundle - audio files not yet split from sibling book directory'];
+        $book->save();
+
+        if (!empty($pendingBook->authors)) {
+            $authorIds = [];
+            foreach ($pendingBook->authors as $authorName) {
+                $authorName = trim((string) $authorName);
+                if ($authorName !== '') {
+                    $authorIds[] = Author::firstOrCreate(['name' => $authorName])->id;
+                }
+            }
+            $book->authors()->sync($authorIds);
+        }
+
+        if (!empty($pendingBook->genre)) {
+            $genreName = $this->validateAndMapGenre(trim((string) $pendingBook->genre));
+            $genre = Genre::firstOrCreate(['name' => $genreName]);
+            $book->genres()->sync([$genre->id => ['is_primary' => true]]);
+        }
+
+        if (!empty($pendingBook->series_name)) {
+            $series = Series::firstOrCreate(['name' => trim((string) $pendingBook->series_name)]);
+            $book->series()->sync([$series->id => ['series_number' => $pendingBook->series_number ?? null]]);
+        }
+
+        if (!empty($pendingBook->narrator)) {
+            $narrator = Narrator::firstOrCreate(['name' => trim((string) $pendingBook->narrator)]);
+            $book->narrators()->sync([$narrator->id]);
+        }
+
+        return $book;
     }
 
     /**
@@ -10474,6 +10526,15 @@ class BookImportService
             $skipEnrichment = true;
         }
 
+        // Check for a pending-download record registered by the ABB bridge
+        // browser extension when the magnet was sent. Only fills fields the
+        // scanner/AI didn't already populate - never overrides real data.
+        $pendingDownload = $this->pendingDownloadService->findMatch($audiobook['path'], $aiMetadata);
+        if ($pendingDownload) {
+            $aiMetadata = $this->pendingDownloadService->mergeIntoMetadata($pendingDownload, $aiMetadata);
+            $aiMetadata['pending_download_id'] = $pendingDownload->id;
+        }
+
         $hasCriticalTagMetadata = false;
         $tagMetadata = $this->extractTagMetadataFromAudiobook($audiobook, $aiProcessor);
         if ($this->hasCriticalTagMetadata($tagMetadata)) {
@@ -11021,6 +11082,33 @@ class BookImportService
 
                 // Process cover image AFTER files are moved (and directory created) to prevent conflict detection
                 $this->processCoverImage($book, $aiMetadata);
+
+                if ($pendingDownload && $pendingDownload->books->isNotEmpty()) {
+                    $pendingBooks = $pendingDownload->books;
+                    $matches = [[
+                        'pending_download_book_id' => $pendingBooks->first()->id,
+                        'book_id' => $book->id,
+                    ]];
+
+                    // The filesystem-level multi-book split didn't fire, but the
+                    // pending-download bundle still claims multiple books. Create one
+                    // additional Book per remaining bundle entry, sharing this directory,
+                    // flagged for manual review since the audio files aren't split yet.
+                    foreach ($pendingBooks->skip(1) as $siblingPendingBook) {
+                        $siblingBook = $this->createAdditionalBundleBook($siblingPendingBook, $book->directory_path);
+                        $matches[] = [
+                            'pending_download_book_id' => $siblingPendingBook->id,
+                            'book_id' => $siblingBook->id,
+                        ];
+                        $processedBooks[] = [
+                            'path' => $audiobook['path'],
+                            'book_id' => $siblingBook->id,
+                            'title' => $siblingBook->title,
+                        ];
+                    }
+
+                    $this->pendingDownloadService->consumeForBooks($pendingDownload, $matches, $book->directory_path);
+                }
 
                 Log::channel('import')->info('Book persisted', [
                     'source_path' => $audiobook['path'] ?? null,

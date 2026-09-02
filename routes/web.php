@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\Admin\BookAutocompleteController;
+use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\Admin\BookCoverAdminController;
 use App\Http\Controllers\Admin\BookExportController;
 use App\Http\Controllers\Admin\BookFormController;
@@ -211,6 +212,8 @@ Route::middleware(['auth'])->group(function (): void {
     Route::post('/profile/request-admin', [ProfileController::class, 'requestAdminPermissions'])
         ->name('profile.requestAdminPermissions');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/profile/tokens', [ApiTokenController::class, 'store'])->name('profile.tokens.store');
+    Route::delete('/profile/tokens/{token}', [ApiTokenController::class, 'destroy'])->name('profile.tokens.destroy');
 });
 
 Route::get('/account-deletion/scheduled', fn () => view('account-deletion.scheduled'))

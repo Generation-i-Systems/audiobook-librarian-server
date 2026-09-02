@@ -104,6 +104,17 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('06:00')
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/librivox-sync.log'));
+
+        // Expire stale pending-download records (from the ABB bridge extension) daily at 3:15 AM
+        $schedule->command('pending-downloads:cleanup')
+            ->dailyAt('03:15')
+            ->appendOutputTo(storage_path('logs/pending-downloads-cleanup.log'));
+
+        // Discover new releases by favorited authors/series for review daily at 5:45 AM
+        $schedule->command('abb:discover-candidates')
+            ->dailyAt('05:45')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/abb-discover-candidates.log'));
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
