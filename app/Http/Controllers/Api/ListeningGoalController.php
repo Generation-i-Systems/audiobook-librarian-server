@@ -28,7 +28,7 @@ class ListeningGoalController extends Controller
     ) {
     }
 
-    private const METRICS = 'total_hours,genre_hours,playlist_hours,fiction_hours,nonfiction_hours,books_finished,series_hours,author_hours,book_hours,book_completion';
+    private const METRICS = 'total_hours,genre_hours,playlist_hours,playlist_completion,playlist_books_finished,fiction_hours,nonfiction_hours,books_finished,series_hours,author_hours,book_hours,book_completion';
 
     /** GET /goals/listening — list all active (not-yet-expired) listening goals with current progress */
     public function index(): JsonResponse
@@ -71,7 +71,7 @@ class ListeningGoalController extends Controller
         $validated = $request->validate([
             'period_type'    => 'required|string|in:day,week,month,year,custom',
             'metric'         => 'required|string|in:' . self::METRICS,
-            'target_minutes' => 'required_unless:metric,book_completion|integer|min:1|max:14400',
+            'target_minutes' => 'required_unless:metric,book_completion,playlist_completion,playlist_books_finished|integer|min:1|max:14400',
             'genre_id'       => 'nullable|integer|exists:genres,id',
             'playlist_id'    => 'nullable|integer|exists:playlists,id',
             'series_id'      => 'nullable|integer|exists:series,id',
@@ -92,6 +92,7 @@ class ListeningGoalController extends Controller
             $validated['book_author'] ?? null
         );
         $this->assertPlaylistOwnership($validated['playlist_id'] ?? null);
+        $this->assertPlaylistCompletionRequirements($validated['metric'], $validated['playlist_id'] ?? null);
 
         $targetMinutes = $this->resolveTargetMinutes($validated);
 
@@ -144,9 +145,11 @@ class ListeningGoalController extends Controller
         $resolvedBookAuthor = array_key_exists('book_author', $validated) ? $validated['book_author'] : $goal->book_author;
         $resolvedStartDate = array_key_exists('start_date', $validated) ? $validated['start_date'] : $goal->start_date?->toDateString();
         $resolvedEndDate = array_key_exists('end_date', $validated) ? $validated['end_date'] : $goal->end_date?->toDateString();
+        $resolvedPlaylistId = array_key_exists('playlist_id', $validated) ? $validated['playlist_id'] : $goal->playlist_id;
         $this->assertCustomRangeConsistency($resolvedPeriodType, $resolvedStartDate, $resolvedEndDate);
         $this->assertBookCompletionRequirements($resolvedMetric, $resolvedPeriodType, $resolvedBookId, $resolvedBookTitle, $resolvedBookAuthor);
         $this->assertPlaylistOwnership($validated['playlist_id'] ?? null);
+        $this->assertPlaylistCompletionRequirements($resolvedMetric, $resolvedPlaylistId);
 
         if ($resolvedMetric === 'book_completion') {
             $validated['target_minutes'] = $this->resolveTargetMinutes([
@@ -176,19 +179,27 @@ class ListeningGoalController extends Controller
         abort_if($goal->user_id !== Auth::id(), 403);
 
         [$periodStart, $periodEnd] = $this->resolvePeriod($goal);
-        $progressAmount = $this->computeProgressAmount($goal, $periodStart, $periodEnd);
-        $progressPercent = $this->progressPercent($goal, $progressAmount);
 
-        $entries = match ($goal->metric) {
-            'books_finished'  => $this->booksFinishedEntries($goal, $periodStart, $periodEnd),
-            'book_completion' => $this->bookCompletionEntries($goal, $progressAmount),
-            default           => $this->hourEntries($goal, $periodStart, $periodEnd),
-        };
+        if ($this->isPlaylistCompletionMetric($goal->metric)) {
+            $amounts = $this->playlistCompletionAmounts($goal);
+            $progressPercent = $amounts['target'] > 0 ? min(100, round(($amounts['amount'] / $amounts['target']) * 100, 1)) : 0;
+            $elapsedPercent = 100.0;
+            $entries = $this->playlistCompletionEntries($goal);
+        } else {
+            $progressAmount = $this->computeProgressAmount($goal, $periodStart, $periodEnd);
+            $progressPercent = $this->progressPercent($goal, $progressAmount);
+            $elapsedPercent = $this->elapsedPercent($periodStart, $periodEnd);
+            $entries = match ($goal->metric) {
+                'books_finished'  => $this->booksFinishedEntries($goal, $periodStart, $periodEnd),
+                'book_completion' => $this->bookCompletionEntries($goal, $progressAmount),
+                default           => $this->hourEntries($goal, $periodStart, $periodEnd),
+            };
+        }
 
         return response()->json([
             'period_start'     => $periodStart->toDateString(),
             'period_end'       => $periodEnd->toDateString(),
-            'elapsed_percent'  => $this->elapsedPercent($periodStart, $periodEnd),
+            'elapsed_percent'  => $elapsedPercent,
             'progress_percent' => $progressPercent,
             'metric'           => $goal->metric,
             'entries'          => $entries,
@@ -233,6 +244,13 @@ class ListeningGoalController extends Controller
      */
     private function resolveTargetMinutes(array $validated): int
     {
+        if ($this->isPlaylistCompletionMetric($validated['metric'])) {
+            // The real target (total playlist duration or item count) is recomputed fresh on
+            // every read in playlistCompletionAmounts() since playlist membership can change -
+            // this stored value is never used for progress display.
+            return 1;
+        }
+
         if ($validated['metric'] !== 'book_completion') {
             return $validated['target_minutes'];
         }
@@ -252,6 +270,20 @@ class ListeningGoalController extends Controller
         abort_if($book === null || empty($book->duration), 422, 'book_completion requires a book with known duration');
 
         return max(1, (int) round($book->duration / 60));
+    }
+
+    private function isPlaylistCompletionMetric(string $metric): bool
+    {
+        return in_array($metric, ['playlist_completion', 'playlist_books_finished'], true);
+    }
+
+    private function assertPlaylistCompletionRequirements(string $metric, ?int $playlistId): void
+    {
+        if (!$this->isPlaylistCompletionMetric($metric)) {
+            return;
+        }
+
+        abort_if(empty($playlistId), 422, $metric . ' goals require playlist_id');
     }
 
     private function assertPlaylistOwnership(?int $playlistId): void
@@ -301,6 +333,10 @@ class ListeningGoalController extends Controller
 
         if ($goal->metric === 'book_completion') {
             return $this->bookCompletionProgressMinutes($goal);
+        }
+
+        if ($this->isPlaylistCompletionMetric($goal->metric)) {
+            return $this->playlistCompletionAmounts($goal)['amount'];
         }
 
         return $this->sumSessionMinutes($goal, $periodStart, $periodEnd);
@@ -424,6 +460,106 @@ class ListeningGoalController extends Controller
         return min($goal->target_minutes, (int) round($furthestPositionSeconds / 60));
     }
 
+    /**
+     * Progress for playlist_completion/playlist_books_finished is a live snapshot of the
+     * playlist's current membership, not accumulated over any period - a book added or removed
+     * from the playlist immediately changes the denominator, same reasoning as book_completion
+     * trusting the book's actual playback position over accumulated session minutes.
+     *
+     * @return array{amount:int, target:int}
+     */
+    private function playlistCompletionAmounts(ListeningGoal $goal): array
+    {
+        $playlist = $goal->playlist;
+        if ($playlist === null) {
+            return ['amount' => 0, 'target' => 1];
+        }
+
+        $items = UserBookStatus::where('playlist_id', $playlist->id)
+            ->where('user_id', $goal->user_id)
+            ->whereNotNull('book_id')
+            ->get(['book_id', 'status', 'marked_read_at']);
+
+        if ($items->isEmpty()) {
+            return ['amount' => 0, 'target' => 1];
+        }
+
+        if ($goal->metric === 'playlist_books_finished') {
+            return [
+                'amount' => $items->whereNotNull('marked_read_at')->count(),
+                'target' => $items->count(),
+            ];
+        }
+
+        $bookIds = $items->pluck('book_id');
+        $durationsSeconds = Book::whereIn('id', $bookIds)->pluck('duration', 'id');
+        $positionsSeconds = BookProgress::where('user_id', $goal->user_id)
+            ->whereIn('book_id', $bookIds)
+            ->selectRaw('book_id, MAX(current_position_seconds) as position')
+            ->groupBy('book_id')
+            ->pluck('position', 'book_id');
+
+        $targetSeconds = 0;
+        $progressSeconds = 0;
+        foreach ($items as $item) {
+            $durationSeconds = (int) ($durationsSeconds[$item->book_id] ?? 0);
+            if ($durationSeconds <= 0) {
+                continue;
+            }
+            $targetSeconds += $durationSeconds;
+            $progressSeconds += $item->status === 'completed'
+                ? $durationSeconds
+                : min($durationSeconds, (int) ($positionsSeconds[$item->book_id] ?? 0));
+        }
+
+        return [
+            'amount' => (int) round($progressSeconds / 60),
+            'target' => max(1, (int) round($targetSeconds / 60)),
+        ];
+    }
+
+    /** @return array<int, array{type:string,book_id:int,title:string,finished_at:?string,minutes:?int}> */
+    private function playlistCompletionEntries(ListeningGoal $goal): array
+    {
+        $playlist = $goal->playlist;
+        if ($playlist === null) {
+            return [];
+        }
+
+        $items = UserBookStatus::where('playlist_id', $playlist->id)
+            ->where('user_id', $goal->user_id)
+            ->whereNotNull('book_id')
+            ->with('book')
+            ->get();
+
+        if ($goal->metric === 'playlist_books_finished') {
+            return $items->map(fn (UserBookStatus $item): array => [
+                'type'        => 'book',
+                'book_id'     => $item->book_id,
+                'title'       => $item->book->title,
+                'finished_at' => $item->marked_read_at?->toDateString(),
+                'minutes'     => null,
+            ])->values()->all();
+        }
+
+        $bookIds = $items->pluck('book_id');
+        $positionsSeconds = BookProgress::where('user_id', $goal->user_id)
+            ->whereIn('book_id', $bookIds)
+            ->selectRaw('book_id, MAX(current_position_seconds) as position')
+            ->groupBy('book_id')
+            ->pluck('position', 'book_id');
+
+        return $items->map(fn (UserBookStatus $item): array => [
+            'type'        => 'book',
+            'book_id'     => $item->book_id,
+            'title'       => $item->book->title,
+            'finished_at' => null,
+            'minutes'     => $item->status === 'completed'
+                ? (int) round(($item->book->duration ?? 0) / 60)
+                : (int) round(((int) ($positionsSeconds[$item->book_id] ?? 0)) / 60),
+        ])->values()->all();
+    }
+
     /** @return array<int, array{type:string,book_id:int,title:string,finished_at:string}> */
     private function booksFinishedEntries(ListeningGoal $goal, Carbon $periodStart, Carbon $periodEnd): array
     {
@@ -496,15 +632,27 @@ class ListeningGoalController extends Controller
     private function formatGoalWithProgress(ListeningGoal $goal): array
     {
         [$periodStart, $periodEnd] = $this->resolvePeriod($goal);
-        $progressAmount = $this->computeProgressAmount($goal, $periodStart, $periodEnd);
+
+        if ($this->isPlaylistCompletionMetric($goal->metric)) {
+            $amounts = $this->playlistCompletionAmounts($goal);
+            $targetMinutes = $amounts['target'];
+            $progressAmount = $amounts['amount'];
+            $progressPercent = $targetMinutes > 0 ? min(100, round(($progressAmount / $targetMinutes) * 100, 1)) : 0;
+            $elapsedPercent = 100.0;
+        } else {
+            $targetMinutes = $goal->target_minutes;
+            $progressAmount = $this->computeProgressAmount($goal, $periodStart, $periodEnd);
+            $progressPercent = $this->progressPercent($goal, $progressAmount);
+            $elapsedPercent = $this->elapsedPercent($periodStart, $periodEnd);
+        }
 
         return [
             'id'               => $goal->id,
             'period_type'      => $goal->period_type,
             'metric'           => $goal->metric,
-            'target_minutes'   => $goal->target_minutes,
+            'target_minutes'   => $targetMinutes,
             'progress_minutes' => $progressAmount,
-            'progress_percent' => $this->progressPercent($goal, $progressAmount),
+            'progress_percent' => $progressPercent,
             'genre_id'         => $goal->genre_id,
             'genre_name'       => $goal->genre?->name,
             'playlist_id'      => $goal->playlist_id,
@@ -518,7 +666,7 @@ class ListeningGoalController extends Controller
             'book_author'      => $goal->book_author,
             'start_date'       => $periodStart->toDateString(),
             'end_date'         => $periodEnd->toDateString(),
-            'elapsed_percent'  => $this->elapsedPercent($periodStart, $periodEnd),
+            'elapsed_percent'  => $elapsedPercent,
             'is_active'        => $goal->is_active,
             'created_at'       => $goal->created_at?->toIso8601String(),
         ];

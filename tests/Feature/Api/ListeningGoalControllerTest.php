@@ -953,4 +953,164 @@ class ListeningGoalControllerTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('goals.0.progress_minutes', 0);
     }
+
+    public function test_playlist_books_finished_goal_progress_counts_marked_read_items(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $playlist = Playlist::create(['user_id' => $user->id, 'name' => 'Road Trip', 'sort_order' => 1]);
+        $finishedBook = Book::factory()->create();
+        $unfinishedBook = Book::factory()->create();
+
+        UserBookStatus::create([
+            'user_id' => $user->id,
+            'book_id' => $finishedBook->id,
+            'playlist_id' => $playlist->id,
+            'status' => 'completed',
+            'order' => 1,
+            'marked_read_at' => now(),
+        ]);
+        UserBookStatus::create([
+            'user_id' => $user->id,
+            'book_id' => $unfinishedBook->id,
+            'playlist_id' => $playlist->id,
+            'status' => 'queue',
+            'order' => 2,
+        ]);
+
+        ListeningGoal::create([
+            'user_id' => $user->id,
+            'period_type' => 'day',
+            'metric' => 'playlist_books_finished',
+            'target_minutes' => 1,
+            'playlist_id' => $playlist->id,
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson('/api/v1/goals/listening');
+
+        $response->assertOk()
+            ->assertJsonPath('goals.0.metric', 'playlist_books_finished')
+            ->assertJsonPath('goals.0.progress_minutes', 1)
+            ->assertJsonPath('goals.0.target_minutes', 2)
+            ->assertJsonPath('goals.0.progress_percent', 50);
+    }
+
+    public function test_playlist_completion_goal_progress_sums_positions_against_total_duration(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $playlist = Playlist::create(['user_id' => $user->id, 'name' => 'Road Trip', 'sort_order' => 1]);
+        $halfDoneBook = Book::factory()->create(['duration' => 3600]);
+        $finishedBook = Book::factory()->create(['duration' => 1800]);
+
+        UserBookStatus::create([
+            'user_id' => $user->id,
+            'book_id' => $halfDoneBook->id,
+            'playlist_id' => $playlist->id,
+            'status' => 'queue',
+            'order' => 1,
+        ]);
+        UserBookStatus::create([
+            'user_id' => $user->id,
+            'book_id' => $finishedBook->id,
+            'playlist_id' => $playlist->id,
+            'status' => 'completed',
+            'order' => 2,
+        ]);
+
+        BookProgress::create([
+            'book_id' => $halfDoneBook->id,
+            'user_id' => (string) $user->id,
+            'device_id' => 'playlist-completion-device',
+            'current_position_seconds' => 1800,
+            'total_duration_seconds' => 3600,
+            'progress_percentage' => 50,
+        ]);
+
+        ListeningGoal::create([
+            'user_id' => $user->id,
+            'period_type' => 'day',
+            'metric' => 'playlist_completion',
+            'target_minutes' => 1,
+            'playlist_id' => $playlist->id,
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson('/api/v1/goals/listening');
+
+        // (1800s + 1800s) listened out of (3600s + 1800s) total = 3600/5400 = 66.7%
+        $response->assertOk()
+            ->assertJsonPath('goals.0.metric', 'playlist_completion')
+            ->assertJsonPath('goals.0.progress_minutes', 60)
+            ->assertJsonPath('goals.0.target_minutes', 90)
+            ->assertJsonPath('goals.0.progress_percent', 66.7);
+    }
+
+    public function test_store_playlist_completion_goal_requires_playlist_id(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/v1/goals/listening', [
+            'period_type' => 'day',
+            'metric' => 'playlist_completion',
+        ], ['X-Acting-As-Test' => '1']);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_store_playlist_completion_goal_does_not_require_target_minutes(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $playlist = Playlist::create(['user_id' => $user->id, 'name' => 'Road Trip', 'sort_order' => 1]);
+
+        $response = $this->postJson('/api/v1/goals/listening', [
+            'period_type' => 'day',
+            'metric' => 'playlist_completion',
+            'playlist_id' => $playlist->id,
+        ], ['X-Acting-As-Test' => '1']);
+
+        $response->assertCreated()
+            ->assertJsonPath('goal.metric', 'playlist_completion')
+            ->assertJsonPath('goal.playlist_id', $playlist->id);
+    }
+
+    public function test_breakdown_returns_book_entries_for_playlist_books_finished_metric(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        $playlist = Playlist::create(['user_id' => $user->id, 'name' => 'Road Trip', 'sort_order' => 1]);
+        $book = Book::factory()->create(['title' => 'Dune']);
+
+        UserBookStatus::create([
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'playlist_id' => $playlist->id,
+            'status' => 'completed',
+            'order' => 1,
+            'marked_read_at' => now(),
+        ]);
+
+        $goal = ListeningGoal::create([
+            'user_id' => $user->id,
+            'period_type' => 'day',
+            'metric' => 'playlist_books_finished',
+            'target_minutes' => 1,
+            'playlist_id' => $playlist->id,
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson("/api/v1/goals/listening/{$goal->id}/breakdown");
+
+        $response->assertOk()
+            ->assertJsonPath('progress_percent', 100)
+            ->assertJsonPath('entries.0.book_id', $book->id)
+            ->assertJsonPath('entries.0.title', 'Dune');
+    }
 }

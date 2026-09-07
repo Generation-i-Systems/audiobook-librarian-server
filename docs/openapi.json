@@ -15368,6 +15368,8 @@
                                             "total_hours",
                                             "genre_hours",
                                             "playlist_hours",
+                                            "playlist_completion",
+                                            "playlist_books_finished",
                                             "fiction_hours",
                                             "nonfiction_hours",
                                             "books_finished"
@@ -15493,6 +15495,8 @@
                                             "total_hours",
                                             "genre_hours",
                                             "playlist_hours",
+                                            "playlist_completion",
+                                            "playlist_books_finished",
                                             "fiction_hours",
                                             "nonfiction_hours"
                                         ]

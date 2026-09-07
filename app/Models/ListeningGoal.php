@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $user_id
  * @property string $period_type  day|week|month|year|custom
- * @property string $metric       total_hours|genre_hours|playlist_hours|fiction_hours|nonfiction_hours|books_finished|series_hours|author_hours|book_hours
+ * @property string $metric       total_hours|genre_hours|playlist_hours|playlist_completion|playlist_books_finished|fiction_hours|nonfiction_hours|books_finished|series_hours|author_hours|book_hours|book_completion
  * @property int $target_minutes
  * @property int|null $genre_id
  * @property int|null $playlist_id
