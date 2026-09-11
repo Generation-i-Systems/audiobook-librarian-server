@@ -184,11 +184,13 @@ class Badge extends Model
      */
     public function hasBeenEarnedByUser(string $userId, ?string $deviceId = null): bool
     {
-        $query = $this->userBadges()->where('user_id', $userId);
+        $query = $this->userBadges()->where(function ($q) use ($userId, $deviceId) {
+            $q->where('user_id', $userId);
 
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
+            if ($deviceId) {
+                $q->orWhere('device_id', $deviceId);
+            }
+        });
 
         return $query->exists();
     }
@@ -198,11 +200,13 @@ class Badge extends Model
      */
     public function getTimesEarnedByUser(string $userId, ?string $deviceId = null): int
     {
-        $query = $this->userBadges()->where('user_id', $userId);
+        $query = $this->userBadges()->where(function ($q) use ($userId, $deviceId) {
+            $q->where('user_id', $userId);
 
-        if ($deviceId) {
-            $query->orWhere('device_id', $deviceId);
-        }
+            if ($deviceId) {
+                $q->orWhere('device_id', $deviceId);
+            }
+        });
 
         return $query->count();
     }
