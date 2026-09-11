@@ -245,4 +245,63 @@ class BadgeApiTest extends TestCase
             ->assertJsonPath('badges.0.points', $badge->points)
             ->assertJsonPath('badges.0.is_repeatable', $badge->is_repeatable);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function stats_reports_the_most_recently_earned_badge_as_latest(): void
+    {
+        [$user, $headers] = $this->authenticateUser();
+
+        $firstBadge = Badge::create([
+            'key' => 'first_' . Str::random(6),
+            'name' => 'First Earned',
+            'description' => 'Earned earliest',
+            'icon' => 'first.png',
+            'image_url' => null,
+            'category' => 'listening',
+            'tier' => 'bronze',
+            'points' => 10,
+            'criteria' => [],
+            'is_active' => true,
+            'is_repeatable' => false,
+            'sort_order' => 1,
+        ]);
+
+        $latestBadge = Badge::create([
+            'key' => 'latest_' . Str::random(6),
+            'name' => 'Latest Earned',
+            'description' => 'Earned most recently',
+            'icon' => 'latest.png',
+            'image_url' => null,
+            'category' => 'listening',
+            'tier' => 'gold',
+            'points' => 50,
+            'criteria' => [],
+            'is_active' => true,
+            'is_repeatable' => false,
+            'sort_order' => 2,
+        ]);
+
+        UserBadge::create([
+            'user_id' => (string) $user->id,
+            'device_id' => null,
+            'badge_id' => $firstBadge->id,
+            'earned_at' => now()->subDays(10),
+            'tier_level' => 1,
+            'is_notified' => true,
+        ]);
+
+        UserBadge::create([
+            'user_id' => (string) $user->id,
+            'device_id' => null,
+            'badge_id' => $latestBadge->id,
+            'earned_at' => now(),
+            'tier_level' => 1,
+            'is_notified' => true,
+        ]);
+
+        $response = $this->withHeaders($headers)->getJson('/api/v1/badges/stats');
+
+        $response->assertOk()
+            ->assertJsonPath('stats.latest_badge', $latestBadge->name);
+    }
 }

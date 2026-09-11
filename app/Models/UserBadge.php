@@ -212,7 +212,7 @@ class UserBadge extends Model
      */
     public static function getUserBadgeStats(string $userId, ?string $deviceId = null): array
     {
-        $badges = self::forUserOrDevice($userId, $deviceId)->with('badge')->get();
+        $badges = self::forUserOrDevice($userId, $deviceId)->with('badge')->newest()->get();
 
         $totalBadges = $badges->count();
         $totalPoints = $badges->sum(function ($userBadge) {
