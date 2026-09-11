@@ -9,11 +9,73 @@ use Illuminate\Database\Seeder;
 
 class CanonicalBadgeSeeder extends Seeder
 {
+    /**
+     * Which badges form a genuine tier ladder, i.e. measure the exact same criteria key at
+     * increasing thresholds. Two badges sharing a category or a bronze/silver/gold/... tier
+     * label are NOT necessarily the same series -- most canonical categories mix several
+     * unrelated one-off achievements in with a real ladder (e.g. "collection" bundles a
+     * library-size ladder with the unrelated "Series Complete" and "Curated Sets" badges), so
+     * series membership is hand-verified against each badge's criteria rather than inferred.
+     */
+    private static function series(): array
+    {
+        $series = [
+            'milestone_books_completed' => [
+                'milestone_first_book_bronze', 'milestone_five_books_silver', 'milestone_ten_books_gold',
+                'milestone_twentyfive_books_platinum', 'milestone_fifty_books_diamond', 'milestone_one_hundred_books_mythic',
+            ],
+            'streak_current_streak' => [
+                'streak_3_day_bronze', 'streak_7_day_silver', 'streak_14_day_gold',
+                'streak_30_day_platinum', 'streak_60_day_diamond', 'streak_100_day_mythic',
+            ],
+            'habit_current_streak' => [
+                'habit_first_week_bronze', 'habit_two_weeks_silver', 'habit_month_streak_gold',
+                'habit_three_months_platinum', 'habit_six_months_diamond', 'habit_year_habit_mythic',
+            ],
+            'listening_total_listening_time' => [
+                'listening_starter_bronze', 'listening_100_hours_platinum',
+                'listening_250_hours_diamond', 'listening_500_hours_mythic',
+            ],
+            'variety_genres_explored' => [
+                'variety_3_genres_bronze', 'variety_5_genres_silver', 'variety_8_genres_gold', 'variety_12_genres_platinum',
+            ],
+            'social_recommendations_sent' => [
+                'social_first_share_bronze', 'social_three_shares_silver',
+            ],
+            'social_books_reviewed' => [
+                'social_five_reviews_gold', 'social_ten_reviews_platinum', 'social_helpful_reviews_diamond',
+            ],
+            'completion_quick_finishes' => [
+                'completion_week_finish_silver', 'completion_5_in_row_diamond',
+            ],
+            'exploration_series_explored' => [
+                'exploration_new_series_bronze', 'exploration_three_series_gold', 'exploration_five_series_platinum',
+            ],
+            'discovery_bookmarks_created' => [
+                'discovery_first_wishlist_bronze', 'discovery_five_wishlist_silver',
+            ],
+            'collection_library_size' => [
+                'collection_first_library_bronze', 'collection_25_library_silver',
+                'collection_50_library_gold', 'collection_100_library_platinum',
+            ],
+        ];
+
+        $keyToSeries = [];
+        foreach ($series as $seriesKey => $keys) {
+            foreach ($keys as $order => $key) {
+                $keyToSeries[$key] = ['series_key' => $seriesKey, 'series_order' => $order + 1];
+            }
+        }
+
+        return $keyToSeries;
+    }
+
     public function run(): void
     {
         Badge::query()->update(['is_active' => false]);
 
         $order = 1;
+        $series = self::series();
 
         foreach (self::badges() as $badge) {
             $data = array_merge([
@@ -25,7 +87,9 @@ class CanonicalBadgeSeeder extends Seeder
                 'is_active' => true,
                 'is_repeatable' => false,
                 'sort_order' => $order++,
-            ], $badge);
+                'series_key' => null,
+                'series_order' => null,
+            ], $badge, $series[$badge['key']] ?? []);
 
             Badge::updateOrCreate(['key' => $data['key']], $data);
         }

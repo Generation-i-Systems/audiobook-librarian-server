@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $image_url
  * @property string $category
  * @property string $tier
+ * @property string|null $series_key
+ * @property int|null $series_order
  * @property int $points
  * @property array $criteria
  * @property bool $is_active
@@ -63,6 +65,8 @@ class Badge extends Model
         'image_url',
         'category',
         'tier',
+        'series_key',
+        'series_order',
         'points',
         'criteria',
         'is_active',

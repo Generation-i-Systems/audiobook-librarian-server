@@ -304,4 +304,28 @@ class BadgeApiTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('stats.latest_badge', $latestBadge->name);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function index_exposes_series_key_only_for_badges_that_share_the_same_criteria_ladder(): void
+    {
+        [, $headers] = $this->authenticateUser();
+
+        $this->seed(\Database\Seeders\CanonicalBadgeSeeder::class);
+
+        $response = $this->withHeaders($headers)->getJson('/api/v1/badges');
+
+        $response->assertOk();
+        $badges = collect($response->json('badges'))->keyBy('key');
+
+        // The library-size ladder shares one series...
+        $this->assertSame('collection_library_size', $badges['collection_first_library_bronze']['series_key']);
+        $this->assertSame('collection_library_size', $badges['collection_100_library_platinum']['series_key']);
+        $this->assertSame(1, $badges['collection_first_library_bronze']['series_order']);
+        $this->assertSame(4, $badges['collection_100_library_platinum']['series_order']);
+
+        // ...but "Series Complete" and "Curated Sets" measure unrelated criteria and must not be
+        // pulled into that ladder just because they share the "collection" category.
+        $this->assertNull($badges['collection_series_complete_diamond']['series_key']);
+        $this->assertNull($badges['collection_curated_sets_mythic']['series_key']);
+    }
 }

@@ -87,6 +87,8 @@ class BadgeController extends Controller
                 'image_url' => $badge->image_url,
                 'category' => $badge->category,
                 'tier' => $badge->tier,
+                'series_key' => $badge->series_key,
+                'series_order' => $badge->series_order,
                 'points' => $badge->points,
                 'is_repeatable' => $badge->is_repeatable,
                 'earned' => $hasEarned,
