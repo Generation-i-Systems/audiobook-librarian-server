@@ -1460,12 +1460,13 @@ Use these standard keys for consistency:
 | `primary`          | Main brand color       | `#2196F3` |
 | `background`       | Screen background      | `#121212` |
 | `surface`          | Card/panel backgrounds | `#1E1E1E` |
-| `text`             | Primary text color     | `#FFFFFF` |
+| `text`             | Primary text color (title, main labels) | `#FFFFFF` |
+| `secondaryText`    | Secondary/muted text (author, chapter, captions) - falls back to `text` if omitted | `#B0B0B0` |
 | `accent`           | Highlight color        | `#FF4081` |
 | `progressActive`   | Filled progress bar    | `#2196F3` |
 | `progressInactive` | Empty progress bar     | `#424242` |
 | `timeText`         | Time display text      | `#B3E5FC` |
-| `buttonTint`       | Button icon tint       | `#2196F3` |
+| `buttonTint`       | Button icon tint - used automatically as a button's default tint even without a `themeable.tint` override | `#2196F3` |
 
 **You can add custom keys** for your specific elements:
 
@@ -2890,6 +2891,18 @@ Enable debug mode to see:
 - Use minimum 48x48dp touch targets
 - Ensure good color contrast (4.5:1 for normal text)
 - Don't rely solely on color to convey information
+
+### Layout & Structure
+
+**Build with Containers**: Group related elements — a row of playback buttons, a progress bar with its time labels, a title/author block — into a container rather than positioning each element independently. The container becomes the one thing you move, resize, or restyle, instead of updating every child by hand.
+
+**Let Containers Handle Spacing**: Set `layoutDirection` on a container and use `gap` and `padding` to control spacing, instead of calculating `x`/`y` for each child yourself. Children space and align themselves automatically, and stay evenly spaced if you later add, remove, or resize one.
+
+**Minimize Fixed Positioning**: Prefer `"auto"`, `"max"`, `"line"`, and anchor points over exact pixel coordinates. Save manual, fixed positioning for layouts that genuinely call for precise placement — a circular control cluster, an overlapping decorative element — rather than using it as the default way to place things.
+
+**Align to Shared Reference Points**: Buttons in the same row, or text within the same block, should line up against a common edge, center line, or baseline. A container with automatic line layout enforces this for you; if you do position elements manually, keep them aligned deliberately rather than eyeballing it.
+
+**Follow the Built-In Skins**: The skins shipped with the player build their button rows and control panels this way — containers with `layoutDirection` and `gap` spacing, not long lists of manually placed elements. They're a good template to start a new skin from.
 
 ### Performance Tips
 
