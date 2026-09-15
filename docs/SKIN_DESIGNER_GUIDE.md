@@ -103,7 +103,7 @@ my-awesome-skin.zip
 - **Total ZIP size**: 50 MB max
 - **Individual images**: 5 MB max
 - **Individual fonts**: 2 MB max
-- **Supported image formats**: PNG, JPG, WebP
+- **Supported image formats**: PNG, JPG, WebP, SVG
 - **Supported font formats**: TTF, OTF
 
 ---
@@ -798,6 +798,8 @@ Static decorative image with advanced background modes, gradient support, and de
   (see [Night Mode](#night-mode) below), the renderer/preview tool uses `nightImage` instead of
   `customImage` for this element, falling back to `customImage` if `nightImage` is unset. Useful
   for a `background` element that should swap to different artwork at night.
+- `nightImages` - Optional dark-mode replacement for an `images` state map. Use the same state
+  keys (for example, `paused` and `playing`) so custom button artwork also changes in dark mode.
 - `foregroundImage` - The element's own picture, drawn on top of everything else (optional). If
   `customImage` is also set, it's drawn as a background fill behind `foregroundImage` instead of
   being used as the main picture. If `foregroundImage` is omitted, `customImage` is used as the
@@ -859,6 +861,10 @@ A container element groups multiple child elements together with **automatic lay
 #### Automatic Line Layout (NEW!)
 
 The easiest way to position buttons - just set `layoutDirection` and children space themselves automatically:
+
+> **Required child coordinates:** `layoutDirection` only lays out children marked with `"line"` on its main axis. In a horizontal container, every managed child needs `"x": "line"` and a cross-axis position such as `"y": "auto"`. In a vertical container, use `"y": "line"` and `"x": "auto"`. Omitting these coordinates defaults them to `0`, which stacks every child in the top-left corner.
+
+> **Supported fields:** use `gap` (not `spacing`) for line-layout gaps, `image` or `images` for artwork, `nightImage` for a single dark replacement, and `nightImages` for dark state-specific button art. `alignment`, `source`, `activeImage`, and `imageActive` are not manifest fields.
 
 ```json
 {
@@ -1138,8 +1144,7 @@ The `anchor` property determines where an element is positioned from:
 
 ### Bottom Anchoring Explained
 
-**Bottom anchors** are crucial for responsive layouts. When using bottom anchors, the `y` value is
-measured **from the bottom of the screen upward**.
+**Bottom anchors** are crucial for responsive layouts. Anchor the control to the bottom edge, leave `y` at `0`, and use a negative `offsetY` to move it upward by a stable distance. `y` remains a normal signed offset from the anchor; a positive `y` moves the element down and can place it off-screen.
 
 **Example**: Position a button 100 pixels from the bottom:
 
@@ -1148,8 +1153,9 @@ measured **from the bottom of the screen upward**.
   "id": "play-button",
   "type": "button",
   "x": 140,
-  "y": 100,
-  // 100 pixels FROM BOTTOM
+  "y": 0,
+  "offsetY": -100,
+  // 100 pixels above the bottom
   "width": 80,
   "height": 80,
   "anchor": "bottom-center"
@@ -2035,6 +2041,23 @@ Name it `minimal-player.zip`
 
 ## Advanced Techniques
 
+### Optional App-Wide Typography
+
+Most skins should leave app typography alone. A skin may optionally set a base family and size
+scale for ordinary app UI outside its player canvas. This affects Material text and shared top
+app bars; player elements still use their own `fontFamily` and `fontSize` fields.
+
+```json
+"appTypography": {
+  "fontFamily": "comic sans",
+  "fontSizeScale": 1.1
+}
+```
+
+- `fontFamily` accepts the same built-in, `custom:`, and `google:` values as text elements.
+- `fontSizeScale` is optional and multiplies the user's configured app text scale. Omit it to
+  preserve normal sizing.
+
 ### Custom Fonts
 
 Add custom fonts to make your skin unique:
@@ -2191,6 +2214,7 @@ the user having to pick a different theme:
   dark mode, the player (and `preview_skin.py --dark`) prefers `embeddedThemes.dark` over whatever
   `defaultTheme` points to. Skins that don't define a `"dark"` entry are unaffected — they keep
   using `defaultTheme` regardless of system dark mode, exactly as before this convention existed.
+- If the light and dark artwork/colors are a matched design, set `allowColorOverride` to `false`; otherwise a user-selected app palette may replace the skin colors even when `nightImage` is available.
 - For any `image`-type element (most commonly your `background` element), set `nightImage` to a
   dark-mode replacement picture (see [Image](#5-image)). It's swapped in for `customImage` under
   the same condition.
@@ -2909,6 +2933,7 @@ Enable debug mode to see:
 
 **Optimize Images**:
 
+- SVG assets are supported when they use self-contained basic shapes (`path`, `rect`, `circle`, `line`, `polygon`, and text). SVG filters (`filter`, `feTurbulence`, `feDisplacementMap`, and `url(#...)` filter references), external resources, and embedded raster images are not portable across the app SVG renderers. If a filter creates an essential effect such as texture, noise, displacement, or grain, convert that effect into ordinary vector paths/shapes in the SVG before packaging; use PNG/WebP only when a path-based conversion is impractical.
 - Use PNG for images with transparency
 - Use JPG for photos/gradients without transparency
 - Compress images before adding to skin
