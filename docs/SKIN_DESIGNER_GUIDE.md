@@ -1722,6 +1722,7 @@ elements:
 ```json
 "dataBinding": "playback.currentTime"  // "2:15:42"
 "dataBinding": "playback.totalTime"    // "10:53:07"
+"dataBinding": "playback.timeRemaining" // "8:37:25" (remaining, speed-adjusted)
 ```
 
 ### Playback Position
@@ -3041,6 +3042,7 @@ License: CC BY 4.0
 | `book.author`          | "Andy Weir"     | Author text          |
 | `playback.currentTime` | "2:15:42"       | Current time display |
 | `playback.totalTime`   | "10:53:07"      | Total time display   |
+| `playback.timeRemaining` | "8:37:25"     | Remaining time display (speed-adjusted) |
 | `playback.position`    | 0.207 (0.0-1.0) | Progress bar         |
 | `playback.state`       | "PLAYING"       | State indicator      |
 | `playback.speed`       | "1.5x"          | Speed display        |
