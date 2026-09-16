@@ -62,7 +62,6 @@
                 <p>{{ isset($book['description']) ? $book['description'] : 'No description available.' }}</p>
 
                 @auth
-                    @php $currentUser = Auth::user(); @endphp
                     <div class="mb-3" id="book-tags">
                         <strong>Tags:</strong>
                         <div class="mt-1">
@@ -105,7 +104,7 @@
                         @endif
 
                         <div class="row mt-2 g-2">
-                            @if($currentUser->isAdmin())
+                            @can('manage-tags')
                                 <div class="col-md-4">
                                     <form action="{{ route('books.tags.update', $book['id']) }}" method="POST" class="border rounded p-2">
                                         @csrf
@@ -116,7 +115,7 @@
                                         <button type="submit" class="btn btn-sm btn-outline-primary mt-1">Save</button>
                                     </form>
                                 </div>
-                            @endif
+                            @endcan
 
                             @foreach($userGroups as $group)
                                 @php
@@ -157,13 +156,11 @@
                         <i class="bi bi-download"></i> Download
                     </a>
 
-                    @auth
-                        @if(Auth::user()->is_admin)
-                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-warning float-end">
-                                <i class="bi bi-pencil"></i> Edit Book
-                            </a>
-                        @endif
-                    @endauth
+                    @can('manage-books')
+                        <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-warning float-end">
+                            <i class="bi bi-pencil"></i> Edit Book
+                        </a>
+                    @endcan
                 </div>
                 <hr>
 
@@ -187,12 +184,12 @@
                                         <div class="d-flex justify-content-between align-items-center mt-2">
                                             <a href="{{ route($showRoute, $relatedBook['id']) }}"
                                                 class="btn btn-sm btn-outline-primary">View</a>
-                                            @if(auth()->check() && (auth()->user()->is_admin ?? false))
+                                            @can('manage-books')
                                                 <a href="{{ route('admin.books.edit', $relatedBook['id']) }}"
                                                     class="btn btn-sm btn-outline-warning">
                                                     <i class="bi bi-pencil"></i> Edit
                                                 </a>
-                                            @endif
+                                            @endcan
                                         </div>
                                     </div>
                                 </div>

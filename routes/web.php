@@ -512,7 +512,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('books/{id}/planned-actions', [BookFormController::class, 'plannedActions'])
         ->name('books.plannedActions');
 
-    Route::resource('books', Admin\BookController::class)->except(['create']);
+    // 'show' is deliberately excluded here: Admin\BookController::show() was an exact
+    // duplicate of BookController::show() (both rendered the same books.show view), so
+    // admin.books.show now points at the single shared implementation below.
+    Route::resource('books', Admin\BookController::class)->except(['create', 'show']);
+    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
     Route::post('books/{book}/autofill-from-path', [Admin\BookController::class, 'autofillFromPath'])
         ->name('books.autofillFromPath');
     Route::get('books/create', [BookFormController::class, 'create'])->name('books.create');
