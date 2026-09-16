@@ -55,7 +55,7 @@ class BookControllerSeriesSortTest extends TestCase
             ]);
 
         // Make request with series filter but no sort parameter
-        $response = $this->get(route('admin.books.index', ['series' => 'Test Series']));
+        $response = $this->get(route('books.index', ['series' => 'Test Series']));
 
         $response->assertOk();
         $response->assertViewHas('sort', 'series_asc');
@@ -74,7 +74,7 @@ class BookControllerSeriesSortTest extends TestCase
             ]);
 
         // Make request with series filter and explicit sort parameter
-        $response = $this->get(route('admin.books.index', ['series' => 'Test Series', 'sort' => 'title_asc']));
+        $response = $this->get(route('books.index', ['series' => 'Test Series', 'sort' => 'title_asc']));
 
         $response->assertOk();
         $response->assertViewHas('sort', 'title_asc');
@@ -93,7 +93,7 @@ class BookControllerSeriesSortTest extends TestCase
             ]);
 
         // Make request with no filters
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertOk();
         $response->assertViewHas('sort', 'recent_desc');

@@ -66,7 +66,7 @@ class BookShowPermissionTest extends TestCase
         $response->assertSee('Edit Book');
     }
 
-    public function test_admin_url_and_user_url_render_the_same_show_page(): void
+    public function test_admin_url_redirects_to_the_shared_show_page(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']));
 
@@ -74,8 +74,7 @@ class BookShowPermissionTest extends TestCase
         $adminUrlResponse = $this->get(route('admin.books.show', ['book' => 'test-book-1']));
 
         $userUrlResponse->assertOk();
-        $adminUrlResponse->assertOk();
         $userUrlResponse->assertSee('Edit Book');
-        $adminUrlResponse->assertSee('Edit Book');
+        $adminUrlResponse->assertRedirect(route('books.show', ['book' => 'test-book-1']));
     }
 }

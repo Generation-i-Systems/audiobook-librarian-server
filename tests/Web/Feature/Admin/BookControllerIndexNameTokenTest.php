@@ -28,8 +28,7 @@ class BookControllerIndexNameTokenTest extends TestCase
             'id' => 'test-admin-user',
             'name' => 'Test Admin',
             'email' => 'admin@test.com',
-            'is_admin' => true,
-            'permissions' => ['admin.books.*'],
+            'role' => 'admin',
         ]);
 
         Auth::login($user);
@@ -45,7 +44,7 @@ class BookControllerIndexNameTokenTest extends TestCase
         $matching->genres()->attach($genre->id);
         Book::factory()->create(['title' => 'Other Book']);
 
-        $response = $this->get('/admin/books?search=' . urlencode('genre:Fantasy'));
+        $response = $this->get('/books?search=' . urlencode('genre:Fantasy'));
 
         $response->assertOk();
         $response->assertSee('Mistborn');
@@ -67,7 +66,7 @@ class BookControllerIndexNameTokenTest extends TestCase
         $this->app->instance(SemanticBookSearchService::class, $semanticService);
 
         $response = $this->get(
-            '/admin/books?search=' . urlencode('space adventure') . '&semantic=true'
+            '/books?search=' . urlencode('space adventure') . '&semantic=true'
         );
 
         $response->assertOk();

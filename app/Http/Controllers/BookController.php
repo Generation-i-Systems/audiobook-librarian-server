@@ -42,13 +42,21 @@ class BookController extends Controller
     }
 
     /**
-     * Display the main books index page with pagination and filtering
+     * Display the main books index page with pagination and filtering.
+     *
+     * Users with the manage-books permission get the management listing
+     * (needs-review books included, edit/delete affordances, admin sort
+     * options) instead of the standard browsing grid.
      *
      * @param Request $request
      * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
      */
     public function index(Request $request)
     {
+        if ($request->user()?->hasPermission(\App\Enums\PermissionKey::MANAGE_BOOKS)) {
+            return $this->managementIndex($request);
+        }
+
         $isLibrivoxMode = (string) config('library_profiles.active_source_mode', 'local') === 'librivox';
 
         // Memory monitoring
@@ -168,6 +176,207 @@ class BookController extends Controller
             'mainPerPage' => $perPage,
             'currentFilters' => $filters,
         ]);
+    }
+
+    /**
+     * The management listing shown instead of index() to users with the
+     * manage-books permission — moved here from the (now-deleted)
+     * Admin\BookController::index(), unchanged, still rendering the
+     * admin.books.index view.
+     */
+    protected function managementIndex(Request $request)
+    {
+        if (config('library_profiles.active_source_mode') === 'librivox') {
+            return redirect()->route('admin.librivox.index');
+        }
+
+        // Emergency: Increase memory limit aggressively
+        try {
+            // Get pagination and filter parameters from request
+            $page = max(1, (int) $request->input('page', 1));
+            $perPage = 20;
+
+            // Get filters from request
+            $filters = [];
+            if ($request->filled('author')) {
+                $filters['author'] = $request->input('author');
+            }
+            if ($request->filled('series')) {
+                $filters['series'] = $request->input('series');
+            }
+            if ($request->filled('genre')) {
+                $filters['genre'] = $request->input('genre');
+            } elseif ($request->filled('genre_id')) {
+                $filters['genre_id'] = $request->input('genre_id');
+            }
+            if ($request->filled('tag')) {
+                $filters['tag'] = $request->input('tag');
+            }
+            if ($request->filled('tags')) {
+                $filters['tags'] = $request->input('tags');
+            }
+
+            $tokens = $this->parseSearchTokens($request->input('search', ''));
+            if ($tokens['author_id']) {
+                $filters['author_id'] = $tokens['author_id'];
+                unset($filters['author']);
+            } elseif ($tokens['author_name']) {
+                $filters['author'] = $tokens['author_name'];
+            }
+            if ($tokens['genre_id']) {
+                $filters['genre_id'] = $tokens['genre_id'];
+                unset($filters['genre']);
+            } elseif ($tokens['genre_name']) {
+                $filters['genre'] = $tokens['genre_name'];
+            }
+            if ($tokens['series_id']) {
+                $filters['series_id'] = $tokens['series_id'];
+                unset($filters['series']);
+            } elseif ($tokens['series_name']) {
+                $filters['series'] = $tokens['series_name'];
+            }
+            if ($tokens['book_id']) {
+                $filters['book_id'] = $tokens['book_id'];
+            }
+            if ($tokens['tag']) {
+                $filters['tag'] = isset($filters['tag'])
+                    ? $filters['tag'] . ',' . $tokens['tag']
+                    : $tokens['tag'];
+            }
+            if ($tokens['search'] !== '') {
+                $filters['search'] = $tokens['search'];
+            }
+
+            // Admin panel should see books that need review
+            $filters['include_needs_review'] = true;
+
+            // Get sorting parameters
+            $sortParam = $request->input('sort', 'recent_desc');
+
+            // Default to series (number) sorting when a series filter is applied
+            if (($request->filled('series') || $tokens['series_id']) && !$request->has('sort')) {
+                $sortParam = 'series_asc';
+            }
+
+            $sort = 'created_at'; // Default internal sort
+            $order = 'desc';      // Default internal order
+
+            // Map admin panel sort options to MySqlService sort options
+            switch ($sortParam) {
+                case 'recent_desc':
+                    $sort = 'created_at';
+                    $order = 'desc';
+                    break;
+                case 'recent_asc':
+                    $sort = 'created_at';
+                    $order = 'asc';
+                    break;
+                case 'author_asc':
+                    $sort = 'author';
+                    $order = 'asc';
+                    break;
+                case 'author_desc':
+                    $sort = 'author';
+                    $order = 'desc';
+                    break;
+                case 'title_asc':
+                    $sort = 'title';
+                    $order = 'asc';
+                    break;
+                case 'title_desc':
+                    $sort = 'title';
+                    $order = 'desc';
+                    break;
+                case 'series_asc':
+                    $sort = 'series';
+                    $order = 'asc';
+                    break;
+                case 'series_desc':
+                    $sort = 'series';
+                    $order = 'desc';
+                    break;
+                case 'genre_asc':
+                    $sort = 'genre';
+                    $order = 'asc';
+                    break;
+                case 'genre_desc':
+                    $sort = 'genre';
+                    $order = 'desc';
+                    break;
+                case 'year_asc':
+                    $sort = 'release_date';
+                    $order = 'asc';
+                    break;
+                case 'year_desc':
+                    $sort = 'release_date';
+                    $order = 'desc';
+                    break;
+                default:
+                    // If an unknown sort param is passed, fall back to recent_desc
+                    $sort = 'created_at';
+                    $order = 'desc';
+                    break;
+            }
+
+            if ($request->boolean('semantic') && !empty($filters['search'])) {
+                $rankedIds = $this->semanticBookSearchService->rankedBookIds($filters['search']);
+                if (!empty($rankedIds)) {
+                    $filters['book_ids'] = $rankedIds;
+                    unset($filters['search']);
+                    $sort = 'relevance';
+                }
+            }
+
+            // Get paginated and filtered books from the document store service
+            // Include all books (even with missing directories) for admin panel
+            $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, true);
+
+            $books = $result['data'];
+
+            $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+
+            foreach ($books as &$book) {
+                $directoryPath = $book['directoryPath'] ?? ($book['directory_path'] ?? null);
+                if (is_string($directoryPath) && $directoryPath !== '') {
+                    $normalizedDirectoryPath = trim($directoryPath, '/');
+                    $absolutePath = $bookRoot . '/' . $normalizedDirectoryPath;
+
+                    $book['directoryPath'] = $normalizedDirectoryPath;
+                    $book['directoryExists'] = is_dir($absolutePath);
+                } else {
+                    $book['directoryExists'] = false;
+                    $book['directoryPath'] = null;
+                }
+            }
+
+            // Wrap in paginator
+            $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+                $books,
+                $result['total'],
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+
+
+            // Store the current URL as the last viewed list for redirects after edit/update
+            session(['last_admin_list_url' => $request->fullUrl()]);
+
+            return view('admin.books.index', [
+                'books' => $paginator,
+                'sort' => $sortParam,
+            ]);
+        } catch (\Throwable $e) {
+            // Log the error using Laravel's logging system
+            Log::error('Admin BookController error', [
+                'message' => $e->getMessage(),
+                'memory_usage' => number_format(memory_get_usage()),
+                'peak_memory' => number_format(memory_get_peak_usage()),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
+        }
     }
 
     /**

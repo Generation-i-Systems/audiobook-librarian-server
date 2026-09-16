@@ -512,11 +512,13 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('books/{id}/planned-actions', [BookFormController::class, 'plannedActions'])
         ->name('books.plannedActions');
 
-    // 'show' is deliberately excluded here: Admin\BookController::show() was an exact
-    // duplicate of BookController::show() (both rendered the same books.show view), so
-    // admin.books.show now points at the single shared implementation below.
-    Route::resource('books', Admin\BookController::class)->except(['create', 'show']);
-    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+    // 'index' and 'show' are deliberately excluded here: both were exact duplicates of
+    // BookController's versions (index() gained a manage-books branch that renders the
+    // same admin.books.index view; show() rendered the identical books.show view). Their
+    // names are registered outside this admin-only-gated group (below, at top level) as
+    // plain redirects to the shared /books URLs, so a manage-books permission holder who
+    // isn't a full admin can still follow an old bookmarked /admin/books(/…) link.
+    Route::resource('books', Admin\BookController::class)->except(['create', 'show', 'index']);
     Route::post('books/{book}/autofill-from-path', [Admin\BookController::class, 'autofillFromPath'])
         ->name('books.autofillFromPath');
     Route::get('books/create', [BookFormController::class, 'create'])->name('books.create');
@@ -784,3 +786,13 @@ foreach (['tags', 'genres', 'authors', 'badges', 'series'] as $blendedEntity) {
         '/' . $blendedEntity . ($any ? '/' . $any : '') . (($qs = request()->getQueryString()) ? '?' . $qs : '')
     ))->where('any', '.*');
 }
+
+// admin.books.index / admin.books.show: named (many other admin views still call these
+// by name) redirects to the shared /books URLs, registered last for the same shadowing
+// reason as above (e.g. must not swallow admin.books.relatedAjax at
+// /admin/books/related-ajax) and outside the 'admin' role middleware so a manage-books
+// permission holder who isn't a full admin can still follow an old bookmarked link.
+Route::name('admin.')->prefix('admin')->middleware(['auth'])->group(function (): void {
+    Route::get('/books', fn () => redirect()->route('books.index'))->name('books.index');
+    Route::get('/books/{book}', fn ($book) => redirect()->route('books.show', $book))->name('books.show');
+});

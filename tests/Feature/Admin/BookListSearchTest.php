@@ -31,7 +31,7 @@ class BookListSearchTest extends TestCase
             'tags' => ['spicy'],
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin/books?search=' . urlencode('genreId:' . $fantasy->id . ' tag:-spicy'));
+        $response = $this->actingAs($admin)->get('/books?search=' . urlencode('genreId:' . $fantasy->id . ' tag:-spicy'));
 
         $response->assertOk();
         $response->assertSee('Safe Fantasy');

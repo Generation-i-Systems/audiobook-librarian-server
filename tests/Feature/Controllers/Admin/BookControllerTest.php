@@ -80,7 +80,7 @@ class BookControllerTest extends TestCase
             'total' => count($books),
         ]);
 
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
             ->assertViewIs('admin.books.index')
@@ -98,7 +98,7 @@ class BookControllerTest extends TestCase
             })
             ->andReturn(['data' => [], 'total' => 0]);
 
-        $response = $this->get(route('admin.books.index', ['search' => 'bookId:42']));
+        $response = $this->get(route('books.index', ['search' => 'bookId:42']));
 
         $response->assertStatus(200);
     }
@@ -113,7 +113,7 @@ class BookControllerTest extends TestCase
             })
             ->andReturn(['data' => [], 'total' => 0]);
 
-        $response = $this->get(route('admin.books.index', ['search' => 'seriesId:7']));
+        $response = $this->get(route('books.index', ['search' => 'seriesId:7']));
 
         $response->assertStatus(200);
     }
@@ -232,7 +232,7 @@ class BookControllerTest extends TestCase
             'total' => count($books),
         ]);
 
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
             ->assertSee(route('admin.books.autofillFromPath', '1'), false);

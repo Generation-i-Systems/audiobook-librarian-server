@@ -65,7 +65,7 @@ class BookControllerCoverImageArrayTest extends TestCase
             'total' => count($books),
         ]);
 
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
             ->assertViewIs('admin.books.index')
@@ -88,7 +88,7 @@ class BookControllerCoverImageArrayTest extends TestCase
             'total' => count($books),
         ]);
 
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
             ->assertViewIs('admin.books.index')
@@ -111,7 +111,7 @@ class BookControllerCoverImageArrayTest extends TestCase
             'total' => count($books),
         ]);
 
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
             ->assertViewIs('admin.books.index')
@@ -134,7 +134,7 @@ class BookControllerCoverImageArrayTest extends TestCase
             'total' => count($books),
         ]);
 
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
             ->assertViewIs('admin.books.index')
@@ -157,7 +157,7 @@ class BookControllerCoverImageArrayTest extends TestCase
             'total' => count($books),
         ]);
 
-        $response = $this->get(route('admin.books.index'));
+        $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
             ->assertViewIs('admin.books.index')
