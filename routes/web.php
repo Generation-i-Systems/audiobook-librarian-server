@@ -15,8 +15,10 @@ use App\Http\Controllers\Admin\BookPathController;
 use App\Http\Controllers\Admin\BookSeriesController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\AppConnectController;
+use App\Http\Controllers\AuthorController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FollowController;
+use App\Http\Controllers\GenreController;
 use App\Http\Controllers\ImageProxyController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
@@ -260,7 +262,75 @@ Route::get('/admin/series-autocomplete', [BookAutocompleteController::class, 'au
     ->name('admin.series.autocomplete')
     ->middleware(['auth', 'admin']);
 
+// --- Blended content-management routes (permission-gated, no separate admin namespace) ---
+// Read-only pages are open to any authenticated user; mutating actions require the
+// matching PermissionKey (see app/Enums/PermissionKey.php and CLAUDE.md plan
+// "Blend admin and user modes"). Old /admin/{entity} URLs redirect below.
+Route::middleware(['auth'])->group(function (): void {
+    // Tags (system tag catalog — distinct from a single book's own tags, see
+    // App\Http\Controllers\TagController::update for that).
+    Route::get('/tags', [\App\Http\Controllers\SystemTagController::class, 'index'])->name('tags.index');
+    Route::middleware('permission:manage-tags')->group(function (): void {
+        Route::get('/tags/{tag}/edit', [\App\Http\Controllers\SystemTagController::class, 'edit'])
+            ->where('tag', '.+')->name('tags.edit');
+        Route::put('/tags/{tag}', [\App\Http\Controllers\SystemTagController::class, 'update'])
+            ->where('tag', '.+')->name('tags.update');
+        Route::delete('/tags/{tag}', [\App\Http\Controllers\SystemTagController::class, 'destroy'])
+            ->where('tag', '.+')->name('tags.destroy');
+    });
 
+    // Genres
+    Route::get('/genres', [GenreController::class, 'index'])->name('genres.index');
+    Route::get('/genres/{genre}/authors', [GenreController::class, 'authors'])->name('genres.authors');
+    Route::middleware('permission:manage-genres')->group(function (): void {
+        Route::get('/genres/create', [GenreController::class, 'create'])->name('genres.create');
+        Route::post('/genres', [GenreController::class, 'store'])->name('genres.store');
+        Route::get('/genres/{genre}/edit', [GenreController::class, 'edit'])->name('genres.edit');
+        Route::put('/genres/{genre}', [GenreController::class, 'update'])->name('genres.update');
+        Route::delete('/genres/{genre}', [GenreController::class, 'destroy'])->name('genres.destroy');
+        Route::post('/genres/merge', [GenreController::class, 'merge'])->name('genres.merge');
+    });
+
+    // Authors
+    Route::get('/authors', [AuthorController::class, 'index'])->name('authors.index');
+    Route::get('/authors/ajax', [AuthorController::class, 'ajax'])->name('authors.ajax');
+    Route::get('/authors/{author}/browse', [AuthorController::class, 'browse'])->name('authors.browse');
+    Route::middleware('permission:manage-authors')->group(function (): void {
+        Route::get('/authors/create', [AuthorController::class, 'create'])->name('authors.create');
+        Route::post('/authors', [AuthorController::class, 'store'])->name('authors.store');
+        Route::get('/authors/{author}/edit', [AuthorController::class, 'edit'])->name('authors.edit');
+        Route::put('/authors/{author}', [AuthorController::class, 'update'])->name('authors.update');
+        Route::delete('/authors/{author}', [AuthorController::class, 'destroy'])->name('authors.destroy');
+        Route::post('/authors/toggle-merge', [AuthorController::class, 'toggleMerge'])->name('authors.toggle-merge');
+        Route::post('/authors/clear-merge', [AuthorController::class, 'clearMerge'])->name('authors.clear-merge');
+        Route::post('/authors/merge', [AuthorController::class, 'merge'])->name('authors.merge');
+    });
+
+    // Badges
+    Route::get('/badges', [\App\Http\Controllers\BadgeController::class, 'index'])->name('badges.index');
+    Route::middleware('permission:manage-badges')->group(function (): void {
+        Route::get('/badges/create', [\App\Http\Controllers\BadgeController::class, 'create'])->name('badges.create');
+        Route::post('/badges', [\App\Http\Controllers\BadgeController::class, 'store'])->name('badges.store');
+        Route::get('/badges/{badge}/edit', [\App\Http\Controllers\BadgeController::class, 'edit'])->name('badges.edit');
+        Route::put('/badges/{badge}', [\App\Http\Controllers\BadgeController::class, 'update'])->name('badges.update');
+        Route::delete('/badges/{badge}', [\App\Http\Controllers\BadgeController::class, 'destroy'])->name('badges.destroy');
+        Route::post('/badges/{badge}/activate', [\App\Http\Controllers\BadgeController::class, 'activate'])
+            ->name('badges.activate');
+        Route::delete('/badges/{badge}/force', [\App\Http\Controllers\BadgeController::class, 'forceDestroy'])
+            ->name('badges.forceDestroy');
+    });
+
+    // Series (ManageSeriesController handles the list/merge/rename page;
+    // SeriesController handles a single series record's edit/update/destroy)
+    Route::get('/series/manage', [\App\Http\Controllers\ManageSeriesController::class, 'index'])->name('series.manage');
+    Route::middleware('permission:manage-series')->group(function (): void {
+        Route::post('/series/merge', [\App\Http\Controllers\ManageSeriesController::class, 'merge'])->name('series.merge');
+        Route::post('/series/rename', [\App\Http\Controllers\ManageSeriesController::class, 'rename'])->name('series.rename');
+        Route::get('/series/{series}/edit', [\App\Http\Controllers\SeriesController::class, 'edit'])->name('series.edit');
+        Route::put('/series/{series}', [\App\Http\Controllers\SeriesController::class, 'update'])->name('series.update');
+        Route::delete('/series/{series}', [\App\Http\Controllers\SeriesController::class, 'destroy'])->name('series.destroy');
+    });
+});
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () use ($redirectToGalleryWww): void {
     // Admin Social Activity Dashboard
@@ -399,7 +469,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/books/audible', action: [BookMetadataSearchController::class, 'audible'])->name('books.audible');
 
     // AJAX endpoints for Tom Select
-    Route::get('/authors/ajax', [Admin\AuthorController::class, 'ajax'])->name('authors.ajax');
     Route::get('/series/ajax', [BookSeriesController::class, 'seriesAjax'])->name('series.ajax');
     Route::post(
         '/import/rename',
@@ -443,21 +512,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('books/{id}/planned-actions', [BookFormController::class, 'plannedActions'])
         ->name('books.plannedActions');
 
-    Route::get('genres/{genre}/authors', [Admin\GenreController::class, 'authors'])->name('genres.authors');
-    Route::post('genres/merge', [Admin\GenreController::class, 'merge'])->name('genres.merge');
-
-    Route::get('authors/{author}/browse', [Admin\AuthorController::class, 'browse'])->name('authors.browse');
-    Route::post('authors/toggle-merge', [Admin\AuthorController::class, 'toggleMerge'])->name('authors.toggle-merge');
-    Route::post('authors/clear-merge', [Admin\AuthorController::class, 'clearMerge'])->name('authors.clear-merge');
-    Route::post('authors/merge', [Admin\AuthorController::class, 'merge'])->name('authors.merge');
-
-    Route::get('tags', [Admin\TagController::class, 'index'])->name('tags.index');
-    Route::get('tags/{tag}/edit', [Admin\TagController::class, 'edit'])->where('tag', '.+')->name('tags.edit');
-    Route::put('tags/{tag}', [Admin\TagController::class, 'update'])->where('tag', '.+')->name('tags.update');
-    Route::delete('tags/{tag}', [Admin\TagController::class, 'destroy'])->where('tag', '.+')->name('tags.destroy');
-
-    Route::resource('genres', Admin\GenreController::class);
-    Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class)->except(['create']);
     Route::post('books/{book}/autofill-from-path', [Admin\BookController::class, 'autofillFromPath'])
         ->name('books.autofillFromPath');
@@ -491,37 +545,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\ParsePathController::class,
         'parsePath',
     ])->name('books.parsePath');
-
-    // Series management routes
-    Route::get('/series/manage', [
-        Admin\ManageSeriesController::class,
-        'index',
-    ])->name('series.manage');
-
-    Route::post('/series/merge', [
-        Admin\ManageSeriesController::class,
-        'merge',
-    ])->name('series.merge');
-
-    Route::post('/series/rename', [
-        Admin\ManageSeriesController::class,
-        'rename',
-    ])->name('series.rename');
-
-    Route::get('/series/{series}/edit', [
-        Admin\SeriesController::class,
-        'edit',
-    ])->name('series.edit');
-
-    Route::put('/series/{series}', [
-        Admin\SeriesController::class,
-        'update',
-    ])->name('series.update');
-
-    Route::delete('/series/{series}', [
-        Admin\SeriesController::class,
-        'destroy',
-    ])->name('series.destroy');
 
     // LibriVox management
     Route::prefix('librivox')->name('librivox.')->group(function (): void {
@@ -567,11 +590,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'bulkImportBooksFromDir',
     ])->name('books.bulkImportDir');
 
-    // Badge management
-    Route::resource('badges', Admin\BadgeController::class)->except(['show']);
-    Route::post('badges/{badge}/activate', [Admin\BadgeController::class, 'activate'])->name('badges.activate');
-    Route::delete('badges/{badge}/force', [Admin\BadgeController::class, 'forceDestroy'])->name('badges.forceDestroy');
-
     // User management
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
@@ -580,6 +598,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('users.sendOtp');
     Route::post('users/{id}/login-qr', [Admin\UserController::class, 'generateLoginQr'])
         ->name('users.loginQr');
+    Route::patch('users/{id}/permissions', [Admin\UserController::class, 'updatePermissions'])
+        ->name('users.updatePermissions');
 
     // Event timeline
     Route::get('users/{user}/events', [Admin\EventTimelineController::class, 'index'])
@@ -750,3 +770,13 @@ Route::name('gallery.')->prefix('gallery')->group(function () use ($redirectToGa
         Route::post('/{id}/rate', $redirectToGalleryWww)->name('rate');
     });
 });
+
+// Redirects for bookmarked/open old /admin/{entity} URLs that moved to top-level,
+// permission-gated routes above (Phase 1 of the admin/user blend). Registered last
+// so any still-active /admin/* route (e.g. admin.series.ajax, used by the book form)
+// is matched first — this only catches paths nothing above claimed.
+foreach (['tags', 'genres', 'authors', 'badges', 'series'] as $blendedEntity) {
+    Route::get('/admin/' . $blendedEntity . '/{any?}', fn (?string $any = null) => redirect(
+        '/' . $blendedEntity . ($any ? '/' . $any : '') . (($qs = request()->getQueryString()) ? '?' . $qs : '')
+    ))->where('any', '.*');
+}

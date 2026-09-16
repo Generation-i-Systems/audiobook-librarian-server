@@ -40,9 +40,9 @@
             <a href="{{ route('admin.books.create') }}" class="btn btn-primary">Add New Book</a>
             <a href="{{ route('admin.books.import') }}" class="btn btn-info">Import Book(s)</a>
             <a href="{{ route('admin.books.importFile') }}" class="btn btn-warning ms-2">Import from File/Audio</a>
-            <a href="{{ route('admin.authors.index') }}" class="btn btn-outline-secondary ms-2">Manage Authors</a>
-            <a href="{{ route('admin.genres.index') }}" class="btn btn-outline-secondary ms-2">Manage Genres</a>
-            <a href="{{ route('admin.series.manage') }}" class="btn btn-outline-secondary ms-2">Manage Series</a>
+            <a href="{{ route('authors.index') }}" class="btn btn-outline-secondary ms-2">Manage Authors</a>
+            <a href="{{ route('genres.index') }}" class="btn btn-outline-secondary ms-2">Manage Genres</a>
+            <a href="{{ route('series.manage') }}" class="btn btn-outline-secondary ms-2">Manage Series</a>
             <a href="{{ route('admin.needs_review.index') }}" class="btn btn-outline-danger ms-2">Needs Review</a>
         </div>
         @php

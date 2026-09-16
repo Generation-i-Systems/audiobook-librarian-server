@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
-// use Illuminate\Support\Facades\Gate;
+use App\Contracts\Permissible;
+use App\Enums\PermissionKey;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Illuminate\Support\Facades\Gate;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -24,6 +26,11 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        //
+        // Admins/super-admins implicitly pass every permission check.
+        Gate::before(fn (Permissible $user) => $user->isAdmin() ? true : null);
+
+        foreach (PermissionKey::cases() as $permissionKey) {
+            Gate::define($permissionKey->value, fn (Permissible $user) => $user->hasPermission($permissionKey));
+        }
     }
 }

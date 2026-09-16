@@ -126,6 +126,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\CheckAdminRole::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
             'standard' => \App\Http\Middleware\RequireLibraryRole::class,
             'library' => \App\Http\Middleware\RequireLibraryRole::class,
             'active' => \App\Http\Middleware\EnsureActiveUser::class,

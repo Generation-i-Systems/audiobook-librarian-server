@@ -2,6 +2,9 @@
 
 namespace App\Auth;
 
+use App\Contracts\Permissible;
+use App\Enums\PermissionKey;
+use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use ArrayAccess;
 
@@ -17,7 +20,7 @@ use ArrayAccess;
  * @property string $role
  * @property-read bool $is_admin
  */
-class DocumentstoreUser implements Authenticatable
+class DocumentstoreUser implements Authenticatable, Permissible
 {
     /**
      * User data as a simple array
@@ -176,6 +179,25 @@ class DocumentstoreUser implements Authenticatable
         $role = $this->userData['role'] ?? 'library-user';
 
         return in_array($role, ['admin', 'super-admin'], true);
+    }
+
+    /**
+     * Permission data (the `permission_user` pivot) isn't part of the
+     * lightweight document-store user payload, so this delegates to the
+     * Eloquent User record for the same id when a non-admin check is needed.
+     */
+    public function hasPermission(PermissionKey|string $key): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        $id = $this->userData['id'] ?? null;
+        if ($id === null) {
+            return false;
+        }
+
+        return (bool) User::find($id)?->hasPermission($key);
     }
 
     /**

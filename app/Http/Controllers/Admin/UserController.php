@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Enums\PermissionKey;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Controller;
+use App\Models\Permission;
 use App\Models\User;
 use App\Models\UserTagFilter;
 use App\Services\UserTagFilterService;
@@ -102,7 +104,13 @@ class UserController extends Controller
             ->get()
             ->groupBy('mode');
 
-        return view('admin.users.edit', compact('user', 'activityData', 'adminTagFilters'));
+        $allPermissions = Permission::query()->orderBy('label')->get();
+        $userPermissionKeys = User::findOrFail($id)->permissions()->pluck('key')->all();
+
+        return view(
+            'admin.users.edit',
+            compact('user', 'activityData', 'adminTagFilters', 'allPermissions', 'userPermissionKeys')
+        );
     }
 
     public function show($id)
@@ -215,6 +223,25 @@ class UserController extends Controller
     public function generateLoginQr(Request $request, $id)
     {
         return app(AdminUserController::class)->generateLoginQr($request, (string) $id);
+    }
+
+    public function updatePermissions(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'string|in:' . implode(',', array_map(
+                fn (PermissionKey $permissionKey) => $permissionKey->value,
+                PermissionKey::cases()
+            )),
+        ]);
+
+        $permissionIds = Permission::query()
+            ->whereIn('key', $validated['permissions'] ?? [])
+            ->pluck('id');
+
+        User::findOrFail($id)->permissions()->sync($permissionIds);
+
+        return back()->with('success', 'Permissions updated successfully.');
     }
 
     public function destroy($id)

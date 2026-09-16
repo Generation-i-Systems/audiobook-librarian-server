@@ -89,6 +89,22 @@
                     <!-- Left Side Of Navbar -->
                     <ul class="navbar-nav me-auto">
                         @auth
+                            <!-- Blended links (Phase 1+): always shown, mutation actions are permission-gated on the pages themselves -->
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white" href="{{ route('authors.index') }}">Authors</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white" href="{{ route('genres.index') }}">Genres</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white" href="{{ route('tags.index') }}">Tags</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white" href="{{ route('badges.index') }}">Badges</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white" href="{{ route('series.manage') }}">Series</a>
+                            </li>
                             @if(request()->is('admin/*'))
                                 <!-- Admin Links (Show only in admin section) -->
                                 <li class="nav-item">
@@ -96,9 +112,6 @@
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('admin.library-repair.index') }}">Library Repair</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.tags.index') }}">Tags</a>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white"

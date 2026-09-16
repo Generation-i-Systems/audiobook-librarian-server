@@ -158,6 +158,41 @@
         </div>
     </form>
 
+    @if(isset($allPermissions))
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Permissions</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Admins and super admins implicitly have every permission. Grant individual
+                    permissions here to let a non-admin user perform specific admin actions.
+                </p>
+                <form action="{{ route('admin.users.updatePermissions', $user['id']) }}" method="POST">
+                    @csrf
+                    @method('PATCH')
+                    <div class="row">
+                        @foreach($allPermissions as $permission)
+                            <div class="col-md-6 mb-2">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" name="permissions[]"
+                                           id="permission-{{ $permission->key }}" value="{{ $permission->key }}"
+                                           {{ in_array($permission->key, $userPermissionKeys, true) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="permission-{{ $permission->key }}">
+                                        {{ $permission->label }}
+                                    </label>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-2">
+                        <i class="fas fa-save me-1"></i> Update Permissions
+                    </button>
+                </form>
+            </div>
+        </div>
+    @endif
+
     @if(!empty($user['email']))
         <div class="card mb-4">
             <div class="card-header">

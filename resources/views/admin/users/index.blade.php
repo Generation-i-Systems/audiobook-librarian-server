@@ -17,7 +17,7 @@
             <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Add User
             </a>
-            <a href="{{ route('admin.badges.index') }}" class="btn btn-info text-white">
+            <a href="{{ route('badges.index') }}" class="btn btn-info text-white">
                 <i class="fas fa-medal"></i> All Badges
             </a>
         </div>

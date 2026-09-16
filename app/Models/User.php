@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Contracts\Permissible;
+use App\Enums\PermissionKey;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -64,7 +66,7 @@ use App\Traits\Auditable;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User withoutTrashed()
  * @mixin \Eloquent
  */
-class User extends Authenticatable
+class User extends Authenticatable implements Permissible
 {
     use HasApiTokens;
     use HasFactory;
@@ -124,6 +126,22 @@ class User extends Authenticatable
         $role = $this->role ?? 'user';
 
         return in_array($role, ['admin', 'super-admin'], true);
+    }
+
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'permission_user');
+    }
+
+    public function hasPermission(PermissionKey|string $key): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        $key = $key instanceof PermissionKey ? $key->value : $key;
+
+        return $this->permissions()->where('key', $key)->exists();
     }
 
     public function books(): BelongsToMany

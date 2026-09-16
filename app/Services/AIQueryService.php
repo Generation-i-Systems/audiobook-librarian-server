@@ -1016,7 +1016,7 @@ PROMPT;
             'id' => $author['id'] ?? null,
             'name' => $author['name'] ?? 'Unknown',
             'book_count' => $author['book_count'] ?? $author['bookCount'] ?? 0,
-            'edit_url' => route('admin.authors.edit', $author['id'] ?? 0),
+            'edit_url' => route('authors.edit', $author['id'] ?? 0),
         ];
     }
 
@@ -1026,7 +1026,7 @@ PROMPT;
             'id' => $genre['id'] ?? null,
             'name' => $genre['name'] ?? 'Unknown',
             'book_count' => $genre['book_count'] ?? $genre['bookCount'] ?? 0,
-            'edit_url' => route('admin.genres.edit', $genre['id'] ?? 0),
+            'edit_url' => route('genres.edit', $genre['id'] ?? 0),
         ];
     }
 
@@ -1036,7 +1036,7 @@ PROMPT;
             'id' => $series['id'] ?? null,
             'name' => $series['name'] ?? 'Unknown',
             'book_count' => $series['book_count'] ?? $series['bookCount'] ?? 0,
-            'edit_url' => route('admin.series.edit', $series['id'] ?? 0),
+            'edit_url' => route('series.edit', $series['id'] ?? 0),
         ];
     }
 
