@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
-use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\NewUserRegistrationNotifier;
@@ -205,17 +204,22 @@ class LoginController extends Controller
                 $this->registrationNotifier->send((array) $userArr, 'web-google', request());
             }
 
-            Log::debug('User array from DB before creating DocumentstoreUser', ['userArr' => $userArr]);
+            Log::debug('User array from DB before logging in', ['userArr' => $userArr]);
 
-            // Create user object and log in
-            $user = new DocumentstoreUser((array) $userArr);
-            Log::debug('DocumentstoreUser object created', ['user_object_data' => $user->getRawUser()]);
+            // Log in as the canonical Eloquent user — the same type the session
+            // guard hydrates on every subsequent request. Hydrated from the fresh
+            // store data (not re-queried) so it reflects this callback exactly.
+            $user = (new \App\Models\User())->newFromBuilder((array) $userArr);
+
+            if ($user->getAuthIdentifier() === null) {
+                throw new \Exception('Failed to load user account after create/update.');
+            }
 
             Auth::login($user, true);
 
             Log::debug('Auth state immediately after login', [
                 'auth_check' => Auth::check(),
-                'auth_user_data' => Auth::user() ? Auth::user()->getRawUser() : null,
+                'auth_user_id' => Auth::id(),
             ]);
 
             Log::info('User logged in via Google', [

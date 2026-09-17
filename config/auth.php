@@ -76,11 +76,11 @@ return [
     */
 
     'providers' => [
-        // Custom Firestore user provider
+        // Returns full App\Models\User Eloquent models from the document store
+        // (MySQL) so Auth::user() has one type regardless of how the request authenticated.
         'documentstore' => [
             'driver' => 'documentstore',
-            'model' => App\Auth\DocumentstoreUser::class,
-            // 'model' => env('AUTH_MODEL', App\Models\User::class), // No longer needed
+            'model' => App\Models\User::class,
         ],
 
         'users' => [

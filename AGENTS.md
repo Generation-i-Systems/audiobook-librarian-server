@@ -197,7 +197,7 @@ npm run test:coverage
 - Prefer dependency injection over facades where possible
 - **MUST update openapi.json after any API change** as it is the source of truth for the API
 - **MUST NOT access database from controllers** - must use DocumentStoreServiceInterface
-- User authentication handled by DocumentstoreUser NOT models/User
+- User authentication returns the Eloquent `App\Models\User` model from all guards (`DocumentUserProvider`); the legacy `DocumentstoreUser` wrapper is no longer the authenticated user
 - Use Laravel Pint with config from `.pint.json` in project root if present
 - **MUST use database abstraction layer for database access**
 - **MUST use as little code in Blade templates as possible** - prefer controllers/services/separate JS files

@@ -5,10 +5,25 @@ declare(strict_types=1);
 namespace App\Auth;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Resolves authenticated users for the session/token guards as full
+ * App\Models\User Eloquent models.
+ *
+ * Historically this returned the lightweight App\Auth\DocumentstoreUser
+ * wrapper (a Firestore-era optimization). That created two different
+ * "Auth::user()" shapes depending on how the request was authenticated
+ * (session => DocumentstoreUser, API bearer token => Eloquent User),
+ * and any code touching Eloquent relations or non-whitelisted attributes
+ * crashed or silently read nulls in production while tests using
+ * actingAs() passed. Returning the Eloquent model everywhere removes
+ * that class of bug.
+ */
 class DocumentUserProvider implements UserProvider
 {
     /**
@@ -62,19 +77,18 @@ class DocumentUserProvider implements UserProvider
     {
         $user = $this->documentStoreService->getUserById($identifier);
 
-        return $user ? new DocumentstoreUser((array) $user) : null;
+        return $user ? (new User())->newFromBuilder((array) $user) : null;
     }
 
     public function retrieveByToken($identifier, $token)
     {
         $user = $this->documentStoreService->getUserByRememberToken($identifier, $token);
 
-        return $user ? new DocumentstoreUser((array) $user) : null;
+        return $user ? (new User())->newFromBuilder((array) $user) : null;
     }
 
     public function updateRememberToken(Authenticatable $user, $token)
     {
-        // Update the "remember me" token in MySQL
         $this->documentStoreService->updateRememberToken((string) $user->getAuthIdentifier(), $token);
     }
 
@@ -83,17 +97,24 @@ class DocumentUserProvider implements UserProvider
         if (empty($credentials)) {
             return null;
         }
-        $user = $this->documentStoreService->getUserByCredentials($credentials);
 
-        return $user ? new DocumentstoreUser($user) : null;
+        if (!empty($credentials['email'])) {
+            return User::where('email', $credentials['email'])->first();
+        }
+
+        if (!empty($credentials['username'])) {
+            return User::where('username', $credentials['username'])->first();
+        }
+
+        return null;
     }
 
     public function validateCredentials(Authenticatable $user, array $credentials)
     {
-        // Validate user credentials (e.g., password)
-        return $this->documentStoreService->validateUserCredentials(
-            $user,
-            $credentials
-        );
+        if (!isset($credentials['password']) || $credentials['password'] === '') {
+            return false;
+        }
+
+        return Hash::check($credentials['password'], (string) $user->getAuthPassword());
     }
 }

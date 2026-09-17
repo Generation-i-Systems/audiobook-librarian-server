@@ -59,6 +59,21 @@ class UserLibraryController extends Controller
     }
 
     /**
+     * Show books other users have recommended to this user.
+     */
+    public function recommendations()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $recommendations = $user->recommendationsReceived()
+            ->with(['book', 'sender'])
+            ->latest()
+            ->get();
+
+        return view('user.library.recommendations', compact('recommendations'));
+    }
+
+    /**
      * Show the user's reading goals (queue with target dates).
      */
     public function goals()

@@ -523,3 +523,7 @@ length is not showing in list view
 ---
 
 App\Services\BookTagService::visibleTagsForBook(): Argument #1 ($user) must be of type App\Models\User, App\Auth\DocumentstoreUser given
+
+---
+
+# Error - Internal Server Error: Call to undefined method App\Auth\DocumentstoreUser::bookStatuses() on GET /my-library/history. "this is a significant issue as we are migrating to a permissions based site. There are going to be many places that have this issue" ... "maybe we are better off sticking with Eloquent User and updating the auth to return it?"

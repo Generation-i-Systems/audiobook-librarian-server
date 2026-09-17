@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
-use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\NewUserRegistrationNotifier;
@@ -87,7 +86,7 @@ class RegisterController extends Controller
     /**
      * Create a new user instance after a valid registration.
      *
-     * @return \App\Auth\DocumentstoreUser
+     * @return \App\Models\User
      */
     protected function create(array $data)
     {
@@ -115,8 +114,16 @@ class RegisterController extends Controller
             // Send external email notification about the new registration
             $this->registrationNotifier->send($completeUserData, 'web', request());
 
-            // Return a DocumentstoreUser instance for authentication
-            return new DocumentstoreUser($completeUserData);
+            // Return the canonical Eloquent user — the same type the session
+            // guard hydrates on every subsequent request. Hydrated from the
+            // fresh store data instead of re-querying.
+            $newUser = (new \App\Models\User())->newFromBuilder((array) $completeUserData);
+
+            if ($newUser->getAuthIdentifier() === null) {
+                throw new \Exception('Failed to load user account after registration.');
+            }
+
+            return $newUser;
         } catch (\Exception $e) {
             Log::error('Error creating user: ' . $e->getMessage());
 

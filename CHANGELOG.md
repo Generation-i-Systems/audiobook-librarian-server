@@ -62,6 +62,7 @@
 
 ### Changed
 
+- **`Auth::user()` is now always the Eloquent `App\Models\User` model.** `DocumentUserProvider` (the `documentstore` auth provider behind the `web`, `api`, and `api_test` guards) hydrates and returns `App\Models\User` instead of the lightweight `App\Auth\DocumentstoreUser` value object, and credential validation uses Eloquent + `Hash::check` directly. Previously the session guard returned `DocumentstoreUser` while bearer-token and `actingAs()` tests returned the Eloquent model, so any code path touching Eloquent relations (e.g. `UserLibraryController`'s queue/wishlist/history/goals pages calling `bookStatuses()`/`queuedBooks()`) or non-whitelisted attributes (e.g. `username`, `photo_url`) crashed with "Call to undefined method" or silently read nulls in production while every test passed — a bug class that would have multiplied with the permissions migration (`CheckPermission` middleware, `hasPermission()`, and per-page service calls like `BookTagService::myTagsOverview(User)`). `DocumentstoreUser` itself remains only as a standalone DTO (console `ApiServiceClient`, legacy fixtures). New regression tests authenticate through the real `POST /login` session flow (`tests/Feature/UserLibrarySessionAuthTest`) and lock the provider contract (`tests/Unit/Auth/DocumentUserProviderTest`).
 - Frontend Sass now loads Bootstrap through the Sass module system with the application's theme values configured explicitly. The declared Bootstrap minimum is aligned with the installed 5.3.8 release, and Vite suppresses only third-party Bootstrap deprecation diagnostics.
 
 - New clients now treat `www.ablibrarian.com` as the backend-independent Skin Store. The existing self-hosted skin/theme proxy remains a legacy compatibility path only; Store commerce and entitlements are intentionally outside this server.
@@ -71,6 +72,7 @@
 
 ### Fixed
 
+- `GET /my-library/history` (and the rest of the "My Library" pages) returned a 500 "Call to undefined method App\Auth\DocumentstoreUser::bookStatuses()" for real session-authenticated users; fixed at the root by the guard change above. Additionally, `my-library.recommendations` — linked from the user dropdown menu — pointed at a `UserLibraryController::recommendations()` method that never existed, so the Recommendations inbox page always 500'd; it now lists books other users have recommended to the viewer.
 - The admin book-edit audio player now uses a session-authenticated, range-capable playback route for the selected book instead of the cover-image proxy, so browser metadata and playback load correctly.
 - Documented discovery-shelf dismissal and aligned series-book API coverage with the current
   contract: Needs Review books and their genres remain available to API clients.
