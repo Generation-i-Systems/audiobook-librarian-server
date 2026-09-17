@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Book;
 use App\Models\PendingDownload;
 use App\Models\PendingDownloadBook;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -51,39 +52,97 @@ class PendingDownloadService
         $infohash = $this->extractInfohash($data['magnet_uri']);
         $releaseName = $data['release_name'] ?? $data['books'][0]['title'];
 
-        return DB::transaction(function () use ($data, $rawRequestData, $infohash, $releaseName, $userId) {
-            $pending = PendingDownload::create([
-                'magnet_infohash' => $infohash,
-                'release_name' => $releaseName,
-                'torrent_name_hint' => $this->normalizeNameHint($releaseName),
-                'abb_url' => $data['abb_url'],
-                'abb_category' => $data['abb_category'] ?? null,
-                'magnet_uri' => $data['magnet_uri'],
-                'book_count' => count($data['books']),
-                'status' => 'pending',
-                'created_by_user_id' => $userId,
-                'expires_at' => now()->addDays(14),
-                'metadata' => $rawRequestData,
-            ]);
+        if ($infohash !== null) {
+            $existing = PendingDownload::where('magnet_infohash', $infohash)->first();
 
-            foreach ($data['books'] as $index => $book) {
-                $pending->books()->create([
-                    'sort_order' => $index,
-                    'title' => $book['title'],
-                    'authors' => $book['authors'] ?? [],
-                    'genre' => $book['genre'] ?? null,
-                    'tags' => $book['tags'] ?? [],
-                    'description' => $book['description'] ?? null,
-                    'cover_url' => $book['cover_url'] ?? null,
-                    'series_name' => $book['series_name'] ?? null,
-                    'series_number' => $book['series_number'] ?? null,
-                    'abb_url' => $book['abb_url'] ?? $data['abb_url'],
-                    'narrator' => $book['narrator'] ?? null,
+            if ($existing !== null) {
+                return $this->requeueExisting($existing, $data, $rawRequestData, $releaseName);
+            }
+        }
+
+        try {
+            return DB::transaction(function () use ($data, $rawRequestData, $infohash, $releaseName, $userId) {
+                $pending = PendingDownload::create([
+                    'magnet_infohash' => $infohash,
+                    'release_name' => $releaseName,
+                    'torrent_name_hint' => $this->normalizeNameHint($releaseName),
+                    'abb_url' => $data['abb_url'],
+                    'abb_category' => $data['abb_category'] ?? null,
+                    'magnet_uri' => $data['magnet_uri'],
+                    'book_count' => count($data['books']),
+                    'status' => 'pending',
+                    'created_by_user_id' => $userId,
+                    'expires_at' => now()->addDays(14),
+                    'metadata' => $rawRequestData,
                 ]);
+
+                foreach ($data['books'] as $index => $book) {
+                    $pending->books()->create([
+                        'sort_order' => $index,
+                        'title' => $book['title'],
+                        'authors' => $book['authors'] ?? [],
+                        'genre' => $book['genre'] ?? null,
+                        'tags' => $book['tags'] ?? [],
+                        'description' => $book['description'] ?? null,
+                        'cover_url' => $book['cover_url'] ?? null,
+                        'series_name' => $book['series_name'] ?? null,
+                        'series_number' => $book['series_number'] ?? null,
+                        'abb_url' => $book['abb_url'] ?? $data['abb_url'],
+                        'narrator' => $book['narrator'] ?? null,
+                    ]);
+                }
+
+                return $pending;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            // Concurrent registration of the same magnet: one insert won the
+            // unique index; resolve to the winner instead of erroring.
+            if ($infohash !== null) {
+                $existing = PendingDownload::where('magnet_infohash', $infohash)->first();
+
+                if ($existing !== null) {
+                    return $this->requeueExisting($existing, $data, $rawRequestData, $releaseName);
+                }
             }
 
-            return $pending;
-        });
+            throw $e;
+        }
+    }
+
+    /**
+     * Re-registering an already-known magnet refreshes the queue entry instead
+     * of hitting the unique index (the bridge extension retries failed
+     * downloads). Consumed records are returned untouched — reviving them
+     * would point the pipeline at a book already imported.
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $rawRequestData
+     */
+    private function requeueExisting(
+        PendingDownload $existing,
+        array $data,
+        array $rawRequestData,
+        string $releaseName
+    ): PendingDownload {
+        if ($existing->status === 'consumed') {
+            return $existing->load('books');
+        }
+
+        $existing->update([
+            'release_name' => $releaseName,
+            'torrent_name_hint' => $this->normalizeNameHint($releaseName),
+            'abb_url' => $data['abb_url'],
+            'abb_category' => $data['abb_category'] ?? null,
+            'magnet_uri' => $data['magnet_uri'],
+            'book_count' => count($data['books']),
+            'status' => 'pending',
+            'matched_book_directory' => null,
+            'matched_at' => null,
+            'expires_at' => now()->addDays(14),
+            'metadata' => $rawRequestData,
+        ]);
+
+        return $existing->load('books');
     }
 
     /**

@@ -6,6 +6,12 @@ This file contains the text of prompts sent to the AI assistant.
 
 ## 2026-09-17
 
+implement the user rebuild to use roles and permissions. roles should be treated as groups of permissions. the normal user case will be a simple role that implys varous permissions
+
+---
+
+## 2026-09-17
+
 playing an audio file from the edit page is failing to open the file. the time shown is 0:00 / 0:00
 https://books.ablibrarian.com/admin/books/11634/edit
 
@@ -527,3 +533,11 @@ App\Services\BookTagService::visibleTagsForBook(): Argument #1 ($user) must be o
 ---
 
 # Error - Internal Server Error: Call to undefined method App\Auth\DocumentstoreUser::bookStatuses() on GET /my-library/history. "this is a significant issue as we are migrating to a permissions based site. There are going to be many places that have this issue" ... "maybe we are better off sticking with Eloquent User and updating the auth to return it?"
+
+---
+
+getting api errors. look at the logs and address them
+
+---
+
+getting api errors. look at the logs and address them
