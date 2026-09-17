@@ -15,7 +15,7 @@ class NavigationGalleryLinksTest extends TestCase
         $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
         $this->assertIsString($layout);
-        $this->assertSame(2, substr_count($layout, 'href="https://www.ablibrarian.com/gallery/skins"'));
-        $this->assertSame(2, substr_count($layout, 'href="https://www.ablibrarian.com/gallery/themes"'));
+        $this->assertSame(1, substr_count($layout, 'href="https://www.ablibrarian.com/gallery/skins"'));
+        $this->assertSame(1, substr_count($layout, 'href="https://www.ablibrarian.com/gallery/themes"'));
     }
 }

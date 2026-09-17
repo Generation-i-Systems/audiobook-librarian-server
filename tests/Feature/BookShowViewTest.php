@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Book;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -140,5 +143,23 @@ class BookShowViewTest extends TestCase
 
         // Assert the series label is not shown when there's no series data
         $response->assertDontSee('Series:');
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function itRendersTagsForTheDocumentstoreAuthenticatedUser(): void
+    {
+        $book = array_replace($this->testBook1, ['id' => '12345']);
+        Book::factory()->create(['id' => 12345]);
+
+        $this->mockService
+            ->shouldReceive('getBook')
+            ->with('12345')
+            ->andReturn($book);
+
+        Auth::setUser(new DocumentstoreUser($this->user->toArray()));
+
+        $response = $this->get(route('books.show', ['book' => '12345']));
+
+        $response->assertOk();
     }
 }

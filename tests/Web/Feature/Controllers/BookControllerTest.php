@@ -39,6 +39,10 @@ class BookControllerTest extends TestCase
         $this->documentStoreServiceMock->shouldReceive('isAdmin')
             ->with($this->admin->getAuthIdentifier())
             ->andReturn(true);
+        // The merged books.index page also loads filter options and recent books
+        // regardless of permission level; stub them so the mock doesn't choke.
+        $this->documentStoreServiceMock->shouldReceive('getUniqueValues')->andReturn([]);
+        $this->documentStoreServiceMock->shouldReceive('getRecentBooks')->andReturn([]);
     }
 
     protected function tearDown(): void
@@ -77,7 +81,7 @@ class BookControllerTest extends TestCase
         $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
-            ->assertViewIs('admin.books.index')
+            ->assertViewIs('books.index')
             ->assertSee('Test Book 1')
             ->assertSee('Test Book 2');
     }

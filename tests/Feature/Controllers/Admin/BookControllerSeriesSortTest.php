@@ -28,6 +28,10 @@ class BookControllerSeriesSortTest extends TestCase
         $this->documentStoreService->shouldReceive('isAdmin')
             ->with($this->admin->getAuthIdentifier())
             ->andReturn(true);
+        // The merged books.index page also loads filter options and recent books
+        // regardless of permission level; stub them so the mock doesn't choke.
+        $this->documentStoreService->shouldReceive('getUniqueValues')->andReturn([]);
+        $this->documentStoreService->shouldReceive('getRecentBooks')->andReturn([]);
         $this->app->instance(DocumentStoreServiceInterface::class, $this->documentStoreService);
     }
 
@@ -48,7 +52,7 @@ class BookControllerSeriesSortTest extends TestCase
         // Mock the listBooks method to expect series sort (secondary sort by number handled in service)
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 20, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series', 'asc', true)
+            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series', 'asc', true)
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -67,7 +71,7 @@ class BookControllerSeriesSortTest extends TestCase
         // Mock the listBooks method to expect the explicit sort
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 20, ['series' => 'Test Series', 'include_needs_review' => true], true, 'title', 'asc', true)
+            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'title', 'asc', true)
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -83,10 +87,11 @@ class BookControllerSeriesSortTest extends TestCase
     #[Test]
     public function it_uses_default_sort_when_no_series_filter_is_applied(): void
     {
-        // Mock the listBooks method to expect default sort
+        // Mock the listBooks method to expect the shared default sort (title A-Z),
+        // same as every other user gets on the merged books.index page.
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 20, ['include_needs_review' => true], true, 'created_at', 'desc', true)
+            ->with(1, 12, ['include_needs_review' => true], true, 'title', 'asc', true)
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -96,7 +101,7 @@ class BookControllerSeriesSortTest extends TestCase
         $response = $this->get(route('books.index'));
 
         $response->assertOk();
-        $response->assertViewHas('sort', 'recent_desc');
+        $response->assertViewHas('sort', 'title_asc');
     }
 
     protected function tearDown(): void

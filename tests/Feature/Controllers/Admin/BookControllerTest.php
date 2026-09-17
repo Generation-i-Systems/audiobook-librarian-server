@@ -45,6 +45,10 @@ class BookControllerTest extends TestCase
         $this->documentStoreServiceMock->shouldReceive('isAdmin')
             ->with($this->admin->getAuthIdentifier())
             ->andReturn(true);
+        // The merged books.index page also loads filter options and recent books
+        // regardless of permission level; stub them so the mock doesn't choke.
+        $this->documentStoreServiceMock->shouldReceive('getUniqueValues')->andReturn([]);
+        $this->documentStoreServiceMock->shouldReceive('getRecentBooks')->andReturn([]);
     }
 
     protected function tearDown(): void
@@ -83,9 +87,12 @@ class BookControllerTest extends TestCase
         $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
-            ->assertViewIs('admin.books.index')
+            ->assertViewIs('books.index')
             ->assertSee('Test Book 1')
-            ->assertSee('Test Book 2');
+            ->assertSee('Test Book 2')
+            ->assertSee('AI Library Assistant')
+            ->assertSee('Most Recent')
+            ->assertSee('Total books:');
     }
 
     #[Test]
@@ -116,6 +123,28 @@ class BookControllerTest extends TestCase
         $response = $this->get(route('books.index', ['search' => 'seriesId:7']));
 
         $response->assertStatus(200);
+    }
+
+    #[Test]
+    public function jsonIndexMapsTheManagementRecentSortOption(): void
+    {
+        $this->documentStoreServiceMock
+            ->shouldReceive('listBooks')
+            ->once()
+            ->withArgs(function ($page, $perPage, $filters, $includeRelations, $sort, $order, $includeMissing) {
+                return $page === 1
+                    && $filters === ['include_needs_review' => true]
+                    && $includeRelations === true
+                    && $sort === 'created_at'
+                    && $order === 'desc'
+                    && $includeMissing === true;
+            })
+            ->andReturn(['data' => [], 'total' => 0]);
+
+        $response = $this->getJson(route('api.books.json', ['sort' => 'recent_desc']));
+
+        $response->assertOk()
+            ->assertJsonPath('canManageBooks', true);
     }
 
     #[Test]

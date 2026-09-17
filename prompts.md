@@ -502,3 +502,17 @@ when parsing a title if removing the series name leaves "The Complete Series" or
 ---
 
 fix issues blocking push
+
+---
+
+## 2026-09-17
+
+there is a task underway to merge the admin(/admin/books) and user(/books) into one template that contains all the best functionality of both
+
+---
+
+length is not showing in list view
+
+---
+
+App\Services\BookTagService::visibleTagsForBook(): Argument #1 ($user) must be of type App\Models\User, App\Auth\DocumentstoreUser given

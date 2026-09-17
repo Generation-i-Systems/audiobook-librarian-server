@@ -162,10 +162,24 @@
     <div class="container">
         <h1>Book Archive</h1>
 
+        @if(Auth::user()?->is_admin)
+            @include('components.ai-query-prompt')
+        @endif
+
         @php
 $showFilters = request()->has('search') || request()->has('genre_id') || request()->has('author_id') || request()->has('series');
 $isLibrivoxMode = $isLibrivoxMode ?? false;
+$canManageBooks = $canManageBooks ?? false;
         @endphp
+
+        @can('manage-books')
+            <div class="mb-3">
+                <a href="{{ route('admin.books.create') }}" class="btn btn-primary">Add New Book</a>
+                <a href="{{ route('admin.books.import') }}" class="btn btn-info">Import Book(s)</a>
+                <a href="{{ route('admin.books.importFile') }}" class="btn btn-warning ms-2">Import from File/Audio</a>
+                <a href="{{ route('admin.needs_review.index') }}" class="btn btn-outline-danger ms-2">Needs Review</a>
+            </div>
+        @endcan
 
         <!-- Show Recently Added Books Only If There Are No Filters And There Are Recent Books -->
         @if (!$showFilters && count($recentBooks) > 0)
@@ -403,7 +417,28 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                     <input type="text" class="form-control" id="tag" name="tag"
                         value="{{ request('tag') }}" placeholder="Filter by tag">
                 </div>
-                <div class="col-md-9 d-flex align-items-center">
+                @can('manage-books')
+                    <div class="col-md-3">
+                        <label for="sort" class="form-label">Sort:</label>
+                        <select name="sort" id="sort" class="form-select">
+                            <option value="recent_desc" {{ $sort === 'recent_desc' ? 'selected' : '' }}>Most Recent</option>
+                            <option value="recent_asc" {{ $sort === 'recent_asc' ? 'selected' : '' }}>Oldest</option>
+                            <option value="title_asc" {{ $sort === 'title_asc' ? 'selected' : '' }}>Title A-Z</option>
+                            <option value="title_desc" {{ $sort === 'title_desc' ? 'selected' : '' }}>Title Z-A</option>
+                            <option value="author_asc" {{ $sort === 'author_asc' ? 'selected' : '' }}>Author A-Z</option>
+                            <option value="author_desc" {{ $sort === 'author_desc' ? 'selected' : '' }}>Author Z-A</option>
+                            <option value="series_asc" {{ $sort === 'series_asc' ? 'selected' : '' }}>Series A-Z</option>
+                            <option value="series_desc" {{ $sort === 'series_desc' ? 'selected' : '' }}>Series Z-A</option>
+                            <option value="genre_asc" {{ $sort === 'genre_asc' ? 'selected' : '' }}>Genre A-Z</option>
+                            <option value="genre_desc" {{ $sort === 'genre_desc' ? 'selected' : '' }}>Genre Z-A</option>
+                            <option value="year_asc" {{ $sort === 'year_asc' ? 'selected' : '' }}>Year Asc</option>
+                            <option value="year_desc" {{ $sort === 'year_desc' ? 'selected' : '' }}>Year Desc</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-center">
+                @else
+                    <div class="col-md-9 d-flex align-items-center">
+                @endcan
                     <div class="form-check">
                         <input type="checkbox" class="form-check-input" id="semantic" name="semantic" value="1"
                             {{ request('semantic') ? 'checked' : '' }}>
@@ -414,6 +449,13 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                 </div>
             </div>
         </form>
+
+        @can('manage-books')
+            <div id="main-book-count" class="mb-2 text-muted small">
+                <span>Total books: <strong>{{ $books->total() }}</strong></span>
+                <span class="ms-3">Showing {{ $books->count() }} of {{ $books->total() }} books</span>
+            </div>
+        @endcan
 
         @if(!$isLibrivoxMode)
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -477,9 +519,13 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                 $seriesText = implode(', ', $tmp);
                             }
                         @endphp
+                        @php
+                            $authorsList = !empty($book['authors']) && is_array($book['authors']) ? $book['authors'] : [];
+                            $directoryMissing = isset($book['directoryExists']) && $book['directoryExists'] === false;
+                        @endphp
                         <div class="col-md-3 mb-4">
-                            <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
-                                <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                            <div class="card h-100">
+                                <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link book-card-hover" style="color:inherit; cursor:pointer;">
                                     @if($hasCover)
                                         <div class="book-media-panel pt-3">
                                             <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
@@ -492,18 +538,45 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                             <span class="book-media-panel__meta">Cover unavailable</span>
                                         </div>
                                     @endif
-                                    <div class="card-body p-2">
+                                    <div class="card-body p-2 pb-0">
                                         <h6 class="card-title small mb-0">{{ $title }}</h6>
-                                        <p class="card-text small mb-0">{{ $authors }}</p>
                                         @if($seriesText)
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">{{ $seriesText }}</p>
                                         @endif
                                         @if(!empty($book['duration']) && $book['duration'] !== '00:00:00')
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;"><i class="fas fa-clock"></i> {{ $book['duration'] }}</p>
                                         @endif
+                                        @if($directoryMissing)
+                                            <span class="badge bg-danger mt-1">⚠️ Missing Files</span>
+                                        @endif
                                     </div>
+                                </a>
+                                <div class="card-body pt-1 pb-2 px-2">
+                                    <p class="card-text small mb-0">
+                                        @forelse($authorsList as $author)
+                                            <a href="{{ route('books.index', ['author' => $author]) }}" class="text-decoration-none">{{ $author }}</a>@if(!$loop->last), @endif
+                                        @empty
+                                            Unknown
+                                        @endforelse
+                                    </p>
+                                    @can('manage-books')
+                                        <div class="d-flex gap-1 mt-1">
+                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                            <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill metadata from path-based best match (prefers Audible)"><i class="fas fa-magic"></i></button>
+                                            </form>
+                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ addslashes($title) }}?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                            </form>
+                                        </div>
+                                    @endcan
                                 </div>
-                            </a>
+                            </div>
                         </div>
                     @endforeach
                 @endif
@@ -531,9 +604,13 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                 $seriesText = implode(', ', $tmp);
                             }
                         @endphp
+                        @php
+                            $authorsList = !empty($book['authors']) && is_array($book['authors']) ? $book['authors'] : [];
+                            $directoryMissing = isset($book['directoryExists']) && $book['directoryExists'] === false;
+                        @endphp
                         <div class="col-md-2 mb-3">
-                            <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
-                                <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                            <div class="card h-100">
+                                <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link book-card-hover" style="color:inherit; cursor:pointer;">
                                     @if($hasCover)
                                         <div class="book-media-panel book-media-panel--compact pt-2">
                                             <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
@@ -546,18 +623,45 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                             <span class="book-media-panel__meta">Cover unavailable</span>
                                         </div>
                                     @endif
-                                    <div class="card-body p-2">
+                                    <div class="card-body p-2 pb-0">
                                         <h6 class="card-title small mb-0" style="font-size: 0.8rem;">{{ $title }}</h6>
-                                        <p class="card-text small mb-0" style="font-size: 0.75rem;">{{ $authors }}</p>
                                         @if($seriesText)
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">{{ $seriesText }}</p>
                                         @endif
                                         @if(!empty($book['duration']) && $book['duration'] !== '00:00:00')
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.7rem;"><i class="fas fa-clock"></i> {{ $book['duration'] }}</p>
                                         @endif
+                                        @if($directoryMissing)
+                                            <span class="badge bg-danger mt-1">⚠️</span>
+                                        @endif
                                     </div>
+                                </a>
+                                <div class="card-body pt-1 pb-2 px-2">
+                                    <p class="card-text small mb-0" style="font-size: 0.75rem;">
+                                        @forelse($authorsList as $author)
+                                            <a href="{{ route('books.index', ['author' => $author]) }}" class="text-decoration-none">{{ $author }}</a>@if(!$loop->last), @endif
+                                        @empty
+                                            Unknown
+                                        @endforelse
+                                    </p>
+                                    @can('manage-books')
+                                        <div class="d-flex gap-1 mt-1">
+                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                            <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
+                                            </form>
+                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ addslashes($title) }}?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                            </form>
+                                        </div>
+                                    @endcan
                                 </div>
-                            </a>
+                            </div>
                         </div>
                     @endforeach
                 @endif
@@ -584,8 +688,8 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                     $cover = $hasCover ? $book['coverImage'] : null;
                                     $title = $book['title'] ?? 'Unknown Title';
                                     $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
-                                    $authors = !empty($book['authors']) && is_array($book['authors']) ? implode(', ', $book['authors']) : 'Unknown';
-                                    $genres = !empty($book['genres']) && is_array($book['genres']) ? implode(', ', $book['genres']) : 'Unknown';
+                                    $authorsList = !empty($book['authors']) && is_array($book['authors']) ? $book['authors'] : [];
+                                    $genresList = !empty($book['genres']) && is_array($book['genres']) ? $book['genres'] : [];
                                     $seriesText = '';
                                     if (!empty($book['series']) && is_array($book['series'])) {
                                         $tmp = [];
@@ -596,6 +700,7 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                         }
                                         $seriesText = implode(', ', $tmp);
                                     }
+                                    $directoryMissing = isset($book['directoryExists']) && $book['directoryExists'] === false;
                                 @endphp
                                 <tr>
                                     <td>
@@ -607,15 +712,44 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                     </td>
                                     <td>
                                         <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none">{{ $title }}</a>
+                                        @if($directoryMissing)
+                                            <span class="badge bg-danger ms-1" title="Directory not found">⚠️ Missing Files</span>
+                                        @endif
                                         @if($seriesText)
                                             <div class="small text-muted">{{ $seriesText }}</div>
                                         @endif
                                     </td>
-                                    <td>{{ $authors }}</td>
-                                    <td>{{ $genres }}</td>
+                                    <td>
+                                        @forelse($authorsList as $author)
+                                            <a href="{{ route('books.index', ['author' => $author]) }}" class="text-decoration-none">{{ $author }}</a>@if(!$loop->last), @endif
+                                        @empty
+                                            Unknown
+                                        @endforelse
+                                    </td>
+                                    <td>
+                                        @forelse($genresList as $genre)
+                                            <a href="{{ route('books.index', ['genre' => $genre]) }}" class="text-decoration-none">{{ $genre }}</a>@if(!$loop->last), @endif
+                                        @empty
+                                            Unknown
+                                        @endforelse
+                                    </td>
                                     <td class="text-muted small">{{ (!empty($book['duration']) && $book['duration'] !== '00:00:00') ? $book['duration'] : '' }}</td>
                                     <td>
-                                        <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i></a>
+                                        <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary" title="Download"><i class="fas fa-download"></i></a>
+                                        @can('manage-books')
+                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                            <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
+                                            </form>
+                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ addslashes($title) }}?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                            </form>
+                                        @endcan
                                     </td>
                                 </tr>
                             @endforeach
@@ -687,12 +821,17 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
             // Route variables with placeholders
             const bookShowRoute = '{{ route("books.show", ":id") }}';
             const bookDownloadRoute = '{{ route("books.download", ":id") }}';
+            const bookIndexRoute = '{{ route("books.index") }}';
+            const bookEditRoute = '{{ route("admin.books.edit", ":id") }}';
+            const bookAutofillRoute = '{{ route("admin.books.autofillFromPath", ":id") }}';
+            const bookDestroyRoute = '{{ route("admin.books.destroy", ":id") }}';
             let mainSearchParams = {
                 "search": '{{ request()->input("search", "") }}',
                 "genre": '{{ request()->input("genre", "") }}',
                 "author": '{{ request()->input("author", "") }}',
                 "series": '{{ request()->input("series", "") }}',
                 "tag": '{{ request()->input("tag", "") }}',
+                "sort": '{{ $sort }}',
                 "semantic": '{{ request()->boolean("semantic") ? "1" : "" }}'
             };
 
@@ -732,7 +871,7 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
             }
 
             // Function to render main books based on current view type
-            function renderMainBooks(books) {
+            function renderMainBooks(books, canManageBooks) {
                 // Clear all containers
                 $('#main-books-grid').empty();
                 $('#main-books-compact').empty();
@@ -753,10 +892,36 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                     return;
                 }
 
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const authorLink = (name) => `${bookIndexRoute}?author=${encodeURIComponent(name)}`;
+                const genreLink = (name) => `${bookIndexRoute}?genre=${encodeURIComponent(name)}`;
+                const authorLinks = (authors) => (authors && authors.length > 0)
+                    ? authors.map(a => `<a href="${authorLink(a)}" class="text-decoration-none">${a}</a>`).join(', ')
+                    : 'Unknown';
+                const genreLinks = (genres) => (genres && genres.length > 0)
+                    ? genres.map(g => `<a href="${genreLink(g)}" class="text-decoration-none">${g}</a>`).join(', ')
+                    : 'Unknown';
+                const manageActions = (book, title) => canManageBooks ? `
+                                                                <div class="d-flex gap-1 mt-1">
+                                                                    <a href="${bookEditRoute.replace(':id', book.id)}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                                                    <form action="${bookAutofillRoute.replace(':id', book.id)}" method="POST" class="d-inline">
+                                                                        <input type="hidden" name="_token" value="${csrfToken}">
+                                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
+                                                                    </form>
+                                                                    <form action="${bookDestroyRoute.replace(':id', book.id)}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete ${String(title).replace(/'/g, "\\'")}?')">
+                                                                        <input type="hidden" name="_token" value="${csrfToken}">
+                                                                        <input type="hidden" name="_method" value="DELETE">
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                                                    </form>
+                                                                </div>
+                                                            ` : '';
+                const missingBadge = (book) => (book.directoryExists === false)
+                    ? '<span class="badge bg-danger mt-1">⚠️ Missing Files</span>'
+                    : '';
+
                 // Render books based on view type
                 books.forEach(function (book) {
                     const title = book.title || 'Unknown Title';
-                    const author = book.authors && book.authors.length > 0 ? book.authors.join(', ') : 'Unknown';
 
                     // Generate series text if available
                     let seriesText = '';
@@ -768,16 +933,20 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                     if (mainViewType === 'grid') {
                         $('#main-books-grid').append(`
                                                                 <div class="col-md-3 mb-4">
-                                                                    <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
-                                                                        <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                                                                    <div class="card h-100">
+                                                                        <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link book-card-hover" style="color:inherit; cursor:pointer;">
                                                                             ${createGridMedia(book, title, 160)}
-                                                                            <div class="card-body p-2">
+                                                                            <div class="card-body p-2 pb-0">
                                                                                 <h6 class="card-title small mb-0">${title}</h6>
-                                                                                <p class="card-text small mb-0">${author}</p>
                                                                                 ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
+                                                                                ${missingBadge(book)}
                                                                             </div>
+                                                                        </a>
+                                                                        <div class="card-body pt-1 pb-2 px-2">
+                                                                            <p class="card-text small mb-0">${authorLinks(book.authors)}</p>
+                                                                            ${manageActions(book, title)}
                                                                         </div>
-                                                                    </a>
+                                                                    </div>
                                                                 </div>
                                                             `);
                     }
@@ -785,16 +954,20 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                     else if (mainViewType === 'compact') {
                         $('#main-books-compact').append(`
                                                                 <div class="col-md-2 mb-3">
-                                                                    <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
-                                                                        <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                                                                    <div class="card h-100">
+                                                                        <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link book-card-hover" style="color:inherit; cursor:pointer;">
                                                                             ${createGridMedia(book, title, 120)}
-                                                                            <div class="card-body p-2">
+                                                                            <div class="card-body p-2 pb-0">
                                                                                 <h6 class="card-title small mb-0" style="font-size: 0.8rem;">${title}</h6>
-                                                                                <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
                                                                                 ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
+                                                                                ${missingBadge(book)}
                                                                             </div>
+                                                                        </a>
+                                                                        <div class="card-body pt-1 pb-2 px-2">
+                                                                            <p class="card-text small mb-0" style="font-size: 0.75rem;">${authorLinks(book.authors)}</p>
+                                                                            ${manageActions(book, title)}
                                                                         </div>
-                                                                    </a>
+                                                                    </div>
                                                                 </div>
                                                             `);
                     }
@@ -807,12 +980,26 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                                                                     </td>
                                                                     <td>
                                                                         <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none">${title}</a>
+                                                                        ${missingBadge(book)}
                                                                         ${seriesText ? `<div class="small text-muted">${seriesText}</div>` : ''}
                                                                     </td>
-                                                                    <td>${book.author && book.author.length ? book.author.join(', ') : 'Unknown'}</td>
-                                                                    <td>${book.genre && book.genre.length ? book.genre.join(', ') : 'Unknown'}</td>
+                                                                    <td>${authorLinks(book.author && book.author.length ? book.author : book.authors)}</td>
+                                                                    <td>${genreLinks(book.genre && book.genre.length ? book.genre : book.genres)}</td>
+                                                                    <td class="text-muted small">${book.duration && book.duration !== '00:00:00' ? book.duration : ''}</td>
                                                                     <td>
-                                                                        <a href="${bookDownloadRoute.replace(':id', book.id)}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i></a>
+                                                                        <a href="${bookDownloadRoute.replace(':id', book.id)}" class="btn btn-sm btn-secondary" title="Download"><i class="fas fa-download"></i></a>
+                                                                        ${canManageBooks ? `
+                                                                        <a href="${bookEditRoute.replace(':id', book.id)}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                                                        <form action="${bookAutofillRoute.replace(':id', book.id)}" method="POST" class="d-inline">
+                                                                            <input type="hidden" name="_token" value="${csrfToken}">
+                                                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
+                                                                        </form>
+                                                                        <form action="${bookDestroyRoute.replace(':id', book.id)}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete ${String(title).replace(/'/g, "\\'")}?')">
+                                                                            <input type="hidden" name="_token" value="${csrfToken}">
+                                                                            <input type="hidden" name="_method" value="DELETE">
+                                                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                                                        </form>
+                                                                        ` : ''}
                                                                     </td>
                                                                 </tr>
                                                             `);
@@ -827,6 +1014,15 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
             function renderPagination(pagination) {
                 const paginationContainer = $('#main-pagination');
                 paginationContainer.empty();
+
+                const bookCount = $('#main-book-count');
+                if (bookCount.length) {
+                    const shownBooks = Math.min(
+                        pagination.per_page,
+                        Math.max(0, pagination.total - ((pagination.current_page - 1) * pagination.per_page))
+                    );
+                    bookCount.html(`<span>Total books: <strong>${pagination.total}</strong></span><span class="ms-3">Showing ${shownBooks} of ${pagination.total} books</span>`);
+                }
 
                 if (pagination.total <= pagination.per_page) {
                     return; // No pagination needed
@@ -932,7 +1128,7 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                         }
 
                         // Render books and pagination
-                        renderMainBooks(response.books);
+                        renderMainBooks(response.books, !!response.canManageBooks);
                         renderPagination(response.pagination);
                     })
                     .catch(function (error) {
@@ -1016,6 +1212,7 @@ $isLibrivoxMode = $isLibrivoxMode ?? false;
                     "author": $('#author').val(),
                     "series": $('#series').val(),
                     "tag": $('#tag').val(),
+                    "sort": $('#sort').val() || 'title_asc',
                     "semantic": $('#semantic').is(':checked') ? '1' : ''
                 };
 

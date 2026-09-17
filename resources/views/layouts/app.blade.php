@@ -89,7 +89,11 @@
                     <!-- Left Side Of Navbar -->
                     <ul class="navbar-nav me-auto">
                         @auth
-                            <!-- Blended links (Phase 1+): always shown, mutation actions are permission-gated on the pages themselves -->
+                            <!-- Blended links: always shown, mutation actions are permission-gated on the pages themselves -->
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white"
+                                    href="{{ route('books.index') }}">{{ __('Books') }}</a>
+                            </li>
                             <li class="nav-item">
                                 <a class="nav-link" style="color:white" href="{{ route('authors.index') }}">Authors</a>
                             </li>
@@ -105,11 +109,14 @@
                             <li class="nav-item">
                                 <a class="nav-link" style="color:white" href="{{ route('series.manage') }}">Series</a>
                             </li>
-                            @if(request()->is('admin/*'))
-                                <!-- Admin Links (Show only in admin section) -->
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.books.index') }}">Books</a>
-                                </li>
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/skins">{{ __('Skins') }}</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/themes">{{ __('Themes') }}</a>
+                            </li>
+                            @if(Auth::user()->is_admin)
+                                <!-- Not yet permission-gated (Phase 4): still full-admin-only tooling -->
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('admin.library-repair.index') }}">Library Repair</a>
                                 </li>
@@ -127,26 +134,8 @@
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('admin.database') }}">Database Admin</a>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/skins">Skins</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/themes">Themes</a>
-                                </li>
-                            @else
-                                <!-- Public Links (Show on public pages) -->
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white"
-                                        href="{{ route('books.index') }}">{{ __('Books') }}</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white"
-                                        href="https://www.ablibrarian.com/gallery/skins">{{ __('Skins') }}</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white"
-                                        href="https://www.ablibrarian.com/gallery/themes">{{ __('Themes') }}</a>
-                                </li>
+                            @endif
+                            @unless(request()->is('admin/*'))
                                 <li class="nav-item dropdown">
                                     <a id="libraryDropdown" class="nav-link dropdown-toggle" href="#" role="button"
                                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre
@@ -199,22 +188,6 @@
                                     <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#appConnectModal">
                                         {{ __('Connect Mobile App') }}
                                     </button>
-
-                                    @if (Auth::user()->is_admin)
-                                        @if(request()->is('admin/*'))
-                                            <form id="user-mode-form" action="{{ route('books.index') }}" method="GET"
-                                                class="d-none"></form>
-                                            <a class="dropdown-item" href="{{ route('books.index') }}"
-                                                onclick="event.preventDefault(); document.getElementById('user-mode-form').submit();">Switch
-                                                to User Mode</a>
-                                        @else
-                                            <form id="admin-mode-form" action="{{ route('admin.books.index') }}" method="GET"
-                                                class="d-none"></form>
-                                            <a class="dropdown-item" href="{{ route('admin.books.index') }}"
-                                                onclick="event.preventDefault(); document.getElementById('admin-mode-form').submit();">Switch
-                                                to Admin Mode</a>
-                                        @endif
-                                    @endif
 
                                     <a class="dropdown-item" href="{{ route('logout') }}"
                                         onclick="event.preventDefault();
