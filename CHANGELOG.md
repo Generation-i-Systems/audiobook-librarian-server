@@ -71,6 +71,7 @@
 
 ### Fixed
 
+- The admin book-edit audio player now uses a session-authenticated, range-capable playback route for the selected book instead of the cover-image proxy, so browser metadata and playback load correctly.
 - Documented discovery-shelf dismissal and aligned series-book API coverage with the current
   contract: Needs Review books and their genres remain available to API clients.
 - `removeSeriesFromTitle()` no longer strips the series name when doing so would leave only a generic, meaningless label like "The Complete Series", "Boxed Set", or "Trilogy" — the series name is kept in the title in that case.

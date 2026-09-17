@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\Admin\BookAutocompleteController;
+use App\Http\Controllers\Api\BookDownloadController;
 use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\Admin\BookCoverAdminController;
 use App\Http\Controllers\Admin\BookExportController;
@@ -44,6 +45,7 @@ use Illuminate\Support\Facades\Route;
  * once in the same process — which Laravel's test suite does whenever it
  * boots a fresh application — never triggers a "cannot redeclare" fatal.
  */
+
 $redirectToGalleryWww = function (Request $request) {
     $target = rtrim((string) config('services.gallery_www.base_url'), '/') . '/' . ltrim($request->path(), '/');
     $query = $request->getQueryString();
@@ -430,6 +432,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'permission:manage-b
     // AJAX: Planned actions preview for edit form
     Route::post('books/{id}/planned-actions', [BookFormController::class, 'plannedActions'])
         ->name('books.plannedActions');
+
+    Route::get('books/{book}/play/{file}', [BookDownloadController::class, 'downloadFile'])
+        ->where('file', '.*')
+        ->name('books.playAudio');
 
     // 'index' and 'show' are deliberately excluded here: both were exact duplicates of
     // BookController's versions (index() gained a manage-books branch that renders the

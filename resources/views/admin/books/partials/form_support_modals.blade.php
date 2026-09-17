@@ -180,6 +180,7 @@
                 window.BOOK_FORM_ROUTES.checkDirectoryConflict = "{{ route('admin.books.checkDirectoryConflict') }}";
                 window.BOOK_FORM_ROUTES.buildPathFromFields = "{{ route('admin.books.buildPathFromFields') }}";
                 @if(isset($book) && !empty($book['id']))
+                    window.BOOK_FORM_ROUTES.playAudio = "{{ route('admin.books.playAudio', ['book' => $book['id'], 'file' => '__FILE__']) }}";
                     window.BOOK_FORM_ROUTES.plannedActions = "{{ route('admin.books.plannedActions', ['id' => $book['id']]) }}";
                     window.BOOK_FORM_ROUTES.executeImmediateMove = "{{ route('admin.books.executeImmediateMove', ['id' => $book['id']]) }}";
                     window.BOOK_ID = "{{ $book['id'] }}";

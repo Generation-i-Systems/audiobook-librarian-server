@@ -1,3 +1,5 @@
+import { buildAudioPreviewUrl } from "./audio-preview-url.js";
+
 (function (window, $) {
     "use strict";
 
@@ -593,8 +595,15 @@
                 e.stopPropagation();
                 const filePath = $(this).data("file");
                 const filename = filePath.split("/").pop();
-                const coverUrl = "/cover/" + filePath;
-                window.openAudioPlayer(filename, coverUrl);
+                const audioUrl = buildAudioPreviewUrl(
+                    window.BOOK_FORM_ROUTES?.playAudio,
+                    filename,
+                );
+                if (!audioUrl) {
+                    showToast("Save the book before playing its audio.", "warning");
+                    return;
+                }
+                window.openAudioPlayer(filename, audioUrl);
             });
     }
 

@@ -4,6 +4,13 @@ This file contains the text of prompts sent to the AI assistant.
 
 ---
 
+## 2026-09-17
+
+playing an audio file from the edit page is failing to open the file. the time shown is 0:00 / 0:00
+https://books.ablibrarian.com/admin/books/11634/edit
+
+---
+
 ## 2026-08-18
 
 update the web search and the api search to support searching by tag and by the elements in qdrant and update searches by genre, author, or series to support searching by name or the element
