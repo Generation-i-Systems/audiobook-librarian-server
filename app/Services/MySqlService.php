@@ -1013,7 +1013,6 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     'duration',
                     'release_date',
                     'audio_file_count',
-                    'total_size',
                 ])
                 ->where('needs_review', false)
                 ->with([

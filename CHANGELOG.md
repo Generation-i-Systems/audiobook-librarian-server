@@ -72,6 +72,7 @@
 
 ### Fixed
 
+- The shared `/books` index logged "Error fetching recent books — Unknown column 'total_size'" on every uncached load in production and rendered an empty "recently added" strip: `MySqlService::getRecentBooks()` selected `total_size`, which is a `Book` accessor derived from chapter sizes, not a database column. SQLite never surfaced this (it silently treats the unknown quoted identifier as a string literal), so the new regression test asserts on the emitted SQL, not the result set.
 - `GET /my-library/history` (and the rest of the "My Library" pages) returned a 500 "Call to undefined method App\Auth\DocumentstoreUser::bookStatuses()" for real session-authenticated users; fixed at the root by the guard change above. Additionally, `my-library.recommendations` — linked from the user dropdown menu — pointed at a `UserLibraryController::recommendations()` method that never existed, so the Recommendations inbox page always 500'd; it now lists books other users have recommended to the viewer.
 - The admin book-edit audio player now uses a session-authenticated, range-capable playback route for the selected book instead of the cover-image proxy, so browser metadata and playback load correctly.
 - Documented discovery-shelf dismissal and aligned series-book API coverage with the current
