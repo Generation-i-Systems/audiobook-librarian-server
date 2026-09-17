@@ -167,11 +167,18 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/tags', [UserLibraryController::class, 'tags'])->name('tags');
     });
 
+    // Was pointing at Admin\BookController::showCreateForm, a method that doesn't exist
+    // anywhere in the codebase (and this route name is never referenced via route() either)
+    // — a pre-existing dead/broken route, made worse by sitting AFTER the books/{book}
+    // resource route below, so "/books/create" was actually captured by show($book =
+    // 'create') and silently redirected to books.index the whole time regardless of
+    // what this route pointed at. Fixed: pointed at the real, working create form (same
+    // one admin.books.create uses), permission-gated, and moved before the wildcard
+    // books/{book} route so it's no longer shadowed.
+    Route::get('/books/create', [BookFormController::class, 'create'])
+        ->name('books.create')
+        ->middleware('permission:manage-books');
     Route::resource('books', BookController::class)->only(['index', 'show'])->middleware('library');
-    Route::get('/books/create', [
-        \App\Http\Controllers\Admin\BookController::class,
-        'showCreateForm',
-    ])->name('books.create');
     Route::get('/books/{book}/download', [BookController::class, 'download'])->name('books.download');
     Route::get('/books/{book}/play', [\App\Http\Controllers\PlayerController::class, 'show'])->name('books.play');
     Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
@@ -257,10 +264,13 @@ Route::middleware(['auth'])->group(function (): void {
 Route::get('/skin-asset/{skinId}/{path}', $redirectToGalleryWww)
     ->where('path', '.*')->name('skin.asset.proxy');
 
-// Admin series autocomplete endpoint for book form (accessible to admin users)
+// Series autocomplete endpoint for the book form — permission-gated to match the
+// rest of the book create/edit surface (was 'admin' role only, which meant even the
+// now-fixed /books/create route above couldn't fully work for a manage-books
+// permission holder who isn't a full admin).
 Route::get('/admin/series-autocomplete', [BookAutocompleteController::class, 'autocompleteSeries'])
     ->name('admin.series.autocomplete')
-    ->middleware(['auth', 'admin']);
+    ->middleware(['auth', 'permission:manage-books']);
 
 // --- Blended content-management routes (permission-gated, no separate admin namespace) ---
 // Read-only pages are open to any authenticated user; mutating actions require the
@@ -332,104 +342,15 @@ Route::middleware(['auth'])->group(function (): void {
     });
 });
 
-Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () use ($redirectToGalleryWww): void {
-    // Admin Social Activity Dashboard
-    Route::get('/social-activity', [Admin\SocialController::class, 'index'])->name('social.index');
 
-    Route::any('/adminer/{any?}', [Admin\AdminerController::class, 'handle'])->where('any', '.*')->name('adminer');
-    // NEW ROUTE FOR DATABASE ADMIN PAGE
-    Route::get('/database', [Admin\AdminerController::class, 'index'])->name('database');
-    Route::get('/', fn () => redirect()->route('admin.books.index'));
-    // Library repair + needs review dashboards
-    Route::get('/needs-review', [Admin\NeedsReviewController::class, 'index'])
-        ->name('needs_review.index');
-    Route::get('/library-repair', [Admin\LibraryRepairController::class, 'index'])
-        ->name('library-repair.index');
-    Route::post('/library-repair/{issue}/resolve', [Admin\LibraryRepairController::class, 'resolve'])
-        ->name('library-repair.resolve');
-    Route::post('/library-repair/{issue}/rescan', [Admin\LibraryRepairController::class, 'rescan'])
-        ->name('library-repair.rescan');
-    Route::post(
-        '/library-repair/{issue}/import-missing',
-        [Admin\LibraryRepairController::class, 'importMissingDirectory']
-    )->name('library-repair.import-missing');
-    Route::post('/library-repair/refresh', [Admin\LibraryRepairController::class, 'refresh'])
-        ->name('library-repair.refresh');
-    Route::get('/library-repair/{issue}/compare', [Admin\LibraryRepairController::class, 'compare'])
-        ->name('library-repair.compare');
-    Route::post('/library-repair/{issue}/resolve-duplicate', [Admin\LibraryRepairController::class, 'resolveDuplicate'])
-        ->name('library-repair.resolve-duplicate');
-    Route::post('/library-repair/{issue}/split-duplicate', [Admin\LibraryRepairController::class, 'splitDuplicate'])
-        ->name('library-repair.split-duplicate');
-    Route::patch('/library-repair/books/{book}/field', [Admin\LibraryRepairController::class, 'updateBookField'])
-        ->name('library-repair.update-book-field');
+// The book create/import/edit surface: permission-gated instead of full-admin so a
+// manage-books permission holder (not necessarily a full admin) can create, import,
+// and edit books. URLs/names are unchanged (/admin/books/*) — no separate namespace
+// to reconcile since there's no user-facing equivalent for these actions.
+Route::name('admin.')->prefix('admin')->middleware(['auth', 'permission:manage-books'])->group(function (): void {
     Route::post('/books/resync-from-path', [BookFormController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 
-    // AI Query routes (SQL-based)
-    Route::post('/ai-query/process', [Admin\AIQueryController::class, 'process'])
-        ->name('ai-query.process');
-    Route::get('/ai-query/results/{queryId}', [Admin\AIQueryController::class, 'results'])
-        ->name('ai-query.results');
-    Route::post('/ai-query/apply-bulk-update', [Admin\AIQueryController::class, 'applyBulkUpdate'])
-        ->name('ai-query.apply-bulk-update');
-    Route::post('/ai-query/execute-custom', [Admin\AIQueryController::class, 'executeCustom'])
-        ->name('ai-query.execute-custom');
-    Route::post('/ai-query/edit-prompt', [Admin\AIQueryController::class, 'editPrompt'])
-        ->name('ai-query.edit-prompt');
-    Route::post('/ai-query/refine-item', [Admin\AIQueryController::class, 'refineItem'])
-        ->name('ai-query.refine-item');
-
-    // AI Query routes (Tool-based - new flexible system)
-    Route::post('/ai-query/tools/process', [Admin\AIQueryController::class, 'processWithTools'])
-        ->name('ai-query.tools.process');
-    Route::get('/ai-query/tools/history', [Admin\AIQueryController::class, 'toolQueryHistory'])
-        ->name('ai-query.tools.history');
-    Route::get('/ai-query/tools/{queryId}', [Admin\AIQueryController::class, 'toolQueryDetails'])
-        ->name('ai-query.tools.details');
-
-    // AI Assistant routes (New conversational book management system)
-    Route::get('/ai-assistant', [Admin\AIAssistantController::class, 'index'])
-        ->name('ai-assistant.index');
-    Route::post('/ai-assistant/process', [Admin\AIAssistantController::class, 'process'])
-        ->name('ai-assistant.process');
-    Route::get('/ai-assistant/session/{sessionId}', [Admin\AIAssistantController::class, 'session'])
-        ->name('ai-assistant.session');
-    Route::post('/ai-assistant/session/{sessionId}/execute', [Admin\AIAssistantController::class, 'execute'])
-        ->name('ai-assistant.execute');
-    Route::post('/ai-assistant/session/{sessionId}/refine', [Admin\AIAssistantController::class, 'refine'])
-        ->name('ai-assistant.refine');
-    Route::post('/ai-assistant/session/{sessionId}/cancel', [Admin\AIAssistantController::class, 'cancel'])
-        ->name('ai-assistant.cancel');
-    Route::get('/ai-assistant/history', [Admin\AIAssistantController::class, 'history'])
-        ->name('ai-assistant.history');
-    Route::get('/ai-assistant/stats', [Admin\AIAssistantController::class, 'stats'])
-        ->name('ai-assistant.stats');
-
-    // Directory validation routes
-    Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
-        ->name('directory-validation');
-    Route::post('/directory-validation/rescan', [Admin\DirectoryValidationController::class, 'rescan'])
-        ->name('directory-validation.rescan');
-    Route::post('/directory-validation/rename', [Admin\DirectoryValidationController::class, 'renameDirectory'])
-        ->name('directory-validation.rename');
-    Route::delete('/directory-validation/delete-book', [Admin\DirectoryValidationController::class, 'deleteBook'])
-        ->name('directory-validation.delete-book');
-    Route::post('/directory-validation/import', [Admin\DirectoryValidationController::class, 'importOrphanedDirectory'])
-        ->name('directory-validation.import');
-    Route::delete(
-        '/directory-validation/delete-orphan',
-        [Admin\DirectoryValidationController::class, 'deleteOrphanedDirectory']
-    )->name('directory-validation.delete-orphan');
-    Route::post(
-        '/directory-validation/rename-orphan',
-        [Admin\DirectoryValidationController::class, 'renameOrphanedDirectory']
-    )->name('directory-validation.rename-orphan');
-
-    Route::post(
-        '/users/{user}/update-role',
-        [Admin\AdminController::class, 'updateRole']
-    )->name('users.updateRole');
     Route::get('/books/import', [BookImportController::class, 'import'])->name('books.import');
     Route::get('/books/import-file', [BookImportController::class, 'importFile'])->name('books.importFile');
 
@@ -468,8 +389,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/books/googleBooks', action: [BookMetadataSearchController::class, 'googleBooks'])->name('books.googleBooks');
     Route::get('/books/audible', action: [BookMetadataSearchController::class, 'audible'])->name('books.audible');
 
-    // AJAX endpoints for Tom Select
-    Route::get('/series/ajax', [BookSeriesController::class, 'seriesAjax'])->name('series.ajax');
     Route::post(
         '/import/rename',
         [Admin\BookFilesystemController::class, 'renameImportItem']
@@ -552,19 +471,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'parsePath',
     ])->name('books.parsePath');
 
-    // LibriVox management
-    Route::prefix('librivox')->name('librivox.')->group(function (): void {
-        Route::get('/', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'index'])->name('index');
-        Route::get('/search', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'search'])->name('search');
-        Route::get('/genres', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genres'])->name('genres');
-        Route::get('/genres/{genre}', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genreBooks'])->name('genre.books')->where('genre', '.+');
-        Route::get('/authors', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authors'])->name('authors');
-        Route::get('/authors/{authorId}/books', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authorBooks'])->name('author.books');
-        Route::post('/sync', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'triggerSync'])->name('sync');
-        Route::post('/sync/cancel', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'cancelSync'])->name('sync.cancel');
-    });
-
-    Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [
         Admin\BookController::class,
         'importFromTitle',
@@ -579,10 +485,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         BookImportController::class,
         'processImport',
     ])->name('books.processImport');
-    Route::get(
-        '/directory-browser',
-        [Admin\DirectoryBrowserController::class, 'browse']
-    )->name('directoryBrowser');
 
     // Bulk import books from directory (recursive, queued)
     Route::post('/books/bulk-import', [
@@ -595,6 +497,121 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\QueueController::class,
         'bulkImportBooksFromDir',
     ])->name('books.bulkImportDir');
+});
+
+Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () use ($redirectToGalleryWww): void {
+    // Admin Social Activity Dashboard
+    Route::get('/social-activity', [Admin\SocialController::class, 'index'])->name('social.index');
+
+    Route::any('/adminer/{any?}', [Admin\AdminerController::class, 'handle'])->where('any', '.*')->name('adminer');
+    // NEW ROUTE FOR DATABASE ADMIN PAGE
+    Route::get('/database', [Admin\AdminerController::class, 'index'])->name('database');
+    Route::get('/', fn () => redirect()->route('admin.books.index'));
+    // Library repair + needs review dashboards
+    Route::get('/needs-review', [Admin\NeedsReviewController::class, 'index'])
+        ->name('needs_review.index');
+    Route::get('/library-repair', [Admin\LibraryRepairController::class, 'index'])
+        ->name('library-repair.index');
+    Route::post('/library-repair/{issue}/resolve', [Admin\LibraryRepairController::class, 'resolve'])
+        ->name('library-repair.resolve');
+    Route::post('/library-repair/{issue}/rescan', [Admin\LibraryRepairController::class, 'rescan'])
+        ->name('library-repair.rescan');
+    Route::post(
+        '/library-repair/{issue}/import-missing',
+        [Admin\LibraryRepairController::class, 'importMissingDirectory']
+    )->name('library-repair.import-missing');
+    Route::post('/library-repair/refresh', [Admin\LibraryRepairController::class, 'refresh'])
+        ->name('library-repair.refresh');
+    Route::get('/library-repair/{issue}/compare', [Admin\LibraryRepairController::class, 'compare'])
+        ->name('library-repair.compare');
+    Route::post('/library-repair/{issue}/resolve-duplicate', [Admin\LibraryRepairController::class, 'resolveDuplicate'])
+        ->name('library-repair.resolve-duplicate');
+    Route::post('/library-repair/{issue}/split-duplicate', [Admin\LibraryRepairController::class, 'splitDuplicate'])
+        ->name('library-repair.split-duplicate');
+    Route::patch('/library-repair/books/{book}/field', [Admin\LibraryRepairController::class, 'updateBookField'])
+        ->name('library-repair.update-book-field');
+
+    // AI Query routes (SQL-based)
+    Route::post('/ai-query/process', [Admin\AIQueryController::class, 'process'])
+        ->name('ai-query.process');
+    Route::get('/ai-query/results/{queryId}', [Admin\AIQueryController::class, 'results'])
+        ->name('ai-query.results');
+    Route::post('/ai-query/apply-bulk-update', [Admin\AIQueryController::class, 'applyBulkUpdate'])
+        ->name('ai-query.apply-bulk-update');
+    Route::post('/ai-query/execute-custom', [Admin\AIQueryController::class, 'executeCustom'])
+        ->name('ai-query.execute-custom');
+    Route::post('/ai-query/edit-prompt', [Admin\AIQueryController::class, 'editPrompt'])
+        ->name('ai-query.edit-prompt');
+    Route::post('/ai-query/refine-item', [Admin\AIQueryController::class, 'refineItem'])
+        ->name('ai-query.refine-item');
+
+    // AI Query routes (Tool-based - new flexible system)
+    Route::post('/ai-query/tools/process', [Admin\AIQueryController::class, 'processWithTools'])
+        ->name('ai-query.tools.process');
+    Route::get('/ai-query/tools/history', [Admin\AIQueryController::class, 'toolQueryHistory'])
+        ->name('ai-query.tools.history');
+    Route::get('/ai-query/tools/{queryId}', [Admin\AIQueryController::class, 'toolQueryDetails'])
+        ->name('ai-query.tools.details');
+
+    // AI Assistant routes (New conversational book management system)
+    Route::get('/ai-assistant', [Admin\AIAssistantController::class, 'index'])
+        ->name('ai-assistant.index');
+    Route::post('/ai-assistant/process', [Admin\AIAssistantController::class, 'process'])
+        ->name('ai-assistant.process');
+    Route::get('/ai-assistant/session/{sessionId}', [Admin\AIAssistantController::class, 'session'])
+        ->name('ai-assistant.session');
+    Route::post('/ai-assistant/session/{sessionId}/execute', [Admin\AIAssistantController::class, 'execute'])
+        ->name('ai-assistant.execute');
+    Route::post('/ai-assistant/session/{sessionId}/refine', [Admin\AIAssistantController::class, 'refine'])
+        ->name('ai-assistant.refine');
+    Route::post('/ai-assistant/session/{sessionId}/cancel', [Admin\AIAssistantController::class, 'cancel'])
+        ->name('ai-assistant.cancel');
+    Route::get('/ai-assistant/history', [Admin\AIAssistantController::class, 'history'])
+        ->name('ai-assistant.history');
+    Route::get('/ai-assistant/stats', [Admin\AIAssistantController::class, 'stats'])
+        ->name('ai-assistant.stats');
+
+    // Directory validation routes
+    Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
+        ->name('directory-validation');
+    Route::post('/directory-validation/rescan', [Admin\DirectoryValidationController::class, 'rescan'])
+        ->name('directory-validation.rescan');
+    Route::post('/directory-validation/rename', [Admin\DirectoryValidationController::class, 'renameDirectory'])
+        ->name('directory-validation.rename');
+    Route::delete('/directory-validation/delete-book', [Admin\DirectoryValidationController::class, 'deleteBook'])
+        ->name('directory-validation.delete-book');
+    Route::post('/directory-validation/import', [Admin\DirectoryValidationController::class, 'importOrphanedDirectory'])
+        ->name('directory-validation.import');
+    Route::delete(
+        '/directory-validation/delete-orphan',
+        [Admin\DirectoryValidationController::class, 'deleteOrphanedDirectory']
+    )->name('directory-validation.delete-orphan');
+    Route::post(
+        '/directory-validation/rename-orphan',
+        [Admin\DirectoryValidationController::class, 'renameOrphanedDirectory']
+    )->name('directory-validation.rename-orphan');
+
+    Route::post(
+        '/users/{user}/update-role',
+        [Admin\AdminController::class, 'updateRole']
+    )->name('users.updateRole');
+    // LibriVox management
+    Route::prefix('librivox')->name('librivox.')->group(function (): void {
+        Route::get('/', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'index'])->name('index');
+        Route::get('/search', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'search'])->name('search');
+        Route::get('/genres', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genres'])->name('genres');
+        Route::get('/genres/{genre}', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'genreBooks'])->name('genre.books')->where('genre', '.+');
+        Route::get('/authors', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authors'])->name('authors');
+        Route::get('/authors/{authorId}/books', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'authorBooks'])->name('author.books');
+        Route::post('/sync', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'triggerSync'])->name('sync');
+        Route::post('/sync/cancel', [\App\Http\Controllers\Admin\LibriVox\LibriVoxController::class, 'cancelSync'])->name('sync.cancel');
+    });
+
+    Route::resource('account_requests', Admin\AccountRequestController::class);
+    Route::get(
+        '/directory-browser',
+        [Admin\DirectoryBrowserController::class, 'browse']
+    )->name('directoryBrowser');
 
     // User management
     Route::resource('users', Admin\UserController::class);

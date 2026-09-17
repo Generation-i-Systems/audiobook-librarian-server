@@ -47,6 +47,7 @@ class BookControllerNarratorAutocompleteTest extends TestCase
         $user->shouldReceive('setRememberToken')->andReturnNull();
         $user->shouldReceive('getRememberTokenName')->andReturn('remember_token');
         $user->shouldReceive('hasPermissionTo')->with('admin.books.*')->andReturn(true);
+        $user->shouldReceive('hasPermission')->andReturn(true);
 
         // Mock the document store service
         $mockDocumentStoreService = Mockery::mock(DocumentStoreServiceInterface::class);
@@ -85,6 +86,7 @@ class BookControllerNarratorAutocompleteTest extends TestCase
         $user->shouldReceive('setRememberToken')->andReturnNull();
         $user->shouldReceive('getRememberTokenName')->andReturn('remember_token');
         $user->shouldReceive('hasPermissionTo')->with('admin.books.*')->andReturn(true);
+        $user->shouldReceive('hasPermission')->andReturn(true);
 
         // Mock the document store service
         $mockDocumentStoreService = Mockery::mock(DocumentStoreServiceInterface::class);

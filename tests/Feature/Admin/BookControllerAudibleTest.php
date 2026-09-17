@@ -36,8 +36,7 @@ class BookControllerAudibleTest extends TestCase
             'id' => 'test-admin-user',
             'name' => 'Test Admin',
             'email' => 'admin@test.com',
-            'is_admin' => true,
-            'permissions' => ['admin.books.*'],
+            'role' => 'admin',
         ];
 
         // Create the user and authenticate
