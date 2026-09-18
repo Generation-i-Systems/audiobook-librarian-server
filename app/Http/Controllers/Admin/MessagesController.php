@@ -22,7 +22,7 @@ class MessagesController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $messages = $this->documentStoreService->getMessages($user->id);
+        $messages = $this->documentStoreService->getMessages((string) $user->id);
 
         return view('admin.messages.index', compact('messages'));
     }

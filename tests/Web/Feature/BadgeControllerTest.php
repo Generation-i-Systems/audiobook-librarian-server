@@ -246,9 +246,9 @@ class BadgeControllerTest extends TestCase
     }
 
     #[Test]
-    public function nonAdminWithoutPermissionCannotCreateABadge(): void
+    public function unverifiedUserCannotCreateABadge(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->post(route('badges.store'), [
             'key' => 'blocked_badge',

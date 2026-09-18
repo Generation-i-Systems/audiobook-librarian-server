@@ -158,7 +158,7 @@ class BookController extends Controller
         // Permission holders see every book (including ones with a missing
         // directory) the way the old admin listing did; everyone else keeps
         // the existing personalized (blocklist-filtered) result set.
-        $result = $canManageBooks ? $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, true) : $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, false, Auth::id());
+        $result = $canManageBooks ? $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, true, (int) Auth::id()) : $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, false, (int) Auth::id());
         $books = $result['data'];
 
         Log::debug(sprintf(
@@ -404,7 +404,7 @@ class BookController extends Controller
         // are enforced here too, matching the API's Api\BookApiController behavior.
         // Permission holders see every book (including missing-directory ones),
         // matching index()'s behavior for the same reason.
-        $result = $canManageBooks ? $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, true) : $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, false, Auth::id());
+        $result = $canManageBooks ? $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, true, (int) Auth::id()) : $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, false, (int) Auth::id());
         $books = $result['data'];
 
         $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');

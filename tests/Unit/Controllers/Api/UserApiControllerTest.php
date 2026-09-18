@@ -49,6 +49,8 @@ class UserApiControllerTest extends TestCase
         $this->assertEquals([
             'name' => 'Jane Smith',
             'email' => 'jane.smith@example.com',
+            'role' => null,
+            'permissions' => [],
         ], $responseData);
     }
 
@@ -83,6 +85,8 @@ class UserApiControllerTest extends TestCase
         $this->assertEquals([
             'name' => null,
             'email' => 'no.name@example.com',
+            'role' => null,
+            'permissions' => [],
         ], $responseData);
     }
 
@@ -117,6 +121,8 @@ class UserApiControllerTest extends TestCase
         $this->assertEquals([
             'name' => 'Test User',
             'email' => '',
+            'role' => null,
+            'permissions' => [],
         ], $responseData);
     }
 

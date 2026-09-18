@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Contracts\Permissible;
 use App\Enums\PermissionKey;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -43,6 +44,8 @@ use App\Traits\Auditable;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBadge> $badges
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\BookProgress> $progress
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Review> $reviews
+ * @property-read \App\Models\Role|null $authRole
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Permission> $permissions
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserRecommendation> $recommendationsReceived
  * @method static \Database\Factories\UserFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User newModelQuery()
@@ -133,6 +136,15 @@ class User extends Authenticatable implements Permissible
         return $this->belongsToMany(Permission::class, 'permission_user');
     }
 
+    /**
+     * The Role row matching this user's users.role key (roles are groups of
+     * permissions). Null when the role string has no seeded role row.
+     */
+    public function authRole(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role', 'key');
+    }
+
     public function hasPermission(PermissionKey|string $key): bool
     {
         if ($this->isAdmin()) {
@@ -141,7 +153,32 @@ class User extends Authenticatable implements Permissible
 
         $key = $key instanceof PermissionKey ? $key->value : $key;
 
-        return $this->permissions()->where('key', $key)->exists();
+        if ($this->permissions()->where('permissions.key', $key)->exists()) {
+            return true;
+        }
+
+        return $this->authRole?->hasPermission($key) ?? false;
+    }
+
+    /**
+     * Every effective permission key: admin resolves to all permissions,
+     * otherwise the user's role bundle plus any direct per-user grants.
+     *
+     * @return array<int, string>
+     */
+    public function permissionKeys(): array
+    {
+        if ($this->isAdmin()) {
+            return array_map(
+                fn (PermissionKey $permissionKey) => $permissionKey->value,
+                PermissionKey::cases()
+            );
+        }
+
+        $keys = $this->permissions()->pluck('permissions.key')->all();
+        $roleKeys = $this->authRole?->permissionKeys() ?? [];
+
+        return array_values(array_unique(array_merge($keys, $roleKeys)));
     }
 
     public function books(): BelongsToMany

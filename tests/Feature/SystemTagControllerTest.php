@@ -25,18 +25,18 @@ class SystemTagControllerTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_non_admin_without_permission_cannot_rename_a_tag(): void
+    public function test_unverified_user_cannot_rename_a_tag(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->put(route('tags.update', 'staff-pick'), ['name' => 'editors-choice']);
 
         $response->assertStatus(403);
     }
 
-    public function test_non_admin_without_permission_cannot_delete_a_tag(): void
+    public function test_unverified_user_cannot_delete_a_tag(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->delete(route('tags.destroy', 'staff-pick'));
 

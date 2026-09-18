@@ -370,6 +370,16 @@ about whether the image actually builds, boots, serves traffic, or persists data
 - **Supervisor process supervision** (`docker/supervisor/supervisord.conf`) — if php-fpm,
   nginx, the queue worker, or the scheduler crashes inside the container, only supervisor's
   restart behavior recovers it; no automated check verifies all four stay up.
+- **Role→permission bundle seeding on deploy** (`database/migrations/2026_09_17_000003_seed_roles_and_role_permissions.php`,
+  `app/Models/Role.php`) — the canonical role/permission bundles live in the `Role` class constants and are
+  pushed into the real database by this migration (`updateOrCreate` + `sync`, additive only). Tests run against
+  fresh SQLite migrations, so what only a real deploy can reveal: (a) the seed migration must apply to live MySQL
+  before traffic, or every role resolves to zero permissions; and (b) seeding **changes access for every existing
+  user immediately** — live `library-user`/`hybrid-user`/`user` accounts gain the standard management bundle with
+  no per-user action. If an operator hand-edits `roles`/`role_permission` rows on a running server, that drift
+  silently reverts on the next deploy (the seed re-`sync`s). Verify manually after deploying: sign in as one known
+  non-admin account and confirm the intended management surfaces work, and check `roles`/`role_permission` row
+  counts match `Role::ROLE_PERMISSIONS`.
 
 ---
 

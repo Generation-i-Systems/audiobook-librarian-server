@@ -21,7 +21,7 @@ class BookQueueController extends Controller
     {
         $user = Auth::user();
         $documentStore = $this->documentStoreService;
-        $queue = $documentStore->getBookQueue($user->id);
+        $queue = $documentStore->getBookQueue((string) $user->id);
 
         return view('queue.index', compact('queue'));
     }
@@ -31,13 +31,13 @@ class BookQueueController extends Controller
     {
         $user = Auth::user();
         $documentStore = $this->documentStoreService;
-        $queue = $documentStore->getBookQueue($user->id);
+        $queue = $documentStore->getBookQueue((string) $user->id);
         foreach ($queue as $item) {
             if ($item['book_id'] == $bookId) {
                 return back()->with('error', 'Book already in queue.');
             }
         }
-        $documentStore->addBookToQueue($user->id, $bookId);
+        $documentStore->addBookToQueue((string) $user->id, $bookId);
 
         return back()->with('success', 'Book added to queue!');
     }
@@ -47,7 +47,7 @@ class BookQueueController extends Controller
     {
         $user = Auth::user();
         $documentStore = $this->documentStoreService;
-        $documentStore->removeBookFromQueue($user->id, $bookId);
+        $documentStore->removeBookFromQueue((string) $user->id, $bookId);
         // @phpstan-ignore-next-line
         $this->reorderQueue($user->id);
 

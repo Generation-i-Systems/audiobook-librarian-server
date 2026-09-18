@@ -11,7 +11,7 @@ class QueueApiController extends Controller
     {
         $user = Auth::user();
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
-        $queue = $documentStore->getBookQueue($user->id);
+        $queue = $documentStore->getBookQueue((string) $user->id);
 
         return response()->json($queue);
     }

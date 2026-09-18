@@ -9,12 +9,14 @@ use App\Enums\PermissionKey;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\UserTagFilter;
 use App\Services\UserTagFilterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -42,7 +44,7 @@ class UserController extends Controller
 
     public function create()
     {
-        return view('admin.users.create');
+        return view('admin.users.create', ['assignableRoles' => Role::assignable()]);
     }
 
 
@@ -55,7 +57,7 @@ class UserController extends Controller
             'username' => 'required|string|max:255',
             'email' => 'required|email',
             'password' => [$sendOtpRequested ? 'nullable' : 'required', 'string', 'min:6', 'confirmed'],
-            'role' => 'required|string',
+            'role' => ['required', 'string', Rule::in(Role::keyList())],
             'send_otp_email' => 'sometimes|boolean',
         ]);
         // Uniqueness check
@@ -105,11 +107,22 @@ class UserController extends Controller
             ->groupBy('mode');
 
         $allPermissions = Permission::query()->orderBy('label')->get();
-        $userPermissionKeys = User::findOrFail($id)->permissions()->pluck('key')->all();
+        $eloquentUser = User::findOrFail($id);
+        $userPermissionKeys = $eloquentUser->permissions()->pluck('permissions.key')->all();
+        $rolePermissionKeys = $eloquentUser->authRole?->permissionKeys() ?? [];
+        $roleLabel = $eloquentUser->authRole?->label;
 
         return view(
             'admin.users.edit',
-            compact('user', 'activityData', 'adminTagFilters', 'allPermissions', 'userPermissionKeys')
+            compact(
+                'user',
+                'activityData',
+                'adminTagFilters',
+                'allPermissions',
+                'userPermissionKeys',
+                'rolePermissionKeys',
+                'roleLabel'
+            ) + ['assignableRoles' => Role::assignable()]
         );
     }
 
@@ -145,7 +158,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
             'email' => 'required|email',
-            'role' => 'required|string',
+            'role' => ['required', 'string', Rule::in(Role::keyList())],
             'password' => 'nullable|string|min:6|confirmed',
             'required_tags' => 'nullable|string|max:2000',
             'ignored_tags' => 'nullable|string|max:2000',

@@ -24,20 +24,20 @@ class SeriesControllerPermissionTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_non_admin_without_permission_cannot_view_edit_form(): void
+    public function test_unverified_user_cannot_view_edit_form(): void
     {
         $series = Series::factory()->create();
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->get(route('series.edit', $series->id));
 
         $response->assertStatus(403);
     }
 
-    public function test_non_admin_without_permission_cannot_update_a_series(): void
+    public function test_unverified_user_cannot_update_a_series(): void
     {
         $series = Series::factory()->create();
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->put(route('series.update', $series->id), ['name' => 'New Name']);
 

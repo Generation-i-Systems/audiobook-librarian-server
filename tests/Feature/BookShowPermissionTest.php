@@ -44,9 +44,9 @@ class BookShowPermissionTest extends TestCase
         $this->app->instance(DocumentStoreServiceInterface::class, $this->mockService);
     }
 
-    public function test_non_admin_without_permission_does_not_see_edit_book_button(): void
+    public function test_unverified_user_does_not_see_edit_book_button(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->get(route('books.show', ['book' => 'test-book-1']));
 

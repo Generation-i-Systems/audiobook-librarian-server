@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\EmailOtpMail;
 use App\Mail\WelcomeMail;
 use App\Models\EmailOtp;
+use App\Models\Role;
 use App\Support\AppConnectLinks;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
 class AdminUserController extends Controller
@@ -72,7 +74,7 @@ class AdminUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255',
             'username' => 'required|string|max:255|alpha_dash',
-            'role' => 'sometimes|string|in:user,admin,unverified',
+            'role' => ['sometimes', 'string', Rule::in(Role::keyList())],
             'send_otp_email' => 'sometimes|boolean',
         ]);
 
@@ -183,7 +185,7 @@ class AdminUserController extends Controller
         }
 
         $role = $request->input('role', 'user');
-        if (!in_array($role, ['user', 'library-user', 'librivox-user', 'hybrid-user', 'admin', 'super-admin'], true)) {
+        if (!in_array($role, array_keys(Role::verifiable()), true)) {
             return response()->json(['message' => 'Invalid role selected.'], 422);
         }
 

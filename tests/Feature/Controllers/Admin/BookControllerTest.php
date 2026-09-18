@@ -131,13 +131,14 @@ class BookControllerTest extends TestCase
         $this->documentStoreServiceMock
             ->shouldReceive('listBooks')
             ->once()
-            ->withArgs(function ($page, $perPage, $filters, $includeRelations, $sort, $order, $includeMissing) {
+            ->withArgs(function ($page, $perPage, $filters, $includeRelations, $sort, $order, $includeMissing, $userId) {
                 return $page === 1
                     && $filters === ['include_needs_review' => true]
                     && $includeRelations === true
                     && $sort === 'created_at'
                     && $order === 'desc'
-                    && $includeMissing === true;
+                    && $includeMissing === true
+                    && $userId === (int) $this->admin->getAuthIdentifier();
             })
             ->andReturn(['data' => [], 'total' => 0]);
 

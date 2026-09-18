@@ -1354,7 +1354,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         ?string $search = null,
         string $sort = 'name',
         string $direction = 'asc'
-    ): \Illuminate\Contracts\Pagination\LengthAwarePaginator {
+    ): \Illuminate\Pagination\LengthAwarePaginator {
         $query = DB::table('authors')
             ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
             ->leftJoin('books', function ($join) {

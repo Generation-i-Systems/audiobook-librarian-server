@@ -83,13 +83,9 @@
         <div class="mb-3">
             <label for="role" class="form-label">Role</label>
             <select name="role" id="role" class="form-control" required>
-                <option value="unverified" {{ old('role', $user['role'] ?? '') == 'unverified' ? 'selected' : '' }}>Unverified</option>
-                <option value="user" {{ old('role', $user['role'] ?? '') == 'user' ? 'selected' : '' }}>User (Player Only)</option>
-                <option value="library-user" {{ old('role', $user['role'] ?? '') == 'library-user' ? 'selected' : '' }}>Library User (Local Books)</option>
-                <option value="librivox-user" {{ old('role', $user['role'] ?? '') == 'librivox-user' ? 'selected' : '' }}>LibriVox User (LibriVox Books)</option>
-                <option value="hybrid-user" {{ old('role', $user['role'] ?? '') == 'hybrid-user' ? 'selected' : '' }}>Hybrid User (Local + LibriVox)</option>
-                <option value="admin" {{ old('role', $user['role'] ?? '') == 'admin' ? 'selected' : '' }}>Admin</option>
-                <option value="super-admin" {{ old('role', $user['role'] ?? '') == 'super-admin' ? 'selected' : '' }}>Super Admin</option>
+                @foreach($assignableRoles as $roleKey => $roleLabel)
+                    <option value="{{ $roleKey }}" @selected(old('role', $user['role'] ?? '') === $roleKey)>{{ $roleLabel }}</option>
+                @endforeach
             </select>
         </div>
 
@@ -165,8 +161,10 @@
             </div>
             <div class="card-body">
                 <p class="text-muted small">
-                    Admins and super admins implicitly have every permission. Grant individual
-                    permissions here to let a non-admin user perform specific admin actions.
+                    Roles are groups of permissions: the user's role ({{ $roleLabel ?? 'none' }})
+                    already implies the permissions marked below. Extra checkboxes grant
+                    specific admin capabilities on top of the role. Admins and super admins
+                    implicitly have every permission.
                 </p>
                 <form action="{{ route('admin.users.updatePermissions', $user['id']) }}" method="POST">
                     @csrf
@@ -180,6 +178,9 @@
                                            {{ in_array($permission->key, $userPermissionKeys, true) ? 'checked' : '' }}>
                                     <label class="form-check-label" for="permission-{{ $permission->key }}">
                                         {{ $permission->label }}
+                                        @if(in_array($permission->key, $rolePermissionKeys, true))
+                                            <span class="badge bg-secondary">from role</span>
+                                        @endif
                                     </label>
                                 </div>
                             </div>

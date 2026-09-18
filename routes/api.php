@@ -97,6 +97,10 @@ Route::prefix('v1')->group(function () {
                 'groups',
                 $user->groups()->get(['groups.id', 'groups.name'])
             );
+            $user->setAttribute(
+                'permissions',
+                method_exists($user, 'permissionKeys') ? $user->permissionKeys() : []
+            );
 
             return $user;
         });

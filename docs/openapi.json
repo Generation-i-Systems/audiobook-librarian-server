@@ -61,9 +61,15 @@
                     },
                     "role": {
                         "type": "string",
-                        "enum": ["admin", "user", "unverified"],
-                        "description": "User role",
+                        "enum": ["user", "library-user", "librivox-user", "hybrid-user", "admin", "super-admin", "unverified", "disabled"],
+                        "description": "User role. Roles are groups of permissions: ordinary library roles imply the standard library-management permission bundle; admin roles imply everything; lifecycle roles (unverified, disabled) imply nothing.",
                         "example": "user"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Effective permission keys: the user's role bundle plus any direct per-user grants (every permission for admins). Returned by GET /user.",
+                        "example": ["manage-books", "manage-authors"]
                     },
                     "email_verified_at": {
                         "type": "string",
@@ -6824,6 +6830,7 @@
                                             "email": "john@example.com",
                                             "photo_url": "https://books.thelin.org/api/v1/books/1/cover",
                                             "role": "user",
+                                            "permissions": ["manage-books", "manage-authors", "manage-genres", "manage-series", "manage-tags", "manage-badges"],
                                             "email_verified_at": null,
                                             "created_at": "2024-01-01T12:00:00Z",
                                             "updated_at": "2024-01-01T12:00:00Z"
@@ -6896,8 +6903,8 @@
         "/me": {
             "get": {
                 "tags": ["Authentication"],
-                "summary": "Get current user information (alias for /user)",
-                "description": "Returns the authenticated user's profile information (same as /user endpoint)",
+                "summary": "Get current user information",
+                "description": "Returns the authenticated user's name, email, role, and effective permission keys (role bundle plus direct grants)",
                 "operationId": "getMe",
                 "security": [
                     {
@@ -6910,37 +6917,22 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/User"
-                                },
-                                "examples": {
-                                    "regular_user": {
-                                        "summary": "Regular user profile",
-                                        "value": {
-                                            "id": 1,
-                                            "name": "John Doe",
-                                            "username": "johndoe",
-                                            "email": "john@example.com",
-                                            "photo_url": "https://books.thelin.org/api/v1/books/1/cover",
-                                            "role": "user",
-                                            "email_verified_at": null,
-                                            "created_at": "2024-01-01T12:00:00Z",
-                                            "updated_at": "2024-01-01T12:00:00Z"
-                                        }
-                                    },
-                                    "admin_user": {
-                                        "summary": "Admin user profile",
-                                        "value": {
-                                            "id": 2,
-                                            "name": "Eric Thelin",
-                                            "username": "eric.thelin",
-                                            "email": "eric.thelin@gmail.com",
-                                            "photo_url": "https://books.thelin.org/api/v1/books/2/cover",
-                                            "role": "admin",
-                                            "email_verified_at": "2024-01-01T10:00:00Z",
-                                            "created_at": "2023-12-15T08:30:00Z",
-                                            "updated_at": "2024-01-01T12:00:00Z"
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "email": {"type": "string", "format": "email"},
+                                        "role": {"type": "string"},
+                                        "permissions": {
+                                            "type": "array",
+                                            "items": {"type": "string"}
                                         }
                                     }
+                                },
+                                "example": {
+                                    "name": "John Doe",
+                                    "email": "john@example.com",
+                                    "role": "user",
+                                    "permissions": ["manage-books", "manage-authors"]
                                 }
                             }
                         }
@@ -16556,9 +16548,15 @@
                                         "type": "string",
                                         "enum": [
                                             "user",
+                                            "library-user",
+                                            "librivox-user",
+                                            "hybrid-user",
                                             "admin",
-                                            "unverified"
-                                        ]
+                                            "super-admin",
+                                            "unverified",
+                                            "disabled"
+                                        ],
+                                        "description": "Canonical role keys. Roles are groups of permissions; ordinary library roles imply the standard library-management bundle."
                                     },
                                     "send_otp_email": {
                                         "type": "boolean"

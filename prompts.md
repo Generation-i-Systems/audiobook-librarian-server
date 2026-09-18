@@ -4,6 +4,12 @@ This file contains the text of prompts sent to the AI assistant.
 
 ---
 
+## 2026-09-18
+
+there is a bug in the author book counts such as https://books.ablibrarian.com/authors?search=Lindsey+Sterling&sort=name&direction=asc&perPage=25 that says authors have 0 books. and because of missing it I just deleted about 20 authors! I need to restore them and fix the bug
+
+---
+
 ## 2026-09-17
 
 implement the user rebuild to use roles and permissions. roles should be treated as groups of permissions. the normal user case will be a simple role that implys varous permissions

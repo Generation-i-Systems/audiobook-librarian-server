@@ -20,6 +20,8 @@ class UserApiController extends Controller
         return response()->json([
             'name' => $user->name,
             'email' => $user->email,
+            'role' => $user->role ?? null,
+            'permissions' => method_exists($user, 'permissionKeys') ? $user->permissionKeys() : [],
         ]);
     }
 }

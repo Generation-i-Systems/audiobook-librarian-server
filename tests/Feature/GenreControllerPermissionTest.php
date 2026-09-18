@@ -24,27 +24,27 @@ class GenreControllerPermissionTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_non_admin_without_permission_cannot_view_create_form(): void
+    public function test_unverified_user_cannot_view_create_form(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->get(route('genres.create'));
 
         $response->assertStatus(403);
     }
 
-    public function test_non_admin_without_permission_cannot_create_a_genre(): void
+    public function test_unverified_user_cannot_create_a_genre(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
 
         $response = $this->post(route('genres.store'), ['name' => 'New Genre']);
 
         $response->assertStatus(403);
     }
 
-    public function test_non_admin_without_permission_cannot_delete_a_genre(): void
+    public function test_unverified_user_cannot_delete_a_genre(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'library-user']));
+        $this->actingAs(User::factory()->create(['role' => 'unverified']));
         $genre = Genre::factory()->create();
 
         $response = $this->delete(route('genres.destroy', $genre->id));

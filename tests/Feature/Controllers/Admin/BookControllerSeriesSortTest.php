@@ -26,7 +26,7 @@ class BookControllerSeriesSortTest extends TestCase
         // Mock the document store service
         $this->documentStoreService = Mockery::mock(DocumentStoreServiceInterface::class);
         $this->documentStoreService->shouldReceive('isAdmin')
-            ->with($this->admin->getAuthIdentifier())
+            ->with((int) $this->admin->getAuthIdentifier())
             ->andReturn(true);
         // The merged books.index page also loads filter options and recent books
         // regardless of permission level; stub them so the mock doesn't choke.
@@ -52,7 +52,7 @@ class BookControllerSeriesSortTest extends TestCase
         // Mock the listBooks method to expect series sort (secondary sort by number handled in service)
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series', 'asc', true)
+            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series', 'asc', true, (int) $this->admin->getAuthIdentifier())
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -71,7 +71,7 @@ class BookControllerSeriesSortTest extends TestCase
         // Mock the listBooks method to expect the explicit sort
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'title', 'asc', true)
+            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'title', 'asc', true, (int) $this->admin->getAuthIdentifier())
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -91,7 +91,7 @@ class BookControllerSeriesSortTest extends TestCase
         // same as every other user gets on the merged books.index page.
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, ['include_needs_review' => true], true, 'title', 'asc', true)
+            ->with(1, 12, ['include_needs_review' => true], true, 'title', 'asc', true, (int) $this->admin->getAuthIdentifier())
             ->andReturn([
                 'data' => [],
                 'total' => 0,
