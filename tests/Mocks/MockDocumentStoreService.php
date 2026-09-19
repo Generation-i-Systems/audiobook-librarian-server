@@ -1178,11 +1178,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         ], $authors);
     }
 
-    public function deleteAuthor(string $id): void
+    public function deleteAuthor(string $id): bool
     {
         if (isset($this->authors[$id])) {
             unset($this->authors[$id]);
+
+            return true;
         }
+
+        return false;
     }
 
     public function findOrCreateMany(string $collection, array $names): array

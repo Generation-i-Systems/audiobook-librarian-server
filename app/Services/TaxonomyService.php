@@ -246,18 +246,30 @@ class TaxonomyService
         }
     }
 
-    public function deleteAuthor(string $authorId): void
+    public function deleteAuthor(string $authorId): bool
     {
         try {
             $author = Author::where('id', $authorId)->first();
 
             if (!$author) {
-                return;
+                return false;
+            }
+
+            if ($author->books()->whereNull('books.deleted_at')->exists()) {
+                Log::warning('Refused to delete author with linked books', [
+                    'author_id' => $authorId,
+                ]);
+
+                return false;
             }
 
             $author->delete();
+
+            return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteAuthor failed: ' . $e->getMessage());
+
+            return false;
         }
     }
 }

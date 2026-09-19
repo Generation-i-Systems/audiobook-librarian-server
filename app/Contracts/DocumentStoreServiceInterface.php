@@ -401,7 +401,10 @@ interface DocumentStoreServiceInterface
 
     public function listAuthors(?int $since = null);
 
-    public function deleteAuthor(string $id): void;
+    /**
+     * Soft-delete an author only when no non-deleted books remain linked to it.
+     */
+    public function deleteAuthor(string $id): bool;
 
     /**
      * List all authors with aggregated statistics.

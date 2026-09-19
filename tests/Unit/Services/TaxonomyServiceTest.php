@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services;
 
 use App\Models\Author;
+use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
@@ -65,5 +66,24 @@ class TaxonomyServiceTest extends TestCase
         $this->assertSoftDeleted('genres', ['id' => $genre->id]);
         $this->assertSoftDeleted('narrators', ['id' => $narrator->id]);
         $this->assertSoftDeleted('series', ['id' => $seriesId]);
+    }
+
+    #[Test]
+    public function deleteAuthorDoesNotDeleteAnAuthorWithAnUnlistedBook(): void
+    {
+        $service = new TaxonomyService();
+        $author = Author::query()->create(['name' => 'Protected Author']);
+        $book = Book::factory()->create([
+            'directory_exists' => false,
+            'needs_review' => true,
+        ]);
+        $book->authors()->attach($author);
+
+        $service->deleteAuthor((string) $author->id);
+
+        $this->assertDatabaseHas('authors', [
+            'id' => $author->id,
+            'deleted_at' => null,
+        ]);
     }
 }

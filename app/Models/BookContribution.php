@@ -24,11 +24,13 @@ class BookContribution extends Model
         'reviewed_at' => 'datetime',
     ];
 
+    /** @return BelongsTo<Book, $this> */
     public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function submitter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');

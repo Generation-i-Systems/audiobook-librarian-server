@@ -825,15 +825,15 @@ $canManageBooks = $canManageBooks ?? false;
             const bookEditRoute = '{{ route("admin.books.edit", ":id") }}';
             const bookAutofillRoute = '{{ route("admin.books.autofillFromPath", ":id") }}';
             const bookDestroyRoute = '{{ route("admin.books.destroy", ":id") }}';
-            let mainSearchParams = {
-                "search": '{{ request()->input("search", "") }}',
-                "genre": '{{ request()->input("genre", "") }}',
-                "author": '{{ request()->input("author", "") }}',
-                "series": '{{ request()->input("series", "") }}',
-                "tag": '{{ request()->input("tag", "") }}',
-                "sort": '{{ $sort }}',
-                "semantic": '{{ request()->boolean("semantic") ? "1" : "" }}'
-            };
+            let mainSearchParams = {{ Illuminate\Support\Js::from([
+                'search' => request()->input('search', ''),
+                'genre' => request()->input('genre', ''),
+                'author' => request()->input('author', ''),
+                'series' => request()->input('series', ''),
+                'tag' => request()->input('tag', ''),
+                'sort' => $sort,
+                'semantic' => request()->boolean('semantic') ? '1' : '',
+            ]) }};
 
             function hasCoverImage(book) {
                 return book.hasCoverImage === true || (typeof book.coverImage === 'string' && book.coverImage.trim() !== '');

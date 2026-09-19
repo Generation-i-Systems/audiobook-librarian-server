@@ -805,9 +805,18 @@ Route::name('gallery.')->prefix('gallery')->group(function () use ($redirectToGa
 // so any still-active /admin/* route (e.g. admin.series.ajax, used by the book form)
 // is matched first — this only catches paths nothing above claimed.
 foreach (['tags', 'genres', 'authors', 'badges', 'series'] as $blendedEntity) {
-    Route::get('/admin/' . $blendedEntity . '/{any?}', fn (?string $any = null) => redirect(
-        '/' . $blendedEntity . ($any ? '/' . $any : '') . (($qs = request()->getQueryString()) ? '?' . $qs : '')
-    ))->where('any', '.*');
+    Route::match(
+        ['get', 'post', 'put', 'patch', 'delete'],
+        '/admin/' . $blendedEntity . '/{any?}',
+        function (Request $request, ?string $any = null) use ($blendedEntity) {
+            $target = '/' . $blendedEntity . ($any ? '/' . $any : '');
+            if ($queryString = $request->getQueryString()) {
+                $target .= '?' . $queryString;
+            }
+
+            return redirect()->to($target, $request->isMethod('GET') ? 302 : 307);
+        }
+    )->where('any', '.*');
 }
 
 // admin.books.index / admin.books.show: named (many other admin views still call these
@@ -816,6 +825,20 @@ foreach (['tags', 'genres', 'authors', 'badges', 'series'] as $blendedEntity) {
 // /admin/books/related-ajax) and outside the 'admin' role middleware so a manage-books
 // permission holder who isn't a full admin can still follow an old bookmarked link.
 Route::name('admin.')->prefix('admin')->middleware(['auth'])->group(function (): void {
-    Route::get('/books', fn () => redirect()->route('books.index'))->name('books.index');
-    Route::get('/books/{book}', fn ($book) => redirect()->route('books.show', $book))->name('books.show');
+    Route::get('/books', function (Request $request) {
+        $target = route('books.index');
+        if ($queryString = $request->getQueryString()) {
+            $target .= '?' . $queryString;
+        }
+
+        return redirect()->to($target);
+    })->name('books.index');
+    Route::get('/books/{book}', function (Request $request, $book) {
+        $target = route('books.show', $book);
+        if ($queryString = $request->getQueryString()) {
+            $target .= '?' . $queryString;
+        }
+
+        return redirect()->to($target);
+    })->name('books.show');
 });

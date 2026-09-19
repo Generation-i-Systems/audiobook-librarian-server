@@ -6,6 +6,23 @@ This file contains the text of prompts sent to the AI assistant.
 
 ## 2026-09-18
 
+commit that. on a related note when a user submits an edit where does that go? is there a server path to validate and apply it? if not make one and also have the server email the admin user(s) that there is an edit to approve
+
+---
+
+find author entries that contain two authors separated with ',' or '&' or 'and' or similar and if there are no books for them delete the author but if there are still books we need to split them to list the authors separately. Remove names whose only listed credit is editor, translator, contributor, or foreword; keep Critical Role and Various as one entry.
+
+---
+
+https://books.ablibrarian.com/authors/2963/browse -> shows 1 book
+the view books link on that page https://books.ablibrarian.com/books?author=Linus%20Torvald&series=Linus%20Torvalds%20%26%20David%20Diamond -> shows 0 books
+
+---
+
+the redirect from legacy /admin/* routes to the new ones that remove /admin doesn't maintain the http params get or post
+
+---
+
 there is a bug in the author book counts such as https://books.ablibrarian.com/authors?search=Lindsey+Sterling&sort=name&direction=asc&perPage=25 that says authors have 0 books. and because of missing it I just deleted about 20 authors! I need to restore them and fix the bug
 
 ---

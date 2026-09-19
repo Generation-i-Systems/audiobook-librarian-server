@@ -2,6 +2,8 @@
 
 ### Added
 
+- Submitting a book metadata contribution now emails every admin and super-admin with the proposed changes and the existing approval/rejection API paths.
+- Added a transactional composite-author normalizer for approved data repair. It preserves active book links for each retained person, soft-deletes the composite source only after verifying those links, and omits editor, translator, contributor, and foreword credits rather than creating author records for them.
 - Fixed the shared Books page replacing a valid initial author/series result with zero books after its AJAX refresh when a filter name contains an ampersand. Filter parameters now use JavaScript-safe serialization rather than HTML-escaped Blade interpolation.
 - Legacy `/admin` compatibility redirects now preserve GET query parameters; legacy write requests to the blended author, genre, series, tag, and badge routes use a method-preserving `307` redirect so submitted form data reaches the top-level route.
 - Author listings now count all linked non-deleted books rather than excluding books that need review or whose directory is temporarily unavailable. Author deletion is also rejected server-side whenever any non-deleted book remains linked, preventing an inaccurate list count from enabling accidental deletion.

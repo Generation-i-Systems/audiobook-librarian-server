@@ -11,6 +11,7 @@ use App\Models\BookContribution;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
+use App\Services\BookContributionNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +24,7 @@ class BookContributionController extends Controller
      * Submit a metadata correction for a book.
      * POST /v1/books/{book}/contributions
      */
-    public function store(Request $request, Book $book): JsonResponse
+    public function store(Request $request, Book $book, BookContributionNotifier $contributionNotifier): JsonResponse
     {
         $data = $request->validate([
             'changes' => 'required|array|min:1',
@@ -49,6 +50,8 @@ class BookContributionController extends Controller
             'changes' => $data['changes'],
             'status' => 'pending',
         ]);
+
+        $contributionNotifier->notifyAdmins($contribution);
 
         return response()->json([
             'id' => $contribution->id,

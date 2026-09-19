@@ -162,6 +162,19 @@ class AuthorController extends Controller
 
     public function destroy(Request $request, $id)
     {
+        $linkedBooks = $this->documentStoreService->listBooks(
+            page: 1,
+            perPage: 1,
+            filters: ['author_id' => (string) $id],
+            withRelated: false,
+            includeAllBooks: true,
+        );
+
+        if (($linkedBooks['total'] ?? 0) > 0) {
+            return redirect()->route('authors.index')
+                ->withErrors(['author' => 'An author with linked books cannot be deleted.']);
+        }
+
         $this->documentStoreService->deleteAuthor($id);
 
         $returnUrl = $request->input('return_url', route('authors.index'));

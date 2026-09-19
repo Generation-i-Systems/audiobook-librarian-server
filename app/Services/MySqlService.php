@@ -1316,9 +1316,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
                 ->leftJoin('books', function ($join) {
                     $join->on('author_book.book_id', '=', 'books.id')
-                        ->whereNull('books.deleted_at')
-                        ->where('books.directory_exists', true)
-                        ->where('books.needs_review', false);
+                        ->whereNull('books.deleted_at');
                 })
                 ->whereNull('authors.deleted_at')
                 ->groupBy('authors.id', 'authors.name', 'authors.updated_at')
@@ -1359,9 +1357,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
             ->leftJoin('books', function ($join) {
                 $join->on('author_book.book_id', '=', 'books.id')
-                    ->whereNull('books.deleted_at')
-                    ->where('books.directory_exists', true)
-                    ->where('books.needs_review', false);
+                    ->whereNull('books.deleted_at');
             })
             ->whereNull('authors.deleted_at')
             ->groupBy('authors.id', 'authors.name', 'authors.updated_at')
@@ -1395,9 +1391,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
             ->leftJoin('books', function ($join) {
                 $join->on('author_book.book_id', '=', 'books.id')
-                    ->whereNull('books.deleted_at')
-                    ->where('books.directory_exists', true)
-                    ->where('books.needs_review', false);
+                    ->whereNull('books.deleted_at');
             })
             ->whereNull('authors.deleted_at')
             ->whereIn('authors.id', $ids)
@@ -2538,9 +2532,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $this->getTaxonomyService()->deleteGenre($genreId);
     }
 
-    public function deleteAuthor(string $authorId): void
+    public function deleteAuthor(string $authorId): bool
     {
-        $this->getTaxonomyService()->deleteAuthor($authorId);
+        return $this->getTaxonomyService()->deleteAuthor($authorId);
     }
 
     public function deleteBook(string $bookId, bool $deleteFiles = true): bool
