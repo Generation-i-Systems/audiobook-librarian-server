@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\PermissionKey;
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Permission;
@@ -71,6 +72,32 @@ class AuthorControllerPermissionTest extends TestCase
             'id' => $author->id,
             'deleted_at' => null,
         ]);
+    }
+
+    public function test_author_edit_lists_linked_books_even_when_their_directory_is_missing(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
+        $authorId = 410;
+        $bookTitle = 'Missing-directory linked book';
+        $documentStore = \Mockery::mock(DocumentStoreServiceInterface::class);
+        $documentStore->shouldReceive('getAuthor')->with((string) $authorId)->andReturn([
+            'id' => $authorId,
+            'name' => 'Linked Author',
+        ]);
+        $documentStore->shouldReceive('listBooks')
+            ->with(1, 25, ['author_id' => (string) $authorId], true, 'title', 'asc', true)
+            ->andReturn([
+                'data' => [['id' => 3456, 'title' => $bookTitle]],
+                'total' => 1,
+            ]);
+        $this->app->instance(DocumentStoreServiceInterface::class, $documentStore);
+
+        $response = $this->get(route('authors.edit', $authorId));
+
+        $response->assertOk();
+        $response->assertSee($bookTitle);
+        $response->assertSee('1 total');
     }
 
     public function test_user_with_manage_authors_permission_can_create_an_author(): void

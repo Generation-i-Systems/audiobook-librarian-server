@@ -123,7 +123,8 @@ class AuthorController extends Controller
             filters: ['author_id' => $id],
             withRelated: true,
             sort: 'title',
-            order: 'asc'
+            order: 'asc',
+            includeAllBooks: true
         );
 
         $books = $booksResult['data'] ?? [];
