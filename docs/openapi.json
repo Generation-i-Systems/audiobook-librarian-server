@@ -16658,7 +16658,7 @@
                     "Admin"
                 ],
                 "summary": "Generate a one-time sign-in QR code for a user",
-                "description": "Admin-only. Mints a login OTP for the specified user without emailing it, returning the magic-link URL so the admin can render it as a scannable QR code. Expires after the same TTL as an emailed OTP.",
+                "description": "Admin-only. Mints a login OTP for the specified user without emailing it. The returned url is the magic-link landing page with the username and the 6-digit one-time code embedded as query parameters (?username=...&otp=...), so the same QR works with a regular camera scanner (browser to app deep link) and with the Librarian app's connect-screen scanner (token redeemed via POST /auth/otp/verify). Expires after the same TTL as an emailed OTP.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -16685,6 +16685,32 @@
                                         "url": {
                                             "type": "string",
                                             "format": "uri"
+                                        },
+                                        "server_name": {
+                                            "type": "string",
+                                            "description": "Configured application name of the server."
+                                        },
+                                        "api_url": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "description": "Absolute API base URL of this server."
+                                        },
+                                        "username": {
+                                            "type": "string",
+                                            "description": "Username of the target account (may be empty)."
+                                        },
+                                        "email": {
+                                            "type": "string",
+                                            "description": "Email of the target account (the OTP is keyed by it)."
+                                        },
+                                        "code": {
+                                            "type": "string",
+                                            "pattern": "^[0-9]{6}$",
+                                            "description": "Plaintext 6-digit one-time code, the same value as the otp query parameter of url."
+                                        },
+                                        "token": {
+                                            "type": "string",
+                                            "description": "Plaintext magic token, the path segment of url; redeem via POST /auth/otp/verify."
                                         },
                                         "expires_in_seconds": {
                                             "type": "integer"

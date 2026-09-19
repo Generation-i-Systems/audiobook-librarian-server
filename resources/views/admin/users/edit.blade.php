@@ -227,6 +227,14 @@
                              style="min-height: 220px; width: 220px;">
                             <span class="text-muted small">Generating QR code...</span>
                         </div>
+                        <div id="login-qr-details" class="text-start small mt-3" style="display:none;">
+                            <div id="login-qr-server"></div>
+                            <div id="login-qr-username"></div>
+                            <div id="login-qr-code"></div>
+                            <div id="login-qr-email"></div>
+                            <div id="login-qr-expiry" class="text-muted"></div>
+                            <div class="text-muted fst-italic mt-1">Treat this code like a password &mdash; anyone who scans it can sign in as this user until it expires.</div>
+                        </div>
                         <div id="login-qr-error" class="alert alert-danger mt-3" style="display:none;"></div>
                     </div>
                 </div>

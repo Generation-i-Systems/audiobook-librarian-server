@@ -136,17 +136,61 @@ class UserControllerOtpTest extends TestCase
     public function test_login_qr_route_returns_json_url(): void
     {
         $this->actingAs($this->admin());
-        $target = User::factory()->create(['email' => 'webqr@example.com']);
+        $target = User::factory()->create(['email' => 'webqr@example.com', 'username' => 'webqruser']);
 
         $response = $this->postJson('/admin/users/' . $target->id . '/login-qr');
 
         $response->assertStatus(200);
-        $response->assertJsonStructure(['url', 'expires_in_seconds']);
+        $response->assertJsonStructure([
+            'url',
+            'server_name',
+            'api_url',
+            'username',
+            'email',
+            'code',
+            'token',
+            'expires_in_seconds',
+        ]);
 
         $token = basename((string) parse_url($response->json('url'), PHP_URL_PATH));
+        $this->assertSame($token, $response->json('token'));
         $this->assertTrue(
             EmailOtp::where('magic_token_hash', hash('sha256', $token))->exists()
         );
+
+        $query = [];
+        parse_str((string) parse_url($response->json('url'), PHP_URL_QUERY), $query);
+        $this->assertSame('webqruser', $query['username'] ?? null);
+        $this->assertSame($response->json('code'), $query['otp'] ?? null);
+        $this->assertMatchesRegularExpression('/^\d{6}$/', (string) $response->json('code'));
+    }
+
+    public function test_login_qr_url_can_be_redeemed_via_otp_verify(): void
+    {
+        $this->actingAs($this->admin());
+        $target = User::factory()->create(['email' => 'redeem@example.com', 'username' => 'redeemuser']);
+
+        $qr = $this->postJson('/admin/users/' . $target->id . '/login-qr')->assertStatus(200);
+        $token = (string) $qr->json('token');
+
+        $verify = $this->postJson('/api/v1/auth/otp/verify', ['token' => $token]);
+
+        $verify->assertStatus(200);
+        $verify->assertJsonPath('username', 'redeemuser');
+        $this->assertNotEmpty($verify->json('authToken'));
+    }
+
+    public function test_login_qr_url_with_username_and_code_serves_the_magic_landing_page(): void
+    {
+        $this->actingAs($this->admin());
+        $target = User::factory()->create(['email' => 'landing@example.com', 'username' => 'landinguser']);
+
+        $url = (string) $this->postJson('/admin/users/' . $target->id . '/login-qr')->json('url');
+
+        $path = (string) parse_url($url, PHP_URL_PATH) . '?' . (string) parse_url($url, PHP_URL_QUERY);
+        $this->get($path)
+            ->assertOk()
+            ->assertSee('ablibrarian://auth/magic', false);
     }
 
     public function test_admin_routes_require_admin_role(): void
