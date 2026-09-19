@@ -116,6 +116,7 @@ class User extends Authenticatable implements Permissible
         'email_verified_at' => 'datetime',
         'deletion_requested_at' => 'datetime',
         'deletion_scheduled_for' => 'datetime',
+        'book_list_preferences' => 'array',
         'password' => 'hashed',
     ];
 

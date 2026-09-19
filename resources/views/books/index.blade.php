@@ -1201,6 +1201,15 @@ $canManageBooks = $canManageBooks ?? false;
                 loadMainBooks();
             });
 
+            // Remember the chosen sort per user
+            $('#sort').on('change', function () {
+                $.post('{{ route("books.set-preference") }}', {
+                    _token: '{{ csrf_token() }}',
+                    key: 'main_sort',
+                    value: $(this).val()
+                });
+            });
+
             // Handle search form submission
             $('form').on('submit', function (e) {
                 e.preventDefault();
@@ -1229,7 +1238,7 @@ $canManageBooks = $canManageBooks ?? false;
                 updateMainViewButtons();
 
                 // Set initial per-page dropdown value
-                const storedPerPage = '{{ session("main_per_page", "24") }}';
+                const storedPerPage = '{{ $savedPerPage }}';
                 if (storedPerPage) {
                     mainPerPage = parseInt(storedPerPage);
                     $('#current-per-page').text(mainPerPage);

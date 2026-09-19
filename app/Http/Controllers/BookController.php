@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\BookListPreferenceService;
 use App\Models\Book;
 use App\Models\User;
 use App\Services\BookTagService;
@@ -33,7 +34,8 @@ class BookController extends Controller
         DocumentStoreServiceInterface $documentStoreService,
         GoogleBooksApiService $googleBooksApiService,
         BookTagService $bookTagService,
-        SemanticBookSearchService $semanticBookSearchService
+        SemanticBookSearchService $semanticBookSearchService,
+        private readonly BookListPreferenceService $bookListPreferences = new BookListPreferenceService()
     ) {
         $this->documentStoreService = $documentStoreService;
         $this->googleBooksApiService = $googleBooksApiService;
@@ -136,7 +138,10 @@ class BookController extends Controller
         // Default to series (number) sorting when a series filter is applied and no
         // explicit sort was requested — browsing a series in publication order is
         // almost always what's wanted.
-        $defaultSort = ($request->filled('series') || $tokens['series_id']) && !$request->has('sort') ? 'series_asc' : 'title_asc';
+        $savedSort = $this->bookListPreferences->get($request, 'sort');
+        $defaultSort = ($request->filled('series') || $tokens['series_id']) && !$request->has('sort')
+            ? 'series_asc'
+            : ($savedSort ?? 'title_asc');
         $sortParam = $request->input('sort', $defaultSort);
         $combinedSort = $this->resolveCombinedBookListSort($sortParam);
         if ($combinedSort !== null) {
@@ -203,7 +208,8 @@ class BookController extends Controller
         $recentBooks = $this->getRecentBooks([], 5);
 
         // Get view preferences from session
-        $mainViewType = $isLibrivoxMode ? 'list' : session('main_view_type', 'grid');
+        $mainViewType = $isLibrivoxMode ? 'list' : $this->bookListPreferences->get($request, 'view_type', 'grid');
+        $savedPerPage = $this->bookListPreferences->get($request, 'per_page', 24);
 
         // Pass pagination data to the view
         $pagination = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -228,6 +234,7 @@ class BookController extends Controller
             'isLibrivoxMode' => $isLibrivoxMode,
             'mainViewType' => $mainViewType,
             'mainPerPage' => $perPage,
+            'savedPerPage' => $savedPerPage,
             'currentFilters' => $filters,
             'canManageBooks' => $canManageBooks,
             'sort' => $sortParam,
@@ -315,8 +322,7 @@ class BookController extends Controller
 
         // Get pagination and filter parameters from request
         $page = max(1, (int) $request->input('page', 1));
-        $perPage = (int) $request->input('per_page', session('main_per_page', 24));
-        session(['main_per_page' => $perPage]);
+        $perPage = (int) $request->input('per_page', $this->bookListPreferences->get($request, 'per_page', 24));
 
         // Get filters from request
         $filters = [];
@@ -435,7 +441,7 @@ class BookController extends Controller
                 'current_page' => $result['currentPage'] ?? $result['current_page'] ?? $page,
                 'last_page' => $result['lastPage'] ?? $result['last_page'] ?? 1,
             ],
-            'view_type' => $isLibrivoxMode ? 'list' : $request->input('view_type', session('main_view_type', 'grid')),
+            'view_type' => $isLibrivoxMode ? 'list' : $request->input('view_type', $this->bookListPreferences->get($request, 'view_type', 'grid')),
             'canManageBooks' => $canManageBooks,
         ];
 
@@ -591,13 +597,12 @@ class BookController extends Controller
      */
     public function setPreference(Request $request)
     {
-        $type = $request->input('type');
-        $value = $request->input('value');
+        // The page's JS posts `key` (main_view_type / main_per_page / main_sort); older callers used `type`.
+        $key = (string) ($request->input('key') ?? $request->input('type'));
+        $key = ['main_view_type' => 'view_type', 'main_per_page' => 'per_page', 'main_sort' => 'sort'][$key] ?? $key;
 
-        if ($type === 'view_type') {
-            session(['main_view_type' => $value]);
-        } elseif ($type === 'per_page') {
-            session(['main_per_page' => (int) $value]);
+        if (!$this->bookListPreferences->set($request, $key, $request->input('value'))) {
+            return response()->json(['success' => false], 422);
         }
 
         return response()->json(['success' => true]);

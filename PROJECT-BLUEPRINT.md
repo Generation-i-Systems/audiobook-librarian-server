@@ -26,6 +26,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - Book CRUD (admin). Book detail views call tag/group services with the session-authenticated Eloquent `User` model directly, as required for persisted user relationships.
 - Book metadata corrections submitted through the API remain pending until an admin reviews them; submissions notify every admin and super-admin by email, and the existing admin contribution API approves and applies or rejects each proposed change.
 - Author listings count every linked, non-deleted book, including books awaiting review or with a temporarily unavailable directory. The server refuses to delete an author while any non-deleted book remains linked, so an inaccurate browser count cannot cause data to disappear from the author list.
+- Author edit pages use that same complete active-link definition: a linked book remains visible even when it needs review or its directory is unavailable, so the edit UI agrees with deletion protection.
 - Composite author repair uses a transactional normalizer: each retained named author receives every active book link before the source composite is soft-deleted. Explicit editor, translator, contributor, and foreword credits are omitted rather than becoming author records; known group/organization values remain untouched for manual review.
 - Legacy `/admin/books` redirects preserve every query parameter. Redirects for the top-level blended management surfaces (`authors`, `genres`, `series`, `tags`, and `badges`) also accept legacy write methods and issue a `307`, preserving the request method and submitted fields at the new path.
 - Shared book-list filters are rendered once by Blade and then reissued to `/api/books/json` by JavaScript. Serialize those values with `Illuminate\Support\Js::from()` rather than interpolating quoted Blade output, so names containing `&`, quotes, or other HTML-sensitive characters retain their exact database value during the AJAX refresh.
@@ -205,3 +206,5 @@ and `book_genre` pivot tables (see [API Documentation](docs/API.md) and
 ---
 
 This blueprint summarizes the architecture, features, and design up to this point. Use for onboarding, planning, or future extension.
+
+- Books page display state (view type, per page, sort) is stored per user in `users.book_list_preferences` (JSON) via `App\Services\BookListPreferenceService`, written through `POST /books/set-preference`; session is the fallback for guests.

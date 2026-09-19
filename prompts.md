@@ -10,6 +10,10 @@ commit that. on a related note when a user submits an edit where does that go? i
 
 ---
 
+https://books.ablibrarian.com/authors/410/edit shows no books, but deletion is blocked because an active book remains attached. Show the linked book consistently with the deletion safeguard.
+
+---
+
 find author entries that contain two authors separated with ',' or '&' or 'and' or similar and if there are no books for them delete the author but if there are still books we need to split them to list the authors separately. Remove names whose only listed credit is editor, translator, contributor, or foreword; keep Critical Role and Various as one entry.
 
 ---
@@ -564,3 +568,7 @@ getting api errors. look at the logs and address them
 ---
 
 getting api errors. look at the logs and address them
+
+## 2026-09-19
+
+- update the books page to remember the default view to remember its state (list/list/grid, sort, per page, and such settings) per user

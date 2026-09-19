@@ -381,6 +381,10 @@ about whether the image actually builds, boots, serves traffic, or persists data
   silently reverts on the next deploy (the seed re-`sync`s). Verify manually after deploying: sign in as one known
   non-admin account and confirm the intended management surfaces work, and check `roles`/`role_permission` row
   counts match `Role::ROLE_PERMISSIONS`.
+- **Books page preference JS** (`resources/views/books/index.blade.php`) — the view-toggle, per-page and sort
+  `change`/click handlers that POST to `books.set-preference` are browser-only; the endpoint and service are
+  tested, but a broken selector or payload key fails silently (the page still works, it just stops remembering).
+  The `users.book_list_preferences` migration must also be applied on live before saves succeed.
 
 ---
 
