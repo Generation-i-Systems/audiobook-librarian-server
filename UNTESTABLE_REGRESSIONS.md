@@ -218,8 +218,15 @@ rendering or real user interactions.
 - **Admin login QR modal** (`resources/js/admin/users/login-qr.js`) — Bootstrap modal
   open, AJAX fetch of a fresh login OTP, and `qrcode` canvas rendering (reusing
   `renderAppConnectQr()` from `resources/js/app-connect-qr.js`); only the backend
-  `generateLoginQr` JSON response is covered by feature tests, not that a phone camera can
-  actually scan the rendered canvas.
+  `generateLoginQr` JSON response and its `/auth/otp/verify` redemption are covered by
+  feature tests, not that a phone camera can actually scan the rendered canvas. The QR
+  payload now also carries the username and the plaintext 6-digit code as query
+  parameters for the Librarian app's connect-screen scanner — whether the browser →
+  magic landing → `ablibrarian://` handoff still completes with those extra parameters
+  on real device browsers, and whether long self-hosted URLs stay scannable (QR density),
+  can only be proven on real hardware. The QR is a short-lived bearer credential: anyone
+  who photographs or screenshots it before its first use/sign-out can take over the
+  account, so the modal's "treat like a password" note must never be removed.
 - **Inline cover preview during import** — the cover candidate list with inline `<img>` tags
   rendered in the terminal; verifying display requires a human.
 - **Skin designer rendering parity** (`public/js/skin-designer.js` `SkinRenderer.renderElement()`)
