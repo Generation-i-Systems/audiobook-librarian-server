@@ -150,4 +150,56 @@ class BookImportServiceDuplicateDetectionTest extends TestCase
         $this->assertSame(1, Book::query()->count());
         $this->assertNotNull($book->fresh()?->directory_path);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findExistingBookDoesNotMatchDifferentTitleOnGenreAuthorOnlyDirectory(): void
+    {
+        // Regression test: two unrelated books by the same author can each legitimately
+        // end up with no series, which historically could degenerate their directory_path
+        // down to just "Genre/Author" (no title/series segment). That thin path must never
+        // be trusted as a duplicate-detection signal on its own, or importing the second
+        // book silently overwrites the first book's already-confirmed metadata.
+        $author = Author::create(['name' => 'Sadie King']);
+        $existingBook = Book::create([
+            'title' => 'Men of Maple Mountain Books 1-7 - A Mountain Man Romance Collection',
+            'directory_path' => 'Romance/Sadie King',
+            'language' => 'en',
+        ]);
+        $existingBook->authors()->attach($author);
+
+        $metadata = [
+            'title' => 'Wild Heart Mountain: Wild Riders MC Books 1-3 - An MC Romance Collection',
+            'author' => ['Sadie King'],
+            'genre' => ['Romance'],
+            'custom_directory_path' => 'Romance/Sadie King',
+        ];
+
+        $result = $this->service->findExistingBook('/some/path', $metadata);
+
+        $this->assertNull($result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findExistingBookStillMatchesGenreAuthorOnlyDirectoryWhenTitleAgrees(): void
+    {
+        $author = Author::create(['name' => 'Sadie King']);
+        $existingBook = Book::create([
+            'title' => 'Men of Maple Mountain Books 1-7 - A Mountain Man Romance Collection',
+            'directory_path' => 'Romance/Sadie King',
+            'language' => 'en',
+        ]);
+        $existingBook->authors()->attach($author);
+
+        $metadata = [
+            'title' => 'Men of Maple Mountain Books 1-7 - A Mountain Man Romance Collection',
+            'author' => ['Sadie King'],
+            'genre' => ['Romance'],
+            'custom_directory_path' => 'Romance/Sadie King',
+        ];
+
+        $result = $this->service->findExistingBook('/some/path', $metadata);
+
+        $this->assertNotNull($result);
+        $this->assertSame($existingBook->id, $result->id);
+    }
 }

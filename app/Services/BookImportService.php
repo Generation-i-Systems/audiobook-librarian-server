@@ -4036,7 +4036,7 @@ class BookImportService
             $tableData[] = ['Source Path', $metadata['source_path']];
         }
 
-        $expectedPath = $this->generateDirectoryPath($metadata);
+        $expectedPath = $this->generateDirectoryPath($metadata, ['include_title' => true]);
         $tableData[] = ['Directory Path', $expectedPath];
 
         if (!empty($metadata['description'])) {
@@ -4258,6 +4258,33 @@ class BookImportService
     }
 
     /**
+     * A directory_path with only a genre/author segment (no title or series) is not
+     * a reliable duplicate signal on its own: two unrelated books by the same author
+     * can legitimately degenerate to the identical genre/author-only path (e.g. a
+     * directory-generation bug once produced "Romance/Sadie King" for two different
+     * box-set titles), and treating that as a match would silently overwrite one
+     * book's already-confirmed metadata with an unrelated book's data. Require the
+     * incoming title to agree with the matched book's title before trusting a match
+     * on a path that thin; a path with a title/series segment is unaffected.
+     */
+    private function directoryMatchIsSafeToReuse(Book $existingBook, array $metadata, string $directoryPath): bool
+    {
+        $segments = array_values(array_filter(explode('/', $directoryPath), static fn (string $segment): bool => $segment !== ''));
+        if (count($segments) >= 3) {
+            return true;
+        }
+
+        $incomingTitle = trim((string) ($metadata['title'] ?? ''));
+        $existingTitle = trim((string) $existingBook->title);
+
+        if ($incomingTitle === '' || $existingTitle === '') {
+            return true;
+        }
+
+        return strcasecmp($incomingTitle, $existingTitle) === 0;
+    }
+
+    /**
      * Find existing book in database (returns Book model instead of boolean)
      */
     public function findExistingBook(string $path, array $metadata = []): ?Book
@@ -4282,6 +4309,16 @@ class BookImportService
         foreach (array_values(array_unique(array_filter($candidateDirectories))) as $directoryPath) {
             $existingByDirectory = Book::where('directory_path', $directoryPath)->first();
             if ($existingByDirectory instanceof Book) {
+                if (!$this->directoryMatchIsSafeToReuse($existingByDirectory, $metadata, $directoryPath)) {
+                    Log::warning('[AUTHOR-TRACE] findExistingBook: rejected unsafe directory match (genre/author-only path, title mismatch)', [
+                        'incoming_path' => $path,
+                        'candidate_directory' => $directoryPath,
+                        'rejected_book_id' => $existingByDirectory->id,
+                        'rejected_book_title' => $existingByDirectory->title,
+                        'incoming_title' => $metadata['title'] ?? null,
+                    ]);
+                    continue;
+                }
                 Log::debug('[AUTHOR-TRACE] findExistingBook: matched by exact directory_path', [
                     'incoming_path' => $path,
                     'candidate_directory' => $directoryPath,
@@ -4298,6 +4335,16 @@ class BookImportService
                 ->first();
 
             if ($existingByDirectoryName instanceof Book) {
+                if (!$this->directoryMatchIsSafeToReuse($existingByDirectoryName, $metadata, $directoryPath)) {
+                    Log::warning('[AUTHOR-TRACE] findExistingBook: rejected unsafe directory match (genre/author-only path, title mismatch)', [
+                        'incoming_path' => $path,
+                        'candidate_directory' => $directoryPath,
+                        'rejected_book_id' => $existingByDirectoryName->id,
+                        'rejected_book_title' => $existingByDirectoryName->title,
+                        'incoming_title' => $metadata['title'] ?? null,
+                    ]);
+                    continue;
+                }
                 Log::debug('[AUTHOR-TRACE] findExistingBook: matched by directory_path LIKE suffix', [
                     'incoming_path' => $path,
                     'candidate_directory' => $directoryPath,
@@ -11003,7 +11050,7 @@ class BookImportService
         $newLineCallback();
 
         $aiMetadata['source_path'] = $audiobook['path'];
-        $expectedPath = $this->generateDirectoryPath($aiMetadata);
+        $expectedPath = $this->generateDirectoryPath($aiMetadata, ['include_title' => true]);
         $infoCallback("📁 Expected directory path: {$expectedPath}");
 
         // Auto mode never shows a review screen, so there is nothing for the user to
