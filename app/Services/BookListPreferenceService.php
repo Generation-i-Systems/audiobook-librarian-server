@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Remembers the Books page display state (view type, per page, sort) per user.
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
 class BookListPreferenceService
 {
     public const VIEW_TYPES = ['grid', 'compact', 'list'];
+
+    public const OPEN_STATES = ['open', 'closed'];
 
     public const PER_PAGE_OPTIONS = [12, 24, 36, 48, 72, 96];
 
@@ -29,12 +32,16 @@ class BookListPreferenceService
         'view_type' => 'main_view_type',
         'per_page' => 'main_per_page',
         'sort' => 'main_sort',
+        'recent_view_type' => 'recent_view_type',
+        'recent_open' => 'recent_open',
     ];
 
     public function normalize(string $key, mixed $value): string|int|null
     {
         return match ($key) {
             'view_type' => is_string($value) && in_array($value, self::VIEW_TYPES, true) ? $value : null,
+            'recent_view_type' => is_string($value) && in_array($value, self::VIEW_TYPES, true) ? $value : null,
+            'recent_open' => is_string($value) && in_array($value, self::OPEN_STATES, true) ? $value : null,
             'per_page' => is_numeric($value) && in_array((int) $value, self::PER_PAGE_OPTIONS, true) ? (int) $value : null,
             'sort' => is_string($value) && in_array($value, self::SORTS, true) ? $value : null,
             default => null,
@@ -55,9 +62,18 @@ class BookListPreferenceService
 
         $user = $request->user();
         if ($user instanceof User) {
-            $stored = is_array($user->book_list_preferences) ? $user->book_list_preferences : [];
-            $stored[$key] = $normalized;
-            $user->forceFill(['book_list_preferences' => $stored])->save();
+            // Re-read under a row lock: the authenticated user instance can be stale (loaded before an earlier
+            // save), and merging into it would silently drop the other remembered preferences.
+            DB::transaction(function () use ($user, $key, $normalized): void {
+                $fresh = User::query()->whereKey($user->getKey())->lockForUpdate()->first();
+                $current = $fresh instanceof User && is_array($fresh->book_list_preferences)
+                    ? $fresh->book_list_preferences
+                    : [];
+                $current[$key] = $normalized;
+                User::query()->whereKey($user->getKey())->update(['book_list_preferences' => json_encode($current)]);
+                $user->setAttribute('book_list_preferences', $current);
+                $user->syncOriginal();
+            });
         }
 
         return true;
@@ -66,8 +82,16 @@ class BookListPreferenceService
     public function get(Request $request, string $key, string|int|null $default = null): string|int|null
     {
         $user = $request->user();
-        if ($user instanceof User && is_array($user->book_list_preferences)) {
-            $saved = $this->normalize($key, $user->book_list_preferences[$key] ?? null);
+        if ($user instanceof User) {
+            // The authenticated user is hydrated from a column whitelist (UserAccountService::getUserById), so
+            // book_list_preferences is never present on it; read the column directly.
+            $stored = User::query()->whereKey($user->getKey())->first(['id', 'book_list_preferences']);
+            $saved = $this->normalize(
+                $key,
+                $stored instanceof User && is_array($stored->book_list_preferences)
+                    ? ($stored->book_list_preferences[$key] ?? null)
+                    : null
+            );
             if ($saved !== null) {
                 return $saved;
             }

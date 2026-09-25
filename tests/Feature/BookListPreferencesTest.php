@@ -73,4 +73,56 @@ class BookListPreferencesTest extends TestCase
 
         $this->assertNull($user->fresh()->book_list_preferences);
     }
+
+    public function testStaleUserInstanceDoesNotWipeOtherPreferences(): void
+    {
+        $user = $this->makeUser('erin');
+        $stale = User::find($user->id);
+        $service = new BookListPreferenceService();
+
+        $first = Request::create('/books');
+        $first->setLaravelSession($this->app['session.store']);
+        $first->setUserResolver(fn () => User::find($user->id));
+        $service->set($first, 'view_type', 'list');
+
+        $second = Request::create('/books');
+        $second->setLaravelSession($this->app['session.store']);
+        $second->setUserResolver(fn () => $stale);
+        $service->set($second, 'per_page', 72);
+
+        $this->assertSame(['view_type' => 'list', 'per_page' => 72], $user->fresh()->book_list_preferences);
+    }
+
+    public function testGetReadsSavedValueWhenUserInstanceLacksTheColumn(): void
+    {
+        $user = $this->makeUser('frank');
+        $service = new BookListPreferenceService();
+        $user->forceFill(['book_list_preferences' => ['view_type' => 'compact', 'per_page' => 48]])->save();
+
+        $request = Request::create('/books');
+        $request->setLaravelSession($this->app['session.store']);
+        $request->setUserResolver(fn () => User::select(['id', 'name', 'username', 'email', 'role'])->find($user->id));
+
+        $this->assertSame(['compact', 48], [
+            $service->get($request, 'view_type', 'grid'),
+            $service->get($request, 'per_page', 24),
+        ]);
+    }
+
+    public function testRecentSectionStateIsPersistedAndValidated(): void
+    {
+        $user = $this->makeUser('gina');
+
+        foreach ([['recent_view_type', 'compact'], ['recent_open', 'closed']] as [$key, $value]) {
+            $this->actingAs($user)->postJson(route('books.set-preference'), ['key' => $key, 'value' => $value])
+                ->assertOk();
+        }
+        $this->actingAs($user)->postJson(route('books.set-preference'), ['key' => 'recent_open', 'value' => 'maybe'])
+            ->assertStatus(422);
+
+        $this->assertSame(
+            ['recent_view_type' => 'compact', 'recent_open' => 'closed'],
+            $user->fresh()->book_list_preferences
+        );
+    }
 }

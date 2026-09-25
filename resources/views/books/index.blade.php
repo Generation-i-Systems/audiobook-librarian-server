@@ -161,6 +161,7 @@
 @section('content')
     <div class="container">
         <h1>Book Archive</h1>
+        <div id="book-preference-error" class="alert alert-warning d-none" role="alert"></div>
 
         @if(Auth::user()?->is_admin)
             @include('components.ai-query-prompt')
@@ -188,21 +189,21 @@ $canManageBooks = $canManageBooks ?? false;
                     <h5 class="mb-0">Recent Books</h5>
                     @if(!$isLibrivoxMode)
                         <div class="btn-group" role="group" aria-label="View options">
-                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn active" id="recent-grid-btn"
+                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn {{ $recentViewType === 'grid' ? 'active' : '' }}" id="recent-grid-btn"
                                 data-view="grid"><i class="fas fa-th"></i> Grid</button>
-                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-compact-btn"
+                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn {{ $recentViewType === 'compact' ? 'active' : '' }}" id="recent-compact-btn"
                                 data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
-                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="recent-list-btn"
+                            <button class="btn btn-sm btn-outline-secondary view-toggle-btn {{ $recentViewType === 'list' ? 'active' : '' }}" id="recent-list-btn"
                                 data-view="list"><i class="fas fa-list"></i> List</button>
                         </div>
                     @endif
                     <button class="btn btn-link text-decoration-none" id="toggle-recent-books" type="button" tabindex="0">
-                        <span id="recent-books-toggle-text">Hide</span>
+                        <span id="recent-books-toggle-text">{{ $recentOpen ? 'Hide' : 'Show' }}</span>
                     </button>
                 </div>
-                <div class="card-body p-0" id="recent-books-block">
+                <div class="card-body p-0" id="recent-books-block" style="display: {{ $recentOpen ? 'block' : 'none' }};">
                     <!-- Grid View (Default) -->
-                    <div class="row g-2" id="recent-books-grid" style="display: flex; flex-wrap: wrap;">
+                    <div class="row g-2" id="recent-books-grid" style="display: {{ $recentViewType === 'grid' ? 'flex' : 'none' }}; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
                                 $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
@@ -255,7 +256,7 @@ $canManageBooks = $canManageBooks ?? false;
                     </div>
 
                     <!-- Compact View (Hidden by default) -->
-                    <div class="row g-2" id="recent-books-compact" style="display: none; flex-wrap: wrap;">
+                    <div class="row g-2" id="recent-books-compact" style="display: {{ $recentViewType === 'compact' ? 'flex' : 'none' }}; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
                                 $hasCover = is_string($book['coverImage'] ?? null) && trim($book['coverImage']) !== '';
@@ -311,7 +312,7 @@ $canManageBooks = $canManageBooks ?? false;
                     </div>
 
                     <!-- List View (Hidden by default) -->
-                    <div class="table-responsive" id="recent-books-list" style="display: none;">
+                    <div class="table-responsive" id="recent-books-list" style="display: {{ $recentViewType === 'list' ? 'block' : 'none' }};">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
@@ -474,7 +475,7 @@ $canManageBooks = $canManageBooks ?? false;
             <div class="dropdown">
                 <button class="btn btn-secondary dropdown-toggle" type="button" id="perPageDropdown"
                     data-bs-toggle="dropdown" aria-expanded="false">
-                    <span id="current-per-page">24</span> per page
+                    <span id="current-per-page">{{ $savedPerPage }}</span> per page
                 </button>
                 <ul class="dropdown-menu" aria-labelledby="perPageDropdown">
                     <li><a class="dropdown-item per-page-option" href="#" data-per-page="24">24</a></li>
@@ -778,6 +779,21 @@ $canManageBooks = $canManageBooks ?? false;
         document.addEventListener('DOMContentLoaded', function () {
             const librivoxListOnly = @json($isLibrivoxMode);
 
+            function saveBookPreference(key, value) {
+                $.post('{{ route("books.set-preference") }}', {
+                    _token: '{{ csrf_token() }}',
+                    key: key,
+                    value: value
+                }).done(function () {
+                    $('#book-preference-error').addClass('d-none').text('');
+                }).fail(function (xhr) {
+                    console.error('[books] Failed to save display preference:', key, xhr.status);
+                    $('#book-preference-error')
+                        .text('Your display setting could not be saved. Please try again.')
+                        .removeClass('d-none');
+                });
+            }
+
             // Toggle recent books visibility
             const toggleButton = document.getElementById('toggle-recent-books');
             const recentBooksBlock = document.getElementById('recent-books-block');
@@ -785,33 +801,24 @@ $canManageBooks = $canManageBooks ?? false;
 
             if (toggleButton && recentBooksBlock) {
                 toggleButton.addEventListener('click', function () {
-                    if (recentBooksBlock.style.display === 'none') {
-                        recentBooksBlock.style.display = 'block';
-                        if (toggleText) toggleText.textContent = 'Hide';
-                    } else {
-                        recentBooksBlock.style.display = 'none';
-                        if (toggleText) toggleText.textContent = 'Show';
-                    }
+                    const opening = recentBooksBlock.style.display === 'none';
+                    recentBooksBlock.style.display = opening ? 'block' : 'none';
+                    if (toggleText) toggleText.textContent = opening ? 'Hide' : 'Show';
+                    saveBookPreference('recent_open', opening ? 'open' : 'closed');
                 });
+                if (@json(!$recentOpen)) {
+                    recentBooksBlock.style.display = 'none';
+                    if (toggleText) toggleText.textContent = 'Show';
+                }
             }
 
             // Recent books view type toggle
-            const recentViewButtons = document.querySelectorAll('.recent-view-type');
-            const recentViews = document.querySelectorAll('.recent-view');
-
-            // Initialize view - show grid view by default
-            if (librivoxListOnly) {
-                $('#recent-books-list').show();
-                $('#recent-books-grid, #recent-books-compact').hide();
-                $('#recent-list-btn').addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
-            } else {
-                $('#recent-books-grid').show();
-                $('#recent-books-compact, #recent-books-list').hide();
-
-                // Set active button for recent books view
-                $('#recent-grid-btn').addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
-                $('#recent-compact-btn, #recent-list-btn').removeClass('active').removeClass('btn-secondary').addClass('btn-outline-secondary');
-            }
+            // Initialize the recent section in the remembered view type
+            const initialRecentView = librivoxListOnly ? 'list' : @json($recentViewType);
+            $('#recent-books-grid, #recent-books-compact, #recent-books-list').hide();
+            $(`#recent-books-${initialRecentView}`).css('display', initialRecentView === 'list' ? 'block' : 'flex');
+            $('#recent-grid-btn, #recent-compact-btn, #recent-list-btn').removeClass('active').removeClass('btn-secondary').addClass('btn-outline-secondary');
+            $(`#recent-${initialRecentView}-btn`).addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
 
             // Variables for pagination and view state
             let currentMainPage = 1;
@@ -1167,12 +1174,7 @@ $canManageBooks = $canManageBooks ?? false;
                 // Update active button styling
                 updateMainViewButtons();
 
-                // Store preference in session
-                $.post('{{ route("books.set-preference") }}', {
-                    _token: '{{ csrf_token() }}',
-                    key: 'main_view_type',
-                    value: viewType
-                });
+                saveBookPreference('main_view_type', viewType);
 
                 // Reload books with new view type
                 loadMainBooks();
@@ -1190,12 +1192,7 @@ $canManageBooks = $canManageBooks ?? false;
                 // Reset to first page
                 currentMainPage = 1;
 
-                // Store preference in session
-                $.post('{{ route("books.set-preference") }}', {
-                    _token: '{{ csrf_token() }}',
-                    key: 'main_per_page',
-                    value: perPage
-                });
+                saveBookPreference('main_per_page', perPage);
 
                 // Reload books with new per page value
                 loadMainBooks();
@@ -1203,11 +1200,7 @@ $canManageBooks = $canManageBooks ?? false;
 
             // Remember the chosen sort per user
             $('#sort').on('change', function () {
-                $.post('{{ route("books.set-preference") }}', {
-                    _token: '{{ csrf_token() }}',
-                    key: 'main_sort',
-                    value: $(this).val()
-                });
+                saveBookPreference('main_sort', $(this).val());
             });
 
             // Handle search form submission
@@ -1314,35 +1307,7 @@ $canManageBooks = $canManageBooks ?? false;
                     $(`#recent-books-${viewType}`).show();
                 }
 
-                // Store preference in session
-                $.post('{{ route("books.set-preference") }}', {
-                    _token: '{{ csrf_token() }}',
-                    key: 'recent_view_type',
-                    value: viewType
-                });
-            });
-
-            recentViewButtons.forEach(button => {
-                button.addEventListener('click', function () {
-                    const viewType = this.getAttribute('data-view');
-
-                    // Update active button styling
-                    recentViewButtons.forEach(btn => {
-                        btn.classList.remove('active', 'btn-secondary');
-                        btn.classList.add('btn-outline-secondary');
-                    });
-                    this.classList.add('active', 'btn-secondary');
-                    this.classList.remove('btn-outline-secondary');
-
-                    // Show selected view, hide others
-                    recentViews.forEach(view => {
-                        if (view.classList.contains('recent-' + viewType + '-view')) {
-                            view.classList.remove('d-none');
-                        } else {
-                            view.classList.add('d-none');
-                        }
-                    });
-                });
+                saveBookPreference('recent_view_type', viewType);
             });
 
             // Add click handlers to book cards and rows

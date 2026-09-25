@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -62,6 +64,35 @@ class BookControllerIndexTest extends TestCase
         parent::tearDown();
     }
 
+    public function testSavedPageSizeIsUsedForTheInitialBooksResponse(): void
+    {
+        $this->user->forceFill(['book_list_preferences' => [
+            'view_type' => 'list',
+            'per_page' => 48,
+            'recent_view_type' => 'compact',
+            'recent_open' => 'closed',
+        ]])->save();
+
+        $this->mockDocumentStoreService->shouldReceive('listBooks')
+            ->once()
+            ->with(1, 48, ['include_needs_review' => true], true, 'title', 'asc', true, $this->user->id)
+            ->andReturn(['data' => [], 'total' => 0]);
+        $this->mockDocumentStoreService->shouldReceive('getUniqueValues')->andReturn([]);
+        $this->mockDocumentStoreService->shouldReceive('getRecentBooks')->andReturn([
+            ['id' => 1, 'title' => 'Recent Book', 'authors' => [], 'series' => [], 'coverImage' => null],
+        ]);
+
+        $this->get(route('books.index'))
+            ->assertOk()
+            ->assertViewHas('mainPerPage', 48)
+            ->assertViewHas('savedPerPage', 48)
+            ->assertViewHas('mainViewType', 'list')
+            ->assertViewHas('recentViewType', 'compact')
+            ->assertViewHas('recentOpen', false)
+            ->assertSee('id="current-per-page">48</span>', false)
+            ->assertSee('id="recent-books-block" style="display: none;"', false);
+    }
+
     #[\PHPUnit\Framework\Attributes\Test]
     public function testItDisplaysBooksWithArrayAndStringProperties()
     {
@@ -115,7 +146,7 @@ class BookControllerIndexTest extends TestCase
             // Mock the DocumentStoreService to return our test data
             $this->mockDocumentStoreService->shouldReceive('listBooks')
                 ->once()
-                ->with(1, 12, ['include_needs_review' => true], true, 'title', 'asc', true, $this->user->id)
+                ->with(1, 24, ['include_needs_review' => true], true, 'title', 'asc', true, $this->user->id)
                 ->andReturn([
                     'data' => $testBooks,
                     'total' => 2,
@@ -220,7 +251,7 @@ class BookControllerIndexTest extends TestCase
 
         $this->mockDocumentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, ['include_needs_review' => true], true, 'title', 'asc', true, $this->user->id)
+            ->with(1, 24, ['include_needs_review' => true], true, 'title', 'asc', true, $this->user->id)
             ->andReturn([
                 'data' => $testBooks,
                 'total' => 1,
@@ -269,7 +300,7 @@ class BookControllerIndexTest extends TestCase
 
         $this->mockDocumentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, [], true, 'title', 'asc', false, $user->id)
+            ->with(1, 24, [], true, 'title', 'asc', false, $user->id)
             ->andReturn([
                 'data' => [],
                 'total' => 0,

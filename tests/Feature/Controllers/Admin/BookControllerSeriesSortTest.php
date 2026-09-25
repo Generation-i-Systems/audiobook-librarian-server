@@ -52,7 +52,7 @@ class BookControllerSeriesSortTest extends TestCase
         // Mock the listBooks method to expect series sort (secondary sort by number handled in service)
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series', 'asc', true, (int) $this->admin->getAuthIdentifier())
+            ->with(1, 24, ['series' => 'Test Series', 'include_needs_review' => true], true, 'series', 'asc', true, (int) $this->admin->getAuthIdentifier())
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -71,7 +71,7 @@ class BookControllerSeriesSortTest extends TestCase
         // Mock the listBooks method to expect the explicit sort
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, ['series' => 'Test Series', 'include_needs_review' => true], true, 'title', 'asc', true, (int) $this->admin->getAuthIdentifier())
+            ->with(1, 24, ['series' => 'Test Series', 'include_needs_review' => true], true, 'title', 'asc', true, (int) $this->admin->getAuthIdentifier())
             ->andReturn([
                 'data' => [],
                 'total' => 0,
@@ -91,7 +91,7 @@ class BookControllerSeriesSortTest extends TestCase
         // same as every other user gets on the merged books.index page.
         $this->documentStoreService->shouldReceive('listBooks')
             ->once()
-            ->with(1, 12, ['include_needs_review' => true], true, 'title', 'asc', true, (int) $this->admin->getAuthIdentifier())
+            ->with(1, 24, ['include_needs_review' => true], true, 'title', 'asc', true, (int) $this->admin->getAuthIdentifier())
             ->andReturn([
                 'data' => [],
                 'total' => 0,

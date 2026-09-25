@@ -211,3 +211,4 @@ This blueprint summarizes the architecture, features, and design up to this poin
 - `user_book_status` permits external books with a nullable `book_id`; uniqueness of non-null library-book pairs is enforced by `user_book_status_user_book_unique` on PostgreSQL/MySQL. The main document store uses Laravel's configured SQL connection; SQLite, PostgreSQL, and MySQL are exercised by installation smoke checks.
 - `GET /statistics/trends` uses daily buckets for week/month views and portable in-process monthly buckets for the year view.
 - Automatic `backup:database` scheduling is registered only for SQLite, MySQL/MariaDB, and PostgreSQL; installations on other SQL drivers need a database-native backup scheduler.
+- `/books` renders saved display preferences on the first response, then uses the same values for its AJAX list. Failed preference saves are visible inline so a settings problem is not mistaken for a successful save.

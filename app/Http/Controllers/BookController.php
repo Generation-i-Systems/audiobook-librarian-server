@@ -76,7 +76,8 @@ class BookController extends Controller
 
         // Get pagination and filter parameters from request
         $page = max(1, (int) $request->get('page', 1));
-        $perPage = min((int) session('main_per_page', 12), 12); // Reduce from 24 to 12 max
+        $savedPerPage = $this->bookListPreferences->get($request, 'per_page', 24);
+        $perPage = $this->bookListPreferences->normalize('per_page', $request->input('per_page')) ?? $savedPerPage;
 
         // Get filters from request
         $filters = [];
@@ -139,9 +140,7 @@ class BookController extends Controller
         // explicit sort was requested — browsing a series in publication order is
         // almost always what's wanted.
         $savedSort = $this->bookListPreferences->get($request, 'sort');
-        $defaultSort = ($request->filled('series') || $tokens['series_id']) && !$request->has('sort')
-            ? 'series_asc'
-            : ($savedSort ?? 'title_asc');
+        $defaultSort = ($request->filled('series') || $tokens['series_id']) && !$request->has('sort') ? 'series_asc' : ($savedSort ?? 'title_asc');
         $sortParam = $request->input('sort', $defaultSort);
         $combinedSort = $this->resolveCombinedBookListSort($sortParam);
         if ($combinedSort !== null) {
@@ -209,7 +208,6 @@ class BookController extends Controller
 
         // Get view preferences from session
         $mainViewType = $isLibrivoxMode ? 'list' : $this->bookListPreferences->get($request, 'view_type', 'grid');
-        $savedPerPage = $this->bookListPreferences->get($request, 'per_page', 24);
 
         // Pass pagination data to the view
         $pagination = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -235,6 +233,8 @@ class BookController extends Controller
             'mainViewType' => $mainViewType,
             'mainPerPage' => $perPage,
             'savedPerPage' => $savedPerPage,
+            'recentViewType' => $isLibrivoxMode ? 'list' : $this->bookListPreferences->get($request, 'recent_view_type', 'grid'),
+            'recentOpen' => $this->bookListPreferences->get($request, 'recent_open', 'open') !== 'closed',
             'currentFilters' => $filters,
             'canManageBooks' => $canManageBooks,
             'sort' => $sortParam,

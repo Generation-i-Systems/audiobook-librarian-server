@@ -2,6 +2,11 @@
 
 ### Added
 
+- Fixed `/books` initial rendering to honor the saved page size and Recent Books view/collapse state, and show an inline error when a display preference cannot be saved.
+- The Books page's Recent Books section now remembers its view type (grid/compact/list) and whether it is collapsed, per user, across reloads and logins.
+- Fixed Books page preferences never being read back: the authenticated user is built from a column whitelist that omitted `book_list_preferences`, so `BookListPreferenceService::get()` now reads the column directly.
+- Fixed Books page preferences overwriting each other: saving one (e.g. per-page) rebuilt the JSON from a stale user instance and dropped the others (view type, sort). `BookListPreferenceService::set()` now re-reads the row under a lock before merging.
+
 - Began SQL-driver portability work: the primary document-store service now follows Laravel's configured SQL connection, obsolete document-store driver configuration is removed, SQLite-safe book and duplicate queries replace MySQL functions, and database backups use a consistent SQLite snapshot or a driver-specific SQL dump. The sample native configuration now defaults to SQLite, and Docker persists its generated application key and includes FFmpeg.
 - Optional Pulse migrations no longer block installation with another Laravel SQL driver. The admin AI query examples now follow the configured SQL dialect, and portability checks cover SQLite, PostgreSQL, MySQL, and cross-platform PHP setup.
 - The built-in Adminer page now takes its connection defaults from Laravel's active SQL connection instead of the hardcoded MySQL connection.
