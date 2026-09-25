@@ -10,6 +10,10 @@ return new class () extends PulseMigration {
      */
     public function up(): void
     {
+        if (! in_array($this->driver(), ['mariadb', 'mysql', 'pgsql', 'sqlite'], true)) {
+            return;
+        }
+
         if (! $this->shouldRun()) {
             return;
         }

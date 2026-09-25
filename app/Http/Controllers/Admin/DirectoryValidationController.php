@@ -69,7 +69,7 @@ class DirectoryValidationController extends Controller
         ]);
 
         $book = Book::findOrFail($request->book_id);
-        $storageRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $storageRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
 
         $oldPath = $storageRoot . '/' . ltrim($request->orphaned_path, '/');
         $newPath = $storageRoot . '/' . ltrim($book->directory_path, '/');
@@ -177,7 +177,7 @@ class DirectoryValidationController extends Controller
             'new_path' => 'required|string',
         ]);
 
-        $storageRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $storageRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
         $oldFullPath = $request->old_path;
         $newFullPath = $storageRoot . '/' . ltrim($request->new_path, '/');
 

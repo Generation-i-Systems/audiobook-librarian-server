@@ -106,7 +106,7 @@ class ValidateAudioFilesCommand extends Command
 
         $this->info("Scanning specific path: {$path}");
 
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
 
         if (File::isDirectory($path)) {
             // Check if this path is within the book root
@@ -150,7 +150,7 @@ class ValidateAudioFilesCommand extends Command
         }
 
         // Group files by book directory and find books
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
         $filesByBook = $this->groupFilesByBook($audioFiles, $bookRoot);
 
         $bar = $this->output->createProgressBar($totalFiles);
@@ -244,7 +244,7 @@ class ValidateAudioFilesCommand extends Command
             return Command::FAILURE;
         }
 
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
         $fullPath = $bookRoot . '/' . ltrim($book->directory_path, '/');
 
         if (!File::exists($fullPath)) {
@@ -322,7 +322,7 @@ class ValidateAudioFilesCommand extends Command
 
     private function scanEntireLibrary(bool $dryRun): int
     {
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
 
         if (!File::exists($bookRoot)) {
             $this->error("Book root directory does not exist: {$bookRoot}");
@@ -336,7 +336,7 @@ class ValidateAudioFilesCommand extends Command
 
     private function scanDirectoryForBooks(string $directory, bool $dryRun): int
     {
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
 
         if (!File::exists($directory)) {
             $this->error("Directory does not exist: {$directory}");
@@ -523,7 +523,7 @@ class ValidateAudioFilesCommand extends Command
 
     private function findBookByFilePath(string $filePath): ?Book
     {
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
 
         if (!str_starts_with($filePath, $bookRoot)) {
             return null;

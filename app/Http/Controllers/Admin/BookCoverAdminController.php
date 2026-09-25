@@ -20,7 +20,7 @@ class BookCoverAdminController extends Controller
         }
 
         // Get the full path to the book directory
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
         $fullDirectoryPath = $bookRoot . '/' . ltrim($directoryPath, '/');
 
         if (!is_dir($fullDirectoryPath)) {

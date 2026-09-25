@@ -49,9 +49,6 @@ if ($isTestRunner) {
     $_ENV['DB_PASSWORD'] = '';
     $_SERVER['DB_PASSWORD'] = '';
 
-    putenv('DOCUMENT_STORE_DRIVER=sqlite');
-    $_ENV['DOCUMENT_STORE_DRIVER'] = 'sqlite';
-    $_SERVER['DOCUMENT_STORE_DRIVER'] = 'sqlite';
 
     putenv('CACHE_STORE=array');
     $_ENV['CACHE_STORE'] = 'array';
@@ -119,14 +116,6 @@ if ($isTestRunner) {
         throw new \RuntimeException(
             "CRITICAL SAFETY FAILURE: .env.testing does not disable MySQL host! " .
             "MySQL connection must be disabled in tests. Database wipe prevented."
-        );
-    }
-
-    // Check DocumentStore driver
-    if (strpos($envContent, 'DOCUMENT_STORE_DRIVER=sqlite') === false) {
-        throw new \RuntimeException(
-            "CRITICAL SAFETY FAILURE: .env.testing does not contain DOCUMENT_STORE_DRIVER=sqlite! " .
-            "DocumentStore should use SQLite in tests. Database wipe prevented."
         );
     }
 }

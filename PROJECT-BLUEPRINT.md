@@ -2,7 +2,7 @@
 
 ## Overview
 
-Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporting admin CRUD, user management, Google Books autofill, and MySQL-backed autocomplete for authors and series. The backend also provides a REST API that supports integration with an Android app client. Recent hardening ensures all automated tests run exclusively against SQLite in-memory via a bootstrap database safety check; any misconfiguration aborts immediately to prevent production MySQL wipes.
+Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporting admin CRUD, user management, and Google Books autofill. Its SQL-backed application services use Laravel's configured database connection; SQLite, PostgreSQL, and MySQL are installation choices. The backend also provides a REST API that supports integration with an Android app client. Automated tests run exclusively against SQLite in-memory via a bootstrap database safety check; any misconfiguration aborts immediately to protect live data.
 
 The API now supports host-based library profile resolution in a single runtime: incoming host name selects an active library profile (for example `main` vs `librivox`) and switches database connection plus book storage roots at request time while preserving the same API routes and response contract.
 
@@ -15,7 +15,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - **Backend:** Laravel (PHP) — provides both web and REST API endpoints
 - **Frontend:** Blade, Bootstrap 5, jQuery, jQuery UI (Autocomplete)
 - **Styles:** Application Sass uses the module system and configures Bootstrap's theme variables at load time. Bootstrap 5 still ships legacy Sass internals, which Vite treats as quiet third-party dependencies while continuing to report application-level deprecations.
-- **Database:** MySQL with Redis caching and queue management
+- **Database:** Laravel SQL connection (SQLite, PostgreSQL, or MySQL); cache and queues are configured separately
 - **Other:** Google Books API integration
 - **API Clients:** Android app (in development/production)
 
@@ -122,7 +122,7 @@ and `book_genre` pivot tables (see [API Documentation](docs/API.md) and
 - `App\Services\Embeddings\EmbeddingPipeline` + `EmbedBookJob`: embeds each book's metadata (+ AI-generated cover caption) into a local vector store (`neuron-ai`, `file` driver); `book_embeddings` table tracks staleness, `books:backfill-embeddings` catches up existing books.
 - `App\Services\Recommendations\RecommendationEngine` + `RecommendationStrategyInterface` (`app/Services/Recommendations/Strategies/*`): Netflix-style "discovery shelves" for Browse. Precomputed per-user into `recommendation_shelves`/`recommendation_shelf_books`, served by `Api\DiscoveryController` (`GET /discovery/shelves`, `GET /discovery/shelves/{shelfKey}/books`); `DELETE /discovery/shelves/{shelfKey}` dismisses one shelf for the current user, including after recomputation. Series-book API responses include Needs Review books and their genres. Recomputed via `RecomputeRecommendationsJob` on `BookStatusUpdated` and by the daily `books:refresh-recommendations` command. `Api\DiscoveryController::surprise()` (`GET /discovery/surprise`) is a separate, live-computed single-book pick, not a cached shelf.
 - `Api\BookSeriesGenreController::booksByGenre()`/`seriesByGenre()` (`GET /genres/{genre}/books`, `GET /genres/{genre}/series`): sortable genre detail sub-lists alongside the existing `authorsByGenre()` (now also `sort=random`-capable). `Api\BookAuthorController` now populates `image_url` (an author's book cover) and `sample_book_titles` instead of always-null placeholders.
-- `App\Services\UserTagFilterService` + `UserTagFilter` model: per-user require/ban tag content filter, self-service via `Api\UserTagFilterController` (`/users/me/tag-filters`) and admin-locked via `Api\AdminUserTagFilterController` (`/admin/users/{id}/tag-filters`) or the admin user-edit Required Tags / Ignored Tags fields. Applied inside `MySqlService::listBooks()` unconditionally, so every listing/search/discovery surface respects it automatically.
+- `App\Services\UserTagFilterService` + `UserTagFilter` model: per-user require/ban tag content filter, self-service via `Api\UserTagFilterController` (`/users/me/tag-filters`) and admin-locked via `Api\AdminUserTagFilterController` (`/admin/users/{id}/tag-filters`) or the admin user-edit Required Tags / Ignored Tags fields. Applied inside `SqlDatabaseService::listBooks()` unconditionally, so every listing/search/discovery surface respects it automatically.
 - **Web Routes:**
     - `/admin/books` (CRUD)
 - `/admin/library-repair` (issue triage dashboard)
@@ -153,7 +153,7 @@ and `book_genre` pivot tables (see [API Documentation](docs/API.md) and
 ## 6. Design Decisions
 
 - Server-side filtering for autocomplete
-- MySQL (via Eloquent) as source of truth
+- Laravel's configured SQL connection (via Eloquent) as source of truth
 - All dynamic logic in external JS
 - Modern UX with jQuery UI
 
@@ -163,7 +163,7 @@ and `book_genre` pivot tables (see [API Documentation](docs/API.md) and
 - jQuery/jQuery UI loaded globally
 - Removed redundant controllers
 - Linting/code style improvements ongoing
-- DocumentStore integration in tests now uses a dedicated MockDocumentStoreService so feature/unit tests confidently run without real MySQL
+- DocumentStore integration in tests now uses a dedicated MockDocumentStoreService so feature/unit tests run without the live database
 
 ## 8. Known Issues & TODOs
 
@@ -173,13 +173,13 @@ and `book_genre` pivot tables (see [API Documentation](docs/API.md) and
 
 ## 9. How to Extend
 
-- **Add autocomplete:** endpoint in BookController/MySqlService, route, field, JS
-- **Add book metadata:** update MySQL model/migration, form, validation, display
+- **Add autocomplete:** endpoint in BookController/SqlDatabaseService, route, field, JS
+- **Add book metadata:** update Eloquent model/migration, form, validation, display
 
 ## 10. Contributors & Structure
 
 - **Controllers:** `app/Http/Controllers/Admin/BookController.php`
-- **Services:** `app/Services/MySqlService.php` (primary `DocumentStoreServiceInterface` implementation)
+- **Services:** `app/Services/SqlDatabaseService.php` (primary `DocumentStoreServiceInterface` implementation)
 - **Views:** `resources/views/admin/books/form.blade.php`, `layouts/app.blade.php`
 - **JS:** `public/js/admin/books/form.js`
 
@@ -208,3 +208,6 @@ and `book_genre` pivot tables (see [API Documentation](docs/API.md) and
 This blueprint summarizes the architecture, features, and design up to this point. Use for onboarding, planning, or future extension.
 
 - Books page display state (view type, per page, sort) is stored per user in `users.book_list_preferences` (JSON) via `App\Services\BookListPreferenceService`, written through `POST /books/set-preference`; session is the fallback for guests.
+- `user_book_status` permits external books with a nullable `book_id`; uniqueness of non-null library-book pairs is enforced by `user_book_status_user_book_unique` on PostgreSQL/MySQL. The main document store uses Laravel's configured SQL connection; SQLite, PostgreSQL, and MySQL are exercised by installation smoke checks.
+- `GET /statistics/trends` uses daily buckets for week/month views and portable in-process monthly buckets for the year view.
+- Automatic `backup:database` scheduling is registered only for SQLite, MySQL/MariaDB, and PostgreSQL; installations on other SQL drivers need a database-native backup scheduler.

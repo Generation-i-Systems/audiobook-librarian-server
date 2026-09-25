@@ -1,9 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 
 return new class () extends Migration {
     /**
@@ -70,14 +71,7 @@ return new class () extends Migration {
      */
     private function indexExists(string $indexName): bool
     {
-        try {
-            // This works for MySQL. For SQLite (tests), we'd need a different approach
-            // but Schema::table handles things gracefully or we can just catch exceptions.
-            $indexes = collect(DB::select("SHOW INDEX FROM books WHERE Key_name = ?", [$indexName]));
-            return $indexes->isNotEmpty();
-        } catch (\Exception $e) {
-            return false;
-        }
+        return Schema::hasIndex('books', $indexName);
     }
 
     /**

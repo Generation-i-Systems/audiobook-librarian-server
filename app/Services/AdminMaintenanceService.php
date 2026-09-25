@@ -56,7 +56,7 @@ class AdminMaintenanceService
 
             return $result;
         } catch (\Exception $e) {
-            Log::error('MySqlService getAllUsers failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getAllUsers failed: ' . $e->getMessage());
 
             return [];
         }
@@ -123,7 +123,7 @@ class AdminMaintenanceService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteMessage failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteMessage failed: ' . $e->getMessage());
 
             return false;
         }

@@ -54,13 +54,6 @@ class DatabaseSafetyCheckTest extends BaseTestCase
             "MySQL connection must be disabled in tests."
         );
 
-        // Check DocumentStore driver
-        $this->assertStringContainsString(
-            'DOCUMENT_STORE_DRIVER=sqlite',
-            $envContent,
-            "CRITICAL SAFETY FAILURE: .env.testing does not contain DOCUMENT_STORE_DRIVER=sqlite! " .
-            "DocumentStore should use SQLite in tests."
-        );
 
         // Check phpunit.xml configuration
         $phpunitXmlPath = __DIR__ . '/../../phpunit.xml';

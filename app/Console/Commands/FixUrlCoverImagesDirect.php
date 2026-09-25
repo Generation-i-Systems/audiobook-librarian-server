@@ -24,7 +24,7 @@ class FixUrlCoverImagesDirect extends Command
             $this->warn('DRY RUN MODE - No changes will be made');
         }
 
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
 
         // Get books with URL covers directly from MySQL
         $query = DB::table('books')

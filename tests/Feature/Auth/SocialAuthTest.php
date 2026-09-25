@@ -15,7 +15,6 @@ class SocialAuthTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['documentstore.driver' => 'mysql']);
         // Ensure configs are set for testing
         config(['services.facebook.client_id' => 'test-fb-app-id']);
         config(['services.apple.client_id' => 'test-apple-bundle-id']);
@@ -41,7 +40,7 @@ class SocialAuthTest extends TestCase
         ]);
 
         $response->assertStatus(403) // Registration returns 403 for unverified users
-                 // Wait, MySqlService creates unverified users.
+                 // Wait, SqlDatabaseService creates unverified users.
                  // And AuthController returns 403 "ACCOUNT_PENDING_APPROVAL" for unverified users.
                  ->assertJson([
                      'code' => 'ACCOUNT_PENDING_APPROVAL',

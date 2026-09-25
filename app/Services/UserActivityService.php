@@ -124,11 +124,7 @@ class UserActivityService
                 $eventForStatus = $finishEvent ?? $latest;
                 $statusMetadata = $eventForStatus->metadata ?? [];
 
-                $percentage = isset($statusMetadata['progress_percentage'])
-                    ? $this->clampPercentage((float) $statusMetadata['progress_percentage'])
-                    : (($book instanceof Book && $book->duration)
-                        ? $this->clampPercentage(($eventForStatus->position_ms / ($book->duration * 1000)) * 100)
-                        : 0.0);
+                $percentage = isset($statusMetadata['progress_percentage']) ? $this->clampPercentage((float) $statusMetadata['progress_percentage']) : (($book instanceof Book && $book->duration) ? $this->clampPercentage(($eventForStatus->position_ms / ($book->duration * 1000)) * 100) : 0.0);
 
                 $isCompleted = $finishEvent !== null || $percentage >= 95;
 
@@ -173,7 +169,7 @@ class UserActivityService
                 'tips' => $this->getBadgeTips($userId),
             ];
         } catch (\Exception $e) {
-            Log::error('MySqlService getUserActivityData failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getUserActivityData failed: ' . $e->getMessage());
 
             return [];
         }

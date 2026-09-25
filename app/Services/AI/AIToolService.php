@@ -258,7 +258,7 @@ class AIToolService
         $prompt .= "Books can belong to multiple series. Each book-series relationship has a series_number indicating the book's position in that series.\n\n";
 
         $prompt .= "File System:\n";
-        $prompt .= "- Book files are stored in: /media/lyra_data1/audiobooks/books/\n";
+        $prompt .= '- Book files are stored in: ' . config('app.book_root') . "\n";
         $prompt .= "- Directory structure typically: {genre}/{author}/{title}/\n";
         $prompt .= "- Audio formats: .m4b, .mp3, .mp4, .ogg, .flac, .wav, .m4a\n\n";
 

@@ -49,7 +49,7 @@ trait HandlesLibraryJson
 
         $fixPermsTool = base_path('scripts/fix_perms');
         if (!$isTesting && file_exists($fixPermsTool) && is_executable($fixPermsTool)) {
-            $bookRoot = rtrim(config('app.book_root', '/media/audiobooks/books'), '/');
+            $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
             $storageRoot = rtrim(config('filesystems.disks.books.root', ''), '/');
             $args = [];
 
@@ -65,12 +65,12 @@ trait HandlesLibraryJson
 
             @exec($fixPermsTool . ' ' . implode(' ', $args));
         } else {
-            // No SUID helper available (e.g. scripts/fix_perms missing) — chgrp() still works
-            // here without elevated privileges as long as the process owner is a member of the
-            // target group (true for both the CLI user and www-data on this deployment), same
-            // as the existing precedent in BookDeletionService.
+            // Without the optional helper, use the configured shared group when available.
             foreach ($validPaths as $path) {
-                @chgrp($path, 'audio');
+                $group = config('filesystems.book_file_group');
+                if (is_string($group) && $group !== '') {
+                    @chgrp($path, $group);
+                }
                 @chmod($path, is_dir($path) ? 0775 : 0664);
             }
         }

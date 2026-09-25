@@ -18,7 +18,7 @@ use Tests\TestCase;
  * while SQLite tests silently coerced the unknown double-quoted identifier to
  * a string literal — so the assertion must be on the emitted SQL itself.
  */
-class MySqlServiceGetRecentBooksTest extends TestCase
+class SqlDatabaseServiceGetRecentBooksTest extends TestCase
 {
     use RefreshDatabase;
 

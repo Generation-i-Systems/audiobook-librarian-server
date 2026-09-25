@@ -3,21 +3,21 @@
 namespace Tests\Unit\Services;
 
 use App\Models\User;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
-class MySqlServiceLoginTest extends TestCase
+class SqlDatabaseServiceLoginTest extends TestCase
 {
     use RefreshDatabase;
 
-    private MySqlService $service;
+    private SqlDatabaseService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = app(MySqlService::class);
+        $this->service = app(SqlDatabaseService::class);
     }
 
     public function testGetUserByCredentialsWithEmail()

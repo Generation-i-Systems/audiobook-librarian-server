@@ -8,6 +8,7 @@ require_once __DIR__ . '/database-safety-check.php';
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Services\DatabaseBackupWriter;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,15 +18,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function ($schedule): void {
-        // Run database backup nightly at 2:00 AM
-        $schedule->command('backup:database --verify')
-            ->dailyAt('02:00')
-            ->appendOutputTo(storage_path('logs/backup-cron.log'));
+        $databaseDriver = (string) config('database.connections.' . config('database.default') . '.driver');
+        if (DatabaseBackupWriter::supportsDriver($databaseDriver)) {
+            // Run database backup nightly at 2:00 AM
+            $schedule->command('backup:database --verify')
+                ->dailyAt('02:00')
+                ->appendOutputTo(storage_path('logs/backup-cron.log'));
 
-        // Run database backup weekly with extra verification on Sundays at 3:00 AM
-        $schedule->command('backup:database --verify')
-            ->weeklyOn(0, '03:00')
-            ->appendOutputTo(storage_path('logs/backup-cron.log'));
+            // Run database backup weekly with extra verification on Sundays at 3:00 AM
+            $schedule->command('backup:database --verify')
+                ->weeklyOn(0, '03:00')
+                ->appendOutputTo(storage_path('logs/backup-cron.log'));
+        }
 
         // Compress log files older than 1 day, daily at 1:00 AM
         $schedule->command('logs:compress')

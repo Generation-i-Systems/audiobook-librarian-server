@@ -2,6 +2,14 @@
 
 ### Added
 
+- Began SQL-driver portability work: the primary document-store service now follows Laravel's configured SQL connection, obsolete document-store driver configuration is removed, SQLite-safe book and duplicate queries replace MySQL functions, and database backups use a consistent SQLite snapshot or a driver-specific SQL dump. The sample native configuration now defaults to SQLite, and Docker persists its generated application key and includes FFmpeg.
+- Optional Pulse migrations no longer block installation with another Laravel SQL driver. The admin AI query examples now follow the configured SQL dialect, and portability checks cover SQLite, PostgreSQL, MySQL, and cross-platform PHP setup.
+- The built-in Adminer page now takes its connection defaults from Laravel's active SQL connection instead of the hardcoded MySQL connection.
+- Replaced MySQL-only index introspection in historical migrations with Laravel schema checks. The external-book status migration now uses a unique user/book constraint so `book_id` can be nullable on PostgreSQL and MySQL. The Docker image includes the MariaDB connector plugin needed to dump MySQL 8 databases using `caching_sha2_password`.
+- Listening trends now group year views by month in PHP, avoiding MySQL date functions and returning a stable first-of-month date on every SQL driver.
+- Scheduled built-in backups now run only for SQL drivers supported by the backup writer; other drivers can use their native backup scheduler.
+- The optional Linux cron helper now detects this checkout's schedule entry specifically and shows the configured backup location instead of an old MySQL server path.
+
 - The Books page now remembers each user's view type (grid/compact/list), items per page, and sort order across sessions and devices (new nullable `users.book_list_preferences` JSON column, `BookListPreferenceService`). Fixed the preference endpoint, which previously never saved anything because the page posted `key` while the server read `type`.
 - Submitting a book metadata contribution now emails every admin and super-admin with the proposed changes and the existing approval/rejection API paths.
 - Added a transactional composite-author normalizer for approved data repair. It preserves active book links for each retained person, soft-deletes the composite source only after verifying those links, and omits editor, translator, contributor, and foreword credits rather than creating author records for them.

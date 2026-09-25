@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Api\Feature;
 
 use App\Models\Book;
@@ -457,6 +459,34 @@ class StatisticsControllerTest extends TestCase
                     ],
                 ],
             ]);
+    }
+
+    public function testGetListeningTrendsGroupsYearByMonthOnSqlite(): void
+    {
+        $book = Book::factory()->create();
+        $previousMonth = now()->startOfMonth()->subMonth();
+        $currentMonth = now()->startOfMonth();
+        $dates = [$previousMonth, $previousMonth->copy()->addDays(5), $currentMonth];
+        foreach ($dates as $date) {
+            ListeningStatistic::create([
+                'book_id' => $book->id,
+                'device_id' => 'year-trend-device',
+                'listening_date' => $date->toDateString(),
+                'seconds_listened' => 600,
+                'session_start' => $date->copy()->addHours(10),
+                'session_end' => $date->copy()->addHours(11),
+            ]);
+        }
+
+        $response = $this->withHeaders(['Authorization' => 'Bearer ' . $this->token])
+            ->getJson('/api/v1/statistics/trends?device_id=year-trend-device&period=year');
+
+        $response->assertOk()->assertJsonPath('data.trends.0.date', $previousMonth->toDateString())
+            ->assertJsonPath('data.trends.0.session_count', 2)
+            ->assertJsonPath('data.trends.0.books_listened', 1)
+            ->assertJsonPath('data.trends.0.total_seconds', 1200)
+            ->assertJsonPath('data.trends.1.date', $currentMonth->toDateString())
+            ->assertJsonPath('data.total_seconds', 1800);
     }
 
     public function test_get_top_books_returns_most_listened_books()

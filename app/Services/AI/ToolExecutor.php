@@ -31,7 +31,7 @@ class ToolExecutor
 
     public function __construct()
     {
-        $this->bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $this->bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
         $this->trashService = app(BookTrashService::class);
         $this->audioAnalyzer = app(AudioFileAnalyzer::class);
         $this->importService = app(BookImportService::class);
@@ -998,14 +998,13 @@ class ToolExecutor
         $duplicates = [];
 
         if ($method === 'exact_title' || $method === 'all') {
-            $titleGroups = Book::select('title', DB::raw('GROUP_CONCAT(id) as book_ids'), DB::raw('COUNT(*) as count'))
+            $titleGroups = Book::select('title')->selectRaw('COUNT(*) as count')
                 ->groupBy('title')
-                ->having('count', '>', 1)
+                ->havingRaw('COUNT(*) > 1')
                 ->get();
 
             foreach ($titleGroups as $group) {
-                $bookIds = explode(',', $group->book_ids);
-                $books = Book::query()->with(['authors', 'series'])->whereIn('id', $bookIds)->get();
+                $books = Book::query()->with(['authors', 'series'])->where('title', $group->title)->get();
 
                 $duplicates[] = [
                     'method' => 'exact_title',
@@ -1022,16 +1021,15 @@ class ToolExecutor
         }
 
         if ($method === 'isbn' || $method === 'all') {
-            $isbnGroups = Book::select('isbn', DB::raw('GROUP_CONCAT(id) as book_ids'), DB::raw('COUNT(*) as count'))
+            $isbnGroups = Book::select('isbn')->selectRaw('COUNT(*) as count')
                 ->whereNotNull('isbn')
                 ->where('isbn', '!=', '')
                 ->groupBy('isbn')
-                ->having('count', '>', 1)
+                ->havingRaw('COUNT(*) > 1')
                 ->get();
 
             foreach ($isbnGroups as $group) {
-                $bookIds = explode(',', $group->book_ids);
-                $books = Book::query()->with(['authors'])->whereIn('id', $bookIds)->get();
+                $books = Book::query()->with(['authors'])->where('isbn', $group->isbn)->get();
 
                 $duplicates[] = [
                     'method' => 'isbn',

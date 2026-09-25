@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Tests\Core\Unit\Services;
+namespace Tests\Unit\Services;
 
 use App\Models\Book;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class MySqlServiceFindBookByDirectoryPathTest extends TestCase
+class SqlDatabaseServiceFindBookByDirectoryPathTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
     public function findBookByDirectoryPathReturnsNullForEmptyPath(): void
     {
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $this->assertNull($service->findBookByDirectoryPath(''));
         $this->assertNull($service->findBookByDirectoryPath(' / '));
@@ -26,7 +26,7 @@ class MySqlServiceFindBookByDirectoryPathTest extends TestCase
     #[Test]
     public function findBookByDirectoryPathReturnsNullWhenNotFound(): void
     {
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $this->assertNull($service->findBookByDirectoryPath('Fantasy/Nope/Unknown'));
     }
@@ -39,7 +39,7 @@ class MySqlServiceFindBookByDirectoryPathTest extends TestCase
             'directory_path' => 'Fantasy/Author/Title',
         ]);
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $found = $service->findBookByDirectoryPath('Fantasy/Author/Title');
 

@@ -38,7 +38,7 @@ class TaxonomyService
 
             return $genre->update($data);
         } catch (\Exception $e) {
-            Log::error('MySqlService updateGenre failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService updateGenre failed: ' . $e->getMessage());
 
             return false;
         }
@@ -147,7 +147,7 @@ class TaxonomyService
 
             return $series->id;
         } catch (\Exception $e) {
-            Log::error('MySqlService createSeries failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService createSeries failed: ' . $e->getMessage());
 
             return null;
         }
@@ -166,7 +166,7 @@ class TaxonomyService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService updateSeries failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService updateSeries failed: ' . $e->getMessage());
 
             return false;
         }
@@ -183,7 +183,7 @@ class TaxonomyService
 
             return $author->update($data);
         } catch (\Exception $e) {
-            Log::error('MySqlService updateAuthor failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService updateAuthor failed: ' . $e->getMessage());
 
             return false;
         }
@@ -202,7 +202,7 @@ class TaxonomyService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteNarrator failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteNarrator failed: ' . $e->getMessage());
 
             return false;
         }
@@ -221,7 +221,7 @@ class TaxonomyService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteSeries failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteSeries failed: ' . $e->getMessage());
 
             return false;
         }
@@ -240,7 +240,7 @@ class TaxonomyService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteGenre failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteGenre failed: ' . $e->getMessage());
 
             return false;
         }
@@ -267,7 +267,7 @@ class TaxonomyService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteAuthor failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteAuthor failed: ' . $e->getMessage());
 
             return false;
         }

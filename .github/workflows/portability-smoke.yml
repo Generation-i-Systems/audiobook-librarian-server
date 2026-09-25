@@ -3,8 +3,11 @@ name: Portability Smoke
 on:
   pull_request:
     paths:
+      - 'app/**'
+      - 'database/**'
       - 'config/**'
       - 'docker/**'
+      - 'tests/**'
       - 'Dockerfile'
       - 'docker-compose*.yml'
       - '.github/workflows/portability-smoke.yml'
@@ -27,4 +30,50 @@ jobs:
           extensions: mbstring, xml, ctype, sqlite3, pdo_sqlite, fileinfo, gd
           coverage: none
       - run: composer install --prefer-dist --no-progress --no-interaction --ignore-platform-req=ext-xdebug
-      - run: php artisan test tests/Core/Unit/Services/PortableStorageConfigurationTest.php
+      - run: php artisan test tests/Core/Unit/Services/PortableStorageConfigurationTest.php tests/Unit/Services/SqlDatabasePortabilityTest.php tests/Unit/Services/DatabaseBackupWriterTest.php tests/Unit/Scheduling/DatabaseBackupScheduleTest.php tests/Unit/Services/AIQuerySqlDialectPromptTest.php tests/Unit/Services/AdminerConnectionConfigTest.php tests/Unit/Database/PulseMigrationPortabilityTest.php tests/Feature/Services/OptimizedBookServicePortabilityTest.php tests/Feature/Services/ToolExecutorSqlPortabilityTest.php tests/Api/Feature/StatisticsControllerTest.php
+
+  container-install:
+    name: Container first install (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, pgsql, mysql]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare disposable configuration
+        run: |
+          cp .env.docker.example .env.docker
+          mkdir -p docker-data/books docker-data/trash
+          if [ "${{ matrix.database }}" != sqlite ]; then
+            sed -i 's/^DB_PASSWORD=$/DB_PASSWORD=portability-test-password/' .env.docker
+            sed -i 's/^DB_ROOT_PASSWORD=$/DB_ROOT_PASSWORD=portability-test-root-password/' .env.docker
+          fi
+      - name: Build and boot
+        run: |
+          if [ "${{ matrix.database }}" = sqlite ]; then
+            docker compose --env-file .env.docker up -d --build
+          else
+            docker compose --env-file .env.docker -f docker-compose.yml -f docker-compose.${{ matrix.database }}.yml up -d --build
+          fi
+      - name: Check installed application
+        run: |
+          docker compose --env-file .env.docker exec -T app php artisan migrate:status
+          docker compose --env-file .env.docker exec -T app php artisan backup:database --verify
+          docker compose --env-file .env.docker exec -T app ffprobe -version
+          if [ "${{ matrix.database }}" = sqlite ]; then
+            docker compose --env-file .env.docker exec -T -u www-data app test -w /var/www/html/database
+          fi
+          key_before=$(docker compose --env-file .env.docker exec -T app sha256sum storage/app/.app-key | cut -d' ' -f1)
+          docker compose --env-file .env.docker restart app
+          key_after=$(docker compose --env-file .env.docker exec -T app sha256sum storage/app/.app-key | cut -d' ' -f1)
+          test "$key_before" = "$key_after"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/up; then exit 0; fi
+            sleep 2
+          done
+          docker compose --env-file .env.docker logs app
+          exit 1
+      - name: Inspect startup logs
+        if: failure()
+        run: docker compose --env-file .env.docker logs --no-color || true

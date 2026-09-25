@@ -7,30 +7,12 @@ namespace Tests\Cli\Feature\Commands;
 use App\Console\Commands\FixSeriesStartingWithNumberCommand;
 use App\Models\Series;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FixSeriesStartingWithNumberCommandTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // Register SQLite REGEXP function for series name matching
-        try {
-            $pdo = DB::connection()->getPdo();
-            if ($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'sqlite') {
-                $pdo->sqliteCreateFunction('REGEXP', function ($pattern, $value) {
-                    return preg_match('/' . $pattern . '/', (string) $value) > 0 ? 1 : 0;
-                });
-            }
-        } catch (\Exception $e) {
-            // Non-SQLite databases support REGEXP natively
-        }
-    }
 
     #[Test]
     public function test_command_identifies_series_with_number_prefix(): void

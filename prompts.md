@@ -572,3 +572,9 @@ getting api errors. look at the logs and address them
 ## 2026-09-19
 
 - update the books page to remember the default view to remember its state (list/list/grid, sort, per page, and such settings) per user
+
+## 2026-09-24
+
+Look for ways the server is tied to this build environment and make it portable and installable. The database must use Laravel's configured SQL connection rather than assume MySQL; SQLite, PostgreSQL, and other supported SQL drivers should be considered.
+
+2026-09-25: Continue the portability and SQL-driver work; approved changing the disposable-test migration design for `user_book_status` from a composite primary key to a unique user/book constraint so `book_id` can become nullable.

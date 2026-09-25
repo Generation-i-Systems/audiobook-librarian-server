@@ -21,7 +21,7 @@ class BookFormController extends Controller
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
-        $this->storagePath = (string) config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $this->storagePath = (string) config('app.book_root', storage_path('app/books'));
     }
 
     public function plannedActions(Request $request, string $id)

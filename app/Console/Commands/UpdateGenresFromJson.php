@@ -27,7 +27,7 @@ class UpdateGenresFromJson extends Command
 
     public function handle(): int
     {
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
 
         $this->info('🔍 Loading OpenAudible books.json files...');
 

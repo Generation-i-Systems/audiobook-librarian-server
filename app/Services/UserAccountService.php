@@ -270,7 +270,7 @@ class UserAccountService
                 ->get()
                 ->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService getPendingAccountRequests failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getPendingAccountRequests failed: ' . $e->getMessage());
 
             return [];
         }
@@ -283,7 +283,7 @@ class UserAccountService
 
             return $request ? (array) $request : null;
         } catch (\Exception $e) {
-            Log::error('MySqlService getAccountRequest failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getAccountRequest failed: ' . $e->getMessage());
 
             return null;
         }
@@ -320,7 +320,7 @@ class UserAccountService
             return true;
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('MySqlService approveAccountRequest failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService approveAccountRequest failed: ' . $e->getMessage());
 
             return false;
         }
@@ -338,7 +338,7 @@ class UserAccountService
 
             return $updated > 0;
         } catch (\Exception $e) {
-            Log::error('MySqlService rejectAccountRequest failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService rejectAccountRequest failed: ' . $e->getMessage());
 
             return false;
         }

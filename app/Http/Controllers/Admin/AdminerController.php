@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\AdminerConnectionConfig;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 
@@ -29,15 +32,17 @@ class AdminerController extends Controller
     {
         // Get database configuration
 
-        $config = config('database.connections.mysql');
+        $config = app(AdminerConnectionConfig::class)->get();
 
-        $server = $config['host'] ?? '127.0.0.1';
+        $server = $config['server'];
 
-        $username = $config['username'] ?? '';
+        $username = $config['username'];
 
-        $db = $config['database'] ?? '';
+        $db = $config['database'];
 
-        $password = $config['password'] ?? '';
+        $password = $config['password'];
+
+        $driver = $config['driver'];
 
 
 
@@ -47,8 +52,8 @@ class AdminerController extends Controller
             $_GET['username'] = $username;
         }
 
-        if (!isset($_GET['server'])) {
-            $_GET['server'] = $server;
+        if (!isset($_GET[$driver])) {
+            $_GET[$driver] = $server;
         }
 
         if (!isset($_GET['db'])) {
@@ -89,11 +94,7 @@ class AdminerController extends Controller
 
 
 
-        $driver = 'server';
-
-
-
-        $_SESSION["pwds"][$driver][$_GET['server']][$_GET['username']] = $password;
+        $_SESSION["pwds"][$driver][$_GET[$driver]][$_GET['username']] = $password;
 
 
 

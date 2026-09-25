@@ -23,7 +23,7 @@ use App\Models\ListeningEvent;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServiceInterface
+class SqlDatabaseService implements DocumentStoreServiceInterface, DocumentStatsServiceInterface
 {
     use HandlesLibraryJson;
 
@@ -296,12 +296,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     'synced_at' => now()->timestamp * 1000,
                 ]);
             } catch (\Exception $e) {
-                Log::error('Failed to record listening event in MySqlService: ' . $e->getMessage());
+                Log::error('Failed to record listening event in SqlDatabaseService: ' . $e->getMessage());
             }
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService setReadingProgress failed: ' . $e->getMessage(), [
+            Log::error('SqlDatabaseService setReadingProgress failed: ' . $e->getMessage(), [
                 'userId' => $userId,
                 'bookId' => $bookId,
             ]);
@@ -1075,7 +1075,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 ])
                 ->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService listNeedsReviewBooks failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService listNeedsReviewBooks failed: ' . $e->getMessage());
 
             return [];
         }
@@ -1105,7 +1105,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return $query->count();
         } catch (\Exception $e) {
-            Log::error('MySqlService countNeedsReviewBooks failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService countNeedsReviewBooks failed: ' . $e->getMessage());
 
             return 0;
         }
@@ -1160,7 +1160,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return $baseReasons;
         } catch (\Exception $e) {
-            Log::error('MySqlService listNeedsReviewReasons failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService listNeedsReviewReasons failed: ' . $e->getMessage());
 
             return [];
         }
@@ -1229,7 +1229,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return $oldSeries->books()->count();
         } catch (\Exception $e) {
-            Log::error('MySqlService renameSeries failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService renameSeries failed: ' . $e->getMessage());
 
             throw $e;
         }
@@ -1303,7 +1303,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'authorCount' => (int) $row->author_count,
             ])->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService listGenresWithStats failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService listGenresWithStats failed: ' . $e->getMessage());
 
             return [];
         }
@@ -1341,7 +1341,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'bookCount' => (int) $row->book_count,
             ])->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService listAuthorsWithStats failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService listAuthorsWithStats failed: ' . $e->getMessage());
 
             return [];
         }
@@ -1452,7 +1452,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'authors' => $authors,
             ];
         } catch (\Exception $e) {
-            Log::error('MySqlService getGenreAuthorsHierarchy failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getGenreAuthorsHierarchy failed: ' . $e->getMessage());
 
             return [
                 'genre' => null,
@@ -1548,7 +1548,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'standaloneBooks' => $standaloneBooks,
             ];
         } catch (\Exception $e) {
-            Log::error('MySqlService getAuthorHierarchy failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getAuthorHierarchy failed: ' . $e->getMessage());
 
             return [
                 'author' => null,
@@ -1600,7 +1600,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 return $bookIds->count();
             });
         } catch (\Exception $e) {
-            Log::error('MySqlService mergeAuthors failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService mergeAuthors failed: ' . $e->getMessage());
 
             return 0;
         }
@@ -1647,7 +1647,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 return $bookIds->count();
             });
         } catch (\Exception $e) {
-            Log::error('MySqlService mergeGenres failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService mergeGenres failed: ' . $e->getMessage());
 
             return 0;
         }
@@ -1696,7 +1696,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 return $bookIds->count();
             });
         } catch (\Exception $e) {
-            Log::error('MySqlService mergeSeries failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService mergeSeries failed: ' . $e->getMessage());
 
             return 0;
         }
@@ -1728,7 +1728,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return $genre ? $genre->toArray() : null;
         } catch (\Exception $e) {
-            Log::error('MySqlService getGenre failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getGenre failed: ' . $e->getMessage());
 
             return null;
         }
@@ -1792,7 +1792,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             return $this->getBookMutationService()->createBook($data);
         } catch (\Exception $e) {
             Log::error(
-                'MySqlService createBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
+                'SqlDatabaseService createBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
             );
 
             throw $e; // Re-throw the exception to be caught by the calling command
@@ -1811,7 +1811,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             return $bookArray;
         } catch (\Exception $e) {
             Log::error(
-                'MySqlService updateBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
+                'SqlDatabaseService updateBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
             );
 
             throw $e; // Re-throw the exception to be caught by the calling command
@@ -2199,7 +2199,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService resetReadingProgress failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService resetReadingProgress failed: ' . $e->getMessage());
 
             return false;
         }

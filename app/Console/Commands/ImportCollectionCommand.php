@@ -257,7 +257,7 @@ class ImportCollectionCommand extends Command
     {
         try {
             $relativePath = str_replace(
-                rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/') . '/',
+                rtrim(config('app.book_root', storage_path('app/books')), '/') . '/',
                 '',
                 $path
             );

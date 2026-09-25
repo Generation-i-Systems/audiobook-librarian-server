@@ -51,4 +51,14 @@ class BackupDatabaseHoursSinceLastBackupTest extends TestCase
         $this->assertNotNull($hours);
         $this->assertEqualsWithDelta(1.0, $hours, 0.05);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function includesSqliteSnapshotsWhenCalculatingBackupAge(): void
+    {
+        $snapshot = $this->backupDir . '/backup_library_20260101_000000.sqlite';
+        File::put($snapshot, 'snapshot');
+        touch($snapshot, time() - (2 * 3600));
+
+        $this->assertEqualsWithDelta(2.0, BackupDatabase::hoursSinceLastBackup($this->backupDir), 0.05);
+    }
 }

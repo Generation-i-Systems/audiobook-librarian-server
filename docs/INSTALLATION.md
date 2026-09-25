@@ -45,14 +45,32 @@ from the running container before importing or moving files.
 
 ## Native PHP installation
 
-Install PHP 8.3, Composer, and FFmpeg on the host. Copy `.env.example` to `.env`, set a unique
-`APP_KEY`, set `APP_URL` to the public `https://` URL, configure the database, and set the storage
-paths above. Then install dependencies and initialize the application:
+Install PHP 8.3, Composer, Node.js/npm, and FFmpeg/FFprobe on the host. Copy `.env.example` to
+`.env`, set `APP_URL` to the public `https://` URL, choose `DB_CONNECTION` (`sqlite`, `pgsql`, or
+`mysql`), and set any external storage paths. For SQLite, create an empty
+`database/database.sqlite` file before migrating. Then initialize the application:
+
+Laravel's other configured SQL drivers can be used when their PHP PDO extension is installed.
+Pulse supports SQLite, MySQL/MariaDB, and PostgreSQL; on another driver its optional tables are
+skipped and Pulse defaults off. If you need Pulse with another primary database, configure a
+separate supported `PULSE_DB_CONNECTION` and enable it explicitly.
+
+The built-in Adminer page uses the active SQL connection for SQLite, MySQL/MariaDB,
+PostgreSQL, and SQL Server. For another Laravel driver, use that database's native administration
+tool.
+
+The legacy `db:sync` and `db:sync-book` maintenance commands still target the separately named
+`mysql_production` and `mysql_devel` connections. They are not part of installation or normal
+library operation; do not use them as a cross-driver migration tool.
 
 ```bash
 composer install --no-dev --optimize-autoloader
+npm ci
+npm run build
 php artisan key:generate
 php artisan migrate --force
+php artisan app:create-admin-user
+php artisan storage:link
 php artisan config:cache
 ```
 
@@ -60,6 +78,10 @@ Serve the `public` directory through IIS, Apache, nginx, Caddy, or another HTTPS
 Keep PHP-FPM/Apache/IIS and the queue worker private to the host; the TLS proxy is the only public
 listener. Run `php artisan queue:work` and `php artisan schedule:work` through the host's service
 manager (systemd, launchd, or Windows Task Scheduler/service wrapper).
+
+The scheduled `backup:database` command creates a SQLite snapshot for SQLite and SQL dumps for
+MySQL/MariaDB or PostgreSQL. For another SQL driver, configure a database-native backup system;
+the command reports unsupported drivers explicitly. Rehearse a restore before relying on backups.
 
 ## Required background processes
 
@@ -92,7 +114,8 @@ or a host cron entry that calls the scheduler once per minute:
 * * * * * cd /path/to/audiobook-librarian-server && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-The helper script `./scripts/setup-cron.sh` adds that scheduler entry for the current checkout.
+On Linux, the helper script `./scripts/setup-cron.sh` adds that scheduler entry for the current
+checkout. On macOS or Windows, use the host scheduler or a managed `schedule:work` process.
 
 Run a queue worker as a separate managed service:
 
@@ -115,11 +138,14 @@ Required scheduled maintenance:
 
 | Command | Default cadence | Purpose |
 | --- | --- | --- |
-| `backup:database --verify` | Daily 02:00 and Sunday 03:00 | Creates verified database backups. Configure `DATABASE_BACKUP_PATH` and confirm backup storage permissions. |
+| `backup:database --verify` | Daily 02:00 and Sunday 03:00 for SQLite, MySQL/MariaDB, PostgreSQL | Creates verified database backups. Configure `DATABASE_BACKUP_PATH` and confirm backup storage permissions. Use a native backup scheduler for another SQL driver. |
 | `accounts:purge-scheduled-deletions` | Daily | Permanently erases accounts whose cancellation window has expired. This is required for account deletion compliance. |
 | `sessions:close-orphaned` | Daily 03:30 | Closes listening sessions that were started by a client but never ended, preventing stale session state. |
-| `storage:fix-permissions` | Hourly | Repairs storage permissions for generated files, imports, downloads, and logs. |
 | `logs:compress`, `log:rotate`, `log:clear --keep-last=14` | Daily | Compresses, rotates, and prunes application logs. |
+
+`storage:fix-permissions` is a separate, privileged Linux host task when filesystem ownership
+repair is needed. It is not registered with Laravel's scheduler and is not needed for a normal
+Docker installation.
 
 Library maintenance that most local-library servers should run:
 

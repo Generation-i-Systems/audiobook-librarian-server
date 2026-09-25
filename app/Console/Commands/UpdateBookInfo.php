@@ -32,7 +32,7 @@ class UpdateBookInfo extends Command
         }
 
         // Find the book
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
         $searchPath = $directory;
 
         if (str_starts_with($directory, $bookRoot)) {

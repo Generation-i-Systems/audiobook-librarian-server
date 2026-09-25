@@ -7,19 +7,19 @@ namespace Tests\Unit\Services;
 use App\Models\Book;
 use App\Models\User;
 use App\Models\UserBookStatus;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class MySqlServiceQueueTest extends TestCase
+class SqlDatabaseServiceQueueTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
     public function addBookToQueueCreatesQueueStatusRowWithIncrementedOrder(): void
     {
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $user = User::factory()->create();
         $bookA = Book::factory()->create();
@@ -50,7 +50,7 @@ class MySqlServiceQueueTest extends TestCase
     #[Test]
     public function addBookToQueueIsIdempotentForSameBook(): void
     {
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $user = User::factory()->create();
         $book = Book::factory()->create();
@@ -70,7 +70,7 @@ class MySqlServiceQueueTest extends TestCase
     #[Test]
     public function removeBookFromQueueDeletesQueueStatusRow(): void
     {
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $user = User::factory()->create();
         $book = Book::factory()->create();
@@ -94,7 +94,7 @@ class MySqlServiceQueueTest extends TestCase
     #[Test]
     public function updateBookQueueUpsertsRowsAndRemovesMissingOnes(): void
     {
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $user = User::factory()->create();
         $bookA = Book::factory()->create();

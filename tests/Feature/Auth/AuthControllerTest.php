@@ -27,9 +27,6 @@ class AuthControllerTest extends TestCase
     {
         parent::setUp();
 
-        // Ensure we use MySQL-backed document store
-        config(['documentstore.driver' => 'mysql']);
-
         // Clean up is handled by RefreshDatabase trait
         // No need to manually delete users here
     }

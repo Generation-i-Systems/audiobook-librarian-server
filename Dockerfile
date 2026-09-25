@@ -45,6 +45,7 @@ RUN apk add --no-cache \
         supervisor \
         bash \
         curl \
+        ffmpeg \
         sqlite \
         libpng-dev \
         libjpeg-turbo-dev \
@@ -55,6 +56,7 @@ RUN apk add --no-cache \
         libxml2-dev \
         sqlite-dev \
         mysql-client \
+        mariadb-connector-c \
         postgresql-dev \
         postgresql-client \
         $PHPIZE_DEPS \

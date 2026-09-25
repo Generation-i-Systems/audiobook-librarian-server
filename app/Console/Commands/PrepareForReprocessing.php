@@ -30,7 +30,7 @@ class PrepareForReprocessing extends Command
 
     public function handle(): int
     {
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
         $quarantinePath = $bookRoot . '/_NEEDS_REPROCESSING';
         $permanent = $this->option('permanent');
 
@@ -267,7 +267,7 @@ class PrepareForReprocessing extends Command
             return null; // Already flat
         }
 
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
         $relativePath = str_replace($bookRoot . '/', '', $fullPath);
 
         // Need to flatten - move all audio files to root

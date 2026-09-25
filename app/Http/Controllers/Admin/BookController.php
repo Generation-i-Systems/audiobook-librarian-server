@@ -940,7 +940,7 @@ class BookController extends Controller
             if ($tempPath && $directoryPath && file_exists($tempPath)) {
                 try {
                     // Get the book root path
-                    $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+                    $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
                     $fullDirectoryPath = $bookRoot . '/' . ltrim($directoryPath, '/');
 
                     // Ensure directory exists
@@ -1053,7 +1053,7 @@ class BookController extends Controller
         $directoryChanged = $oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath;
         $durationMissing = empty($book['duration']);
         if ($directoryPath && ($directoryChanged || $durationMissing)) {
-            $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            $bookRoot = rtrim((string) config('app.book_root', storage_path('app/books')), '/');
             $absolutePath = $bookRoot . '/' . ltrim($directoryPath, '/');
             if (is_dir($absolutePath)) {
                 $durationInfo = $this->audioFileAnalyzer->getDirectoryAudioDuration($absolutePath);

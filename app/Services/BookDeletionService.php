@@ -40,8 +40,14 @@ class BookDeletionService
             $trashDisk->makeDirectory($trashItemId);
             $trashPath = $trashDisk->path($trashItemId);
             @chmod($trashPath, 0775);
-            @chown($trashPath, 'eric');
-            @chgrp($trashPath, 'audio');
+            $owner = config('filesystems.book_file_owner');
+            $group = config('filesystems.book_file_group');
+            if (is_string($owner) && $owner !== '') {
+                @chown($trashPath, $owner);
+            }
+            if (is_string($group) && $group !== '') {
+                @chgrp($trashPath, $group);
+            }
 
             $fileCount = 0;
             $movedFiles = false;
@@ -391,8 +397,14 @@ class BookDeletionService
             $trashDisk->makeDirectory($trashItemId);
             $trashPath = $trashDisk->path($trashItemId);
             @chmod($trashPath, 0775);
-            @chown($trashPath, 'eric');
-            @chgrp($trashPath, 'audio');
+            $owner = config('filesystems.book_file_owner');
+            $group = config('filesystems.book_file_group');
+            if (is_string($owner) && $owner !== '') {
+                @chown($trashPath, $owner);
+            }
+            if (is_string($group) && $group !== '') {
+                @chgrp($trashPath, $group);
+            }
 
             $result = $this->moveFilesToTrash($directoryPath, $trashItemId);
 

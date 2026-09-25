@@ -26,7 +26,7 @@ class UserReadingStatsService
 
             return $session->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService recordReadingSession failed: ' . $e->getMessage(), [
+            Log::error('SqlDatabaseService recordReadingSession failed: ' . $e->getMessage(), [
                 'userId' => $userId,
                 'bookId' => $bookId,
             ]);
@@ -63,7 +63,7 @@ class UserReadingStatsService
                 })
                 ->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService getDailyStats failed: ' . $e->getMessage(), [
+            Log::error('SqlDatabaseService getDailyStats failed: ' . $e->getMessage(), [
                 'userId' => $userId,
                 'from' => $from,
                 'to' => $to,
@@ -92,7 +92,7 @@ class UserReadingStatsService
                 'last_ended_at' => $this->formatIso8601DateTime($stats->getAttribute('last_ended_at')),
             ];
         } catch (\Exception $e) {
-            Log::error('MySqlService getBookStats failed: ' . $e->getMessage(), [
+            Log::error('SqlDatabaseService getBookStats failed: ' . $e->getMessage(), [
                 'userId' => $userId,
                 'bookId' => $bookId,
             ]);
@@ -119,7 +119,7 @@ class UserReadingStatsService
                 'streak_longest' => $streaks['longest'] ?? 0,
             ];
         } catch (\Exception $e) {
-            Log::error('MySqlService getUserStats failed: ' . $e->getMessage(), [
+            Log::error('SqlDatabaseService getUserStats failed: ' . $e->getMessage(), [
                 'userId' => $userId,
             ]);
 
@@ -188,7 +188,7 @@ class UserReadingStatsService
                 'last_active_date' => $dates[0] ?? null,
             ];
         } catch (\Exception $e) {
-            Log::error('MySqlService getStreaks failed: ' . $e->getMessage(), [
+            Log::error('SqlDatabaseService getStreaks failed: ' . $e->getMessage(), [
                 'userId' => $userId,
             ]);
 

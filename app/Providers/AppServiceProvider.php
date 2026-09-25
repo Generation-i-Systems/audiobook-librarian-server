@@ -20,8 +20,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(AudibleApiService::class, function ($app) {
             return new AudibleApiService(config('services.audible', []));
         });
-        // DocumentStoreServiceInterface binding is now handled by DocumentStoreServiceProvider
-        // to avoid conflicts and ensure proper driver selection based on documentstore.driver config
+        // DocumentStoreServiceInterface binding is handled by DocumentStoreServiceProvider.
 
         $this->app->singleton(\App\Services\AI\AIAssistantService::class, function ($app) {
             $provider = config('services.ai.default_provider', 'gemini');

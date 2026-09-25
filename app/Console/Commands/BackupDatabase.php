@@ -1,9 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
+use App\Services\DatabaseBackupWriter;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use PDO;
+use RuntimeException;
 
 class BackupDatabase extends Command
 {
@@ -19,7 +25,7 @@ class BackupDatabase extends Command
      *
      * @var string
      */
-    protected $description = 'Create a backup of the MySQL database';
+    protected $description = 'Create a backup of the configured SQL database';
 
     /**
      * Minimum time between automatic (non-manual) backups.
@@ -36,8 +42,8 @@ class BackupDatabase extends Command
             return null;
         }
 
-        $files = glob($backupDir . '/backup_*.sql.gz');
-        if ($files === false || count($files) === 0) {
+        $files = array_merge(glob($backupDir . '/backup_*.sql.gz') ?: [], glob($backupDir . '/backup_*.sqlite') ?: []);
+        if ($files === []) {
             return null;
         }
 
@@ -49,117 +55,122 @@ class BackupDatabase extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(DatabaseBackupWriter $writer): int
     {
-        $this->info('Starting database backup...');
-
-        // Safety: never execute external mysqldump during automated tests
         if (app()->environment('testing')) {
             $this->warn('Skipping database backup in testing environment.');
             Log::info('Backup skipped in testing environment');
-            return Command::SUCCESS;
+            return self::SUCCESS;
         }
 
-        // Get database configuration
-        $dbHost = config('database.connections.mysql.host');
-        $dbPort = config('database.connections.mysql.port');
-        $dbName = config('database.connections.mysql.database');
-        $dbUser = config('database.connections.mysql.username');
-        $dbPassword = config('database.connections.mysql.password');
-
-        // Create backup directory
+        $connection = DB::connection();
+        $driver = $connection->getDriverName();
+        $databaseName = (string) $connection->getDatabaseName();
         $backupDir = (string) config('app.database_backup_path');
-        if (!is_dir($backupDir)) {
-            mkdir($backupDir, 0755, true);
+        if (!is_dir($backupDir) && !mkdir($backupDir, 0755, true) && !is_dir($backupDir)) {
+            $this->error('Cannot create database backup directory.');
+            return self::FAILURE;
         }
 
-        // Generate backup filename
-        $timestamp = now()->format('Ymd_His');
-        $suffix = $this->option('suffix');
-        $suffixPart = $suffix ? "_{$suffix}" : '';
-        $backupFile = "{$backupDir}/backup_{$dbName}{$suffixPart}_{$timestamp}.sql";
+        $identifier = preg_replace('/[^a-zA-Z0-9_-]+/', '_', basename($databaseName));
+        $suffix = (string) ($this->option('suffix') ?? '');
+        $safeSuffix = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $suffix);
+        $name = 'backup_' . $identifier . ($safeSuffix !== '' ? '_' . $safeSuffix : '')
+            . '_' . now()->format('Ymd_His');
+        $extension = $driver === 'sqlite' ? '.sqlite' : '.sql.gz';
+        $backupFile = $backupDir . '/' . $name . $extension;
+        $workingFile = $backupFile . '.part';
+        $dumpFile = $driver === 'sqlite' ? $workingFile : $workingFile . '.sql';
 
-        // Build mysqldump command
-        $command = sprintf(
-            'mysqldump -h%s -P%s -u%s -p%s --single-transaction --routines --triggers --events --add-drop-database --databases %s > %s',
-            escapeshellarg($dbHost),
-            escapeshellarg($dbPort),
-            escapeshellarg($dbUser),
-            escapeshellarg($dbPassword),
-            escapeshellarg($dbName),
-            escapeshellarg($backupFile)
-        );
-
-        // Execute backup
-        $this->line("Creating backup: " . basename($backupFile));
-
-        $output = [];
-        $returnCode = 0;
-        exec($command, $output, $returnCode);
-
-        if ($returnCode === 0) {
-            // Compress the backup
-            $compressCommand = "gzip " . escapeshellarg($backupFile);
-            exec($compressCommand, $output, $returnCode);
-
-            if ($returnCode === 0) {
-                $compressedFile = $backupFile . '.gz';
-                $fileSize = $this->formatBytes(filesize($compressedFile));
-
-                $this->info("✓ Backup created successfully: " . basename($compressedFile) . " ({$fileSize})");
-
-                // Log the backup
-                Log::info('Database backup created', [
-                    'file' => basename($compressedFile),
-                    'size' => $fileSize,
-                    'database' => $dbName,
-                    'suffix' => $suffix ?: 'none'
-                ]);
-
-                // Verify backup if requested
-                if ($this->option('verify')) {
-                    $this->verifyBackup($compressedFile);
+        try {
+            $writer->write($connection, $dumpFile);
+            if ($driver !== 'sqlite') {
+                $input = fopen($dumpFile, 'rb');
+                $output = gzopen($workingFile, 'wb9');
+                if ($input === false || $output === false) {
+                    if ($input !== false) {
+                        fclose($input);
+                    }
+                    if ($output !== false) {
+                        gzclose($output);
+                    }
+                    throw new RuntimeException('Cannot compress the database backup.');
                 }
-
-                // Cleanup old backups
-                $this->cleanupOldBackups($backupDir);
-
-                return Command::SUCCESS;
-            } else {
-                $this->error("✗ Failed to compress backup");
-                return Command::FAILURE;
+                try {
+                    while (!feof($input)) {
+                        $chunk = fread($input, 1048576);
+                        if ($chunk === false) {
+                            throw new RuntimeException('Cannot compress the database backup.');
+                        }
+                        while ($chunk !== '') {
+                            $written = gzwrite($output, $chunk);
+                            if ($written === false || $written === 0) {
+                                throw new RuntimeException('Cannot compress the database backup.');
+                            }
+                            $chunk = substr($chunk, $written);
+                        }
+                    }
+                } finally {
+                    fclose($input);
+                    gzclose($output);
+                }
+                unlink($dumpFile);
             }
-        } else {
-            $this->error("✗ Backup failed");
-            Log::error('Database backup failed', [
-                'database' => $dbName,
-                'command' => $command,
-                'output' => implode("\n", $output)
+
+            if ($this->option('verify') && !$this->verifyBackup($workingFile, $driver)) {
+                throw new RuntimeException('Database backup integrity verification failed.');
+            }
+            if (!rename($workingFile, $backupFile)) {
+                throw new RuntimeException('Cannot publish the completed database backup.');
+            }
+
+            $fileSize = $this->formatBytes((int) filesize($backupFile));
+            $this->info('Backup created: ' . basename($backupFile) . ' (' . $fileSize . ')');
+            Log::info('Database backup created', [
+                'file' => basename($backupFile),
+                'size' => $fileSize,
+                'connection' => $connection->getName(),
+                'driver' => $driver,
             ]);
-            return Command::FAILURE;
+            $this->cleanupOldBackups($backupDir);
+            return self::SUCCESS;
+        } catch (\Throwable $exception) {
+            @unlink($dumpFile);
+            @unlink($workingFile);
+            $this->error('Database backup failed: ' . $exception->getMessage());
+            Log::error('Database backup failed', [
+                'connection' => $connection->getName(),
+                'driver' => $driver,
+                'error' => $exception->getMessage(),
+            ]);
+            return self::FAILURE;
         }
     }
 
-    /**
-     * Verify backup integrity
-     */
-    private function verifyBackup(string $backupFile): void
+    private function verifyBackup(string $backupFile, string $driver): bool
     {
-        $this->line("Verifying backup integrity...");
-
-        $command = "gunzip -t " . escapeshellarg($backupFile);
-        $output = [];
-        $returnCode = 0;
-        exec($command, $output, $returnCode);
-
-        if ($returnCode === 0) {
-            $this->info("✓ Backup integrity verified");
-        } else {
-            $this->error("✗ Backup integrity check failed");
-            Log::error('Backup integrity check failed', [
-                'file' => basename($backupFile)
-            ]);
+        if ($driver === 'sqlite') {
+            $snapshot = new PDO('sqlite:' . $backupFile);
+            return $snapshot->query('PRAGMA quick_check')->fetchColumn() === 'ok';
         }
+
+        $stream = gzopen($backupFile, 'rb');
+        if ($stream === false) {
+            return false;
+        }
+        $hasContent = false;
+        try {
+            while (!gzeof($stream)) {
+                $chunk = gzread($stream, 1048576);
+                if ($chunk === false) {
+                    return false;
+                }
+                $hasContent = $hasContent || $chunk !== '';
+            }
+        } finally {
+            gzclose($stream);
+        }
+        return $hasContent;
     }
 
     /**
@@ -169,7 +180,7 @@ class BackupDatabase extends Command
     {
         $this->line("Cleaning up old backups...");
 
-        $files = glob($backupDir . '/backup_*.sql.gz');
+        $files = array_merge(glob($backupDir . '/backup_*.sql.gz') ?: [], glob($backupDir . '/backup_*.sqlite') ?: []);
         $thirtyDaysAgo = now()->subDays(30)->timestamp;
         $deletedCount = 0;
 

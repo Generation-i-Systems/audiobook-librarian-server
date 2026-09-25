@@ -7,12 +7,12 @@ namespace Tests\Unit\Services;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Series;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class MySqlServiceGetBooksGroupedBySeriesTest extends TestCase
+class SqlDatabaseServiceGetBooksGroupedBySeriesTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -21,7 +21,7 @@ class MySqlServiceGetBooksGroupedBySeriesTest extends TestCase
     {
         Book::factory()->create(['title' => 'Standalone']);
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $this->assertSame(['data' => [], 'total' => 0], $service->getBooksGroupedBySeries());
     }
@@ -48,7 +48,7 @@ class MySqlServiceGetBooksGroupedBySeriesTest extends TestCase
         ]);
         $bookTwo->series()->attach($aSeries->id, ['series_number' => 1]);
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $result = $service->getBooksGroupedBySeries();
 
@@ -76,7 +76,7 @@ class MySqlServiceGetBooksGroupedBySeriesTest extends TestCase
         $bookOther = Book::factory()->create(['title' => 'Book B']);
         $bookOther->series()->attach($other->id, ['series_number' => 1]);
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $result = $service->getBooksGroupedBySeries('wanted');
 
@@ -94,7 +94,7 @@ class MySqlServiceGetBooksGroupedBySeriesTest extends TestCase
         $book->series()->attach($seriesOne->id, ['series_number' => 1]);
         $book->series()->attach($seriesTwo->id, ['series_number' => 2]);
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $result = $service->getBooksGroupedBySeries();
 
@@ -113,7 +113,7 @@ class MySqlServiceGetBooksGroupedBySeriesTest extends TestCase
             $book->series()->attach($series->id, ['series_number' => 1]);
         }
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $pageOne = $service->getBooksGroupedBySeries(null, 1, 2);
         $pageTwo = $service->getBooksGroupedBySeries(null, 2, 2);

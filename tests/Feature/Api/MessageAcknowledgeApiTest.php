@@ -11,7 +11,7 @@ use PHPUnit\Framework\Attributes\Test;
 class MessageAcknowledgeApiTest extends ApiTestCase
 {
     #[Test]
-    public function testMySqlServiceAcknowledgeMessageSetsAcknowledgedAt(): void
+    public function testSqlDatabaseServiceAcknowledgeMessageSetsAcknowledgedAt(): void
     {
         $admin = User::factory()->create([
             'role' => 'admin',

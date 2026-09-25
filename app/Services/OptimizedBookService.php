@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -16,81 +17,48 @@ class OptimizedBookService
     public function getBooks(int $page = 1, int $perPage = 10, array $filters = []): array
     {
         try {
-            $perPage = min($perPage, 10); // Hard limit
-            $offset = ($page - 1) * $perPage;
-
-            // Base query
-            $whereConditions = [];
-            $params = [];
-
-            // Apply search filter
+            $perPage = min($perPage, 10);
+            $query = DB::table('books');
             if (!empty($filters['search'])) {
-                $whereConditions[] = '(books.title LIKE ? OR books.description LIKE ?)';
-                $params[] = '%' . $filters['search'] . '%';
-                $params[] = '%' . $filters['search'] . '%';
+                $term = '%' . $filters['search'] . '%';
+                $query->where(function (Builder $query) use ($term): void {
+                    $query->where('books.title', 'like', $term)->orWhere('books.description', 'like', $term);
+                });
             }
-
-            // Apply author filter
             if (!empty($filters['author'])) {
-                $whereConditions[] = 'EXISTS (
-                    SELECT 1 FROM author_book ab
-                    JOIN authors a ON ab.author_id = a.id
-                    WHERE ab.book_id = books.id AND a.name LIKE ?
-                )';
-                $params[] = '%' . $filters['author'] . '%';
+                $query->whereExists(function (Builder $query) use ($filters): void {
+                    $query->selectRaw('1')->from('author_book')
+                        ->join('authors', 'authors.id', '=', 'author_book.author_id')
+                        ->whereColumn('author_book.book_id', 'books.id')
+                        ->where('authors.name', 'like', '%' . $filters['author'] . '%');
+                });
             }
-
-            // Apply genre filter
             if (!empty($filters['genre'])) {
-                $whereConditions[] = 'EXISTS (
-                    SELECT 1 FROM book_genre bg
-                    JOIN genres g ON bg.genre_id = g.id
-                    WHERE bg.book_id = books.id AND g.name = ?
-                )';
-                $params[] = $filters['genre'];
+                $query->whereExists(function (Builder $query) use ($filters): void {
+                    $query->selectRaw('1')->from('book_genre')
+                        ->join('genres', 'genres.id', '=', 'book_genre.genre_id')
+                        ->whereColumn('book_genre.book_id', 'books.id')
+                        ->where('genres.name', $filters['genre']);
+                });
             }
 
-            $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
+            $total = (clone $query)->count();
+            $books = $query->select('books.id', 'books.title', 'books.cover_image', 'books.directory_path', 'books.description')
+                ->orderBy('books.title')->offset(($page - 1) * $perPage)->limit($perPage)->get();
+            $ids = $books->pluck('id')->all();
+            $authors = $this->namesByBook($ids, 'author_book', 'authors', 'author_id');
+            $genres = $this->namesByBook($ids, 'book_genre', 'genres', 'genre_id');
 
-            // Get books with minimal fields
-            $books = DB::select("
-                SELECT books.id, books.title, books.cover_image, books.directory_path, books.description,
-                       GROUP_CONCAT(DISTINCT a.name ORDER BY a.name SEPARATOR '|') as authors,
-                       GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR '|') as genres
-                FROM books
-                LEFT JOIN author_book ab ON books.id = ab.book_id
-                LEFT JOIN authors a ON ab.author_id = a.id
-                LEFT JOIN book_genre bg ON books.id = bg.book_id
-                LEFT JOIN genres g ON bg.genre_id = g.id
-                {$whereClause}
-                GROUP BY books.id, books.title, books.cover_image, books.directory_path, books.description
-                ORDER BY books.title ASC
-                LIMIT {$perPage} OFFSET {$offset}
-            ", $params);
-
-            // Get total count
-            $totalQuery = "
-                SELECT COUNT(DISTINCT books.id) as total
-                FROM books
-                LEFT JOIN author_book ab ON books.id = ab.book_id
-                LEFT JOIN authors a ON ab.author_id = a.id
-                LEFT JOIN book_genre bg ON books.id = bg.book_id
-                LEFT JOIN genres g ON bg.genre_id = g.id
-                {$whereClause}
-            ";
-            $total = DB::scalar($totalQuery, $params) ?? 0;
-
-            // Process results efficiently
             $processedBooks = [];
             foreach ($books as $book) {
                 $processedBooks[] = [
                     'id' => $book->id,
                     'title' => $book->title ?? 'Untitled',
-                    'author' => !empty($book->authors) ? explode('|', $book->authors) : ['Unknown'],
-                    'genre' => !empty($book->genres) ? explode('|', $book->genres) : ['Unknown'],
+                    'author' => $authors[$book->id] ?? ['Unknown'],
+                    'genre' => $genres[$book->id] ?? ['Unknown'],
                     'coverImage' => $this->processCoverImage($book->cover_image, $book->directory_path),
                     'description' => substr($book->description ?? 'No description available.', 0, 200),
-                    'series' => [], // Skip series for now to save memory
+                    'series' => [],
                 ];
             }
 
@@ -105,17 +73,15 @@ class OptimizedBookService
             Log::error('OptimizedBookService failed: ' . $e->getMessage());
 
             return [
-                'data' => [
-                    [
-                        'id' => '1',
-                        'title' => 'Database Error - Contact Admin',
-                        'author' => ['System'],
-                        'genre' => ['Error'],
-                        'coverImage' => asset('images/placeholder.png'),
-                        'description' => 'Error loading books: ' . $e->getMessage(),
-                        'series' => [],
-                    ],
-                ],
+                'data' => [[
+                    'id' => '1',
+                    'title' => 'Database Error - Contact Admin',
+                    'author' => ['System'],
+                    'genre' => ['Error'],
+                    'coverImage' => asset('images/placeholder.png'),
+                    'description' => 'Error loading books: ' . $e->getMessage(),
+                    'series' => [],
+                ]],
                 'total' => 1,
                 'perPage' => $perPage,
                 'currentPage' => $page,
@@ -173,24 +139,18 @@ class OptimizedBookService
     public function getRecentBooks(int $limit = 5): array
     {
         try {
-            $books = DB::select("
-                SELECT books.id, books.title, books.cover_image, books.created_at,
-                       GROUP_CONCAT(DISTINCT a.name ORDER BY a.name SEPARATOR '|') as authors
-                FROM books
-                LEFT JOIN author_book ab ON books.id = ab.book_id
-                LEFT JOIN authors a ON ab.author_id = a.id
-                WHERE books.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                GROUP BY books.id, books.title, books.cover_image, books.created_at
-                ORDER BY books.created_at DESC
-                LIMIT {$limit}
-            ");
+            $books = DB::table('books')
+                ->select('id', 'title', 'cover_image', 'created_at')
+                ->where('created_at', '>=', now()->subDays(7))
+                ->orderByDesc('created_at')->limit($limit)->get();
+            $authors = $this->namesByBook($books->pluck('id')->all(), 'author_book', 'authors', 'author_id');
 
             $processedBooks = [];
             foreach ($books as $book) {
                 $processedBooks[] = [
                     'id' => $book->id,
                     'title' => $book->title ?? 'Untitled',
-                    'author' => !empty($book->authors) ? explode('|', $book->authors) : ['Unknown'],
+                    'author' => $authors[$book->id] ?? ['Unknown'],
                     'coverImage' => $this->processCoverImage($book->cover_image),
                     'createdAt' => $book->created_at,
                 ];
@@ -201,6 +161,26 @@ class OptimizedBookService
             Log::error('Error getting recent books: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /** @return array<int, list<string>> */
+    private function namesByBook(array $bookIds, string $pivot, string $table, string $relatedId): array
+    {
+        if ($bookIds === []) {
+            return [];
+        }
+
+        $names = DB::table($pivot)->join($table, "$table.id", '=', "$pivot.$relatedId")
+            ->whereIn("$pivot.book_id", $bookIds)
+            ->select("$pivot.book_id", "$table.name")
+            ->distinct()->orderBy("$table.name")->get();
+
+        $byBook = [];
+        foreach ($names as $row) {
+            $byBook[$row->book_id][] = $row->name;
+        }
+
+        return $byBook;
     }
 
     /**

@@ -38,12 +38,15 @@ support arbitrary cleartext `http://` servers. See [Mobile App Connection](docs/
 
 ### Native install
 
-1. Clone the repo
-2. Run `composer install`
-3. Copy `.env.example` to `.env` and set DB/storage config
-4. Run `php artisan migrate --seed`
-5. Create an admin: `php artisan app:create-admin-user`
-6. Start the server: `php artisan serve`
+1. Clone the repo and install PHP 8.3, Composer, Node.js/npm, and FFmpeg/FFprobe.
+2. Copy `.env.example` to `.env` and choose a Laravel SQL connection. SQLite is the sample default;
+   create `database/database.sqlite` before migrating, or configure PostgreSQL/MySQL credentials.
+3. Run `composer install --no-dev --optimize-autoloader`, `npm ci`, and `npm run build`.
+4. Run `php artisan key:generate`, `php artisan migrate --force`, and `php artisan storage:link`.
+5. Create an admin with `php artisan app:create-admin-user`, then start the server with `php artisan serve`.
+
+See [Cross-platform installation](docs/INSTALLATION.md) for production HTTPS, backups, and
+background-process setup.
 
 For production and self-hosted installs, also configure the scheduler and queue worker — see
 [Cross-platform installation](docs/INSTALLATION.md#required-background-processes) for the required

@@ -1,9 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 
 return new class () extends Migration {
     /**
@@ -128,13 +129,7 @@ return new class () extends Migration {
      */
     private function indexExists(string $tableName, string $indexName): bool
     {
-        try {
-            $indexes = collect(DB::select("SHOW INDEX FROM {$tableName} WHERE Key_name = ?", [$indexName]));
-            return $indexes->isNotEmpty();
-        } catch (\Exception $e) {
-            // Fallback for drivers that don't support SHOW INDEX or if table doesn't exist yet
-            return false;
-        }
+        return Schema::hasIndex($tableName, $indexName);
     }
 
     /**

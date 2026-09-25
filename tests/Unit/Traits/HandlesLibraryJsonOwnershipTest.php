@@ -13,6 +13,7 @@ class HandlesLibraryJsonOwnershipTest extends TestCase
     public function setFileOwnershipSetsGroupToAudioAndMakesItGroupWritable(): void
     {
         $audioGid = $this->audioGroupIdOrSkip();
+        config(['filesystems.book_file_group' => 'audio']);
 
         $path = sys_get_temp_dir() . '/ownership_test_' . uniqid() . '.txt';
         touch($path);
@@ -34,6 +35,7 @@ class HandlesLibraryJsonOwnershipTest extends TestCase
     public function setDirectoryOwnershipSetsGroupToAudioAndMakesItGroupWritable(): void
     {
         $audioGid = $this->audioGroupIdOrSkip();
+        config(['filesystems.book_file_group' => 'audio']);
 
         $dir = sys_get_temp_dir() . '/ownership_test_dir_' . uniqid();
         mkdir($dir, 0700);

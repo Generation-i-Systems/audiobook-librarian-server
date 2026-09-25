@@ -67,7 +67,7 @@ class WorkflowMessagingService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService createJob failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService createJob failed: ' . $e->getMessage());
 
             return false;
         }
@@ -86,7 +86,7 @@ class WorkflowMessagingService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteJob failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteJob failed: ' . $e->getMessage());
 
             return false;
         }
@@ -131,7 +131,7 @@ class WorkflowMessagingService
 
             return (string) $message->id;
         } catch (\Exception $e) {
-            Log::error('MySqlService createMessage failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService createMessage failed: ' . $e->getMessage());
 
             return null;
         }
@@ -150,7 +150,7 @@ class WorkflowMessagingService
 
             return $message->save();
         } catch (\Exception $e) {
-            Log::error('MySqlService acknowledgeMessage failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService acknowledgeMessage failed: ' . $e->getMessage());
 
             return false;
         }
@@ -167,7 +167,7 @@ class WorkflowMessagingService
                 'updated_at' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('MySqlService createFollow failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService createFollow failed: ' . $e->getMessage());
 
             return false;
         }
@@ -182,7 +182,7 @@ class WorkflowMessagingService
                 ->where('followable_id', $followableId)
                 ->delete() > 0;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteFollow failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteFollow failed: ' . $e->getMessage());
 
             return false;
         }

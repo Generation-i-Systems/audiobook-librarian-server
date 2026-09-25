@@ -265,7 +265,7 @@ class ShowBookInfo extends Command
 
     protected function showBookFromDirectory(string $directory): void
     {
-        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', storage_path('app/books'));
         // Resolve symlinks in book root for consistent path handling
         $bookRoot = realpath($bookRoot) ?: $bookRoot;
         $searchPath = $directory;
@@ -377,7 +377,7 @@ class ShowBookInfo extends Command
         if ($book->coverImage) {
             $coverPath = $book->coverImage;
             if (!str_starts_with($coverPath, 'http')) {
-                $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', storage_path('app/books'));
                 // Resolve symlinks in book root for consistent path handling
                 $bookRoot = realpath($bookRoot) ?: $bookRoot;
 
@@ -554,7 +554,7 @@ class ShowBookInfo extends Command
         $directoryPath = $book->directoryPath ?? 'N/A';
 
         // Check if directory exists on disk
-        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', storage_path('app/books'));
         // Resolve symlinks in book root for consistent path handling
         $bookRoot = realpath($bookRoot) ?: $bookRoot;
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
@@ -791,7 +791,7 @@ class ShowBookInfo extends Command
         if ($book->coverImage) {
             $coverPath = $book->coverImage;
             if (!str_starts_with($coverPath, 'http')) {
-                $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', storage_path('app/books'));
                 // Resolve symlinks in book root for consistent path handling
                 $bookRoot = realpath($bookRoot) ?: $bookRoot;
 
@@ -859,7 +859,7 @@ class ShowBookInfo extends Command
 
         // Check if directory exists on disk
         $directoryPath = $book->directoryPath ?? 'N/A';
-        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', storage_path('app/books'));
         // Resolve symlinks in book root for consistent path handling
         $bookRoot = realpath($bookRoot) ?: $bookRoot;
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
@@ -1071,7 +1071,7 @@ class ShowBookInfo extends Command
     protected function updateBookFields(Book $book, ?string $directory): void
     {
         $updated = false;
-        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root', storage_path('app/books'));
         // Resolve symlinks in book root for consistent path handling
         $bookRoot = realpath($bookRoot) ?: $bookRoot;
 
@@ -1479,7 +1479,7 @@ class ShowBookInfo extends Command
             return Command::FAILURE;
         }
 
-        $bookRoot = realpath(config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books')) ?: config('filesystems.disks.books.root');
+        $bookRoot = realpath(config('filesystems.disks.books.root') ?? config('app.book_root', storage_path('app/books'))) ?: config('filesystems.disks.books.root');
 
         // Resolve each argument (ID or directory path) to a Book
         $books = collect();
@@ -1501,9 +1501,7 @@ class ShowBookInfo extends Command
                 return Command::FAILURE;
             }
 
-            $searchPath = str_starts_with($realDir, $bookRoot)
-                ? ltrim(substr($realDir, strlen($bookRoot)), '/')
-                : $realDir;
+            $searchPath = str_starts_with($realDir, $bookRoot) ? ltrim(substr($realDir, strlen($bookRoot)), '/') : $realDir;
 
             /** @var Book|null $book */
             $book = $this->queryBook()->where('directory_path', $searchPath)->first();
@@ -1791,7 +1789,7 @@ class ShowBookInfo extends Command
      */
     protected function handleDelete(string $deleteInput): int
     {
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = config('app.book_root', storage_path('app/books'));
         $bookRoot = realpath($bookRoot) ?: $bookRoot;
 
         $items = array_map('trim', explode(',', $deleteInput));

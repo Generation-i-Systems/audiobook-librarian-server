@@ -17,7 +17,7 @@ class TokenMaintenanceService
 
             return (string) $id;
         } catch (\Exception $e) {
-            Log::error('MySqlService createApiToken failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService createApiToken failed: ' . $e->getMessage());
 
             return null;
         }
@@ -30,7 +30,7 @@ class TokenMaintenanceService
 
             return $row ? (array) $row : null;
         } catch (\Exception $e) {
-            Log::error('MySqlService getApiTokenByValue failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getApiTokenByValue failed: ' . $e->getMessage());
 
             return null;
         }
@@ -45,7 +45,7 @@ class TokenMaintenanceService
 
             return $deleted > 0;
         } catch (\Exception $e) {
-            Log::error('MySqlService deleteApiTokenByValue failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService deleteApiTokenByValue failed: ' . $e->getMessage());
 
             return false;
         }

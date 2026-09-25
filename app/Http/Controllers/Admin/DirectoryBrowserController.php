@@ -12,7 +12,7 @@ class DirectoryBrowserController extends Controller
 {
     public function browse(Request $request)
     {
-        $basePath = (string) config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $basePath = (string) config('app.book_root', storage_path('app/books'));
 
         if (!$basePath) {
             Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');

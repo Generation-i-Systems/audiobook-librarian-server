@@ -301,7 +301,7 @@ class AIQueryController extends Controller
 
         // Delete all queries after this one in the conversation
         ControllerDatabase::table('ai_queries')
-            ->whereRaw("JSON_EXTRACT(results, '$.parent_query_id') = ?", [$conversationId])
+            ->where('results->parent_query_id', $conversationId)
             ->where('id', '>', $queryId)
             ->delete();
 

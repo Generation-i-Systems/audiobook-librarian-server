@@ -33,7 +33,7 @@ class ImageProxyController extends Controller
      */
     public function show(Request $request)
     {
-        $storagePath = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $storagePath = rtrim((string) config('app.book_root', storage_path('app/books')), '/');
 
         $dir = $request->query('dir') ?? '.';
         $file = $request->query('file');
@@ -78,7 +78,7 @@ class ImageProxyController extends Controller
         // Decode the path to handle both old (encoded) and new (non-encoded) styles
         $decodedPath = rawurldecode($path);
 
-        $storagePath = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $storagePath = rtrim((string) config('app.book_root', storage_path('app/books')), '/');
         $fullPath = rtrim($storagePath, '/') . '/' . ltrim($decodedPath, '/');
 
         // If not found with decoded path, try the original path (for non-encoded URLs)

@@ -29,7 +29,7 @@ class ValidateBookDirectoriesCommand extends Command
     public function handle()
     {
         $force = $this->option('force');
-        $storageRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $storageRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
 
         $this->info('Validating book directories...');
 

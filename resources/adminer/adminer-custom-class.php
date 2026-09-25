@@ -30,10 +30,11 @@ class AdminerCustom extends Adminer
      */
     public function credentials()
     {
+        $config = \app(\App\Services\AdminerConnectionConfig::class)->get();
         return [
-            \config('database.connections.mysql.host'),
-            \config('database.connections.mysql.username'),
-            \config('database.connections.mysql.password')
+            $config['server'],
+            $config['username'],
+            $config['password'],
         ];
     }
 
@@ -42,7 +43,7 @@ class AdminerCustom extends Adminer
      */
     public function database()
     {
-        return \config('database.connections.mysql.database');
+        return \app(\App\Services\AdminerConnectionConfig::class)->get()['database'];
     }
 
     /**

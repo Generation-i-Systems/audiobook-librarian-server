@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Book;
@@ -490,7 +492,7 @@ Response:
     "explanation": "This will list all authors that don't have any books associated with them"
 }
 
-CRITICAL FOR BOOK LISTS: When listing books, ALWAYS include these JOINs and GROUP_CONCAT to populate authors, genres, and series:
+CRITICAL FOR BOOK LISTS: When listing books, include these JOINs and driver-supported aggregation to populate authors, genres, and series:
 - LEFT JOIN author_book ab ON b.id = ab.book_id LEFT JOIN authors a ON ab.author_id = a.id
 - LEFT JOIN book_genre bg ON b.id = bg.book_id LEFT JOIN genres g ON bg.genre_id = g.id
 - LEFT JOIN book_series bs ON b.id = bs.book_id LEFT JOIN series s ON bs.series_id = s.id
@@ -576,7 +578,26 @@ PROMPT;
 
 
 
-        return $prompt;
+        $driver = DB::connection()->getDriverName();
+        $replacements = match ($driver) {
+            'pgsql' => [
+                "GROUP_CONCAT(DISTINCT CONCAT(s.name, ' #', bs.series_number))" => "STRING_AGG(DISTINCT CONCAT(s.name, ' #', bs.series_number), ',')",
+                'GROUP_CONCAT(DISTINCT g.name)' => "STRING_AGG(DISTINCT g.name, ',')",
+                'GROUP_CONCAT(DISTINCT a.name)' => "STRING_AGG(DISTINCT a.name, ',')",
+            ],
+            'sqlsrv' => [
+                "GROUP_CONCAT(DISTINCT CONCAT(s.name, ' #', bs.series_number))" => "STRING_AGG(CONCAT(s.name, ' #', bs.series_number), ',')",
+                'GROUP_CONCAT(DISTINCT g.name)' => "STRING_AGG(g.name, ',')",
+                'GROUP_CONCAT(DISTINCT a.name)' => "STRING_AGG(a.name, ',')",
+            ],
+            'sqlite' => [
+                "CONCAT(s.name, ' #', bs.series_number)" => "(s.name || ' #' || bs.series_number)",
+            ],
+            default => [],
+        };
+
+        return "SQL dialect: {$driver}. Generate SQL valid for this database driver.\n\n"
+            . str_replace(array_keys($replacements), array_values($replacements), $prompt);
     }
 
     protected function getSchemaContext(): string
@@ -603,7 +624,7 @@ Key Relationships:
 - Books have directory_path which stores the file system location
 
 File Structure:
-- Books are stored in: /storage/books/{genre}/{author}/{title}/
+- Books are stored on the configured books disk under {genre}/{author}/{title}/
 - directory_path typically follows pattern: {genre}/{author}/{title}
 
 CRITICAL: Always use author_book (not book_author) for the authors pivot table!

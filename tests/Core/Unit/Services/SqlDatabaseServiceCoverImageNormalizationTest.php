@@ -8,18 +8,18 @@ use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class MySqlServiceCoverImageNormalizationTest extends TestCase
+class SqlDatabaseServiceCoverImageNormalizationTest extends TestCase
 {
     use RefreshDatabase;
 
     #[\PHPUnit\Framework\Attributes\Test]
     public function createBookNormalizesCoverImageToBasename(): void
     {
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $book = $service->createBook([
             'title' => 'Test Book',
@@ -37,7 +37,7 @@ class MySqlServiceCoverImageNormalizationTest extends TestCase
             'cover_image' => 'cover_old.jpg',
         ]);
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $service->updateBook((string) $book->id, [
             'coverImage' => 'https://example.com/images/cover_googlebooks_456.png',
@@ -59,7 +59,7 @@ class MySqlServiceCoverImageNormalizationTest extends TestCase
         $narrator = Narrator::query()->create(['name' => 'Real Narrator']);
         $genre = Genre::query()->create(['name' => 'Real Genre']);
 
-        $service = new MySqlService();
+        $service = new SqlDatabaseService();
 
         $service->updateBook((string) $book->id, [
             'authors' => [(string) $author->id],

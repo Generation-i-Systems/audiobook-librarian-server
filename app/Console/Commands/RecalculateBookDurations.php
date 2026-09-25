@@ -29,7 +29,7 @@ class RecalculateBookDurations extends Command
     public function handle(): int
     {
         $dryRun = (bool) $this->option('dry-run');
-        $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim((string) config('app.book_root', storage_path('app/books')), '/');
 
         if ($dryRun) {
             $this->warn('DRY RUN — no changes will be saved');

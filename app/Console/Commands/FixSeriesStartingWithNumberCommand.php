@@ -41,7 +41,11 @@ class FixSeriesStartingWithNumberCommand extends Command
 
         // Find all series that start with a number
         $this->info('Finding series that start with a number...');
-        $seriesWithNumberPrefix = Series::whereRaw('name REGEXP \'^[0-9]\'')->get();
+        $seriesWithNumberPrefix = Series::where(function ($query): void {
+            foreach (range(0, 9) as $digit) {
+                $query->orWhere('name', 'like', $digit . '%');
+            }
+        })->get();
 
         if ($seriesWithNumberPrefix->isEmpty()) {
             $this->info('No series found that start with a number.');

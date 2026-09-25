@@ -5,13 +5,19 @@ cd /var/www/html
 
 # ---------------------------------------------------------------------------
 # APP_KEY: generate one on first boot if missing so the container is usable
-# out of the box. Persist it via a mounted .env or APP_KEY env var to keep
-# encrypted data (sessions, cookies) stable across restarts.
+# out of the box. Keep the generated key on the persistent storage volume so
+# encrypted data remains readable across container restarts.
 # ---------------------------------------------------------------------------
 if [ -z "${APP_KEY:-}" ]; then
-    echo "[entrypoint] APP_KEY not set, generating one for this container run..."
+    key_file="/var/www/html/storage/app/.app-key"
+    mkdir -p "$(dirname "$key_file")"
+    if [ ! -s "$key_file" ]; then
+        echo "[entrypoint] APP_KEY not set, generating one in persistent storage..."
+        umask 077
+        php artisan key:generate --show > "$key_file"
+    fi
+    APP_KEY=$(cat "$key_file")
     export APP_KEY
-    APP_KEY=$(php artisan key:generate --show)
 fi
 
 # ---------------------------------------------------------------------------
@@ -25,7 +31,7 @@ if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
         echo "[entrypoint] Creating SQLite database at $DB_DATABASE"
         touch "$DB_DATABASE"
     fi
-    chown www-data:www-data "$DB_DATABASE" 2>/dev/null || true
+    chown www-data:www-data "$(dirname "$DB_DATABASE")" "$DB_DATABASE" 2>/dev/null || true
 fi
 
 # ---------------------------------------------------------------------------
@@ -35,7 +41,7 @@ fi
 if [ "${DB_CONNECTION:-sqlite}" = "mysql" ]; then
     echo "[entrypoint] Waiting for MySQL at ${DB_HOST:-mysql}:${DB_PORT:-3306}..."
     for _ in $(seq 1 30); do
-        if mysqladmin ping -h "${DB_HOST:-mysql}" -P "${DB_PORT:-3306}" \
+        if mysqladmin --skip-ssl ping -h "${DB_HOST:-mysql}" -P "${DB_PORT:-3306}" \
             -u "${DB_USERNAME:-root}" --password="${DB_PASSWORD:-}" --silent 2>/dev/null; then
             break
         fi

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit\Services;
 
 use App\Models\Book;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class MySqlServiceSearchByIdTest extends TestCase
+class SqlDatabaseServiceSearchByIdTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -20,7 +20,7 @@ class MySqlServiceSearchByIdTest extends TestCase
         $target = Book::factory()->create(['title' => 'Unrelated Title One']);
         Book::factory()->create(['title' => 'Unrelated Title Two']);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(1, 20, ['search' => (string) $target->id]);
 
@@ -36,7 +36,7 @@ class MySqlServiceSearchByIdTest extends TestCase
         $target = Book::factory()->create(['title' => 'Findable Book']);
         Book::factory()->create(['title' => 'Other Book']);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(1, 20, ['book_id' => $target->id]);
 
@@ -51,7 +51,7 @@ class MySqlServiceSearchByIdTest extends TestCase
         $series = \App\Models\Series::factory()->create(['name' => 'Some Series']);
         $target->series()->attach($series->id, ['series_number' => '1']);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         // "id" is ambiguous once book_series/series are joined for sorting unless
         // the search filter's id match is qualified as books.id.
@@ -68,7 +68,7 @@ class MySqlServiceSearchByIdTest extends TestCase
         $series = \App\Models\Series::factory()->create(['name' => 'Some Series']);
         $target->series()->attach($series->id, ['series_number' => '1']);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(1, 20, ['book_id' => $target->id], true, 'series', 'asc');
 

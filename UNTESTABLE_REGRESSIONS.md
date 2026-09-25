@@ -18,6 +18,8 @@ cannot be verified by the test suite — only by live calls.
 | Service | Files | What breaks silently |
 |---------|-------|----------------------|
 | **Anthropic Claude API** | `app/Services/AI/Providers/ClaudeProvider.php` | Prompt format, schema-mode output, token cost calculations. `describeImage()`/`callAPIWithImage()` (used by `EmbedBookJob` to caption book covers for the recommendation embedding pipeline) sends a vision-content-block request whose exact accepted shape (base64 image + text block ordering, media_type values) can only be confirmed against the real Anthropic API. |
+| **AI tool filesystem prompt** | `app/Services/AI/AIToolService.php` | Tests confirm the configured book path appears in the prompt, but only a real model response can show whether the model uses that path correctly for tool calls. |
+| **AI-generated SQL dialect** | `app/Services/AIQueryService.php` | Tests inspect SQLite, PostgreSQL, and SQL Server example syntax, but only real model responses and database executions can show whether generated queries follow the configured SQL driver. |
 | **OpenAI Whisper (transcription)** | `app/Services/AI/Providers/OpenAIProvider.php` `transcribe()` | Requires real audio; mock cannot verify transcription accuracy |
 | **OpenAI Chat / GPT** | `app/Services/AI/Providers/OpenAIProvider.php` | Structured JSON schema responses. `describeImage()`/`callAPIWithImage()` sends a Chat Completions vision request (`image_url` with a `data:` URI) whose real-API acceptance can't be proven by mocks. |
 | **Google Gemini** | `app/Services/AI/Providers/GeminiProvider.php` | Any model-response format changes. `describeImage()`/`callAPIWithImage()` sends `inline_data` with a real cover image's bytes; only a mocked HTTP response is exercised by tests, not the real Gemini vision endpoint's actual acceptance/limits (e.g. max image size). |
@@ -197,6 +199,10 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
 These features require a live browser with DOM and event-loop; Jest tests cover logic but not
 rendering or real user interactions.
 
+- **Adminer SQL driver login** (`app/Http/Controllers/Admin/AdminerController.php`,
+  `resources/adminer/adminer-custom-class.php`) — connection defaults can be unit tested, but
+  the embedded Adminer login and database browsing require a live browser and database for each
+  driver.
 - **Cover image selection UI** (`resources/js/admin/books/form-cover.js`) —
   `ensureCoverImageSelected()`, radio button handlers, `syncCornerPreview()`.
 - **Import file browser** (`resources/js/admin/books/import_file.js`) — AJAX directory tree,
@@ -359,6 +365,15 @@ feature tests without running a real queue worker.
 
 ## 12. Docker / Container Deployment
 
+- **Configured SQL backup and restore** (`DatabaseBackupWriter`, `backup:database`) — an
+  isolated SQLite snapshot test and container smoke checks exercise SQLite, MySQL, and PostgreSQL
+  backup creation. They cannot prove that a populated production database can be restored from
+  the resulting file or that a host's custom backup directory has the right permissions.
+- **Nullable book-status key migration** (`database/migrations/2026_01_30_223000_support_non_library_books_and_enhanced_messages.php`)
+  — fresh disposable PostgreSQL/MySQL installs verify the unique user/book constraint, but do
+  not exercise an existing populated installation. Back up and review that schema before applying
+  pending migrations to a live database.
+
 The `Dockerfile`, `docker-compose*.yml`, and `docker/entrypoint.sh` orchestrate image build,
 first-boot bootstrap (APP_KEY generation, SQLite file creation or MySQL/PostgreSQL
 readiness wait, `migrate --force`, `storage:link`, config/route/view caching), and
@@ -369,9 +384,8 @@ about whether the image actually builds, boots, serves traffic, or persists data
 - **`docker/entrypoint.sh`** — first-boot logic (SQLite creation, external DB wait loop,
   migrations, caching) only runs when a container starts; a broken condition here silently
   produces a container that never becomes healthy, or worse, runs with a stale/empty schema.
-- **`docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays** — switching database
-  backends via compose overlay is untested; a typo in the overlay's `environment:` block
-  fails silently until the app tries to query the database.
+- **`docker-compose.mysql.yml` / `docker-compose.pgsql.yml` overlays** — CI checks fresh
+  installs, but cannot verify an existing deployment's volumes, credentials, or network.
 - **Volume/bind-mount book storage** (`HOST_BOOK_STORAGE_PATH`, `HOST_DELETED_BOOKS_PATH`)
   — see section 4; inside a container, a wrong host path or permission mismatch on the
   bind mount is invisible until `checkStorageVolumes()` or an import job hits it.

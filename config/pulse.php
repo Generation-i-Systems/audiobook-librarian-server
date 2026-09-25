@@ -43,7 +43,7 @@ return [
     |
     */
 
-    'enabled' => env('PULSE_ENABLED', true),
+    'enabled' => env('PULSE_ENABLED', in_array(env('DB_CONNECTION', 'sqlite'), ['sqlite', 'mysql', 'mariadb', 'pgsql'], true)),
 
     /*
     |--------------------------------------------------------------------------

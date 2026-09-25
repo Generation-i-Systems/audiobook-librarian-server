@@ -10,10 +10,10 @@ echo "Setting up cron job for Laravel scheduler..."
 echo "Project directory: $PROJECT_DIR"
 
 # Create the cron entry
-CRON_ENTRY="* * * * * cd $PROJECT_DIR && php artisan schedule:run >> /dev/null 2>&1"
+CRON_ENTRY="* * * * * cd \"$PROJECT_DIR\" && php artisan schedule:run >> /dev/null 2>&1"
 
 # Check if cron entry already exists
-if crontab -l 2>/dev/null | grep -q "php artisan schedule:run"; then
+if crontab -l 2>/dev/null | grep -Fqx "$CRON_ENTRY"; then
     echo "Laravel scheduler cron job already exists."
 else
     # Add the cron entry
@@ -21,11 +21,11 @@ else
     echo "✓ Laravel scheduler cron job added successfully."
     echo "The scheduler will run every minute and check for scheduled tasks."
     echo ""
-    echo "Scheduled backup times:"
+    echo "Scheduled backup times for SQLite, MySQL/MariaDB, or PostgreSQL:"
     echo "  - Daily backup: 2:00 AM"
     echo "  - Weekly backup: Sunday 3:00 AM"
     echo ""
-    echo "Backup location: /var/lib/mysql/laravel_backup/"
+    echo "Backup location: DATABASE_BACKUP_PATH from .env (default: $PROJECT_DIR/storage/app/backups)"
     echo "Backup logs: $PROJECT_DIR/storage/logs/backup-cron.log"
 fi
 

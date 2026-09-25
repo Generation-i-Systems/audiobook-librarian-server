@@ -922,25 +922,35 @@ class StatisticsController extends Controller
             }
         }
 
-        $groupBy = match ($period) {
-            'week'  => 'listening_date',
-            'year'  => 'YEAR(listening_date), MONTH(listening_date)',
-            default => 'listening_date', // month
-        };
+        $query = ListeningStatistic::where('device_id', $validated['device_id'])
+            ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()]);
 
-        $stats = ListeningStatistic::where('device_id', $validated['device_id'])
-            ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
-            ->selectRaw("
+        if ($period === 'year') {
+            $stats = $query->orderBy('listening_date')
+                ->get(['listening_date', 'book_id', 'seconds_listened'])
+                ->groupBy(fn (ListeningStatistic $stat): string => $stat->listening_date->format('Y-m'))
+                ->map(static function ($sessions, string $month): object {
+                    return (object) [
+                        'listening_date' => $month . '-01',
+                        'total_seconds' => $sessions->sum('seconds_listened'),
+                        'books_listened' => $sessions->pluck('book_id')->filter()->unique()->count(),
+                        'session_count' => $sessions->count(),
+                        'avg_session_duration' => $sessions->avg('seconds_listened') ?? 0,
+                    ];
+                })->values();
+        } else {
+            $stats = $query->selectRaw("
                 listening_date,
                 SUM(seconds_listened) as total_seconds,
                 COUNT(DISTINCT book_id) as books_listened,
                 COUNT(*) as session_count,
                 AVG(seconds_listened) as avg_session_duration
             ")
-            ->groupByRaw($groupBy)
-            ->orderBy('listening_date')
-            ->toBase()
-            ->get();
+                ->groupBy('listening_date')
+                ->orderBy('listening_date')
+                ->toBase()
+                ->get();
+        }
 
         $totalSeconds = $stats->sum('total_seconds');
         $totalBooks   = ListeningStatistic::where('device_id', $validated['device_id'])

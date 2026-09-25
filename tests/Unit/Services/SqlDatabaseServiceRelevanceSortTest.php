@@ -7,12 +7,12 @@ namespace Tests\Unit\Services;
 use App\Models\Book;
 use App\Models\BookTag;
 use App\Models\User;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class MySqlServiceRelevanceSortTest extends TestCase
+class SqlDatabaseServiceRelevanceSortTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -23,7 +23,7 @@ class MySqlServiceRelevanceSortTest extends TestCase
         $b = Book::factory()->create(['title' => 'Beta']);
         Book::factory()->create(['title' => 'Gamma']);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(1, 20, ['book_ids' => [$a->id, $b->id]]);
 
@@ -43,7 +43,7 @@ class MySqlServiceRelevanceSortTest extends TestCase
         $third = Book::factory()->create(['title' => 'Mid']);
         Book::factory()->create(['title' => 'AAA Distractor Not In Candidate List']);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(
             1,
@@ -64,7 +64,7 @@ class MySqlServiceRelevanceSortTest extends TestCase
         Book::factory()->create(['title' => 'Zed']);
         Book::factory()->create(['title' => 'Alpha']);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(1, 20, [], true, 'relevance');
 
@@ -86,7 +86,7 @@ class MySqlServiceRelevanceSortTest extends TestCase
             'tags' => ['funny'],
         ]);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(1, 20, [
             'book_ids' => [$tagged->id, $untagged->id],
@@ -118,7 +118,7 @@ class MySqlServiceRelevanceSortTest extends TestCase
             'mode' => 'ban',
         ]);
 
-        $service = app(MySqlService::class);
+        $service = app(SqlDatabaseService::class);
 
         $result = $service->listBooks(
             1,

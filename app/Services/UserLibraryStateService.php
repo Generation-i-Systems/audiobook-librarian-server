@@ -24,7 +24,7 @@ class UserLibraryStateService
 
             return $user->queuedBooks()->with(['authors', 'narrators', 'genres', 'series'])->get()->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService getBookQueue failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService getBookQueue failed: ' . $e->getMessage());
 
             return [];
         }
@@ -60,7 +60,7 @@ class UserLibraryStateService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService addBookToQueue failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService addBookToQueue failed: ' . $e->getMessage());
 
             return false;
         }
@@ -88,7 +88,7 @@ class UserLibraryStateService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService removeBookFromQueue failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService removeBookFromQueue failed: ' . $e->getMessage());
 
             return false;
         }
@@ -134,7 +134,7 @@ class UserLibraryStateService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('MySqlService updateBookQueue failed: ' . $e->getMessage());
+            Log::error('SqlDatabaseService updateBookQueue failed: ' . $e->getMessage());
 
             return false;
         }

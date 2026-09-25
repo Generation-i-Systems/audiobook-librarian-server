@@ -12387,7 +12387,7 @@
             "get": {
                 "tags": ["Statistics"],
                 "summary": "Get listening trends",
-                "description": "Returns listening trends over time.",
+                "description": "Returns listening trends over time. For period=year, trends are grouped by month and each date is the first day of that month; week and month periods return daily trends.",
                 "responses": {
                     "200": {
                         "description": "Successful response",

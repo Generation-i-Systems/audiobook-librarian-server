@@ -14,7 +14,7 @@ class FixDuplicatedTitleDirectories extends Command
 
     public function handle(): int
     {
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
         $apply = (bool) $this->option('apply');
 
         $this->info('Scanning for duplicated title directories (pattern: .../Title/Title)');

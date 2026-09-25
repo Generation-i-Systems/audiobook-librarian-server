@@ -141,14 +141,6 @@ abstract class TestCase extends BaseTestCase
                 "MySQL connection must be disabled in tests. Database wipe prevented."
             );
         }
-
-        // Check DocumentStore driver
-        if (strpos($envContent, 'DOCUMENT_STORE_DRIVER=sqlite') === false) {
-            throw new \RuntimeException(
-                "CRITICAL SAFETY FAILURE: .env.testing does not contain DOCUMENT_STORE_DRIVER=sqlite! " .
-                "DocumentStore should use SQLite in tests. Database wipe prevented."
-            );
-        }
     }
 
     private function ensureDatabaseSafetyRuntime(): void

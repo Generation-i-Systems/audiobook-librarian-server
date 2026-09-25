@@ -6,11 +6,11 @@ namespace Tests\Unit\Services;
 
 use App\Models\Author;
 use App\Models\Book;
-use App\Services\MySqlService;
+use App\Services\SqlDatabaseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class MySqlServiceAuthorStatsTest extends TestCase
+class SqlDatabaseServiceAuthorStatsTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -23,7 +23,7 @@ class MySqlServiceAuthorStatsTest extends TestCase
         ]);
         $book->authors()->attach($author);
 
-        $authors = app(MySqlService::class)->paginateAuthorsWithStats(search: $author->name);
+        $authors = app(SqlDatabaseService::class)->paginateAuthorsWithStats(search: $author->name);
 
         $this->assertSame(1, $authors->total());
         $this->assertSame(1, (int) $authors->first()->book_count);

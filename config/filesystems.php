@@ -14,6 +14,8 @@ return [
     */
 
     'default' => env('FILESYSTEM_DISK', 'local'),
+    'book_file_owner' => env('BOOK_FILE_OWNER'),
+    'book_file_group' => env('BOOK_FILE_GROUP'),
 
     /*
     |--------------------------------------------------------------------------
@@ -49,7 +51,7 @@ return [
 
         'books' => [
             'driver' => 'local',
-            'root' => env('BOOK_STORAGE_PATH'),
+            'root' => env('BOOK_STORAGE_PATH', storage_path('app/books')),
             'throw' => false,
             'report' => false,
         ],

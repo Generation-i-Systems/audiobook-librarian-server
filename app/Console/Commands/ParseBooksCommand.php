@@ -45,7 +45,7 @@ class ParseBooksCommand extends Command
     public function handle(BookDirectoryParser $parser, DocumentStoreServiceInterface $documentStoreService)
     {
         $paths = $this->argument('paths');
-        $bookStoragePath = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookStoragePath = rtrim((string) config('app.book_root', storage_path('app/books')), '/');
         $expandedPaths = [];
         foreach ($paths as $path) {
             // Absolute path that exists directly
@@ -148,7 +148,7 @@ class ParseBooksCommand extends Command
                 // Set dateAdded for each book from directory mtime or authoritative time
                 foreach ($books as &$book) {
                     $dirPath = $book['directoryPath'] ?? $book['path'] ?? null;
-                    $storageRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+                    $storageRoot = rtrim((string) config('app.book_root', storage_path('app/books')), '/');
                     if ($dirPath && strpos($dirPath, '/') !== 0) {
                         $fullPath = $storageRoot . '/' . ltrim($dirPath, '/');
                     } else {

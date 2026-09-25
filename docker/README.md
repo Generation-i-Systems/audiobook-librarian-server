@@ -89,9 +89,8 @@ in `.env.docker` if you need multiple libraries served from one instance.
 
 `docker/entrypoint.sh` (see that file for the exact logic):
 
-1. Generates `APP_KEY` if one isn't set (ephemeral unless you pin `APP_KEY`
-   in `.env.docker` — pin it if you care about session/cookie stability
-   across restarts).
+1. Generates `APP_KEY` if one isn't set and stores it on the persistent
+   `app-storage` volume. You can also set `APP_KEY` in `.env.docker`.
 2. Creates the SQLite file if it doesn't exist yet (SQLite mode only), or
    waits for MySQL/PostgreSQL to accept connections (external DB modes).
 3. Runs `php artisan migrate --force`. **This only applies pending

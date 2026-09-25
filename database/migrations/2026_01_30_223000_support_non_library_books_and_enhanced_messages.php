@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -29,6 +31,15 @@ return new class () extends Migration {
         });
 
         // 4. Update user_book_status
+        // book_id must become nullable for external books, so it cannot remain
+        // part of the primary key. Preserve uniqueness for library-book pairs.
+        if (in_array(Schema::getConnection()->getDriverName(), ['pgsql', 'mysql', 'mariadb', 'sqlsrv'], true)) {
+            Schema::table('user_book_status', function (Blueprint $table) {
+                $table->dropPrimary();
+                $table->unique(['user_id', 'book_id'], 'user_book_status_user_book_unique');
+            });
+        }
+
         Schema::table('user_book_status', function (Blueprint $table) {
             $table->unsignedBigInteger('book_id')->nullable()->change();
             $table->string('title')->nullable()->after('book_id');
