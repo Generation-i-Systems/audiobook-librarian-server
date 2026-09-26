@@ -48,13 +48,15 @@ class UserControllerOtpTest extends TestCase
             'user_id' => $target->id,
             'tag' => 'existing-required',
             'mode' => UserTagFilter::MODE_REQUIRE,
-            'locked_by_admin' => true,
+            'scope' => UserTagFilter::SCOPE_SYSTEM,
+            'owner_key' => 'account:' . $target->id,
         ]);
         UserTagFilter::create([
             'user_id' => $target->id,
             'tag' => 'personal-tag',
             'mode' => UserTagFilter::MODE_BAN,
-            'locked_by_admin' => false,
+            'scope' => UserTagFilter::SCOPE_USER,
+            'owner_key' => 'user:' . $target->id,
         ]);
 
         $this->get('/admin/users/' . $target->id . '/edit')
@@ -77,13 +79,15 @@ class UserControllerOtpTest extends TestCase
             'user_id' => $target->id,
             'tag' => 'cozy',
             'mode' => UserTagFilter::MODE_REQUIRE,
-            'locked_by_admin' => true,
+            'scope' => UserTagFilter::SCOPE_SYSTEM,
+            'owner_key' => 'account:' . $target->id,
         ]);
         $this->assertDatabaseHas('user_tag_filters', [
             'user_id' => $target->id,
             'tag' => 'gore',
             'mode' => UserTagFilter::MODE_BAN,
-            'locked_by_admin' => true,
+            'scope' => UserTagFilter::SCOPE_SYSTEM,
+            'owner_key' => 'account:' . $target->id,
         ]);
         $this->assertDatabaseMissing('user_tag_filters', [
             'user_id' => $target->id,
@@ -93,7 +97,8 @@ class UserControllerOtpTest extends TestCase
             'user_id' => $target->id,
             'tag' => 'personal-tag',
             'mode' => UserTagFilter::MODE_BAN,
-            'locked_by_admin' => false,
+            'scope' => UserTagFilter::SCOPE_USER,
+            'owner_key' => 'user:' . $target->id,
         ]);
     }
 

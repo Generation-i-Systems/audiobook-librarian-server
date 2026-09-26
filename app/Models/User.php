@@ -95,6 +95,8 @@ class User extends Authenticatable implements Permissible
         'facebook_id',
         'apple_id',
         'must_change_password',
+        'parent_user_id',
+        'is_filter_manager',
     ];
 
     /**
@@ -118,6 +120,7 @@ class User extends Authenticatable implements Permissible
         'deletion_scheduled_for' => 'datetime',
         'book_list_preferences' => 'array',
         'password' => 'hashed',
+        'is_filter_manager' => 'boolean',
     ];
 
     public function getIsAdminAttribute(): bool
@@ -130,6 +133,42 @@ class User extends Authenticatable implements Permissible
         $role = $this->role ?? 'user';
 
         return in_array($role, ['admin', 'super-admin'], true);
+    }
+
+    /** The account this user belongs to: their own id, or their parent's id if managed. */
+    public function accountRootId(): int
+    {
+        return $this->parent_user_id ?? $this->id;
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'parent_user_id');
+    }
+
+    /** @return HasMany<User, $this> */
+    public function managedUsers(): HasMany
+    {
+        return $this->hasMany(User::class, 'parent_user_id');
+    }
+
+    /**
+     * Whether this user may edit system (account-wide) tag filters for $target's
+     * account: a full admin, the account's parent, or a member flagged as a
+     * designated filter manager for that same account.
+     */
+    public function canManageSystemFiltersFor(User $target): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if ($this->accountRootId() !== $target->accountRootId()) {
+            return false;
+        }
+
+        return $this->is_filter_manager || $this->managedUsers()->exists();
     }
 
     public function permissions(): BelongsToMany

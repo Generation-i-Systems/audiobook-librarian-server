@@ -1230,9 +1230,15 @@
                     "user_id": {"type": "integer"},
                     "tag": {"type": "string", "example": "mature"},
                     "mode": {"type": "string", "enum": ["require", "ban"]},
-                    "locked_by_admin": {
-                        "type": "boolean",
-                        "description": "If true, only an admin can change or remove this filter"
+                    "scope": {
+                        "type": "string",
+                        "enum": ["user", "system"],
+                        "description": "'user': a personal filter the owner may change or remove at will. 'system': an account-wide filter set by an admin or a designated account manager; ordinary account members cannot change or remove it."
+                    },
+                    "owner_key": {
+                        "type": "string",
+                        "description": "\"user:{userId}\" for scope=user, or \"account:{accountRootId}\" for scope=system — the account's parent user id.",
+                        "example": "account:42"
                     }
                 }
             },
@@ -16046,7 +16052,7 @@
                     "Admin"
                 ],
                 "summary": "Approve a contribution and apply it to the book",
-                "description": "Admin-only. Applies the proposed changes to the book and marks the contribution approved.",
+                "description": "Admin-only. Applies the proposed changes only when the book still matches every submitted original value, then marks the contribution approved. Returns 409 when the book changed after submission so an editor cannot overwrite a newer edit.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -16104,6 +16110,27 @@
                                     "properties": {
                                         "message": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "One or more proposed fields are stale",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "stale_fields": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -16910,7 +16937,8 @@
         "/admin/users/{id}/tag-filters": {
             "get": {
                 "tags": ["Admin", "Discovery"],
-                "summary": "List a user's require/ban tag filters (admin)",
+                "summary": "List a user's account-wide (system) tag filters (admin)",
+                "description": "Returns the system-scope filters for the target user's account (their own account if they have no parent, or the account of the parent they're managed under).",
                 "security": [{"BearerAuth": []}],
                 "parameters": [
                     {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}
@@ -16936,8 +16964,8 @@
             },
             "post": {
                 "tags": ["Admin", "Discovery"],
-                "summary": "Set a locked require/ban tag filter on a user (admin)",
-                "description": "Creates or overwrites the filter for this tag, always as locked_by_admin=true. The owning user cannot change or remove a locked filter themselves.",
+                "summary": "Set a system (account-wide) require/ban tag filter for a user's account (admin)",
+                "description": "Creates or overwrites the filter for this tag as scope=system, applying to every member of the target's account. Ordinary account members cannot change or remove it themselves. See /users/{id}/tag-filters/system for the equivalent endpoint usable by a non-admin account parent or designated filter manager.",
                 "security": [{"BearerAuth": []}],
                 "parameters": [
                     {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}
@@ -16975,7 +17003,7 @@
         "/admin/users/{id}/tag-filters/{filterId}": {
             "delete": {
                 "tags": ["Admin", "Discovery"],
-                "summary": "Remove a (including locked) tag filter from a user (admin)",
+                "summary": "Remove a system tag filter from a user's account (admin)",
                 "security": [{"BearerAuth": []}],
                 "parameters": [
                     {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}},
@@ -16983,6 +17011,90 @@
                 ],
                 "responses": {
                     "200": {"description": "Filter removed"},
+                    "404": {"description": "Filter not found"}
+                }
+            }
+        },
+        "/users/{id}/tag-filters/system": {
+            "get": {
+                "tags": ["Discovery"],
+                "summary": "List a user's account-wide (system) tag filters (account parent or designated manager)",
+                "description": "Usable by a full admin, the account's parent user, or a member the parent flagged as a designated filter manager (User.is_filter_manager). Returns 403 for anyone else.",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/UserTagFilter"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {"description": "Not authorized to manage this account's tag filters"}
+                }
+            },
+            "post": {
+                "tags": ["Discovery"],
+                "summary": "Set a system (account-wide) require/ban tag filter (account parent or designated manager)",
+                "description": "Creates or overwrites the filter for this tag as scope=system, applying to every member of the target's account, regardless of which member's id was used in the path. Only a full admin, the account's parent, or a designated filter manager for that account may call this.",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["tag", "mode"],
+                                "properties": {
+                                    "tag": {"type": "string"},
+                                    "mode": {"type": "string", "enum": ["require", "ban"]}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Filter created/updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"data": {"$ref": "#/components/schemas/UserTagFilter"}}
+                                }
+                            }
+                        }
+                    },
+                    "403": {"description": "Not authorized to manage this account's tag filters"}
+                }
+            }
+        },
+        "/users/{id}/tag-filters/system/{filterId}": {
+            "delete": {
+                "tags": ["Discovery"],
+                "summary": "Remove a system tag filter from an account (account parent or designated manager)",
+                "security": [{"BearerAuth": []}],
+                "parameters": [
+                    {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "filterId", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {"description": "Filter removed"},
+                    "403": {"description": "Not authorized to manage this account's tag filters"},
                     "404": {"description": "Filter not found"}
                 }
             }

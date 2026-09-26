@@ -11,7 +11,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\UserTagFilter;
 use App\Services\UserTagFilterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -100,10 +99,8 @@ class UserController extends Controller
         }
 
         $activityData = $this->documentStoreService->getUserActivityData($id);
-        $adminTagFilters = UserTagFilter::query()
-            ->where('user_id', $id)
-            ->where('locked_by_admin', true)
-            ->get()
+        $adminTagFilters = $this->userTagFilterService
+            ->systemFiltersForAccount(User::findOrFail($id))
             ->groupBy('mode');
 
         $allPermissions = Permission::query()->orderBy('label')->get();
@@ -201,7 +198,8 @@ class UserController extends Controller
         ]);
 
         $this->documentStoreService->updateUser($id, $validated);
-        $this->userTagFilterService->replaceAdminFilters(
+        $this->userTagFilterService->replaceSystemFilters(
+            auth()->user(),
             User::findOrFail($id),
             $requiredTags,
             $ignoredTags,

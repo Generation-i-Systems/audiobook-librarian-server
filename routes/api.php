@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\AdminGroupController;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AdminUserTagFilterController;
+use App\Http\Controllers\Api\AccountTagFilterController;
 use App\Http\Controllers\Api\UserTagFilterController;
 use App\Http\Controllers\Api\EmailOtpController;
 use App\Http\Controllers\Api\PasswordResetController;
@@ -282,6 +283,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/users/me/tag-filters', [UserTagFilterController::class, 'index']);
         Route::post('/users/me/tag-filters', [UserTagFilterController::class, 'store']);
         Route::delete('/users/me/tag-filters/{id}', [UserTagFilterController::class, 'destroy']);
+
+        // Account-wide (system) tag filters — usable by a non-admin account parent or a
+        // designated filter manager for that account (an admin may also use these).
+        Route::get('/users/{id}/tag-filters/system', [AccountTagFilterController::class, 'index']);
+        Route::post('/users/{id}/tag-filters/system', [AccountTagFilterController::class, 'store']);
+        Route::delete('/users/{id}/tag-filters/system/{filterId}', [AccountTagFilterController::class, 'destroy']);
 
         // Book Request Route
         Route::post('/book-requests', [BookRequestApiController::class, 'store']);

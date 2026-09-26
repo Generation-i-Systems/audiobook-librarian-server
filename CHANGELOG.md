@@ -2,10 +2,9 @@
 
 ### Added
 
+- Tag filters now distinguish personal filters from account-wide "system" filters. `user_tag_filters` gained `scope` (`user`|`system`) and `owner_key` (`"user:{userId}"` or `"account:{accountRootId}"`), replacing the old single-user `locked_by_admin` flag. A new lightweight parent/child account model (`users.parent_user_id`, `users.is_filter_manager`) lets a system filter apply to every member of an account. System filters can still be set by a full admin (`Api\AdminUserTagFilterController`, `/admin/users/{id}/tag-filters`), and now also by the account's parent user or a member the parent designated as a filter manager, via a new `Api\AccountTagFilterController` (`GET/POST /users/{id}/tag-filters/system`, `DELETE /users/{id}/tag-filters/system/{filterId}`). Personal filters (`/users/me/tag-filters`) are unchanged for the user themselves.
+
 - Fixed `/books` initial rendering to honor the saved page size and Recent Books view/collapse state, and show an inline error when a display preference cannot be saved.
-- The Books page's Recent Books section now remembers its view type (grid/compact/list) and whether it is collapsed, per user, across reloads and logins.
-- Fixed Books page preferences never being read back: the authenticated user is built from a column whitelist that omitted `book_list_preferences`, so `BookListPreferenceService::get()` now reads the column directly.
-- Fixed Books page preferences overwriting each other: saving one (e.g. per-page) rebuilt the JSON from a stale user instance and dropped the others (view type, sort). `BookListPreferenceService::set()` now re-reads the row under a lock before merging.
 
 - Began SQL-driver portability work: the primary document-store service now follows Laravel's configured SQL connection, obsolete document-store driver configuration is removed, SQLite-safe book and duplicate queries replace MySQL functions, and database backups use a consistent SQLite snapshot or a driver-specific SQL dump. The sample native configuration now defaults to SQLite, and Docker persists its generated application key and includes FFmpeg.
 - Optional Pulse migrations no longer block installation with another Laravel SQL driver. The admin AI query examples now follow the configured SQL dialect, and portability checks cover SQLite, PostgreSQL, MySQL, and cross-platform PHP setup.
@@ -15,8 +14,12 @@
 - Scheduled built-in backups now run only for SQL drivers supported by the backup writer; other drivers can use their native backup scheduler.
 - The optional Linux cron helper now detects this checkout's schedule entry specifically and shows the configured backup location instead of an old MySQL server path.
 
+- The Books page's Recent Books section now remembers its view type (grid/compact/list) and whether it is collapsed, per user, across reloads and logins.
+- Fixed Books page preferences never being read back: the authenticated user is built from a column whitelist that omitted `book_list_preferences`, so `BookListPreferenceService::get()` now reads the column directly.
+- Fixed Books page preferences overwriting each other: saving one (e.g. per-page) rebuilt the JSON from a stale user instance and dropped the others (view type, sort). `BookListPreferenceService::set()` now re-reads the row under a lock before merging.
 - The Books page now remembers each user's view type (grid/compact/list), items per page, and sort order across sessions and devices (new nullable `users.book_list_preferences` JSON column, `BookListPreferenceService`). Fixed the preference endpoint, which previously never saved anything because the page posted `key` while the server read `type`.
 - Submitting a book metadata contribution now emails every admin and super-admin with the proposed changes and the existing approval/rejection API paths.
+- Book metadata contributions now reject unsupported fields and refuse approval when the book changed after the proposal was submitted, preventing stale editorial review from overwriting newer metadata.
 - Added a transactional composite-author normalizer for approved data repair. It preserves active book links for each retained person, soft-deletes the composite source only after verifying those links, and omits editor, translator, contributor, and foreword credits rather than creating author records for them.
 - Fixed the shared Books page replacing a valid initial author/series result with zero books after its AJAX refresh when a filter name contains an ampersand. Filter parameters now use JavaScript-safe serialization rather than HTML-escaped Blade interpolation.
 - Legacy `/admin` compatibility redirects now preserve GET query parameters; legacy write requests to the blended author, genre, series, tag, and badge routes use a method-preserving `307` redirect so submitted form data reaches the top-level route.

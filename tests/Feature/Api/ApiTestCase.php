@@ -35,4 +35,15 @@ abstract class ApiTestCase extends TestCase
         $token = $this->user->createToken('api-token')->plainTextToken;
         $this->withHeader('Authorization', 'Bearer ' . $token);
     }
+
+    /**
+     * Switches the authenticated actor to a different user, for tests that need to
+     * exercise authorization against someone other than the default $this->user.
+     */
+    protected function actingAsUser(User $user): void
+    {
+        Sanctum::actingAs($user);
+        $token = $user->createToken('api-token')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer ' . $token);
+    }
 }

@@ -14,8 +14,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 /**
- * Self-service require/ban tag filters — a user managing their own content filter.
- * See AdminUserTagFilterController for the admin-locked variant.
+ * Self-service personal tag filters — a user managing their own content filter.
+ * See AdminUserTagFilterController and AccountTagFilterController for the
+ * account-wide (system-scope) variants.
  */
 class UserTagFilterController extends Controller
 {
@@ -28,7 +29,10 @@ class UserTagFilterController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        return response()->json(['data' => UserTagFilter::where('user_id', $user->id)->get()]);
+        return response()->json([
+            'data' => $this->service->userFiltersFor($user)->values(),
+            'system' => $this->service->systemFiltersForAccount($user)->values(),
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -40,7 +44,7 @@ class UserTagFilterController extends Controller
 
         /** @var User $user */
         $user = Auth::user();
-        $filter = $this->service->setFilter($user, $data['tag'], $data['mode'], lockedByAdmin: false, actingAsAdmin: false);
+        $filter = $this->service->setFilter($user, $user, $data['tag'], $data['mode'], UserTagFilter::SCOPE_USER);
 
         return response()->json(['data' => $filter], 201);
     }
@@ -49,7 +53,7 @@ class UserTagFilterController extends Controller
     {
         /** @var User $user */
         $user = Auth::user();
-        $this->service->removeFilter($user, $id, actingAsAdmin: false);
+        $this->service->removeFilter($user, $user, $id, UserTagFilter::SCOPE_USER);
 
         return response()->json(['message' => 'Tag filter removed.']);
     }

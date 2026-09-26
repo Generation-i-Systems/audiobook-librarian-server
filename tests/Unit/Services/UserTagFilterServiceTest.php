@@ -47,51 +47,82 @@ class UserTagFilterServiceTest extends TestCase
         $this->assertSame(['sci-fi', 'romance'], $parsed['banned']);
     }
 
-    public function testSetFilterCreatesARequireRow(): void
+    public function testSetFilterCreatesAPersonalRow(): void
     {
         $user = User::factory()->create();
 
-        $filter = $this->service->setFilter($user, 'cozy', UserTagFilter::MODE_REQUIRE, lockedByAdmin: false, actingAsAdmin: false);
+        $filter = $this->service->setFilter($user, $user, 'cozy', UserTagFilter::MODE_REQUIRE, UserTagFilter::SCOPE_USER);
 
         $this->assertSame('cozy', $filter->tag);
         $this->assertSame(UserTagFilter::MODE_REQUIRE, $filter->mode);
-        $this->assertFalse($filter->locked_by_admin);
+        $this->assertSame(UserTagFilter::SCOPE_USER, $filter->scope);
+        $this->assertSame('user:' . $user->id, $filter->owner_key);
     }
 
-    public function testUserCannotOverwriteAnAdminLockedFilter(): void
+    public function testOrdinaryUserCannotSetASystemFilterForThemselves(): void
     {
         $user = User::factory()->create();
-        $this->service->setFilter($user, 'mature', UserTagFilter::MODE_BAN, lockedByAdmin: true, actingAsAdmin: true);
 
         $this->expectException(HttpException::class);
-        $this->service->setFilter($user, 'mature', UserTagFilter::MODE_REQUIRE, lockedByAdmin: false, actingAsAdmin: false);
+        $this->service->setFilter($user, $user, 'mature', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_SYSTEM);
     }
 
-    public function testAdminCanOverwriteALockedFilter(): void
+    public function testAdminCanSetASystemFilterOnATarget(): void
     {
-        $user = User::factory()->create();
-        $this->service->setFilter($user, 'mature', UserTagFilter::MODE_BAN, lockedByAdmin: true, actingAsAdmin: true);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $target = User::factory()->create();
 
-        $filter = $this->service->setFilter($user, 'mature', UserTagFilter::MODE_REQUIRE, lockedByAdmin: true, actingAsAdmin: true);
+        $filter = $this->service->setFilter($admin, $target, 'mature', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_SYSTEM);
 
-        $this->assertSame(UserTagFilter::MODE_REQUIRE, $filter->mode);
+        $this->assertSame(UserTagFilter::SCOPE_SYSTEM, $filter->scope);
+        $this->assertSame('account:' . $target->id, $filter->owner_key);
     }
 
-    public function testUserCannotRemoveALockedFilter(): void
+    public function testAccountParentCanSetASystemFilterForAChild(): void
     {
-        $user = User::factory()->create();
-        $filter = $this->service->setFilter($user, 'mature', UserTagFilter::MODE_BAN, lockedByAdmin: true, actingAsAdmin: true);
+        $parent = User::factory()->create();
+        $child = User::factory()->create(['parent_user_id' => $parent->id]);
+
+        $filter = $this->service->setFilter($parent, $child, 'mature', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_SYSTEM);
+
+        $this->assertSame('account:' . $parent->id, $filter->owner_key);
+    }
+
+    public function testDesignatedFilterManagerCanSetASystemFilterForTheAccount(): void
+    {
+        $parent = User::factory()->create();
+        $manager = User::factory()->create(['parent_user_id' => $parent->id, 'is_filter_manager' => true]);
+
+        $filter = $this->service->setFilter($manager, $parent, 'mature', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_SYSTEM);
+
+        $this->assertSame('account:' . $parent->id, $filter->owner_key);
+    }
+
+    public function testOrdinaryChildCannotSetASystemFilterForTheAccount(): void
+    {
+        $parent = User::factory()->create();
+        $child = User::factory()->create(['parent_user_id' => $parent->id, 'is_filter_manager' => false]);
 
         $this->expectException(HttpException::class);
-        $this->service->removeFilter($user, $filter->id, actingAsAdmin: false);
+        $this->service->setFilter($child, $parent, 'mature', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_SYSTEM);
+    }
+
+    public function testUserCannotRemoveASystemFilter(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $user = User::factory()->create();
+        $filter = $this->service->setFilter($admin, $user, 'mature', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_SYSTEM);
+
+        $this->expectException(HttpException::class);
+        $this->service->removeFilter($user, $user, $filter->id, UserTagFilter::SCOPE_USER);
     }
 
     public function testUserCanRemoveTheirOwnFilter(): void
     {
         $user = User::factory()->create();
-        $filter = $this->service->setFilter($user, 'cozy', UserTagFilter::MODE_REQUIRE, lockedByAdmin: false, actingAsAdmin: false);
+        $filter = $this->service->setFilter($user, $user, 'cozy', UserTagFilter::MODE_REQUIRE, UserTagFilter::SCOPE_USER);
 
-        $this->service->removeFilter($user, $filter->id, actingAsAdmin: false);
+        $this->service->removeFilter($user, $user, $filter->id, UserTagFilter::SCOPE_USER);
 
         $this->assertDatabaseMissing('user_tag_filters', ['id' => $filter->id]);
     }
@@ -99,7 +130,7 @@ class UserTagFilterServiceTest extends TestCase
     public function testApplyToBookQueryRequiresASystemScopeTag(): void
     {
         $user = User::factory()->create();
-        $this->service->setFilter($user, 'cozy', UserTagFilter::MODE_REQUIRE, lockedByAdmin: false, actingAsAdmin: false);
+        $this->service->setFilter($user, $user, 'cozy', UserTagFilter::MODE_REQUIRE, UserTagFilter::SCOPE_USER);
 
         $matching = Book::factory()->create();
         BookTag::create(['book_id' => $matching->id, 'scope' => 'system', 'owner_key' => 'system', 'tags' => ['cozy']]);
@@ -116,7 +147,7 @@ class UserTagFilterServiceTest extends TestCase
     public function testApplyToBookQueryBansASystemScopeTag(): void
     {
         $user = User::factory()->create();
-        $this->service->setFilter($user, 'spoilers', UserTagFilter::MODE_BAN, lockedByAdmin: false, actingAsAdmin: false);
+        $this->service->setFilter($user, $user, 'spoilers', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_USER);
 
         $banned = Book::factory()->create();
         BookTag::create(['book_id' => $banned->id, 'scope' => 'system', 'owner_key' => 'system', 'tags' => ['spoilers']]);
@@ -139,5 +170,22 @@ class UserTagFilterServiceTest extends TestCase
         $this->service->applyToBookQuery($query, $user->id);
 
         $this->assertSame(2, $query->count());
+    }
+
+    public function testApplyToBookQueryAppliesTheAccountsSystemFilterToAChild(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $parent = User::factory()->create();
+        $child = User::factory()->create(['parent_user_id' => $parent->id]);
+        $this->service->setFilter($admin, $parent, 'spoilers', UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_SYSTEM);
+
+        $banned = Book::factory()->create();
+        BookTag::create(['book_id' => $banned->id, 'scope' => 'system', 'owner_key' => 'system', 'tags' => ['spoilers']]);
+        $allowed = Book::factory()->create();
+
+        $query = Book::query();
+        $this->service->applyToBookQuery($query, $child->id);
+
+        $this->assertSame([$allowed->id], $query->pluck('id')->all());
     }
 }

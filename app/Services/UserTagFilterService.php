@@ -11,51 +11,108 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Single source of truth for reading/writing per-user require/ban tag filters, and for
- * applying them to a book query. A filter row set by the user themselves can be changed
- * or removed by that same user; a row an admin locked (locked_by_admin) can only be
- * changed or removed by an admin.
+ * Single source of truth for reading/writing tag filters, and for applying them to a
+ * book query. Two scopes exist:
+ *   - user   — a personal filter the user themselves added; only that user (or an
+ *     admin) may change or remove it.
+ *   - system — an account-wide filter set by an admin or a designated account manager
+ *     (see User::canManageSystemFiltersFor()); ordinary account members cannot change
+ *     or remove it. Stored once per account (owner_key "account:{rootId}"), so it
+ *     applies to every member of that account regardless of which member's id the
+ *     manager acted through.
  */
 class UserTagFilterService
 {
-    public function setFilter(User $target, string $tag, string $mode, bool $lockedByAdmin, bool $actingAsAdmin): UserTagFilter
+    public function ownerKeyForScope(string $scope, User $target): string
+    {
+        return $scope === UserTagFilter::SCOPE_SYSTEM
+            ? 'account:' . $target->accountRootId()
+            : 'user:' . $target->id;
+    }
+
+    public function setFilter(User $actor, User $target, string $tag, string $mode, string $scope): UserTagFilter
     {
         $tag = trim($tag);
-        $existing = UserTagFilter::where('user_id', $target->id)->where('tag', $tag)->first();
+        $this->authorize($actor, $target, $scope);
 
-        if ($existing && $existing->locked_by_admin && !$actingAsAdmin) {
-            abort(403, 'This tag filter was set by an admin and cannot be changed.');
-        }
+        $ownerKey = $this->ownerKeyForScope($scope, $target);
+        $ownerUserId = $scope === UserTagFilter::SCOPE_SYSTEM ? $target->accountRootId() : $target->id;
 
         return UserTagFilter::updateOrCreate(
-            ['user_id' => $target->id, 'tag' => $tag],
-            ['mode' => $mode, 'locked_by_admin' => $lockedByAdmin]
+            ['owner_key' => $ownerKey, 'tag' => $tag],
+            ['user_id' => $ownerUserId, 'mode' => $mode, 'scope' => $scope]
         );
     }
 
-    public function removeFilter(User $target, int $filterId, bool $actingAsAdmin): void
+    public function removeFilter(User $actor, User $target, int $filterId, string $scope): void
     {
-        $filter = UserTagFilter::where('user_id', $target->id)->where('id', $filterId)->first();
+        $ownerKey = $this->ownerKeyForScope($scope, $target);
+        $filter = UserTagFilter::where('owner_key', $ownerKey)->where('id', $filterId)->first();
 
-        if (!$filter) {
-            abort(404, 'Tag filter not found.');
+        if ($filter) {
+            $this->authorize($actor, $target, $scope);
+            $filter->delete();
+
+            return;
         }
 
-        if ($filter->locked_by_admin && !$actingAsAdmin) {
-            abort(403, 'This tag filter was set by an admin and cannot be removed.');
+        // Not found under the requested scope. If the id belongs to the other scope for
+        // this same target, surface a clear 403/404 instead of a misleading "not found".
+        $otherScope = $scope === UserTagFilter::SCOPE_SYSTEM ? UserTagFilter::SCOPE_USER : UserTagFilter::SCOPE_SYSTEM;
+        $otherOwnerKey = $this->ownerKeyForScope($otherScope, $target);
+        $existsUnderOtherScope = UserTagFilter::where('owner_key', $otherOwnerKey)->where('id', $filterId)->exists();
+
+        if ($existsUnderOtherScope && $otherScope === UserTagFilter::SCOPE_SYSTEM) {
+            abort(403, 'This is a system tag filter and cannot be removed here.');
         }
 
-        $filter->delete();
+        abort(404, 'Tag filter not found.');
+    }
+
+    private function authorize(User $actor, User $target, string $scope): void
+    {
+        if ($scope === UserTagFilter::SCOPE_SYSTEM) {
+            if (!$actor->canManageSystemFiltersFor($target)) {
+                abort(403, 'Only an admin or a designated account manager can change a system tag filter.');
+            }
+
+            return;
+        }
+
+        if ($actor->id !== $target->id && !$actor->isAdmin()) {
+            abort(403, 'Cannot change another user\'s personal tag filter.');
+        }
     }
 
     /**
-     * Replace administrator-managed filters without disturbing a user's own filters.
+     * @return \Illuminate\Database\Eloquent\Collection<int, UserTagFilter>
+     */
+    public function userFiltersFor(User $user): \Illuminate\Database\Eloquent\Collection
+    {
+        return UserTagFilter::where('owner_key', $this->ownerKeyForScope(UserTagFilter::SCOPE_USER, $user))->get();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Collection<int, UserTagFilter>
+     */
+    public function systemFiltersForAccount(User $target): \Illuminate\Database\Eloquent\Collection
+    {
+        return UserTagFilter::where('owner_key', $this->ownerKeyForScope(UserTagFilter::SCOPE_SYSTEM, $target))->get();
+    }
+
+    /**
+     * Replace an account's system-scope filters without disturbing any member's own
+     * personal filters.
      *
      * @param array<int, string> $requiredTags
      * @param array<int, string> $bannedTags
      */
-    public function replaceAdminFilters(User $target, array $requiredTags, array $bannedTags): void
+    public function replaceSystemFilters(User $actor, User $target, array $requiredTags, array $bannedTags): void
     {
+        if (!$actor->canManageSystemFiltersFor($target)) {
+            abort(403, 'Only an admin or a designated account manager can change a system tag filter.');
+        }
+
         $filters = [];
         foreach ($requiredTags as $tag) {
             $filters[trim($tag)] = UserTagFilter::MODE_REQUIRE;
@@ -65,14 +122,16 @@ class UserTagFilterService
         }
         unset($filters['']);
 
-        DB::transaction(function () use ($target, $filters): void {
-            $existingFilters = UserTagFilter::where('user_id', $target->id)
+        $ownerKey = $this->ownerKeyForScope(UserTagFilter::SCOPE_SYSTEM, $target);
+        $ownerUserId = $target->accountRootId();
+
+        DB::transaction(function () use ($ownerKey, $ownerUserId, $filters): void {
+            $existingFilters = UserTagFilter::where('owner_key', $ownerKey)
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('tag');
 
-            UserTagFilter::where('user_id', $target->id)
-                ->where('locked_by_admin', true)
+            UserTagFilter::where('owner_key', $ownerKey)
                 ->when(
                     $filters !== [],
                     fn (Builder $query) => $query->whereNotIn('tag', array_keys($filters))
@@ -81,11 +140,12 @@ class UserTagFilterService
 
             foreach ($filters as $tag => $mode) {
                 $filter = $existingFilters->get($tag) ?? new UserTagFilter([
-                    'user_id' => $target->id,
+                    'user_id' => $ownerUserId,
+                    'owner_key' => $ownerKey,
+                    'scope' => UserTagFilter::SCOPE_SYSTEM,
                     'tag' => $tag,
                 ]);
                 $filter->mode = $mode;
-                $filter->locked_by_admin = true;
                 $filter->save();
             }
         });
@@ -93,10 +153,11 @@ class UserTagFilterService
 
     /**
      * Restricts a Book query builder to books satisfying every one of the user's active
-     * require/ban filters. Checks tags visible to the user: system-scope (public),
-     * their groups' scope, and their own private scope — matching BookTagService's
-     * visibility rules, since a "require the mature tag" rule set by an admin is
-     * typically a system-scope tag, not something in the user's own private tag list.
+     * require/ban filters — their own personal filters, plus their account's system
+     * filters. Checks tags visible to the user: system-scope (public), their groups'
+     * scope, and their own private scope — matching BookTagService's visibility rules,
+     * since a "require the mature tag" rule is typically a system-scope book tag, not
+     * something in the user's own private tag list.
      */
     public function applyToBookQuery(Builder $query, int $userId): void
     {
@@ -104,12 +165,22 @@ class UserTagFilterService
             return;
         }
 
-        $filters = UserTagFilter::where('user_id', $userId)->get();
+        $user = User::find($userId);
+        if (!$user) {
+            return;
+        }
+
+        $ownerKeys = [
+            $this->ownerKeyForScope(UserTagFilter::SCOPE_USER, $user),
+            $this->ownerKeyForScope(UserTagFilter::SCOPE_SYSTEM, $user),
+        ];
+
+        $filters = UserTagFilter::whereIn('owner_key', $ownerKeys)->get();
         if ($filters->isEmpty()) {
             return;
         }
 
-        $groupIds = User::find($userId)?->groups()->pluck('groups.id')->all() ?? [];
+        $groupIds = $user->groups()->pluck('groups.id')->all();
 
         foreach ($filters as $filter) {
             $scopeMatcher = function ($q) use ($userId, $groupIds, $filter): void {

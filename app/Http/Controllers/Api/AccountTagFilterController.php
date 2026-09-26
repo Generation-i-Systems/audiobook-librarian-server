@@ -14,12 +14,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 /**
- * Full-admin management of system (account-wide) tag filters on another user's
- * account. See AccountTagFilterController for the equivalent endpoint usable by a
- * non-admin account parent or designated account manager, and UserTagFilterController
- * for the self-service personal-filter variant.
+ * Management of system (account-wide) tag filters by a non-admin account parent or a
+ * member the parent has designated as a filter manager (User::is_filter_manager).
+ * A full admin may also use these routes. See AdminUserTagFilterController for the
+ * equivalent admin-only endpoint, and UserTagFilterController for the self-service
+ * personal-filter variant.
  */
-class AdminUserTagFilterController extends Controller
+class AccountTagFilterController extends Controller
 {
     public function __construct(private readonly UserTagFilterService $service)
     {
@@ -28,6 +29,7 @@ class AdminUserTagFilterController extends Controller
     public function index(int $userId): JsonResponse
     {
         $target = User::findOrFail($userId);
+        $this->authorizeAccountManagement($target);
 
         return response()->json(['data' => $this->service->systemFiltersForAccount($target)->values()]);
     }
@@ -55,5 +57,14 @@ class AdminUserTagFilterController extends Controller
         $this->service->removeFilter($actor, $target, $id, UserTagFilter::SCOPE_SYSTEM);
 
         return response()->json(['message' => 'Tag filter removed.']);
+    }
+
+    private function authorizeAccountManagement(User $target): void
+    {
+        /** @var User $actor */
+        $actor = Auth::user();
+        if (!$actor->canManageSystemFiltersFor($target)) {
+            abort(403, 'You are not authorized to manage tag filters for this account.');
+        }
     }
 }
