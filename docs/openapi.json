@@ -4163,7 +4163,10 @@
                                     "type": "array",
                                     "items": {}
                                 },
-                                "default": {},
+                                "default": {
+                                    "nullable": true,
+                                    "description": "Suggested value. For the target decision it is the first available candidate whose duplicate_actions include the duplicate_action decision's default, and null when none fits (for example no candidates, or the usual folder is occupied and no renamed folder is offered)."
+                                },
                                 "plan_field": {
                                     "type": "string",
                                     "description": "Approval payload field this decision fills, e.g. duplicate_action or target.candidate_id."
@@ -4461,7 +4464,7 @@
                     },
                     "event": {
                         "type": "string",
-                        "description": "Event type, e.g. state_changed, metadata_updated, plan_invalidated.",
+                        "description": "Event type, e.g. state_changed, metadata_updated, plan_invalidated, targets_refreshed (data: trigger approval|review_patch, unavailable_candidate_ids).",
                         "example": "state_changed"
                     },
                     "draft_id": {
@@ -7648,7 +7651,7 @@
             "patch": {
                 "operationId": "updateImportDraft",
                 "summary": "Save reviewed metadata edits (JSON merge patch)",
-                "description": "Merges metadata edits, records `user_edit` provenance and re-derives duplicates, targets and required decisions. Invalid values are rejected, never rewritten. A no-op edit returns the draft unchanged. Editing an approved draft invalidates its plan (`plan_invalidated` event) and returns it to `awaiting_review`. `local_ai_artifacts` is not supported yet and returns 422 `local_ai_artifacts_not_supported`.",
+                "description": "Merges metadata edits, records `user_edit` provenance and re-derives duplicates, targets and required decisions. Invalid values are rejected, never rewritten. A no-op edit rechecks destination availability from the stored metadata: if duplicates, destinations, policy warnings or required decisions change, the revision is bumped once and a `targets_refreshed` event is recorded; otherwise the draft is returned with the same revision. On an approved draft such a change returns 409 `approved_plan_stale` instead. Editing an approved draft invalidates its plan (`plan_invalidated` event) and returns it to `awaiting_review`. `local_ai_artifacts` is not supported yet and returns 422 `local_ai_artifacts_not_supported`.",
                 "parameters": [
                     {
                         "name": "Idempotency-Key",
@@ -7705,7 +7708,7 @@
                         }
                     },
                     "409": {
-                        "description": "Stale revision (draft_revision_conflict) or draft not editable (invalid_state_transition)",
+                        "description": "Stale revision (draft_revision_conflict), draft not editable (invalid_state_transition), or a no-op edit of an approved draft whose destination recheck would change its recommendation (approved_plan_stale, details: plan_revision, current_revision; nothing is changed)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8004,7 +8007,7 @@
             "post": {
                 "operationId": "approveImportDraft",
                 "summary": "Approve the reviewed draft and lock an immutable plan",
-                "description": "Validates the approval against the current recommendation and stores the plan exactly as approved. Metadata must equal the reviewed recommendation for title, authors, narrators, series and genres (save edits via PATCH first) or 422 `metadata_not_reviewed` is returned. Other 422 codes: validation_failed, invalid_genre (details.suggestion), invalid_duplicate_action, invalid_target, target_incompatible, target_unavailable, invalid_file_operation, invalid_transfer_mode, invalid_cover_artifact, unknown_warning, warnings_not_acknowledged.",
+                "description": "Validates the approval against the current recommendation and stores the plan exactly as approved. Metadata must equal the reviewed recommendation for title, authors, narrators, series and genres (save edits via PATCH first) or 422 `metadata_not_reviewed` is returned. Other 422 codes: validation_failed, invalid_genre (details.suggestion), invalid_duplicate_action, invalid_target, target_incompatible, target_unavailable (the draft's destinations are refreshed first; details: candidate_id, current_revision, targets_refreshed; when targets_refreshed is true the revision was bumped and a `targets_refreshed` event recorded, so reload the draft and approve again with current_revision), invalid_file_operation, invalid_transfer_mode, invalid_cover_artifact, unknown_warning, warnings_not_acknowledged.",
                 "parameters": [
                     {
                         "name": "draftId",

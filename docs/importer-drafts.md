@@ -86,6 +86,34 @@ offers `create_new` (plus `skip` when only similar titles were found). Warnings 
 `requires_acknowledgment: true` (currently the client's `source.warnings`) add an
 `acknowledged_warning_ids` decision of type `acknowledgment`.
 
+The `target` decision offers only candidates with `available: true`. Its `default` is the first
+of those whose `duplicate_actions` include the `duplicate_action` decision's default. It is
+**`null`** when no available candidate fits that default action, for example when the title or
+author is missing (no candidates at all), or when the usual folder is occupied and no renamed
+folder can be offered. The server never invents a destination; the client must ask the user
+to choose one of `options` (possibly after choosing a different duplicate action) or to edit the
+details.
+
+### Refreshing destinations
+
+Destination availability is computed from the library folders when the recommendation is
+derived, and is not rechecked by `GET`. The server re-derives duplicates, destinations, policy
+warnings and `required_decisions` from the draft's **stored** metadata (never changing the
+metadata or its provenance) when:
+
+- an approval finds the chosen destination unavailable (`target_unavailable`), and
+- a `PATCH` changes nothing (a no-op edit is the way to ask for a recheck).
+
+If the result differs from the stored recommendation, the revision is bumped once and one
+`targets_refreshed` event is recorded with
+`{"trigger": "approval" | "review_patch", "unavailable_candidate_ids": [...]}`. If nothing
+differs, the revision stays the same and no event is recorded.
+
+An `approved` draft is never rewritten this way, because its locked plan was built from the old
+recommendation: a no-op `PATCH` whose recheck would change anything returns
+`409 approved_plan_stale` (`details: {plan_revision, current_revision}`) and changes nothing.
+Editing a detail for real invalidates the plan and reopens review, as described below.
+
 ### Events
 
 `GET /imports/drafts/{draftId}/events?after=<cursor>` (or `Last-Event-ID`) returns events oldest
@@ -104,7 +132,11 @@ Polling this or `GET /imports/drafts/{draftId}` is the supported way to follow p
 - Invalid values (blank title, non-list authors, negative series number, series number without a
   name, unknown fields) are rejected with `422 validation_failed`; they are never rewritten.
   `local_ai_artifacts` returns `422 local_ai_artifacts_not_supported` for now.
-- A no-op edit returns the draft unchanged (same revision). A real edit bumps the revision,
+- A no-op edit rechecks destinations (see [Refreshing destinations](#refreshing-destinations)):
+  the draft is returned with the same revision unless the recheck changed the recommendation, in
+  which case the revision is bumped once and a `targets_refreshed` event is recorded. On an
+  `approved` draft a recheck that would change anything fails with `409 approved_plan_stale`.
+  A real edit bumps the revision,
   prepends a `your edit` (`source_id: user_edit`) provenance entry to each changed field and
   re-derives duplicates, targets, warnings and `required_decisions` from the edited metadata. A
   `metadata_updated` event carries `{fields}`.
@@ -129,7 +161,7 @@ optional `cover_artifact_id`, `target.candidate_id`, `duplicate_action`, `file_o
 | `invalid_duplicate_action` | 422 | Action is not an option of the `duplicate_action` decision |
 | `invalid_target` | 422 | Unknown candidate id |
 | `target_incompatible` | 422 | The candidate does not allow that duplicate action |
-| `target_unavailable` | 422 | The folder is occupied (rechecked live at approval), unless the action is `skip` |
+| `target_unavailable` | 422 | The folder is occupied (rechecked live at approval), unless the action is `skip`. The destinations are refreshed first; `details: {candidate_id, current_revision, targets_refreshed}`. Reload the draft (`GET`) and approve again with `current_revision` |
 | `invalid_transfer_mode` / `invalid_file_operation` | 422 | Not offered (`upload` allows `copy` or `move`) |
 | `invalid_cover_artifact` | 422 | Cover id is not an artifact of this draft |
 | `unknown_warning` / `warnings_not_acknowledged` | 422 | Acknowledgements must match warnings that require one |
