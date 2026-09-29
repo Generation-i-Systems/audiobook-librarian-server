@@ -2045,6 +2045,17 @@
                         "type": "integer",
                         "example": 10
                     },
+                    "batchId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "senderId": {
+                        "type": "integer"
+                    },
+                    "recipientId": {
+                        "type": "integer"
+                    },
                     "bookId": {
                         "type": "integer",
                         "example": 123
@@ -2054,20 +2065,86 @@
                         "nullable": true,
                         "example": "Found this for you"
                     },
+                    "audienceType": {
+                        "type": "string",
+                        "enum": [
+                            "user",
+                            "group",
+                            "all"
+                        ]
+                    },
+                    "groupId": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "startPositionMs": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "createdAt": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "seenAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "dismissedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "acknowledgedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "reaction": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "thanks",
+                            "queued",
+                            "loved",
+                            "not_for_me",
+                            null
+                        ]
+                    },
+                    "reply": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "respondedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
                     },
                     "sender": {
                         "type": "object",
                         "properties": {
                             "id": {
-                                "type": "integer",
-                                "example": 5
+                                "type": "integer"
                             },
                             "name": {
                                 "type": "string",
-                                "example": "John Doe"
+                                "nullable": true
+                            },
+                            "photoUrl": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
+                    },
+                    "group": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
                             }
                         }
                     },
@@ -2524,6 +2601,9 @@
                                 }
                             }
                         }
+                    },
+                    "community": {
+                        "$ref": "#/components/schemas/CommunityStatus"
                     }
                 }
             },
@@ -3336,6 +3416,137 @@
                         "nullable": true
                     }
                 }
+            },
+            "CommunityStatus": {
+                "type": "object",
+                "description": "Whether community features (recommendations between users of this server, notifications) are available. mode is full on self-hosted servers, demo on demo installs (features shown but refused), off when disabled.",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "full",
+                            "demo",
+                            "off"
+                        ]
+                    }
+                }
+            },
+            "SentRecommendation": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/UserRecommendation"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "recipient": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "integer"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "photoUrl": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                }
+                            },
+                            "recipientProgress": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                    "started",
+                                    "finished",
+                                    null
+                                ],
+                                "description": "Only present when the recipient shares progress with senders"
+                            }
+                        }
+                    }
+                ]
+            },
+            "UserNotification": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "recommendation",
+                            "recommendation_reaction",
+                            "recommendation_reply"
+                        ]
+                    },
+                    "delivery": {
+                        "type": "string",
+                        "enum": [
+                            "show",
+                            "badge"
+                        ]
+                    },
+                    "actor": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
+                    },
+                    "payload": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "read_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "NotificationPreferences": {
+                "type": "object",
+                "properties": {
+                    "preferences": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "show",
+                                "badge",
+                                "off"
+                            ]
+                        }
+                    }
+                }
+            },
+            "CommunitySettings": {
+                "type": "object",
+                "properties": {
+                    "share_progress": {
+                        "type": "boolean"
+                    },
+                    "family_only": {
+                        "type": "boolean"
+                    }
+                }
             }
         }
     },
@@ -3482,6 +3693,19 @@
                                         },
                                         "serverTimestamp": {
                                             "type": "integer"
+                                        },
+                                        "notifications": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "description": "Newest community notification id and unread count; fetch GET /notifications?since= when cursor is ahead of the device. Null when community features are unavailable.",
+                                            "properties": {
+                                                "cursor": {
+                                                    "type": "integer"
+                                                },
+                                                "unread": {
+                                                    "type": "integer"
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -5468,7 +5692,9 @@
         },
         "/health/capabilities": {
             "get": {
-                "tags": ["Health"],
+                "tags": [
+                    "Health"
+                ],
                 "summary": "Server capability discovery",
                 "description": "Returns which features this server supports, so clients can adapt their UI accordingly. No authentication required. Clients that receive a 404 from this endpoint should assume all capabilities are supported (older server versions predating this endpoint). authMethods only includes 'email_otp' when the server has a real mail transport configured (not 'log' or 'array').",
                 "operationId": "healthCapabilities",
@@ -5523,6 +5749,9 @@
                                                 "discord_oauth",
                                                 "email_otp"
                                             ]
+                                        },
+                                        "community": {
+                                            "$ref": "#/components/schemas/CommunityStatus"
                                         }
                                     }
                                 }
@@ -12477,9 +12706,11 @@
         },
         "/recommendations/{book}": {
             "post": {
-                "tags": ["Recommendations"],
+                "tags": [
+                    "Recommendations"
+                ],
                 "summary": "Send a book recommendation",
-                "description": "Share a specific book with another user.",
+                "description": "Recommend a book to people, groups the sender belongs to, or (admins) everyone on this server. Fans out to one recommendation per recipient and records a notification for each.",
                 "operationId": "sendRecommendation",
                 "security": [
                     {
@@ -12503,17 +12734,40 @@
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["recipient_id"],
+                                "description": "At least one of recipient_id, recipient_ids, group_ids or everyone is required.",
                                 "properties": {
                                     "recipient_id": {
                                         "type": "integer",
-                                        "description": "ID of the user to receive the recommendation"
+                                        "description": "Single recipient (legacy clients)"
+                                    },
+                                    "recipient_ids": {
+                                        "type": "array",
+                                        "maxItems": 100,
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "group_ids": {
+                                        "type": "array",
+                                        "maxItems": 20,
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "description": "Groups the sender belongs to (any group for admins)"
+                                    },
+                                    "everyone": {
+                                        "type": "boolean",
+                                        "description": "Admins only: every user the admin can reach on this server"
                                     },
                                     "message": {
                                         "type": "string",
                                         "maxLength": 500,
+                                        "nullable": true
+                                    },
+                                    "start_position_ms": {
+                                        "type": "integer",
                                         "nullable": true,
-                                        "description": "Optional personal message"
+                                        "description": "Suggested starting point in the book"
                                     }
                                 }
                             }
@@ -12522,17 +12776,46 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Recommendation sent successfully",
+                        "description": "Recommendation sent",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "batchId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "recipientCount": {
+                                            "type": "integer"
+                                        },
+                                        "skippedRecipientIds": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            },
+                                            "description": "Recipients who already had an open recommendation for this book from the sender"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
                     },
                     "409": {
-                        "description": "Duplicate recommendation",
+                        "description": "Every selected recipient already has an open recommendation for this book",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12546,7 +12829,27 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ApiValidationError"
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many sends in the last hour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -12556,9 +12859,11 @@
         },
         "/recommendations/inbox": {
             "get": {
-                "tags": ["Recommendations"],
+                "tags": [
+                    "Recommendations"
+                ],
                 "summary": "Get recommendation inbox",
-                "description": "Retrieve unacknowledged recommendations for the authenticated user.",
+                "description": "Open (not acknowledged or dismissed) recommendations for the authenticated user, newest first.",
                 "operationId": "getRecommendationInbox",
                 "security": [
                     {
@@ -12578,13 +12883,36 @@
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
                     }
-                }
+                },
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100
+                        }
+                    }
+                ]
             }
         },
         "/recommendations/{recommendation}/acknowledge": {
             "post": {
-                "tags": ["Recommendations"],
+                "tags": [
+                    "Recommendations"
+                ],
                 "summary": "Acknowledge a recommendation",
                 "operationId": "acknowledgeRecommendation",
                 "security": [
@@ -12622,7 +12950,7 @@
                         }
                     },
                     "403": {
-                        "description": "Unauthorized action",
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12646,9 +12974,11 @@
         },
         "/books/{book}/recommend": {
             "post": {
-                "tags": ["Recommendations"],
+                "tags": [
+                    "Recommendations"
+                ],
                 "summary": "Send a book recommendation (alias)",
-                "description": "Alias for POST /recommendations/{book} used by some clients.",
+                "description": "Recommend a book to people, groups the sender belongs to, or (admins) everyone on this server. Fans out to one recommendation per recipient and records a notification for each.",
                 "operationId": "sendRecommendationAlias",
                 "security": [
                     {
@@ -12671,15 +13001,40 @@
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["recipient_id"],
+                                "description": "At least one of recipient_id, recipient_ids, group_ids or everyone is required.",
                                 "properties": {
                                     "recipient_id": {
-                                        "type": "integer"
+                                        "type": "integer",
+                                        "description": "Single recipient (legacy clients)"
+                                    },
+                                    "recipient_ids": {
+                                        "type": "array",
+                                        "maxItems": 100,
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "group_ids": {
+                                        "type": "array",
+                                        "maxItems": 20,
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "description": "Groups the sender belongs to (any group for admins)"
+                                    },
+                                    "everyone": {
+                                        "type": "boolean",
+                                        "description": "Admins only: every user the admin can reach on this server"
                                     },
                                     "message": {
                                         "type": "string",
                                         "maxLength": 500,
                                         "nullable": true
+                                    },
+                                    "start_position_ms": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "description": "Suggested starting point in the book"
                                     }
                                 }
                             }
@@ -12688,17 +13043,46 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Recommendation sent successfully",
+                        "description": "Recommendation sent",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "batchId": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "recipientCount": {
+                                            "type": "integer"
+                                        },
+                                        "skippedRecipientIds": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            },
+                                            "description": "Recipients who already had an open recommendation for this book from the sender"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
                     },
                     "409": {
-                        "description": "Duplicate recommendation",
+                        "description": "Every selected recipient already has an open recommendation for this book",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12712,7 +13096,27 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ApiValidationError"
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many sends in the last hour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -14877,10 +15281,16 @@
         },
         "/blocks": {
             "get": {
-                "tags": ["Blocks"],
+                "tags": [
+                    "Blocks"
+                ],
                 "summary": "List the user's blocked books/authors/series/tags",
                 "operationId": "listBlockedEntities",
-                "security": [{ "BearerAuth": [] }],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Blocked entities",
@@ -14891,35 +15301,73 @@
                                     "properties": {
                                         "blocks": {
                                             "type": "array",
-                                            "items": { "$ref": "#/components/schemas/BlockedEntity" }
+                                            "items": {
+                                                "$ref": "#/components/schemas/BlockedEntity"
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     },
-                    "401": { "$ref": "#/components/responses/Unauthorized" }
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
                 }
             },
             "post": {
-                "tags": ["Blocks"],
+                "tags": [
+                    "Blocks"
+                ],
                 "summary": "Block a book/author/series/tag, or refresh it if string_id already exists",
                 "operationId": "createBlockedEntity",
-                "security": [{ "BearerAuth": [] }],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["string_id", "entity_type", "entity_value", "entity_label", "created_at"],
+                                "required": [
+                                    "string_id",
+                                    "entity_type",
+                                    "entity_value",
+                                    "entity_label",
+                                    "created_at"
+                                ],
                                 "properties": {
-                                    "string_id": { "type": "string", "format": "uuid" },
-                                    "entity_type": { "type": "string", "enum": ["BOOK", "AUTHOR", "SERIES", "TAG"] },
-                                    "entity_ref_id": { "type": "integer", "nullable": true },
-                                    "entity_value": { "type": "string" },
-                                    "entity_label": { "type": "string" },
-                                    "created_at": { "type": "integer" }
+                                    "string_id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "entity_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "BOOK",
+                                            "AUTHOR",
+                                            "SERIES",
+                                            "TAG",
+                                            "USER"
+                                        ]
+                                    },
+                                    "entity_ref_id": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "description": "Required for USER blocks (the blocked user's id)"
+                                    },
+                                    "entity_value": {
+                                        "type": "string"
+                                    },
+                                    "entity_label": {
+                                        "type": "string"
+                                    },
+                                    "created_at": {
+                                        "type": "integer"
+                                    }
                                 }
                             }
                         }
@@ -14932,13 +15380,21 @@
                             "application/json": {
                                 "schema": {
                                     "type": "object",
-                                    "properties": { "block": { "$ref": "#/components/schemas/BlockedEntity" } }
+                                    "properties": {
+                                        "block": {
+                                            "$ref": "#/components/schemas/BlockedEntity"
+                                        }
+                                    }
                                 }
                             }
                         }
                     },
-                    "401": { "$ref": "#/components/responses/Unauthorized" },
-                    "422": { "$ref": "#/components/responses/ValidationError" }
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
                 }
             }
         },
@@ -17249,6 +17705,766 @@
                     }
                 }
             }
+        },
+        "/recommendations/sent": {
+            "get": {
+                "tags": [
+                    "Recommendations"
+                ],
+                "summary": "List sent recommendations",
+                "description": "Recommendations the authenticated user sent, newest first, with each recipient's seen/dismissed state, reaction and reply.",
+                "operationId": "getSentRecommendations",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sent recommendations",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/SentRecommendation"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/recommendations/{recommendation}": {
+            "patch": {
+                "tags": [
+                    "Recommendations"
+                ],
+                "summary": "Update a received recommendation",
+                "description": "Recipient marks it seen or dismissed, or reacts/replies. A reaction or reply records a notification for the sender.",
+                "operationId": "updateRecommendation",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "recommendation",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "seen": {
+                                        "type": "boolean"
+                                    },
+                                    "dismissed": {
+                                        "type": "boolean"
+                                    },
+                                    "reaction": {
+                                        "type": "string",
+                                        "enum": [
+                                            "thanks",
+                                            "queued",
+                                            "loved",
+                                            "not_for_me"
+                                        ]
+                                    },
+                                    "reply": {
+                                        "type": "string",
+                                        "maxLength": 500
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "recommendation": {
+                                            "$ref": "#/components/schemas/UserRecommendation"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/community/people": {
+            "get": {
+                "tags": [
+                    "Community"
+                ],
+                "summary": "People and groups the user can share with",
+                "description": "Every user on this server the caller can reach (blocks and family-only restrictions applied), and the groups they can address.",
+                "operationId": "getCommunityPeople",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reachable people and groups",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "users": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "photo_url": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "is_family": {
+                                                        "type": "boolean"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "groups": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "member_count": {
+                                                        "type": "integer"
+                                                    },
+                                                    "is_member": {
+                                                        "type": "boolean"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "can_send_to_everyone": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/community/settings": {
+            "get": {
+                "tags": [
+                    "Community"
+                ],
+                "summary": "Get the user's community settings",
+                "operationId": "getCommunitySettings",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Community settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CommunitySettings"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Community"
+                ],
+                "summary": "Update the user's community settings",
+                "description": "share_progress lets people who recommended a book see whether the user started or finished it.",
+                "operationId": "updateCommunitySettings",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "share_progress"
+                                ],
+                                "properties": {
+                                    "share_progress": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Community settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CommunitySettings"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/community/members/{member}/family-only": {
+            "put": {
+                "tags": [
+                    "Community"
+                ],
+                "summary": "Restrict a family member to family-only sharing",
+                "description": "The account parent or an admin limits a managed user so they can only share with, and be reached by, their own family account.",
+                "operationId": "setCommunityFamilyOnly",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "member",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "family_only"
+                                ],
+                                "properties": {
+                                    "family_only": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "family_only": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications": {
+            "get": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Community notifications since a cursor",
+                "description": "Notifications are delivered only through sync (no remote push). Pass the last cursor the device received; results are oldest first.",
+                "operationId": "getNotifications",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "since",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notifications",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "notifications": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserNotification"
+                                            }
+                                        },
+                                        "cursor": {
+                                            "type": "integer"
+                                        },
+                                        "has_more": {
+                                            "type": "boolean"
+                                        },
+                                        "unread_count": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/read": {
+            "post": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Mark notifications read",
+                "operationId": "markNotificationsRead",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "all": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Marked read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "updated": {
+                                            "type": "integer"
+                                        },
+                                        "unread_count": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/preferences": {
+            "get": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get notification preferences",
+                "operationId": "getNotificationPreferences",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Effective delivery per notification type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotificationPreferences"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Update notification preferences",
+                "description": "show = local notification and inbox, badge = inbox only, off = not recorded.",
+                "operationId": "updateNotificationPreferences",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NotificationPreferences"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Effective delivery per notification type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotificationPreferences"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Community features unavailable (error = community_demo_only on demo servers, community_disabled when turned off) or action not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown type or delivery",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "tags": [
@@ -17343,6 +18559,14 @@
         {
             "name": "Admin",
             "description": "Admin-only management endpoints"
+        },
+        {
+            "name": "Community",
+            "description": "People and groups a user can share with on this server"
+        },
+        {
+            "name": "Notifications",
+            "description": "Community notifications delivered through sync"
         }
     ]
 }
