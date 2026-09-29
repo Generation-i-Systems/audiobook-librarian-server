@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Fixed
+
+- CI: the PHP 8.3 test job and the Windows portability check install dependencies without the dev-only `ext-xdebug` and Unix-only `ext-pcntl`/`ext-posix` requirements, and the container first-install check waits for the app to finish migrating before inspecting it.
+
 ### Added
 
 - Community sharing, phase 1: each server is a closed community for its own users. `POST /recommendations/{book}` (and the `/books/{book}/recommend` alias) now accepts `recipient_ids`, `group_ids` (groups the sender belongs to; any group for admins) and `everyone` (admins only) alongside the legacy `recipient_id`, fans out to one `user_recommendations` row per recipient with a shared `batch_id`, skips recipients who already have an open recommendation for the book, and is rate limited per sender (`community.recommendation_sends_per_hour`). New `GET /recommendations/sent`, `PATCH /recommendations/{id}` (seen, dismissed, reaction, reply), `GET /community/people`, `GET/PUT /community/settings`, `PUT /community/members/{id}/family-only`, and sync-delivered notifications (`GET /notifications?since=`, `POST /notifications/read`, `GET/PUT /notifications/preferences`); `POST /sync/events` now returns a `notifications` cursor/unread summary. Nothing is pushed: clients show local notifications from sync. Reach is decided in one place (`CommunityAudience`): blocks in either direction (new `USER` block type), family-only restrictions set by a parent or admin, and disabled or unverified accounts all exclude a person. `/health/capabilities` and `/api/v1` advertise `community: {enabled, mode}`; on demo installs (`DEMO_MODE`) every community endpoint is refused with `community_demo_only`. Additive migration `2026_09_29_000001_add_community_sharing_tables`.

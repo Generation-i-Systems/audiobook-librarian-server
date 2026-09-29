@@ -27,9 +27,9 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, xml, ctype, sqlite3, pdo_sqlite, fileinfo, gd
+          extensions: mbstring, xml, ctype, sqlite3, pdo_sqlite, fileinfo, gd, zip
           coverage: none
-      - run: composer install --prefer-dist --no-progress --no-interaction --ignore-platform-req=ext-xdebug
+      - run: composer install --prefer-dist --no-progress --no-interaction --ignore-platform-req=ext-xdebug --ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix
       - run: php artisan test tests/Core/Unit/Services/PortableStorageConfigurationTest.php tests/Unit/Services/SqlDatabasePortabilityTest.php tests/Unit/Services/DatabaseBackupWriterTest.php tests/Unit/Scheduling/DatabaseBackupScheduleTest.php tests/Unit/Services/AIQuerySqlDialectPromptTest.php tests/Unit/Services/AdminerConnectionConfigTest.php tests/Unit/Database/PulseMigrationPortabilityTest.php tests/Feature/Services/OptimizedBookServicePortabilityTest.php tests/Feature/Services/ToolExecutorSqlPortabilityTest.php tests/Api/Feature/StatisticsControllerTest.php
 
   container-install:
@@ -58,6 +58,15 @@ jobs:
           fi
       - name: Check installed application
         run: |
+          wait_until_up() {
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent --output /dev/null http://127.0.0.1:8080/up; then return 0; fi
+              sleep 2
+            done
+            docker compose --env-file .env.docker logs app
+            return 1
+          }
+          wait_until_up
           docker compose --env-file .env.docker exec -T app php artisan migrate:status
           docker compose --env-file .env.docker exec -T app php artisan backup:database --verify
           docker compose --env-file .env.docker exec -T app ffprobe -version
@@ -68,12 +77,7 @@ jobs:
           docker compose --env-file .env.docker restart app
           key_after=$(docker compose --env-file .env.docker exec -T app sha256sum storage/app/.app-key | cut -d' ' -f1)
           test "$key_before" = "$key_after"
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:8080/up; then exit 0; fi
-            sleep 2
-          done
-          docker compose --env-file .env.docker logs app
-          exit 1
+          wait_until_up
       - name: Inspect startup logs
         if: failure()
         run: docker compose --env-file .env.docker logs --no-color || true
