@@ -588,3 +588,8 @@ Look for ways the server is tied to this build environment and make it portable 
 ## 2026-09-26
 
 expand the tag filters to allow user filters and system filters. system filters are edited by an admin or other designated user for a given account (parent) user filters are added by the user themselves and can be added or removed at will both on the web or on the client (the client already supports this)
+
+## 2026-09-29
+
+Plan and build reviews and book recommendation sharing between users of the same self-hosted server, including admin-to-user recommendations and community features within the server. No remote push and no reliance on a central server: notifications are delivered through sync only. Each server is a closed community open to all its users and groups; users on different servers have no connection. Groups are created by admins; members can recommend to groups they belong to. On the public demo the features are shown but explain that they need a self-hosted server.
+

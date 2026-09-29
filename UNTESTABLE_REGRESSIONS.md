@@ -360,6 +360,15 @@ feature tests without running a real queue worker.
   belongs to the store variant it claims (`fcm` vs `adm`), and whether a push notification
   built from it would actually reach a device can only be verified against a real Google
   Play / Amazon Appstore install, not this test suite.
+- **Community notifications delivered through sync** (`NotificationController`, the
+  `notifications` summary in `EventController::sync()`) — the server only records
+  notifications and reports a cursor; when a user actually sees one depends on the client's
+  background sync schedule (Android background work, iOS background app refresh), which only
+  real devices can show. Tests cover the cursor, unread count and preference handling.
+- **Community demo mode on the public demo server** — `CommunityStatus` reports `demo` only
+  when that deployment sets `DEMO_MODE=true`; whether demo.ablibrarian.com (and not the
+  private books.ablibrarian.com) actually has that setting is deployment configuration no
+  test here can see.
 
 ---
 
