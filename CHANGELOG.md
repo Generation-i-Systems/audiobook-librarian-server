@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Fixed
+
+- CI: the PHP 8.3 test job and the Windows portability check install dependencies without the dev-only `ext-xdebug` and Unix-only `ext-pcntl`/`ext-posix` requirements, and the container first-install check waits for the app to finish migrating before inspecting it.
+
 ### Added
 
 - Tag filters now distinguish personal filters from account-wide "system" filters. `user_tag_filters` gained `scope` (`user`|`system`) and `owner_key` (`"user:{userId}"` or `"account:{accountRootId}"`), replacing the old single-user `locked_by_admin` flag. A new lightweight parent/child account model (`users.parent_user_id`, `users.is_filter_manager`) lets a system filter apply to every member of an account. System filters can still be set by a full admin (`Api\AdminUserTagFilterController`, `/admin/users/{id}/tag-filters`), and now also by the account's parent user or a member the parent designated as a filter manager, via a new `Api\AccountTagFilterController` (`GET/POST /users/{id}/tag-filters/system`, `DELETE /users/{id}/tag-filters/system/{filterId}`). Personal filters (`/users/me/tag-filters`) are unchanged for the user themselves.
