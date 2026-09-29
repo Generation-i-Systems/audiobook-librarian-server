@@ -1,6 +1,12 @@
 ## [Unreleased]
 
+### Fixed
+
+- CI: the PHP 8.3 test job and the Windows portability check install dependencies without the dev-only `ext-xdebug` and Unix-only `ext-pcntl`/`ext-posix` requirements, and the container first-install check waits for the app to finish migrating before inspecting it.
+
 ### Added
+
+- Import drafts API, phase 1 of the importer rebuild (`imports.v1`, see `docs/importer-drafts.md`): new additive tables (`import_drafts`, `import_draft_files`, `import_artifacts`, `import_plans`, `import_events`, `import_idempotency_keys`), a new `import-books` permission (admins have it implicitly; grant it per user for anyone else), and the routes `GET /imports/capabilities`, `GET|POST /imports/drafts`, `GET /imports/drafts/{draftId}` and `POST /imports/drafts/{draftId}/cancel`. A draft records the file facts the desktop/terminal importer observed locally (relative paths, sizes, fingerprints, raw tags) without any audio upload. POST actions require an `Idempotency-Key` and replay the stored response on retry; revisions are exposed as `ETag`/`If-Match`. The feature is off until `IMPORT_DRAFTS_ENABLED=true`. Existing import routes and `book:import` are unchanged.
 
 - Tag filters now distinguish personal filters from account-wide "system" filters. `user_tag_filters` gained `scope` (`user`|`system`) and `owner_key` (`"user:{userId}"` or `"account:{accountRootId}"`), replacing the old single-user `locked_by_admin` flag. A new lightweight parent/child account model (`users.parent_user_id`, `users.is_filter_manager`) lets a system filter apply to every member of an account. System filters can still be set by a full admin (`Api\AdminUserTagFilterController`, `/admin/users/{id}/tag-filters`), and now also by the account's parent user or a member the parent designated as a filter manager, via a new `Api\AccountTagFilterController` (`GET/POST /users/{id}/tag-filters/system`, `DELETE /users/{id}/tag-filters/system/{filterId}`). Personal filters (`/users/me/tag-filters`) are unchanged for the user themselves.
 

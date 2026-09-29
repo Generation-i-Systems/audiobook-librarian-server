@@ -31,6 +31,9 @@ enum PermissionKey: string
     case MANAGE_MESSAGES = 'manage-messages';
     case ACCESS_DEBUG_TOOLS = 'access-debug-tools';
 
+    // Import drafts API (Kotlin desktop/terminal importer)
+    case IMPORT_BOOKS = 'import-books';
+
     public function label(): string
     {
         return match ($this) {
@@ -51,6 +54,7 @@ enum PermissionKey: string
             self::MANAGE_ACCOUNT_REQUESTS => 'Manage Account Requests',
             self::MANAGE_MESSAGES => 'Manage Messages',
             self::ACCESS_DEBUG_TOOLS => 'Access Debug Tools',
+            self::IMPORT_BOOKS => 'Import Books',
         };
     }
 }

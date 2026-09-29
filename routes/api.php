@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\BookContributionController;
 use App\Http\Controllers\Api\BookCoverController;
 use App\Http\Controllers\Api\BookDownloadController;
 use App\Http\Controllers\Api\BookImportApiController;
+use App\Http\Controllers\Api\ImportDraftController;
 use App\Http\Controllers\Api\BookTagController;
 use App\Http\Controllers\Api\BookSeriesGenreController;
 use App\Http\Controllers\Api\DiscoveryController;
@@ -434,8 +435,20 @@ Route::prefix('v1')->group(function () {
             Route::post('/check-duplicate', [BookImportApiController::class, 'checkDuplicate']);
             Route::get('/queue/stats', [BookImportApiController::class, 'getQueueStats']);
             Route::get('/queue/pending', [BookImportApiController::class, 'getPendingImports']);
-            Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
             Route::get('/genres', [BookImportApiController::class, 'getGenres']);
+
+            // imports.v1 draft workflow (Kotlin desktop/terminal importer)
+            Route::get('/capabilities', [ImportDraftController::class, 'capabilities']);
+            Route::get('/drafts', [ImportDraftController::class, 'index']);
+            Route::post('/drafts', [ImportDraftController::class, 'store'])
+                ->middleware(['imports.idempotency', 'throttle:30,1']);
+            Route::get('/drafts/{draftId}', [ImportDraftController::class, 'show'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+');
+            Route::post('/drafts/{draftId}/cancel', [ImportDraftController::class, 'cancel'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+')
+                ->middleware('imports.idempotency');
+
+            Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
         });
 
         // Pending Download Routes (for the ABB bridge browser extension)

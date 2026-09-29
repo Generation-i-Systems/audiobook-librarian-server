@@ -588,3 +588,7 @@ Look for ways the server is tied to this build environment and make it portable 
 ## 2026-09-26
 
 expand the tag filters to allow user filters and system filters. system filters are edited by an admin or other designated user for a given account (parent) user filters are added by the user themselves and can be added or removed at will both on the web or on the client (the client already supports this)
+
+## 2026-09-29
+
+Continue enhancing and building out the importer according to the docs/IMPORTER_REBUILD_PLAN.md document (audiobook-librarian-importer repo): a client/server importer with a command-line tool and a GUI on the client side, and server support for everything specified, such as sending files remotely as part of the upload. The UI must be very user friendly, clear, attractive and modern, with no generic file inputs or API keys that would confuse end users. The terminal UI must be as good as or better than the server's built-in import TUI, with image previews and multi-level menus.
