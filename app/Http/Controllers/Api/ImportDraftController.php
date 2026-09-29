@@ -9,7 +9,9 @@ use App\Models\Imports\ImportDraft;
 use App\Models\User;
 use App\Services\Imports\ImportApiException;
 use App\Services\Imports\ImportDraftPresenter;
+use App\Services\Imports\ImportDraftReviewService;
 use App\Services\Imports\ImportDraftService;
+use App\Services\Imports\ImportPlanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -22,6 +24,8 @@ class ImportDraftController extends Controller
     public function __construct(
         private readonly ImportDraftService $draftService,
         private readonly ImportDraftPresenter $presenter,
+        private readonly ImportDraftReviewService $reviewService,
+        private readonly ImportPlanService $planService,
     ) {
     }
 
@@ -63,6 +67,30 @@ class ImportDraftController extends Controller
         return $this->draftResponse($draft, 200);
     }
 
+    public function update(Request $request, string $draftId): JsonResponse
+    {
+        $draft = $this->reviewService->update(
+            $this->user($request),
+            $draftId,
+            $this->expectedRevision($request),
+            $this->jsonBody($request)
+        );
+
+        return $this->draftResponse($draft, 200);
+    }
+
+    public function approve(Request $request, string $draftId): JsonResponse
+    {
+        $draft = $this->planService->approve(
+            $this->user($request),
+            $draftId,
+            $this->expectedRevision($request),
+            $this->jsonBody($request)
+        );
+
+        return $this->draftResponse($draft, 200);
+    }
+
     public function events(Request $request, string $draftId): JsonResponse
     {
         $after = $request->query('after', $request->header('Last-Event-ID'));
@@ -99,6 +127,19 @@ class ImportDraftController extends Controller
         );
 
         return $this->draftResponse($draft, 200);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonBody(Request $request): array
+    {
+        $decoded = json_decode((string) $request->getContent(), true);
+        if (!is_array($decoded)) {
+            throw ImportApiException::validation('The request body must be a JSON object.');
+        }
+
+        return $decoded;
     }
 
     private function draftResponse(ImportDraft $draft, int $status): JsonResponse

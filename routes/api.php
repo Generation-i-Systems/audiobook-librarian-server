@@ -449,6 +449,12 @@ Route::prefix('v1')->group(function () {
                 ->middleware('imports.idempotency');
             Route::get('/drafts/{draftId}/events', [ImportDraftController::class, 'events'])
                 ->where('draftId', 'imp_[A-Za-z0-9]+');
+            Route::patch('/drafts/{draftId}', [ImportDraftController::class, 'update'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+')
+                ->middleware('imports.idempotency');
+            Route::post('/drafts/{draftId}/approve', [ImportDraftController::class, 'approve'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+')
+                ->middleware('imports.idempotency');
 
             Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
         });

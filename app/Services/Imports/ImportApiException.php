@@ -49,6 +49,25 @@ class ImportApiException extends RuntimeException
     }
 
     /**
+     * A request that is well-formed but violates import policy (unknown target, unoffered option, ...).
+     *
+     * @param array<string, mixed> $details
+     */
+    public static function policy(string $code, string $message, array $details = []): self
+    {
+        return new self(422, $code, $message, $details);
+    }
+
+    public static function revisionRequired(): self
+    {
+        return new self(
+            428,
+            'revision_required',
+            'Send the draft revision you reviewed in the If-Match header.'
+        );
+    }
+
+    /**
      * @param array<string, mixed> $currentDraft
      */
     public static function revisionConflict(int $currentRevision, array $currentDraft): self

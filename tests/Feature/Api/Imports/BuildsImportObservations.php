@@ -58,7 +58,18 @@ trait BuildsImportObservations
      */
     protected function postDraft(array $observation): TestResponse
     {
-        return $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson(self::DRAFTS_URL, $observation);
+        return $this->withDraftHeaders(['Idempotency-Key' => (string) Str::uuid()])
+            ->postJson(self::DRAFTS_URL, $observation);
+    }
+
+    /**
+     * Test-case headers persist across requests, so per-request draft headers are reset before each call.
+     *
+     * @param array<string, string> $headers
+     */
+    protected function withDraftHeaders(array $headers): static
+    {
+        return $this->withoutHeaders(['Idempotency-Key', 'If-Match', 'Content-Type'])->withHeaders($headers);
     }
 
     /**
@@ -122,6 +133,58 @@ trait BuildsImportObservations
         $directory = $this->booksRoot . '/' . $relativeDirectory;
         File::makeDirectory($directory, 0755, true);
         File::put($directory . '/' . ($withAudio ? '01.mp3' : 'notes.txt'), 'x');
+    }
+
+    /**
+     * An approval built from the recommendation's defaults, as a client would send it.
+     *
+     * @param array<string, mixed> $draft
+     * @return array<string, mixed>
+     */
+    protected function approvalFromDefaults(array $draft): array
+    {
+        $recommendation = $draft['recommendation'];
+        $defaults = array_column($recommendation['required_decisions'], 'default', 'id');
+        $metadata = $recommendation['metadata'];
+        unset($metadata['cover_artifact_id']);
+
+        return [
+            'contract_version' => 'imports.v1',
+            'expected_revision' => $draft['revision'],
+            'metadata' => $metadata,
+            'cover_artifact_id' => $recommendation['metadata']['cover_artifact_id'],
+            'target' => ['candidate_id' => $defaults['target']],
+            'duplicate_action' => $defaults['duplicate_action'],
+            'file_operation' => $defaults['file_operation'],
+            'transfer_mode' => 'upload',
+            'acknowledged_warning_ids' => $defaults['acknowledged_warning_ids'] ?? [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    protected function approve(string $draftId, array $payload, ?string $ifMatch = null): TestResponse
+    {
+        $headers = ['Idempotency-Key' => (string) Str::uuid()];
+        if ($ifMatch !== null) {
+            $headers['If-Match'] = $ifMatch;
+        }
+
+        return $this->withDraftHeaders($headers)->postJson(self::DRAFTS_URL . '/' . $draftId . '/approve', $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    protected function patchDraft(string $draftId, array $body, ?string $ifMatch): TestResponse
+    {
+        $headers = ['Idempotency-Key' => (string) Str::uuid(), 'Content-Type' => 'application/merge-patch+json'];
+        if ($ifMatch !== null) {
+            $headers['If-Match'] = $ifMatch;
+        }
+
+        return $this->withDraftHeaders($headers)->patchJson(self::DRAFTS_URL . '/' . $draftId, $body);
     }
 
     /**
