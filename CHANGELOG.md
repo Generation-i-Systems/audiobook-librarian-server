@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Fixed
+
+- CI: the PHP 8.3 test job and the Windows portability check install dependencies without the dev-only `ext-xdebug` and Unix-only `ext-pcntl`/`ext-posix` requirements, and the container first-install check waits for the app to finish migrating before inspecting it.
+
 ### Added
 
 - Import drafts API, phase 1 of the importer rebuild (`imports.v1`, see `docs/importer-drafts.md`): new additive tables (`import_drafts`, `import_draft_files`, `import_artifacts`, `import_plans`, `import_events`, `import_idempotency_keys`), a new `import-books` permission (admins have it implicitly; grant it per user for anyone else), and the routes `GET /imports/capabilities`, `GET|POST /imports/drafts`, `GET /imports/drafts/{draftId}` and `POST /imports/drafts/{draftId}/cancel`. A draft records the file facts the desktop/terminal importer observed locally (relative paths, sizes, fingerprints, raw tags) without any audio upload. POST actions require an `Idempotency-Key` and replay the stored response on retry; revisions are exposed as `ETag`/`If-Match`. The feature is off until `IMPORT_DRAFTS_ENABLED=true`. Existing import routes and `book:import` are unchanged.
