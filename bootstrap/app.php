@@ -137,6 +137,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.auth' => \App\Http\Middleware\ApiAuth::class,
             'idempotency' => \App\Http\Middleware\CheckIdempotency::class,
             'device.identify' => \App\Http\Middleware\IdentifyDevice::class,
+            'community' => \App\Http\Middleware\EnsureCommunityAvailable::class,
         ]);
     })
     ->withProviders([

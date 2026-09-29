@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\CommunityStatus;
 use App\Support\MailConfiguration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Route;
@@ -69,6 +70,7 @@ class ApiRootController extends Controller
             'documentation' => $baseUrl . '/docs/api', // Assuming this exists or points to something useful
             'openapi' => route('api.v1.openapi'), // We'll name the existing openapi route
             'otp_available' => MailConfiguration::isMailConfigured(),
+            'community' => CommunityStatus::toArray(),
             'resources' => $apiRoutes,
         ]);
     }
