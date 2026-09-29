@@ -16,6 +16,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $book_id
  * @property string|null $message
  * @property \Illuminate\Support\Carbon|null $acknowledged_at
+ * @property string|null $batch_id
+ * @property string $audience_type
+ * @property int|null $group_id
+ * @property int|null $start_position_ms
+ * @property \Illuminate\Support\Carbon|null $seen_at
+ * @property \Illuminate\Support\Carbon|null $dismissed_at
+ * @property string|null $reaction
+ * @property string|null $reply
+ * @property \Illuminate\Support\Carbon|null $responded_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
@@ -48,11 +57,31 @@ class UserRecommendation extends Model
         'book_id',
         'message',
         'acknowledged_at',
+        'batch_id',
+        'audience_type',
+        'group_id',
+        'start_position_ms',
+        'seen_at',
+        'dismissed_at',
+        'reaction',
+        'reply',
+        'responded_at',
     ];
 
     protected $casts = [
         'acknowledged_at' => 'datetime',
+        'seen_at' => 'datetime',
+        'dismissed_at' => 'datetime',
+        'responded_at' => 'datetime',
+        'group_id' => 'integer',
+        'start_position_ms' => 'integer',
     ];
+
+    public const AUDIENCE_USER = 'user';
+    public const AUDIENCE_GROUP = 'group';
+    public const AUDIENCE_ALL = 'all';
+
+    public const REACTIONS = ['thanks', 'queued', 'loved', 'not_for_me'];
 
     public function sender(): BelongsTo
     {
@@ -67,5 +96,10 @@ class UserRecommendation extends Model
     public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class);
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(Group::class);
     }
 }

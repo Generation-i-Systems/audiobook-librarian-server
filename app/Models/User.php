@@ -28,6 +28,8 @@ use App\Traits\Auditable;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property bool $is_admin
+ * @property bool $community_family_only
+ * @property bool $community_share_progress
  * @property string|null $remember_token
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBookStatus> $bookStatuses
@@ -97,6 +99,8 @@ class User extends Authenticatable implements Permissible
         'must_change_password',
         'parent_user_id',
         'is_filter_manager',
+        'community_family_only',
+        'community_share_progress',
     ];
 
     /**
@@ -121,6 +125,8 @@ class User extends Authenticatable implements Permissible
         'book_list_preferences' => 'array',
         'password' => 'hashed',
         'is_filter_manager' => 'boolean',
+        'community_family_only' => 'boolean',
+        'community_share_progress' => 'boolean',
     ];
 
     public function getIsAdminAttribute(): bool

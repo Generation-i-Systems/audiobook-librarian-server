@@ -37,7 +37,11 @@ class BlockedEntityController extends Controller
         $validated = $request->validate([
             'string_id'     => 'required|uuid',
             'entity_type'   => ['required', 'string', Rule::in(BlockedEntity::TYPES)],
-            'entity_ref_id' => 'nullable|integer',
+            'entity_ref_id' => [
+                Rule::requiredIf($request->input('entity_type') === BlockedEntity::TYPE_USER),
+                'nullable',
+                'integer',
+            ],
             'entity_value'  => 'required|string|max:255',
             'entity_label'  => 'required|string|max:255',
             'created_at'    => 'required|integer',
