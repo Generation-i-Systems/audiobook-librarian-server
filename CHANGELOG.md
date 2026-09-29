@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Fixed
+
+- CI: the PHP 8.3 test job and the Windows portability check install dependencies without the dev-only `ext-xdebug` and Unix-only `ext-pcntl`/`ext-posix` requirements, and the container first-install check waits for the app to finish migrating before inspecting it.
+
 ### Added
 
 - Import drafts, phase 3 (`imports.v1` review and approval): `PATCH /imports/drafts/{draftId}` saves reviewed metadata edits as a JSON merge patch (`If-Match` and `Idempotency-Key` required; `428 revision_required`, `409 draft_revision_conflict`), rejects invalid values instead of rewriting them, records `user_edit` provenance and re-derives duplicates, targets and required decisions. Editing an approved draft invalidates its plan and returns it to review. `POST /imports/drafts/{draftId}/approve` validates the approval (revision, state, reviewed metadata, library genres with a suggestion, duplicate action, target availability rechecked live, file operation, cover artifact, warning acknowledgements) and locks an `ImportPlan` exactly as approved. No files are moved yet.
