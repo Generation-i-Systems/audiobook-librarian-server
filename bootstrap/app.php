@@ -124,6 +124,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
         $middleware->append(\App\Http\Middleware\DemoMode::class);
 
+        // imports.v1 drafts carry checksummed inline text and user-confirmed metadata;
+        // both must reach the server byte-for-byte, so never trim or null them.
+        $importDraftRequest = static fn (\Illuminate\Http\Request $request): bool => $request->is(
+            'api/v1/imports/drafts',
+            'api/v1/imports/drafts/*'
+        );
+        $middleware->trimStrings(except: [$importDraftRequest]);
+        $middleware->convertEmptyStringsToNull(except: [$importDraftRequest]);
+
         $middleware->validateCsrfTokens(except: [
             'admin/adminer*',
         ]);

@@ -183,6 +183,30 @@ class ImportDraftApiTest extends ApiTestCase
         $this->postDraft($observation)->assertStatus(422);
     }
 
+    #[DataProvider('untrimmedInlineTextProvider')]
+    public function testCreateDraftKeepsInlineTextByteForByte(string $text): void
+    {
+        $observation = $this->observation();
+        $observation['source']['artifacts'][0]['inline_utf8'] = $text;
+        $observation['source']['artifacts'][0]['sha256'] = hash('sha256', $text);
+
+        $draftId = (string) $this->postDraft($observation)->assertCreated()->json('draft.id');
+
+        $draft = ImportDraft::query()->where('public_id', $draftId)->firstOrFail();
+        $this->assertSame($text, $draft->artifacts()->value('inline_text'));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function untrimmedInlineTextProvider(): array
+    {
+        return [
+            'trailing newline' => ["Title: Test\n"],
+            'leading spaces' => ["  Title: Test"],
+        ];
+    }
+
     public function testUserWithoutImportPermissionIsForbidden(): void
     {
         $this->actingAsUser(User::factory()->create(['role' => 'library-user']));
