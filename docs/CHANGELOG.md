@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added `serverName` to the `/health/capabilities` response schema.
 - Documented the imports.v1 draft endpoints (`/imports/capabilities`, `/imports/drafts`, `/imports/drafts/{draftId}`, `/imports/drafts/{draftId}/cancel`) and their `Imports*` component schemas, merged from the importer repository's `docs/imports-v1.openapi.yaml`.
 
 ## 2026-05-08

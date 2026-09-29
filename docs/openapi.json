@@ -6423,6 +6423,11 @@
                                             "type": "string",
                                             "example": "ablibrarian-full"
                                         },
+                                        "serverName": {
+                                            "type": "string",
+                                            "description": "Display name of this library server (the configured application name). Clients show it as the library's name.",
+                                            "example": "AB Librarian"
+                                        },
                                         "syncApiVersion": {
                                             "type": "string",
                                             "example": "1"
