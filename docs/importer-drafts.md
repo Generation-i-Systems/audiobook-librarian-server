@@ -23,6 +23,8 @@ user and which limits apply.
 | `GET /imports/drafts/{draftId}` | One draft; `ETag` is the quoted revision, `If-None-Match` returns 304 |
 | `POST /imports/drafts/{draftId}/cancel` | Cancel; optional `If-Match` guards against stale revisions |
 | `GET /imports/drafts/{draftId}/events` | Event log for polling, `?after=<cursor>` (phase 2) |
+| `PATCH /imports/drafts/{draftId}` | Save reviewed metadata edits; `If-Match` + `Idempotency-Key` required (phase 3) |
+| `POST /imports/drafts/{draftId}/approve` | Validate and lock an `ImportPlan` (requires `Idempotency-Key`) (phase 3) |
 
 No audio bytes are accepted yet.
 
@@ -89,6 +91,54 @@ offers `create_new` (plus `skip` when only similar titles were found). Warnings 
 `GET /imports/drafts/{draftId}/events?after=<cursor>` (or `Last-Event-ID`) returns events oldest
 first with `next_cursor` and `has_more`. `next_cursor` is always present; pass it back unchanged.
 Polling this or `GET /imports/drafts/{draftId}` is the supported way to follow progress.
+
+## Review and approval (phase 3)
+
+### Editing (`PATCH /imports/drafts/{draftId}`)
+
+- Body is a JSON merge patch (`application/merge-patch+json` or `application/json`) with a
+  `metadata` object. `series` merges key by key; other fields replace. `cover_artifact_id` may
+  name one of the draft's artifacts.
+- `If-Match` is required (`428 revision_required` without it, `409 draft_revision_conflict` with a
+  stale value). `Idempotency-Key` is required.
+- Invalid values (blank title, non-list authors, negative series number, series number without a
+  name, unknown fields) are rejected with `422 validation_failed`; they are never rewritten.
+  `local_ai_artifacts` returns `422 local_ai_artifacts_not_supported` for now.
+- A no-op edit returns the draft unchanged (same revision). A real edit bumps the revision,
+  prepends a `your edit` (`source_id: user_edit`) provenance entry to each changed field and
+  re-derives duplicates, targets, warnings and `required_decisions` from the edited metadata. A
+  `metadata_updated` event carries `{fields}`.
+- Only `awaiting_review` and `approved` drafts are editable (`409 invalid_state_transition`
+  otherwise). Editing an `approved` draft invalidates its plan (`invalidated_reason:
+  metadata_edited_after_approval`, `plan_invalidated` event), clears `plan_revision` and returns
+  the draft to `awaiting_review`; the client must approve again.
+
+### Approving (`POST /imports/drafts/{draftId}/approve`)
+
+The body is an `ImportsPlanApproval`: `contract_version`, `expected_revision`, `metadata`,
+optional `cover_artifact_id`, `target.candidate_id`, `duplicate_action`, `file_operation`,
+`transfer_mode` and `acknowledged_warning_ids`. Checks, in order:
+
+| Code | Status | Meaning |
+|---|---|---|
+| `validation_failed` | 422 | Wrong shape, unknown keys, contract version, or missing title/author |
+| `draft_revision_conflict` | 409 | `expected_revision` (or `If-Match`) is not the current revision |
+| `invalid_state_transition` | 409 | Draft is not `awaiting_review` |
+| `metadata_not_reviewed` | 422 | Title, authors, narrators, series or genres differ from the recommendation; save them via PATCH first so targets and duplicates are re-checked |
+| `invalid_genre` | 422 | Genre is not in the library list; `details.suggestion` is the closest valid genre |
+| `invalid_duplicate_action` | 422 | Action is not an option of the `duplicate_action` decision |
+| `invalid_target` | 422 | Unknown candidate id |
+| `target_incompatible` | 422 | The candidate does not allow that duplicate action |
+| `target_unavailable` | 422 | The folder is occupied (rechecked live at approval), unless the action is `skip` |
+| `invalid_transfer_mode` / `invalid_file_operation` | 422 | Not offered (`upload` allows `copy` or `move`) |
+| `invalid_cover_artifact` | 422 | Cover id is not an artifact of this draft |
+| `unknown_warning` / `warnings_not_acknowledged` | 422 | Acknowledgements must match warnings that require one |
+
+On success the plan is stored exactly as sent (description, tags and language included, byte for
+byte), with the resolved relative target directory, the duplicate book id, a manifest snapshot and
+the recommendation snapshot. The draft becomes `approved`, `revision` and `plan_revision` both
+become the plan revision, and `draft.plan` returns the locked plan. A retry with the same
+`Idempotency-Key` replays the response; a second approval of an approved draft is rejected.
 
 ## Rules
 
