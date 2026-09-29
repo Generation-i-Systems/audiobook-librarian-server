@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\Imports;
 
 use App\Enums\PermissionKey;
+use App\Jobs\InterpretImportDraftJob;
 use App\Models\Imports\ImportDraft;
 use App\Models\Imports\ImportEvent;
 use App\Models\Permission;
 use App\Models\User;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Api\ApiTestCase;
@@ -22,6 +24,19 @@ class ImportDraftApiTest extends ApiTestCase
         parent::setUp();
         config(['import_drafts.enabled' => true]);
         $this->grantImportPermission($this->user);
+        // Draft lifecycle only; interpretation is covered by ImportDraftInterpretationTest.
+        Queue::fake();
+    }
+
+    public function testCreateDraftQueuesInterpretation(): void
+    {
+        $draftId = (string) $this->postDraft($this->observation())->assertCreated()->json('draft.id');
+
+        $internalId = ImportDraft::query()->where('public_id', $draftId)->value('id');
+        Queue::assertPushed(
+            InterpretImportDraftJob::class,
+            static fn (InterpretImportDraftJob $job): bool => $job->draftId === $internalId
+        );
     }
 
     public function testCapabilitiesReportDraftsEnabledForPermittedUser(): void

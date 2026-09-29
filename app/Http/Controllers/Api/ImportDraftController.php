@@ -63,6 +63,28 @@ class ImportDraftController extends Controller
         return $this->draftResponse($draft, 200);
     }
 
+    public function events(Request $request, string $draftId): JsonResponse
+    {
+        $after = $request->query('after', $request->header('Last-Event-ID'));
+        $page = $this->draftService->eventsForUser(
+            $this->user($request),
+            $draftId,
+            is_string($after) ? $after : null
+        );
+
+        return response()->json([
+            'contract_version' => config('import_drafts.contract_version'),
+            'draft' => [
+                'id' => $page['draft']->public_id,
+                'revision' => $page['draft']->revision,
+                'state' => $page['draft']->state->value,
+            ],
+            'data' => $page['events']->map(fn ($event) => $this->presenter->event($page['draft'], $event))->all(),
+            'next_cursor' => $page['next_cursor'],
+            'has_more' => $page['has_more'],
+        ])->header('ETag', $this->presenter->etag($page['draft']));
+    }
+
     public function cancel(Request $request, string $draftId): JsonResponse
     {
         $reason = $request->input('reason');

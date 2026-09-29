@@ -3957,6 +3957,19 @@
                     "recommendation": {
                         "$ref": "#/components/schemas/ImportsRecommendation"
                     },
+                    "interpretation_error": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Set when interpretation ended in needs_attention (e.g. no_audio_files) or failed (interpretation_failed).",
+                        "properties": {
+                            "code": {
+                                "type": "string"
+                            },
+                            "message": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "transfer": {
                         "$ref": "#/components/schemas/ImportsTransferSummary"
                     }
@@ -3977,6 +3990,10 @@
                                 "properties": {
                                     "source": {
                                         "type": "string"
+                                    },
+                                    "source_id": {
+                                        "type": "string",
+                                        "description": "Machine-readable origin: embedded_tag, nfo, filename, library_series, external_enrichment, server_policy, user_edit. `source` is a short human-readable label."
                                     },
                                     "value": {},
                                     "confidence": {
@@ -4022,6 +4039,19 @@
                                 },
                                 "available": {
                                     "type": "boolean"
+                                },
+                                "duplicate_actions": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": [
+                                            "create_new",
+                                            "merge",
+                                            "replace",
+                                            "skip"
+                                        ]
+                                    },
+                                    "description": "Duplicate actions this destination can be approved with."
                                 }
                             }
                         }
@@ -4036,6 +4066,13 @@
                                 },
                                 "message": {
                                     "type": "string"
+                                },
+                                "code": {
+                                    "type": "string"
+                                },
+                                "requires_acknowledgment": {
+                                    "type": "boolean",
+                                    "description": "When true, the id must be listed in the approval's acknowledged_warning_ids."
                                 }
                             }
                         }
@@ -4055,9 +4092,28 @@
                                     "type": "array",
                                     "items": {}
                                 },
-                                "default": {}
+                                "default": {},
+                                "plan_field": {
+                                    "type": "string",
+                                    "description": "Approval payload field this decision fills, e.g. duplicate_action or target.candidate_id."
+                                },
+                                "related_book_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "Existing library book a duplicate_action decision refers to."
+                                }
                             }
                         }
+                    },
+                    "identifiers": {
+                        "type": "object",
+                        "properties": {
+                            "isbn": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "description": "Identifiers found in the observation, used for duplicate checks."
                     }
                 }
             },
@@ -4273,6 +4329,86 @@
                                 "type": "boolean"
                             }
                         }
+                    }
+                }
+            },
+            "ImportsDraftEventPage": {
+                "type": "object",
+                "required": [
+                    "contract_version",
+                    "draft",
+                    "data",
+                    "next_cursor",
+                    "has_more"
+                ],
+                "properties": {
+                    "contract_version": {
+                        "$ref": "#/components/schemas/ImportsContractVersion"
+                    },
+                    "draft": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "revision": {
+                                "type": "integer"
+                            },
+                            "state": {
+                                "$ref": "#/components/schemas/ImportsDraftState"
+                            }
+                        }
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ImportsDraftEvent"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string",
+                        "description": "Cursor to pass as `after` next time; unchanged when there were no new events."
+                    },
+                    "has_more": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ImportsDraftEvent": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "event",
+                    "draft_id",
+                    "revision",
+                    "data"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Monotonic event id; usable as a cursor."
+                    },
+                    "event": {
+                        "type": "string",
+                        "description": "Event type, e.g. state_changed, metadata_updated, plan_invalidated.",
+                        "example": "state_changed"
+                    },
+                    "draft_id": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "description": "Draft revision after the event."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "User-safe payload. state_changed carries `state` and, for failures, `error_code`."
                     }
                 }
             }
@@ -7510,6 +7646,111 @@
                     },
                     "409": {
                         "description": "Draft changed since caller opened it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Draft or transfer not found/visible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Authenticated caller lacks import permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Imports"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/imports/drafts/{draftId}/events": {
+            "get": {
+                "operationId": "listImportDraftEvents",
+                "summary": "Poll a draft's append-only event log",
+                "description": "Returns events after the `after` cursor (or the `Last-Event-ID` header), oldest first. `next_cursor` is always set: pass it back unchanged to receive only newer events. Polling this endpoint (or GET /imports/drafts/{draftId}) is the supported way to follow progress; a server-sent event stream is not offered yet (capabilities `sse: false`).",
+                "parameters": [
+                    {
+                        "name": "draftId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^imp_[A-Za-z0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "after",
+                        "in": "query",
+                        "required": false,
+                        "description": "Opaque event cursor from a previous response's next_cursor.",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "Last-Event-ID",
+                        "in": "header",
+                        "required": false,
+                        "description": "Alternative to `after`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of draft events",
+                        "headers": {
+                            "ETag": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "\"4\""
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsDraftEventPage"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid cursor",
                         "content": {
                             "application/json": {
                                 "schema": {

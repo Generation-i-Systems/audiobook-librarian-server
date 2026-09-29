@@ -447,6 +447,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/drafts/{draftId}/cancel', [ImportDraftController::class, 'cancel'])
                 ->where('draftId', 'imp_[A-Za-z0-9]+')
                 ->middleware('imports.idempotency');
+            Route::get('/drafts/{draftId}/events', [ImportDraftController::class, 'events'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+');
 
             Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
         });
