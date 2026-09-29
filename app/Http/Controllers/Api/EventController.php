@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\ListeningEvent;
+use App\Models\UserNotification;
 use App\Services\BadgeService;
 use App\Services\BookIdResolver;
 use App\Services\PositionMaterializer;
+use App\Support\CommunityStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
@@ -214,6 +216,7 @@ class EventController extends Controller
                 'hasMore'         => $hasMore,
                 'nextSyncAfter'   => $nextSyncAfter,
                 'badgesEarned'    => $badgesEarned,
+                'notifications'   => $this->notificationSummary($user->id),
             ]);
         } catch (\Exception $e) {
             ControllerDatabase::rollBack();
@@ -228,6 +231,25 @@ class EventController extends Controller
                 'error'   => 'Failed to sync events',
             ], 500);
         }
+    }
+
+    /**
+     * Newest community notification id and unread count, so an idle sync tells the client
+     * whether to fetch /notifications without an extra request. Null when community
+     * features are unavailable on this server.
+     *
+     * @return array{cursor: int, unread: int}|null
+     */
+    private function notificationSummary(int $userId): ?array
+    {
+        if (CommunityStatus::mode() !== CommunityStatus::MODE_FULL) {
+            return null;
+        }
+
+        return [
+            'cursor' => (int) (UserNotification::where('user_id', $userId)->max('id') ?? 0),
+            'unread' => UserNotification::where('user_id', $userId)->whereNull('read_at')->count(),
+        ];
     }
 
     /**
