@@ -20,6 +20,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ImportDraftReviewService
 {
+    public const EVENT_TARGETS_REFRESHED = 'targets_refreshed';
+    public const TRIGGER_REVIEW_PATCH = 'review_patch';
+    public const TRIGGER_APPROVAL = 'approval';
+
     public function __construct(
         private readonly ImportDraftService $draftService,
         private readonly ImportMetadataValidator $metadataValidator,
@@ -58,7 +62,9 @@ class ImportDraftReviewService
                 ARRAY_FILTER_USE_BOTH
             ));
             if ($changed === []) {
-                return $locked;
+                $this->refreshTargets($locked, self::TRIGGER_REVIEW_PATCH);
+
+                return $locked->load('files');
             }
 
             $locked->revision = $locked->revision + 1;
@@ -71,6 +77,42 @@ class ImportDraftReviewService
 
             return $locked->load('files');
         });
+    }
+
+    /**
+     * Re-derives the server-computed parts of a locked draft (duplicates, destinations,
+     * policy warnings, required decisions) from its stored metadata, so destination
+     * availability is current. The metadata and its provenance are never touched.
+     *
+     * When anything changed the revision is bumped once and a targets_refreshed event is
+     * recorded. An approved draft is never rewritten: its locked plan was built from the
+     * old recommendation, so a change fails with approved_plan_stale instead.
+     *
+     * @return bool whether the recommendation changed
+     */
+    public function refreshTargets(ImportDraft $locked, string $trigger): bool
+    {
+        $recommendation = (array) $locked->recommendation;
+        $refreshed = $this->withDerivedPolicy($locked, $recommendation, (array) ($recommendation['metadata'] ?? []));
+        if ($refreshed == $recommendation) {
+            return false;
+        }
+        if ($locked->state !== ImportDraftState::AWAITING_REVIEW) {
+            throw ImportApiException::approvedPlanStale((int) $locked->plan_revision, $locked->revision);
+        }
+
+        $locked->revision = $locked->revision + 1;
+        $locked->recommendation = $refreshed;
+        $locked->save();
+        $this->draftService->recordEvent($locked, self::EVENT_TARGETS_REFRESHED, [
+            'trigger' => $trigger,
+            'unavailable_candidate_ids' => array_column(array_filter(
+                $refreshed['target_candidates'],
+                static fn (array $candidate): bool => $candidate['available'] !== true
+            ), 'id'),
+        ]);
+
+        return true;
     }
 
     /**
@@ -143,6 +185,22 @@ class ImportDraftReviewService
             $provenance[$field] = $entries;
         }
 
+        return array_merge($this->withDerivedPolicy($draft, $recommendation, $edited), [
+            'metadata' => $edited,
+            'field_provenance' => $provenance,
+        ]);
+    }
+
+    /**
+     * The recommendation with its policy parts re-derived from $metadata; other
+     * warnings and every non-policy key are kept as they were.
+     *
+     * @param array<string, mixed> $recommendation
+     * @param array<string, mixed> $metadata
+     * @return array<string, mixed>
+     */
+    private function withDerivedPolicy(ImportDraft $draft, array $recommendation, array $metadata): array
+    {
         $keptWarnings = array_values(array_filter(
             (array) ($recommendation['warnings'] ?? []),
             static fn (array $warning): bool => !in_array(
@@ -153,14 +211,11 @@ class ImportDraftReviewService
         ));
         $derived = $this->policy->derive(
             $draft,
-            $edited,
+            $metadata,
             (array) ($recommendation['identifiers'] ?? []),
             $keptWarnings
         );
 
-        return array_merge($recommendation, $derived, [
-            'metadata' => $edited,
-            'field_provenance' => $provenance,
-        ]);
+        return array_merge($recommendation, $derived);
     }
 }

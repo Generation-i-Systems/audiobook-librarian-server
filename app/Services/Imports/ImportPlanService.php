@@ -36,6 +36,7 @@ class ImportPlanService
         private readonly ImportMetadataValidator $metadataValidator,
         private readonly ImportRecommendationPolicy $policy,
         private readonly BookImportService $importService,
+        private readonly ImportDraftReviewService $reviewService,
     ) {
     }
 
@@ -47,7 +48,12 @@ class ImportPlanService
         $draft = $this->draftService->findForUser($user, $publicId);
         $this->assertShape($body);
 
-        return DB::transaction(function () use ($user, $draft, $ifMatchRevision, $body): ImportDraft {
+        $approved = DB::transaction(function () use (
+            $user,
+            $draft,
+            $ifMatchRevision,
+            $body
+        ): ImportDraft|ImportApiException {
             /** @var ImportDraft $locked */
             $locked = ImportDraft::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
             $locked->load('files');
@@ -61,7 +67,16 @@ class ImportPlanService
             $recommendation = (array) $locked->recommendation;
             $this->assertReviewedMetadata($metadata, (array) ($recommendation['metadata'] ?? []));
             $this->assertGenres($metadata['genres'] ?? []);
-            $candidate = $this->assertDecisions($locked, $recommendation, $body);
+            try {
+                $candidate = $this->assertDecisions($locked, $recommendation, $body);
+            } catch (ImportApiException $exception) {
+                if ($exception->errorCode !== 'target_unavailable') {
+                    throw $exception;
+                }
+
+                // Returned rather than thrown so the refreshed destinations are committed.
+                return $this->targetUnavailable($locked, $exception);
+            }
             $this->assertCoverArtifact($locked, $body['cover_artifact_id'] ?? null);
             $this->assertCoverArtifact($locked, $metadata['cover_artifact_id'] ?? null);
             $acknowledged = $this->assertAcknowledgements($recommendation, $body['acknowledged_warning_ids'] ?? []);
@@ -106,6 +121,26 @@ class ImportPlanService
 
             return $locked;
         });
+        if ($approved instanceof ImportApiException) {
+            throw $approved;
+        }
+
+        return $approved;
+    }
+
+    /**
+     * The chosen destination is no longer usable: refresh the draft's destinations so the
+     * client can reload them and choose again, then report the revision to reload.
+     */
+    private function targetUnavailable(ImportDraft $locked, ImportApiException $exception): ImportApiException
+    {
+        $refreshed = $this->reviewService->refreshTargets($locked, ImportDraftReviewService::TRIGGER_APPROVAL);
+
+        return ImportApiException::policy(
+            $exception->errorCode,
+            'That destination folder is in use. Reload the draft to choose from the refreshed destinations.',
+            $exception->details + ['current_revision' => $locked->revision, 'targets_refreshed' => $refreshed]
+        );
     }
 
     /**

@@ -162,6 +162,14 @@ trait BuildsImportObservations
     }
 
     /**
+     * @param array<string, mixed> $draft
+     */
+    protected function decisionDefault(array $draft, string $decisionId): mixed
+    {
+        return array_column($draft['recommendation']['required_decisions'], 'default', 'id')[$decisionId] ?? null;
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     protected function approve(string $draftId, array $payload, ?string $ifMatch = null): TestResponse

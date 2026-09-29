@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\Imports;
 
+use App\Models\Imports\ImportDraft;
 use App\Models\Imports\ImportPlan;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -186,6 +187,71 @@ class ImportDraftApprovalTest extends ApiTestCase
         $this->approve((string) $draft['id'], $this->approvalFromDefaults($draft))
             ->assertStatus(422)
             ->assertJsonPath('error.code', 'target_unavailable');
+    }
+
+    public function testApprovalOfNewlyOccupiedTargetRefreshesDestinations(): void
+    {
+        $draft = $this->createInterpretedDraft($this->dustRoadObservation());
+        $draftId = (string) $draft['id'];
+        $this->assertSame('recommended', $this->decisionDefault($draft, 'target'));
+        $this->createLibraryDirectory('Fantasy/Jane Author/Dust Road', true);
+
+        $this->approve($draftId, $this->approvalFromDefaults($draft), '"3"')
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'target_unavailable')
+            ->assertJsonPath('error.details', [
+                'candidate_id' => 'recommended',
+                'current_revision' => 4,
+                'targets_refreshed' => true,
+            ]);
+
+        $refreshed = (array) $this->withDraftHeaders([])->getJson(self::DRAFTS_URL . '/' . $draftId)
+            ->assertOk()
+            ->assertHeader('ETag', '"4"')
+            ->json('draft');
+        $recommendation = $refreshed['recommendation'];
+        $this->assertSame(4, $refreshed['revision']);
+        $this->assertSame('awaiting_review', $refreshed['state']);
+        $this->assertSame($draft['recommendation']['metadata'], $recommendation['metadata']);
+        $this->assertSame($draft['recommendation']['field_provenance'], $recommendation['field_provenance']);
+        $this->assertSame(
+            ['recommended' => false, 'renamed' => true],
+            array_column($recommendation['target_candidates'], 'available', 'id')
+        );
+        $this->assertSame('renamed', $this->decisionDefault($refreshed, 'target'));
+        $this->assertContains('target_unavailable', array_column($recommendation['warnings'], 'code'));
+
+        $model = ImportDraft::query()->where('public_id', $draftId)->firstOrFail();
+        $refreshEvents = $model->events()->where('event_type', 'targets_refreshed')->get();
+        $this->assertSame(
+            [[4, ['trigger' => 'approval', 'unavailable_candidate_ids' => ['recommended']]]],
+            $refreshEvents->map(static fn ($event): array => [$event->observed_revision, $event->payload])->all()
+        );
+        $this->assertSame(0, ImportPlan::query()->count());
+
+        $this->approve($draftId, $this->approvalFromDefaults($refreshed), '"4"')
+            ->assertOk()
+            ->assertJsonPath('draft.plan.target.candidate_id', 'renamed');
+    }
+
+    public function testApprovalOfTargetAlreadyMarkedUnavailableKeepsRevision(): void
+    {
+        $this->createLibraryDirectory('Fantasy/Jane Author/Dust Road', true);
+        $draft = $this->createInterpretedDraft($this->dustRoadObservation());
+        $payload = array_merge($this->approvalFromDefaults($draft), ['target' => ['candidate_id' => 'recommended']]);
+
+        $this->approve((string) $draft['id'], $payload)
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'target_unavailable')
+            ->assertJsonPath('error.details', [
+                'candidate_id' => 'recommended',
+                'current_revision' => 3,
+                'targets_refreshed' => false,
+            ]);
+
+        $model = ImportDraft::query()->where('public_id', $draft['id'])->firstOrFail();
+        $this->assertSame(3, $model->revision);
+        $this->assertSame(0, $model->events()->where('event_type', 'targets_refreshed')->count());
     }
 
     public function testUserWithoutPermissionCannotApprove(): void

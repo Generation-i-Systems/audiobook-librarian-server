@@ -122,11 +122,71 @@ class ImportDraftReviewTest extends ApiTestCase
 
     public function testNoOpPatchKeepsRevision(): void
     {
-        $draftId = (string) $this->createInterpretedDraft($this->dustRoadObservation())['id'];
+        $draft = $this->createInterpretedDraft($this->dustRoadObservation());
+        $draftId = (string) $draft['id'];
 
         $this->patchDraft($draftId, ['metadata' => ['title' => 'Dust Road']], '"3"')
             ->assertOk()
-            ->assertJsonPath('draft.revision', 3);
+            ->assertJsonPath('draft.revision', 3)
+            ->assertJsonPath('draft.recommendation', $draft['recommendation']);
+        $model = ImportDraft::query()->where('public_id', $draftId)->firstOrFail();
+        $this->assertSame(0, $model->events()->where('event_type', 'targets_refreshed')->count());
+    }
+
+    public function testNoOpPatchRefreshesTargetsAfterOccupancyChange(): void
+    {
+        $draft = $this->createInterpretedDraft($this->dustRoadObservation());
+        $draftId = (string) $draft['id'];
+        $this->createLibraryDirectory('Fantasy/Jane Author/Dust Road', true);
+
+        $response = $this->patchDraft($draftId, ['metadata' => ['title' => 'Dust Road']], '"3"')
+            ->assertOk()
+            ->assertHeader('ETag', '"4"')
+            ->assertJsonPath('draft.revision', 4)
+            ->assertJsonPath('draft.state', 'awaiting_review');
+
+        $recommendation = (array) $response->json('draft.recommendation');
+        $this->assertSame($draft['recommendation']['metadata'], $recommendation['metadata']);
+        $this->assertSame($draft['recommendation']['field_provenance'], $recommendation['field_provenance']);
+        $this->assertSame(
+            ['recommended' => false, 'renamed' => true],
+            array_column($recommendation['target_candidates'], 'available', 'id')
+        );
+        $this->assertSame('renamed', $this->decisionDefault(['recommendation' => $recommendation], 'target'));
+        $model = ImportDraft::query()->where('public_id', $draftId)->firstOrFail();
+        $this->assertSame(
+            [[4, 'targets_refreshed', ['trigger' => 'review_patch', 'unavailable_candidate_ids' => ['recommended']]]],
+            $model->events()->where('observed_revision', 4)->get()
+                ->map(static fn ($event): array => [$event->observed_revision, $event->event_type, $event->payload])
+                ->all()
+        );
+
+        $this->patchDraft($draftId, ['metadata' => ['title' => 'Dust Road']], '"4"')
+            ->assertOk()
+            ->assertJsonPath('draft.revision', 4);
+    }
+
+    public function testNoOpPatchOnApprovedDraftFailsWhenTargetsChanged(): void
+    {
+        $draft = $this->createInterpretedDraft($this->dustRoadObservation());
+        $draftId = (string) $draft['id'];
+        $this->approve($draftId, $this->approvalFromDefaults($draft))->assertOk();
+        $this->patchDraft($draftId, ['metadata' => ['title' => 'Dust Road']], '"4"')
+            ->assertOk()
+            ->assertJsonPath('draft.revision', 4)
+            ->assertJsonPath('draft.state', 'approved');
+        $this->createLibraryDirectory('Fantasy/Jane Author/Dust Road', true);
+
+        $this->patchDraft($draftId, ['metadata' => ['title' => 'Dust Road']], '"4"')
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'approved_plan_stale')
+            ->assertJsonPath('error.details', ['plan_revision' => 4, 'current_revision' => 4]);
+
+        $model = ImportDraft::query()->where('public_id', $draftId)->firstOrFail();
+        $this->assertSame(4, $model->revision);
+        $this->assertSame('approved', $model->state->value);
+        $this->assertSame($draft['recommendation'], $model->recommendation);
+        $this->assertNull(ImportPlan::query()->sole()->invalidated_at);
     }
 
     public function testPatchIsRejectedOutsideReview(): void

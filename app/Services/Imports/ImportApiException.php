@@ -91,6 +91,20 @@ class ImportApiException extends RuntimeException
         );
     }
 
+    /**
+     * Fresh server checks no longer agree with an approved draft. Its locked plan is
+     * never changed silently; editing the details reopens review.
+     */
+    public static function approvedPlanStale(int $planRevision, int $currentRevision): self
+    {
+        return new self(
+            409,
+            'approved_plan_stale',
+            'This import was approved, but its destinations have changed since. Edit its details to review it again.',
+            ['plan_revision' => $planRevision, 'current_revision' => $currentRevision]
+        );
+    }
+
     public function render(): JsonResponse
     {
         $error = [
