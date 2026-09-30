@@ -153,6 +153,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'idempotency' => \App\Http\Middleware\CheckIdempotency::class,
             'imports.idempotency' => \App\Http\Middleware\RequireImportIdempotency::class,
             'device.identify' => \App\Http\Middleware\IdentifyDevice::class,
+            'community' => \App\Http\Middleware\EnsureCommunityAvailable::class,
         ]);
     })
     ->withProviders([

@@ -24,7 +24,9 @@ class BlockedEntity extends Model
     public const TYPE_AUTHOR = 'AUTHOR';
     public const TYPE_SERIES = 'SERIES';
     public const TYPE_TAG = 'TAG';
-    public const TYPES = [self::TYPE_BOOK, self::TYPE_AUTHOR, self::TYPE_SERIES, self::TYPE_TAG];
+    /** Another user on this server; entity_ref_id holds their user id. */
+    public const TYPE_USER = 'USER';
+    public const TYPES = [self::TYPE_BOOK, self::TYPE_AUTHOR, self::TYPE_SERIES, self::TYPE_TAG, self::TYPE_USER];
 
     protected $fillable = [
         'user_id', 'string_id', 'entity_type', 'entity_ref_id', 'entity_value', 'entity_label', 'created_at',

@@ -41,6 +41,8 @@ use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
 use App\Http\Controllers\Api\RecommendationController;
+use App\Http\Controllers\Api\CommunityController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\SkinController;
 use App\Http\Controllers\Api\ListeningGoalController;
@@ -383,14 +385,35 @@ Route::prefix('v1')->group(function () {
         Route::get('/statistics/dashboard', [StatisticsController::class, 'getDashboardStats']);
         Route::get('/books/{book}/statistics', [StatisticsController::class, 'getBookStats']);
 
-        // Recommendation Routes
-        Route::prefix('recommendations')->group(function () {
-            Route::post('/{book}', [RecommendationController::class, 'send']);
-            Route::get('/inbox', [RecommendationController::class, 'inbox']);
-            Route::post('/{recommendation}/acknowledge', [RecommendationController::class, 'acknowledge']);
-        });
+        // Community: recommendations between users of this server, the people/groups they can
+        // reach, and sync-delivered notifications. Refused on demo installs (EnsureCommunityAvailable).
+        Route::middleware('community')->group(function () {
+            Route::prefix('recommendations')->group(function () {
+                Route::get('/inbox', [RecommendationController::class, 'inbox']);
+                Route::get('/sent', [RecommendationController::class, 'sent']);
+                Route::post('/{book}', [RecommendationController::class, 'send'])->whereNumber('book');
+                Route::patch('/{recommendation}', [RecommendationController::class, 'update'])
+                    ->whereNumber('recommendation');
+                Route::post('/{recommendation}/acknowledge', [RecommendationController::class, 'acknowledge']);
+            });
 
-        Route::post('/books/{book}/recommend', [RecommendationController::class, 'send']);
+            Route::post('/books/{book}/recommend', [RecommendationController::class, 'send']);
+
+            Route::prefix('community')->group(function () {
+                Route::get('/people', [CommunityController::class, 'people']);
+                Route::get('/settings', [CommunityController::class, 'settings']);
+                Route::put('/settings', [CommunityController::class, 'updateSettings']);
+                Route::put('/members/{member}/family-only', [CommunityController::class, 'setFamilyOnly'])
+                    ->whereNumber('member');
+            });
+
+            Route::prefix('notifications')->group(function () {
+                Route::get('/', [NotificationController::class, 'index']);
+                Route::post('/read', [NotificationController::class, 'markRead']);
+                Route::get('/preferences', [NotificationController::class, 'preferences']);
+                Route::put('/preferences', [NotificationController::class, 'updatePreferences']);
+            });
+        });
 
         // Badge routes
         Route::prefix('badges')->group(function () {

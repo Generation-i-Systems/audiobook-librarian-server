@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Support\CommunityStatus;
 use App\Support\MailConfiguration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -166,6 +167,7 @@ class ApiHealthController extends Controller
             ],
             'requiresAuth' => true,
             'authMethods' => $authMethods,
+            'community' => CommunityStatus::toArray(),
         ]);
     }
 

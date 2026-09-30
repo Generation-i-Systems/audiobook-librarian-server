@@ -26,7 +26,7 @@ class RecommendationControllerTest extends TestCase
         $user = User::factory()->create(['email_verified_at' => now(), 'role' => 'admin']);
         $this->user = $user;
         /** @var User $recipient */
-        $recipient = User::factory()->create();
+        $recipient = User::factory()->create(['role' => 'library-user']);
         $this->recipient = $recipient;
         /** @var Book $book */
         $book = Book::factory()->create();
