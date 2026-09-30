@@ -63,10 +63,11 @@ class RecommendationController extends Controller
             return response()->json(['message' => 'Choose at least one recipient, group or everyone.'], 422);
         }
 
-        $targets = $this->resolveTargets($sender, $userIds, $groupIds, $everyone);
-        if ($targets instanceof JsonResponse) {
-            return $targets;
+        $resolved = $this->resolveTargets($sender, $userIds, $groupIds, $everyone);
+        if ($resolved instanceof JsonResponse) {
+            return $resolved;
         }
+        $targets = collect($resolved);
 
         $alreadyOpen = UserRecommendation::query()
             ->where('sender_id', $sender->id)
@@ -260,14 +261,14 @@ class RecommendationController extends Controller
      *
      * @param Collection<int, int> $userIds
      * @param Collection<int, int> $groupIds
-     * @return Collection<int, array{user: User, audience: string, group_id: int|null}>|JsonResponse
+     * @return array<int, array{user: User, audience: string, group_id: int|null}>|JsonResponse
      */
     private function resolveTargets(
         User $sender,
         Collection $userIds,
         Collection $groupIds,
         bool $everyone,
-    ): Collection|JsonResponse {
+    ): array|JsonResponse {
         /** @var array<int, array{user: User, audience: string, group_id: int|null}> $targets */
         $targets = [];
 
@@ -311,7 +312,7 @@ class RecommendationController extends Controller
             ];
         }
 
-        return collect($targets);
+        return $targets;
     }
 
     /**
