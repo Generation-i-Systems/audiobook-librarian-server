@@ -49,7 +49,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'notifications' => $notifications->map(fn (UserNotification $n) => $this->format($n))->values(),
-            'cursor' => $notifications->last()?->id ?? $since,
+            'cursor' => $notifications->isEmpty() ? $since : $notifications->last()->id,
             'has_more' => $hasMore,
             'unread_count' => $this->unreadCount($user),
         ]);

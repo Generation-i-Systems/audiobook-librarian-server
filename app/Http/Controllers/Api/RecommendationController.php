@@ -268,19 +268,19 @@ class RecommendationController extends Controller
         Collection $groupIds,
         bool $everyone,
     ): Collection|JsonResponse {
-        /** @var Collection<int, array{user: User, audience: string, group_id: int|null}> $targets */
-        $targets = collect();
+        /** @var array<int, array{user: User, audience: string, group_id: int|null}> $targets */
+        $targets = [];
 
         if ($everyone) {
             if (!$this->audience->canReachEveryone($sender)) {
                 return response()->json(['message' => 'Only admins can recommend to everyone.'], 403);
             }
             foreach ($this->audience->reachableUsers($sender) as $user) {
-                $targets->put($user->id, [
+                $targets[$user->id] = [
                     'user' => $user,
                     'audience' => UserRecommendation::AUDIENCE_ALL,
                     'group_id' => null,
-                ]);
+                ];
             }
         }
 
@@ -289,11 +289,11 @@ class RecommendationController extends Controller
                 return response()->json(['message' => 'You can only recommend to groups you belong to.'], 403);
             }
             foreach ($this->audience->reachableGroupMembers($sender, $group) as $user) {
-                $targets->put($user->id, [
+                $targets[$user->id] = [
                     'user' => $user,
                     'audience' => UserRecommendation::AUDIENCE_GROUP,
                     'group_id' => $group->id,
-                ]);
+                ];
             }
         }
 
@@ -304,14 +304,14 @@ class RecommendationController extends Controller
                     'recipientId' => $user->id,
                 ], 403);
             }
-            $targets->put($user->id, [
+            $targets[$user->id] = [
                 'user' => $user,
                 'audience' => UserRecommendation::AUDIENCE_USER,
                 'group_id' => null,
-            ]);
+            ];
         }
 
-        return $targets;
+        return collect($targets);
     }
 
     /**

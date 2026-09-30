@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property-read \App\Models\Book|null $book
+ * @property-read \App\Models\Group|null $group
  * @property-read \App\Models\User|null $recipient
  * @property-read \App\Models\User|null $sender
  * @method static \Database\Factories\UserRecommendationFactory factory($count = null, $state = [])

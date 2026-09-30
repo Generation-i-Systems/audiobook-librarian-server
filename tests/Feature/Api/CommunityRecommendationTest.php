@@ -223,6 +223,7 @@ class CommunityRecommendationTest extends TestCase
 
     public function testRecipientReactionNotifiesSenderAndDismissHidesFromInbox(): void
     {
+        /** @var UserRecommendation $recommendation */
         $recommendation = UserRecommendation::factory()->create([
             'sender_id' => $this->friend->id,
             'recipient_id' => $this->member->id,
@@ -240,7 +241,8 @@ class CommunityRecommendationTest extends TestCase
             [UserNotification::TYPE_RECOMMENDATION_REPLY],
             UserNotification::where('user_id', $this->friend->id)->pluck('type')->all(),
         );
-        $this->assertNotNull($recommendation->fresh()->seen_at);
+        $recommendation->refresh();
+        $this->assertNotNull($recommendation->seen_at);
 
         $this->getJson('/api/v1/recommendations/inbox')->assertJsonCount(1);
         $this->patchJson("/api/v1/recommendations/{$recommendation->id}", ['dismissed' => true])->assertOk();
@@ -249,6 +251,7 @@ class CommunityRecommendationTest extends TestCase
 
     public function testOnlyRecipientCanUpdateRecommendation(): void
     {
+        /** @var UserRecommendation $recommendation */
         $recommendation = UserRecommendation::factory()->create([
             'sender_id' => $this->member->id,
             'recipient_id' => $this->friend->id,
