@@ -4,6 +4,9 @@
 
 ### Added
 
+- Added `serverName` to the `/health/capabilities` response schema.
+- Documented `PATCH /imports/drafts/{draftId}` (`updateImportDraft`) and `POST /imports/drafts/{draftId}/approve` (`approveImportDraft`), `ImportsImportDraft.plan`, and `ImportsMetadata.cover_artifact_id`.
+- Documented `GET /imports/drafts/{draftId}/events` (`ImportsDraftEventPage`, `ImportsDraftEvent`), `ImportsImportDraft.interpretation_error`, and additive recommendation fields: provenance `source_id`, target `duplicate_actions`, warning `code`/`requires_acknowledgment`, decision `plan_field`/`related_book_id`, and `identifiers`.
 - Documented the imports.v1 draft endpoints (`/imports/capabilities`, `/imports/drafts`, `/imports/drafts/{draftId}`, `/imports/drafts/{draftId}/cancel`) and their `Imports*` component schemas, merged from the importer repository's `docs/imports-v1.openapi.yaml`.
 
 ## 2026-05-08

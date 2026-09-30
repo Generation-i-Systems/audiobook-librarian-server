@@ -29,6 +29,11 @@ class AppServiceProvider extends ServiceProvider
             return new \App\Services\AI\AIAssistantService($provider, $model);
         });
 
+        $this->app->bind(
+            \App\Services\Imports\ImportMetadataEnricher::class,
+            \App\Services\Imports\ExternalImportMetadataEnricher::class
+        );
+
         // Firestore support removed
     }
 

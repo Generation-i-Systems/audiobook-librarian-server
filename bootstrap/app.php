@@ -109,6 +109,12 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/librivox-sync.log'));
 
+        // Delete staged import-draft uploads of cancelled/failed/expired drafts past retention
+        $schedule->command('imports:purge-staging')
+            ->hourly()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/imports-purge-staging.log'));
+
         // Expire stale pending-download records (from the ABB bridge extension) daily at 3:15 AM
         $schedule->command('pending-downloads:cleanup')
             ->dailyAt('03:15')
@@ -123,6 +129,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
         $middleware->append(\App\Http\Middleware\DemoMode::class);
+
+        // imports.v1 drafts carry checksummed inline text and user-confirmed metadata;
+        // both must reach the server byte-for-byte, so never trim or null them.
+        $importDraftRequest = static fn (\Illuminate\Http\Request $request): bool => $request->is(
+            'api/v1/imports/drafts',
+            'api/v1/imports/drafts/*'
+        );
+        $middleware->trimStrings(except: [$importDraftRequest]);
+        $middleware->convertEmptyStringsToNull(except: [$importDraftRequest]);
 
         $middleware->validateCsrfTokens(except: [
             'admin/adminer*',

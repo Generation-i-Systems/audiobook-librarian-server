@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ImportDraftState $state
  * @property int $revision
  * @property int|null $plan_revision
+ * @property int|null $transfer_verified_plan_revision
+ * @property \Illuminate\Support\Carbon|null $transfer_verified_at
  * @property string $source_mode
  * @property string $source_display_name
  * @property string|null $source_root_fingerprint
@@ -43,6 +45,7 @@ class ImportDraft extends Model
         'state',
         'revision',
         'plan_revision',
+        'transfer_verified_plan_revision',
         'source_mode',
         'source_display_name',
         'source_root_fingerprint',
@@ -58,6 +61,7 @@ class ImportDraft extends Model
         'queued_at',
         'completed_at',
         'cancelled_at',
+        'transfer_verified_at',
     ];
 
     protected $casts = [
@@ -65,6 +69,7 @@ class ImportDraft extends Model
         'owner_user_id' => 'integer',
         'revision' => 'integer',
         'plan_revision' => 'integer',
+        'transfer_verified_plan_revision' => 'integer',
         'observation_schema_version' => 'integer',
         'source_warnings' => 'array',
         'client_metadata' => 'array',
@@ -76,6 +81,7 @@ class ImportDraft extends Model
         'queued_at' => 'datetime',
         'completed_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'transfer_verified_at' => 'datetime',
     ];
 
     /**

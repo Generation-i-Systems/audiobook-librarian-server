@@ -29,6 +29,15 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->ip());
         });
 
+        // imports.v1 resumable uploads: session creation/verification and chunk appends
+        // are limited separately so a long upload never starves the other draft routes.
+        RateLimiter::for('import-upload-sessions', function (Request $request) {
+            return Limit::perMinute(30)->by($this->importLimiterKey($request));
+        });
+        RateLimiter::for('import-upload-chunks', function (Request $request) {
+            return Limit::perMinute(1200)->by($this->importLimiterKey($request));
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')
@@ -37,5 +46,12 @@ class RouteServiceProvider extends ServiceProvider
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
         });
+    }
+
+    private function importLimiterKey(Request $request): string
+    {
+        $user = $request->user();
+
+        return $user === null ? 'ip:' . $request->ip() : 'user:' . $user->getAuthIdentifier();
     }
 }

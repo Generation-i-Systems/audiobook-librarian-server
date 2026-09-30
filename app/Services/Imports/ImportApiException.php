@@ -49,6 +49,25 @@ class ImportApiException extends RuntimeException
     }
 
     /**
+     * A request that is well-formed but violates import policy (unknown target, unoffered option, ...).
+     *
+     * @param array<string, mixed> $details
+     */
+    public static function policy(string $code, string $message, array $details = []): self
+    {
+        return new self(422, $code, $message, $details);
+    }
+
+    public static function revisionRequired(): self
+    {
+        return new self(
+            428,
+            'revision_required',
+            'Send the draft revision you reviewed in the If-Match header.'
+        );
+    }
+
+    /**
      * @param array<string, mixed> $currentDraft
      */
     public static function revisionConflict(int $currentRevision, array $currentDraft): self
@@ -69,6 +88,20 @@ class ImportApiException extends RuntimeException
             'invalid_state_transition',
             'This import can no longer be ' . $action . '.',
             ['state' => $state]
+        );
+    }
+
+    /**
+     * Fresh server checks no longer agree with an approved draft. Its locked plan is
+     * never changed silently; editing the details reopens review.
+     */
+    public static function approvedPlanStale(int $planRevision, int $currentRevision): self
+    {
+        return new self(
+            409,
+            'approved_plan_stale',
+            'This import was approved, but its destinations have changed since. Edit its details to review it again.',
+            ['plan_revision' => $planRevision, 'current_revision' => $currentRevision]
         );
     }
 

@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Imports;
+
+use App\Enums\ImportDraftState;
+use RuntimeException;
+
+/**
+ * An expected reason interpretation cannot produce a recommendation. The code
+ * and message are user-safe and are stored on the draft.
+ */
+class ImportInterpretationException extends RuntimeException
+{
+    public function __construct(
+        public readonly ImportDraftState $targetState,
+        public readonly string $errorCode,
+        string $message,
+    ) {
+        parent::__construct($message);
+    }
+
+    public static function noAudioFiles(): self
+    {
+        return new self(
+            ImportDraftState::NEEDS_ATTENTION,
+            'no_audio_files',
+            'This import has no audio files. Choose a folder or file that contains the audiobook.'
+        );
+    }
+}

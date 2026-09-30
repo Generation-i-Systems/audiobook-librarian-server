@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -225,6 +226,28 @@ class ApiHealthTest extends TestCase
         $response->assertJsonPath('serverType', 'ablibrarian-full');
         $response->assertJsonPath('syncApiVersion', '1');
         $response->assertJsonCount(10, 'capabilities');
+    }
+
+    #[Test]
+    #[DataProvider('serverNameProvider')]
+    public function testCapabilitiesReportsConfiguredServerName(string $serverName): void
+    {
+        config(['app.name' => $serverName]);
+
+        $this->getJson('/api/v1/health/capabilities')
+            ->assertStatus(200)
+            ->assertJsonPath('serverName', $serverName);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function serverNameProvider(): array
+    {
+        return [
+            'default name' => ['AB Librarian'],
+            'custom library name' => ['Smith Family Audiobooks'],
+        ];
     }
 
     #[Test]

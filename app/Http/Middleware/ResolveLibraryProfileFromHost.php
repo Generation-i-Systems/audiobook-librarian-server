@@ -125,14 +125,29 @@ class ResolveLibraryProfileFromHost
             return;
         }
 
-        config([
-            'library_profiles.active_profile' => $profileName,
-            'library_profiles.active_host' => $host,
-            'library_profiles.active_source_mode' => (string) ($profile['source_mode'] ?? 'local'),
-        ]);
+        config(['library_profiles.active_host' => $host]);
 
         $request->attributes->set('library_profile', $profileName);
         $request->attributes->set('library_source_mode', (string) ($profile['source_mode'] ?? 'local'));
+
+        $this->activateProfile($profileName);
+    }
+
+    /**
+     * Apply a profile's source mode, database connection and book storage outside a
+     * request, e.g. in a queued job dispatched while that profile was active.
+     */
+    public function activateProfile(string $profileName): void
+    {
+        $profile = config('library_profiles.profiles.' . $profileName, []);
+        if (!is_array($profile)) {
+            return;
+        }
+
+        config([
+            'library_profiles.active_profile' => $profileName,
+            'library_profiles.active_source_mode' => (string) ($profile['source_mode'] ?? 'local'),
+        ]);
 
         $this->applyDatabaseConnection($profileName, $profile);
         $this->applyBookStorage($profile);

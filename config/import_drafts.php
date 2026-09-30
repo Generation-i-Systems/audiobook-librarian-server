@@ -30,9 +30,42 @@ return [
 
     'max_upload_chunk_bytes' => 16 * 1024 * 1024,
 
+    // Private staging area for resumable uploads (never a client-supplied path).
+    // Bytes live at {staging_root}/{draft public id}/{file row id}.part.
+    'staging_root' => env('IMPORT_DRAFT_STAGING_ROOT', storage_path('app/import-staging')),
+
+    // Staged bytes of cancelled, failed or expired drafts are removed this long after
+    // the draft last changed (imports:purge-staging, scheduled hourly).
+    'staging_retention_hours' => (int) env('IMPORT_DRAFT_STAGING_RETENTION_HOURS', 24),
+
+    // A transfer_progress event is recorded each time a file crosses this percentage step.
+    'progress_event_percent_step' => 5,
+
     'accepted_audio_extensions' => [
         'mp3', 'm4a', 'm4b', 'flac', 'ogg', 'oga', 'wav', 'aac', 'wma', 'm4p', 'mp4', 'opus',
     ],
 
     'page_size' => 50,
+
+    'event_page_size' => 100,
+
+    // Queue for InterpretImportDraftJob; null uses the default queue.
+    'interpretation_queue' => env('IMPORT_DRAFT_INTERPRETATION_QUEUE'),
+
+    // Optional external metadata lookup (Audible/Google Books/Hardcover) during
+    // interpretation. Off by default; failures never block a draft.
+    'enrichment' => [
+        'enabled' => (bool) env('IMPORT_DRAFTS_ENRICHMENT_ENABLED', false),
+        'sources' => ['audible', 'google_books', 'hardcover'],
+    ],
+
+    'max_duplicate_candidates' => 5,
+
+    // File operations a plan may choose, per transfer mode; the first is the default.
+    // Upload clients send copy (originals stay on the user's computer). in_place is
+    // only for server-approved shared staging targets.
+    'file_operations' => [
+        'upload' => ['copy', 'move'],
+        'shared_stage' => ['move', 'copy', 'in_place'],
+    ],
 ];

@@ -151,6 +151,7 @@ class ApiHealthController extends Controller
 
         return response()->json([
             'serverType' => 'ablibrarian-full',
+            'serverName' => (string) config('app.name'),
             'syncApiVersion' => '1',
             'capabilities' => [
                 'BROWSE',

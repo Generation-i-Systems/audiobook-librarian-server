@@ -6,6 +6,7 @@ namespace App\Services\Imports;
 
 use App\Enums\ImportDraftState;
 use App\Enums\PermissionKey;
+use App\Jobs\InterpretImportDraftJob;
 use App\Models\Imports\ImportArtifact;
 use App\Models\Imports\ImportDraft;
 use App\Models\Imports\ImportDraftFile;
@@ -23,6 +24,7 @@ class ImportDraftService
     public function __construct(
         private readonly SourceObservationValidator $observationValidator,
         private readonly ImportDraftPresenter $presenter,
+        private readonly ImportStagingStore $staging,
     ) {
     }
 
@@ -120,7 +122,10 @@ class ImportDraftService
             'client_kind' => $observation['client']['client_kind'],
         ]);
 
-        return $draft->load('files');
+        InterpretImportDraftJob::dispatch($draft->id);
+
+        // A synchronous queue has already interpreted the draft; return its current state.
+        return $draft->refresh()->load('files');
     }
 
     public function findForUser(User $user, string $publicId): ImportDraft
@@ -174,11 +179,52 @@ class ImportDraftService
         return ['drafts' => $drafts->values(), 'next_cursor' => $nextCursor];
     }
 
+    /**
+     * Events after a cursor (an event id), oldest first. next_cursor is always set so
+     * a polling client can keep passing it back, even when nothing new happened.
+     *
+     * @return array{
+     *     draft: ImportDraft,
+     *     events: \Illuminate\Support\Collection<int, ImportEvent>,
+     *     next_cursor: string,
+     *     has_more: bool
+     * }
+     */
+    public function eventsForUser(User $user, string $publicId, ?string $after): array
+    {
+        $draft = $this->findForUser($user, $publicId);
+        $afterId = 0;
+        if ($after !== null && $after !== '') {
+            if (!ctype_digit($after)) {
+                throw ImportApiException::validation('The event cursor is not valid.');
+            }
+            $afterId = (int) $after;
+        }
+
+        $pageSize = (int) config('import_drafts.event_page_size');
+        $events = ImportEvent::query()
+            ->where('draft_id', $draft->id)
+            ->where('id', '>', $afterId)
+            ->orderBy('id')
+            ->limit($pageSize + 1)
+            ->get();
+        $hasMore = $events->count() > $pageSize;
+        $events = $events->take($pageSize)->values();
+        $last = $events->last();
+
+        return [
+            'draft' => $draft,
+            'events' => $events,
+            'next_cursor' => (string) ($last !== null ? $last->id : $afterId),
+            'has_more' => $hasMore,
+        ];
+    }
+
     public function cancel(User $user, string $publicId, ?int $expectedRevision, ?string $reason): ImportDraft
     {
         $draft = $this->findForUser($user, $publicId);
 
-        return DB::transaction(function () use ($draft, $expectedRevision, $reason): ImportDraft {
+        $cancelled = DB::transaction(function () use ($draft, $expectedRevision, $reason): ImportDraft {
             /** @var ImportDraft $locked */
             $locked = ImportDraft::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
             if ($locked->state === ImportDraftState::CANCELLED) {
@@ -199,6 +245,16 @@ class ImportDraftService
 
             return $locked->load('files');
         });
+
+        // Uploaded bytes are never kept for a cancelled draft; deleted only once the cancel is committed.
+        if ($this->staging->deleteDraft($cancelled->public_id)) {
+            Log::info('Import draft staged bytes deleted', [
+                'draft_id' => $cancelled->public_id,
+                'reason' => 'cancelled',
+            ]);
+        }
+
+        return $cancelled;
     }
 
     public function assertRevision(ImportDraft $draft, ?int $expectedRevision): void
