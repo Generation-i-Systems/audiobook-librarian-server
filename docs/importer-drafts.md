@@ -25,8 +25,10 @@ user and which limits apply.
 | `GET /imports/drafts/{draftId}/events` | Event log for polling, `?after=<cursor>` (phase 2) |
 | `PATCH /imports/drafts/{draftId}` | Save reviewed metadata edits; `If-Match` + `Idempotency-Key` required (phase 3) |
 | `POST /imports/drafts/{draftId}/approve` | Validate and lock an `ImportPlan` (requires `Idempotency-Key`) (phase 3) |
-
-No audio bytes are accepted yet.
+| `POST /imports/drafts/{draftId}/uploads` | Open resumable upload sessions for approved files (phase 5) |
+| `HEAD /imports/drafts/{draftId}/uploads/{fileId}` | Confirmed `Upload-Offset` / `Upload-Length` (phase 5) |
+| `PATCH /imports/drafts/{draftId}/uploads/{fileId}` | Append one chunk at `Upload-Offset` (phase 5) |
+| `POST /imports/drafts/{draftId}/verify` | Re-hash staged files and bind them to the plan revision (phase 5) |
 
 ## Interpretation (phase 2)
 
@@ -171,6 +173,54 @@ byte), with the resolved relative target directory, the duplicate book id, a man
 the recommendation snapshot. The draft becomes `approved`, `revision` and `plan_revision` both
 become the plan revision, and `draft.plan` returns the locked plan. A retry with the same
 `Idempotency-Key` replays the response; a second approval of an approved draft is rejected.
+
+## Resumable uploads (phase 5)
+
+After approval a client with `transfer_mode: upload` sends every manifest file with more than
+zero bytes (all roles). Zero-byte files are staged by the server and never uploaded.
+
+1. `POST /uploads` (`If-Match` = current draft revision, `Idempotency-Key`) with
+   `{plan_revision, files: [{file_id, sha256, bytes}]}`. `plan_revision` must be the draft's live,
+   non-invalidated plan (else `409 approved_plan_stale {plan_revision, current_revision}`); every
+   file must be in the plan's manifest with the same `bytes`, and a manifest `sha256`, when known,
+   must match (`422 unknown_file` / `upload_manifest_mismatch`). Returns `201`
+   `{contract_version, chunk_size, uploads: [{file_id, upload_url, offset}]}` and a new `ETag`.
+   `upload_url` is relative to `/api/v1/`. Calls are cumulative and report the confirmed offset, so
+   calling it again (with a new key) after a restart is a safe resume. The first call moves the draft
+   `approved` -> `transferring`.
+2. `HEAD /uploads/{fileId}` returns `204` with `Upload-Offset`, `Upload-Length` and
+   `Cache-Control: no-store` (`404 upload_not_found` without a session).
+3. `PATCH /uploads/{fileId}` with `Content-Type: application/offset+octet-stream` (`415` otherwise)
+   and `Upload-Offset` equal to the confirmed offset (`409 upload_offset_conflict {expected_offset}`
+   otherwise, nothing written). Bodies over `max_upload_chunk_bytes` are `413 chunk_too_large`; past
+   the file length `422 upload_length_exceeded`. Returns `204` with the new `Upload-Offset`. When the
+   last byte arrives the staged file is hashed: a mismatch discards it, resets the offset to 0 and
+   returns `422 upload_hash_mismatch {file_id, reason}`. When every file is uploaded the draft moves to
+   `verifying`.
+4. `POST /verify` (`If-Match`, `Idempotency-Key`, body ignored) re-hashes every staged file, checks
+   the staged layout and records a `transfer_verified` event binding the files to the plan revision
+   (`import_drafts.transfer_verified_plan_revision`). `transfer.state` becomes `verified`; the draft
+   stays `verifying`. Nothing is queued or imported. `422 upload_incomplete {file_ids}`,
+   `422 transfer_verification_failed {file_ids}` (those files restart at 0),
+   `422 staged_layout_invalid {file_ids}`.
+
+Bytes are staged privately under `IMPORT_DRAFT_STAGING_ROOT` (default
+`storage/app/import-staging/{draft id}/{file row id}.part`); the database offset is authoritative
+and each append truncates the staged file to it first. Appends to one draft are serialized under a
+row lock on the draft. The revision is bumped when the transfer state changes or a file completes or
+is rejected, not for each chunk. Events: `transfer_progress {file_id, bytes_received, bytes_total}`
+(each 5% step and on completion), `transfer_file_rejected {file_id, reason}`, `transfer_verified`,
+`transfer_reset`.
+
+Cancelling deletes the staged bytes. Editing the metadata of an approved, transferring or
+verifying draft invalidates the plan, resets every file and deletes the staged bytes.
+`imports:purge-staging` (hourly) deletes staged bytes of cancelled/failed/expired drafts older than
+`IMPORT_DRAFT_STAGING_RETENTION_HOURS` (default 24); directories whose draft is not in the active
+database are left alone. Session creation/verify and chunk appends have separate per-user rate
+limits (30/min and 1200/min).
+
+Make sure the web server and PHP accept request bodies of at least one chunk (16 MiB by default):
+nginx `client_max_body_size`, PHP `post_max_size`.
 
 ## Rules
 
