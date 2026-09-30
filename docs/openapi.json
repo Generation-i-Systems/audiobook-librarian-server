@@ -18759,7 +18759,19 @@
                                 "properties": {
                                     "changes": {
                                         "type": "object",
-                                        "description": "Map of field name to {original, new} value pairs.",
+                                        "description": "Map of field name to {original, new} value pairs. Only the listed fields are accepted; any other field name, or any key other than original/new, is rejected with 422.",
+                                        "minProperties": 1,
+                                        "propertyNames": {
+                                            "enum": [
+                                                "title",
+                                                "description",
+                                                "author",
+                                                "narrator",
+                                                "genre",
+                                                "series",
+                                                "seriesNumber"
+                                            ]
+                                        },
                                         "additionalProperties": {
                                             "type": "object",
                                             "properties": {
@@ -18771,7 +18783,8 @@
                                                     "type": "string",
                                                     "nullable": true
                                                 }
-                                            }
+                                            },
+                                            "additionalProperties": false
                                         }
                                     }
                                 },
@@ -18806,7 +18819,7 @@
                         }
                     },
                     "422": {
-                        "description": "No changes detected",
+                        "description": "No changes detected, or an unsupported field or change key was submitted",
                         "content": {
                             "application/json": {
                                 "schema": {

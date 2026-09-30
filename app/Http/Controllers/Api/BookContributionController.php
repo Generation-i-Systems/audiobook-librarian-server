@@ -17,9 +17,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Services\ControllerDatabaseService as ControllerDatabase;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class BookContributionController extends Controller
 {
+    /** @var list<string> */
+    private const EDITABLE_FIELDS = [
+        'title',
+        'description',
+        'author',
+        'narrator',
+        'genre',
+        'series',
+        'seriesNumber',
+    ];
+
     /**
      * Submit a metadata correction for a book.
      * POST /v1/books/{book}/contributions
@@ -28,9 +40,17 @@ class BookContributionController extends Controller
     {
         $data = $request->validate([
             'changes' => 'required|array|min:1',
+            'changes.*' => 'array:original,new',
             'changes.*.original' => 'nullable|string',
             'changes.*.new' => 'nullable|string',
         ]);
+
+        $unknownFields = array_diff(array_keys($data['changes']), self::EDITABLE_FIELDS);
+        if ($unknownFields !== []) {
+            throw ValidationException::withMessages([
+                'changes' => 'Unsupported contribution fields: ' . implode(', ', $unknownFields),
+            ]);
+        }
 
         // Reject submissions where no field actually changed
         $hasChange = collect($data['changes'])->contains(
@@ -131,30 +151,50 @@ class BookContributionController extends Controller
      */
     public function approve(Request $request, BookContribution $contribution): JsonResponse
     {
-        if (!$contribution->isPending()) {
-            return response()->json(['message' => 'Contribution is not pending.'], 422);
-        }
-
         $data = $request->validate([
             'reviewer_notes' => 'nullable|string|max:1000',
         ]);
 
-        ControllerDatabase::transaction(function () use ($contribution, $data): void {
-            $book = $contribution->book;
+        $staleFields = ControllerDatabase::transaction(function () use ($contribution, $data): array {
+            $lockedContribution = BookContribution::query()
+                ->lockForUpdate()
+                ->find($contribution->getKey());
+
+            if (! $lockedContribution instanceof BookContribution || ! $lockedContribution->isPending()) {
+                throw ValidationException::withMessages([
+                    'contribution' => 'Contribution is not pending.',
+                ]);
+            }
+
+            $book = Book::query()->lockForUpdate()->find($lockedContribution->book_id);
 
             if (! $book instanceof Book) {
                 throw new \RuntimeException('Contribution book not found.');
             }
 
-            $this->applyChangesToBook($book, $contribution->changes);
+            $staleFields = $this->staleFields($book, $lockedContribution->changes);
+            if ($staleFields !== []) {
+                return $staleFields;
+            }
 
-            $contribution->update([
+            $this->applyChangesToBook($book, $lockedContribution->changes);
+
+            $lockedContribution->update([
                 'status' => 'approved',
                 'reviewer_notes' => $data['reviewer_notes'] ?? null,
                 'reviewed_by' => Auth::id(),
                 'reviewed_at' => now(),
             ]);
+
+            return [];
         });
+
+        if ($staleFields !== []) {
+            return response()->json([
+                'message' => 'The book changed after this contribution was submitted. Review it again before applying.',
+                'stale_fields' => $staleFields,
+            ], 409);
+        }
 
         Log::info('Contribution approved', [
             'contribution_id' => $contribution->id,
@@ -213,6 +253,43 @@ class BookContributionController extends Controller
         if (!empty($updates)) {
             $book->update($updates);
         }
+    }
+
+    /** @param array<string, array{original?: ?string, new?: ?string}> $changes
+     *  @return list<string>
+     */
+    private function staleFields(Book $book, array $changes): array
+    {
+        $staleFields = [];
+
+        foreach ($changes as $field => $change) {
+            $original = $this->normalizeValue($change['original'] ?? null);
+            if ($this->currentValue($book, $field) !== $original) {
+                $staleFields[] = $field;
+            }
+        }
+
+        return $staleFields;
+    }
+
+    private function currentValue(Book $book, string $field): ?string
+    {
+        $value = match ($field) {
+            'title', 'description' => $book->{$field},
+            'author' => $book->authors()->value('name'),
+            'narrator' => $book->narrators()->value('name'),
+            'genre' => $book->genres()->value('name'),
+            'series' => $book->series()->value('name'),
+            'seriesNumber' => data_get($book->series()->first(), 'pivot.series_number'),
+            default => null,
+        };
+
+        return $this->normalizeValue($value);
+    }
+
+    private function normalizeValue(?string $value): ?string
+    {
+        return blank($value) ? null : trim($value);
     }
 
     private function syncSingleRelation(Book $book, string $relation, string $modelClass, ?string $name): void

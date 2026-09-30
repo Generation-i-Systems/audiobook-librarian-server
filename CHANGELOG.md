@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- Metadata contributions: `POST /books/{book}/contributions` now accepts only the editable fields (`title`, `description`, `author`, `narrator`, `genre`, `series`, `seriesNumber`), each with only `original`/`new`, and rejects anything else with 422. Approving a contribution locks the contribution and book rows, so a contribution cannot be applied twice, and refuses with `409` plus `stale_fields` when the book changed after submission, instead of overwriting the newer edit.
 - Security: updated laravel/framework to 13.34.0 (debug-page XSS), league/flysystem to 3.36.0 with flysystem-local 3.35.3 (path normaliser bypass) and phpseclib to 3.0.57 (X25519 timing leak), which `composer audit` flagged on 2026-09-29.
 - Security: updated brace-expansion to 5.0.12 (three denial-of-service advisories), which `npm audit` flagged on 2026-09-29.
 - CI: the PHP 8.3 test job and the Windows portability check install dependencies without the dev-only `ext-xdebug` and Unix-only `ext-pcntl`/`ext-posix` requirements, and the container first-install check waits for the app to finish migrating before inspecting it.
