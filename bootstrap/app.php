@@ -109,6 +109,12 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->appendOutputTo(storage_path('logs/librivox-sync.log'));
 
+        // Delete staged import-draft uploads of cancelled/failed/expired drafts past retention
+        $schedule->command('imports:purge-staging')
+            ->hourly()
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/imports-purge-staging.log'));
+
         // Expire stale pending-download records (from the ABB bridge extension) daily at 3:15 AM
         $schedule->command('pending-downloads:cleanup')
             ->dailyAt('03:15')

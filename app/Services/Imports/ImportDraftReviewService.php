@@ -13,8 +13,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * Revision-safe metadata edits during review (PATCH /imports/drafts/{id}).
  *
- * Edits are allowed in awaiting_review. Editing an approved draft explicitly
- * invalidates the locked plan (recorded, never overwritten) and returns the
+ * Edits are allowed in awaiting_review. Editing an approved (or transferring or
+ * verifying) draft explicitly invalidates the locked plan (recorded, never
+ * overwritten), resets its transfer and deletes its staged bytes, and returns the
  * draft to awaiting_review, as the rebuild plan requires. Every edit re-derives
  * duplicates, destinations and decisions from the edited metadata.
  */
@@ -24,11 +25,23 @@ class ImportDraftReviewService
     public const TRIGGER_REVIEW_PATCH = 'review_patch';
     public const TRIGGER_APPROVAL = 'approval';
 
+    /**
+     * Review edits are allowed until the draft is queued. Editing after approval
+     * invalidates the plan and any uploaded or verified transfer.
+     */
+    private const EDITABLE_STATES = [
+        ImportDraftState::AWAITING_REVIEW,
+        ImportDraftState::APPROVED,
+        ImportDraftState::TRANSFERRING,
+        ImportDraftState::VERIFYING,
+    ];
+
     public function __construct(
         private readonly ImportDraftService $draftService,
         private readonly ImportMetadataValidator $metadataValidator,
         private readonly ImportRecommendationPolicy $policy,
         private readonly ImportObservationInterpreter $interpreter,
+        private readonly ImportTransferService $transferService,
     ) {
     }
 
@@ -43,11 +56,11 @@ class ImportDraftReviewService
         }
         $patch = $this->validateBody($body);
 
-        return DB::transaction(function () use ($draft, $expectedRevision, $patch): ImportDraft {
+        $updated = DB::transaction(function () use ($draft, $expectedRevision, $patch): ImportDraft {
             /** @var ImportDraft $locked */
             $locked = ImportDraft::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
             $this->draftService->assertRevision($locked->load('files'), $expectedRevision);
-            if (!in_array($locked->state, [ImportDraftState::AWAITING_REVIEW, ImportDraftState::APPROVED], true)) {
+            if (!in_array($locked->state, self::EDITABLE_STATES, true)) {
                 throw ImportApiException::invalidState($locked->state->value, 'edited');
             }
 
@@ -68,7 +81,7 @@ class ImportDraftReviewService
             }
 
             $locked->revision = $locked->revision + 1;
-            if ($locked->state === ImportDraftState::APPROVED) {
+            if ($locked->state !== ImportDraftState::AWAITING_REVIEW) {
                 $this->invalidatePlan($locked);
             }
             $locked->recommendation = $this->reviewedRecommendation($locked, $recommendation, $edited, $changed);
@@ -77,6 +90,13 @@ class ImportDraftReviewService
 
             return $locked->load('files');
         });
+
+        if ($updated->state === ImportDraftState::AWAITING_REVIEW) {
+            // Bytes uploaded for an invalidated plan are void; removed once the edit is committed.
+            $this->transferService->deleteStagedBytes($updated);
+        }
+
+        return $updated;
     }
 
     /**
@@ -155,6 +175,7 @@ class ImportDraftReviewService
         ]);
         $draft->plan_revision = null;
         $draft->state = ImportDraftState::AWAITING_REVIEW;
+        $this->transferService->resetTransfer($draft, 'plan_invalidated');
         $this->draftService->recordEvent($draft, 'state_changed', ['state' => $draft->state->value]);
     }
 

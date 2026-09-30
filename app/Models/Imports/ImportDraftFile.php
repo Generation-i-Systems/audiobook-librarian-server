@@ -26,6 +26,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $received_bytes
  * @property string|null $received_sha256
  * @property string|null $staged_relative_path
+ * @property string|null $expected_sha256
+ * @property \Illuminate\Support\Carbon|null $uploaded_at
+ * @property \Illuminate\Support\Carbon|null $verified_at
  */
 class ImportDraftFile extends Model
 {
@@ -49,12 +52,17 @@ class ImportDraftFile extends Model
         'received_bytes',
         'received_sha256',
         'staged_relative_path',
+        'expected_sha256',
+        'uploaded_at',
+        'verified_at',
     ];
 
     protected $casts = [
         'bytes' => 'integer',
         'received_bytes' => 'integer',
         'modified_at' => 'datetime',
+        'uploaded_at' => 'datetime',
+        'verified_at' => 'datetime',
         'media_observation' => 'array',
     ];
 

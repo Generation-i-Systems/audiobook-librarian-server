@@ -24,6 +24,7 @@ class ImportDraftService
     public function __construct(
         private readonly SourceObservationValidator $observationValidator,
         private readonly ImportDraftPresenter $presenter,
+        private readonly ImportStagingStore $staging,
     ) {
     }
 
@@ -223,7 +224,7 @@ class ImportDraftService
     {
         $draft = $this->findForUser($user, $publicId);
 
-        return DB::transaction(function () use ($draft, $expectedRevision, $reason): ImportDraft {
+        $cancelled = DB::transaction(function () use ($draft, $expectedRevision, $reason): ImportDraft {
             /** @var ImportDraft $locked */
             $locked = ImportDraft::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
             if ($locked->state === ImportDraftState::CANCELLED) {
@@ -244,6 +245,16 @@ class ImportDraftService
 
             return $locked->load('files');
         });
+
+        // Uploaded bytes are never kept for a cancelled draft; deleted only once the cancel is committed.
+        if ($this->staging->deleteDraft($cancelled->public_id)) {
+            Log::info('Import draft staged bytes deleted', [
+                'draft_id' => $cancelled->public_id,
+                'reason' => 'cancelled',
+            ]);
+        }
+
+        return $cancelled;
     }
 
     public function assertRevision(ImportDraft $draft, ?int $expectedRevision): void
