@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- Security: updated laravel/framework to 13.34.0 (debug-page XSS), league/flysystem to 3.36.0 with flysystem-local 3.35.3 (path normaliser bypass) and phpseclib to 3.0.57 (X25519 timing leak), which `composer audit` flagged on 2026-09-29.
 - CI: the PHP 8.3 test job and the Windows portability check install dependencies without the dev-only `ext-xdebug` and Unix-only `ext-pcntl`/`ext-posix` requirements, and the container first-install check waits for the app to finish migrating before inspecting it.
 
 ### Added
