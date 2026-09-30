@@ -136,6 +136,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => \App\Http\Middleware\EnsureActiveUser::class,
             'api.auth' => \App\Http\Middleware\ApiAuth::class,
             'idempotency' => \App\Http\Middleware\CheckIdempotency::class,
+            'imports.idempotency' => \App\Http\Middleware\RequireImportIdempotency::class,
             'device.identify' => \App\Http\Middleware\IdentifyDevice::class,
             'community' => \App\Http\Middleware\EnsureCommunityAvailable::class,
         ]);
