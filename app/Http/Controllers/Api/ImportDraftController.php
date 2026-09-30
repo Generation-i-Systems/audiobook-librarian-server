@@ -12,6 +12,7 @@ use App\Services\Imports\ImportDraftPresenter;
 use App\Services\Imports\ImportDraftReviewService;
 use App\Services\Imports\ImportDraftService;
 use App\Services\Imports\ImportPlanService;
+use App\Services\Imports\ImportTransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -26,6 +27,7 @@ class ImportDraftController extends Controller
         private readonly ImportDraftPresenter $presenter,
         private readonly ImportDraftReviewService $reviewService,
         private readonly ImportPlanService $planService,
+        private readonly ImportTransferService $transferService,
     ) {
     }
 
@@ -127,6 +129,60 @@ class ImportDraftController extends Controller
         );
 
         return $this->draftResponse($draft, 200);
+    }
+
+    public function createUploads(Request $request, string $draftId): JsonResponse
+    {
+        $result = $this->transferService->createSessions(
+            $this->user($request),
+            $draftId,
+            $this->expectedRevision($request),
+            $this->jsonBody($request)
+        );
+
+        return response()->json([
+            'contract_version' => config('import_drafts.contract_version'),
+            'chunk_size' => (int) config('import_drafts.max_upload_chunk_bytes'),
+            'uploads' => $result['uploads'],
+        ], 201)->header('ETag', $this->presenter->etag($result['draft']));
+    }
+
+    public function uploadOffset(Request $request, string $draftId, string $fileId): Response
+    {
+        $offset = $this->transferService->offset($this->user($request), $draftId, $fileId);
+
+        return $this->uploadResponse($offset['offset'])->header('Upload-Length', (string) $offset['length']);
+    }
+
+    public function appendUpload(Request $request, string $draftId, string $fileId): Response
+    {
+        $body = $request->getContent(true);
+        $offset = $this->transferService->append(
+            $this->user($request),
+            $draftId,
+            $fileId,
+            $request->header('Content-Type'),
+            $request->header('Upload-Offset'),
+            $request->header('Content-Length'),
+            $body
+        );
+
+        return $this->uploadResponse($offset);
+    }
+
+    public function verify(Request $request, string $draftId): JsonResponse
+    {
+        $draft = $this->transferService->verify($this->user($request), $draftId, $this->expectedRevision($request));
+
+        return $this->draftResponse($draft, 202);
+    }
+
+    private function uploadResponse(int $offset): Response
+    {
+        return response('', 204)
+            ->header('Upload-Offset', (string) $offset)
+            ->header('Tus-Resumable', '1.0.0')
+            ->header('Cache-Control', 'no-store');
     }
 
     /**

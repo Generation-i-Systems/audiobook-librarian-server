@@ -30,6 +30,17 @@ return [
 
     'max_upload_chunk_bytes' => 16 * 1024 * 1024,
 
+    // Private staging area for resumable uploads (never a client-supplied path).
+    // Bytes live at {staging_root}/{draft public id}/{file row id}.part.
+    'staging_root' => env('IMPORT_DRAFT_STAGING_ROOT', storage_path('app/import-staging')),
+
+    // Staged bytes of cancelled, failed or expired drafts are removed this long after
+    // the draft last changed (imports:purge-staging, scheduled hourly).
+    'staging_retention_hours' => (int) env('IMPORT_DRAFT_STAGING_RETENTION_HOURS', 24),
+
+    // A transfer_progress event is recorded each time a file crosses this percentage step.
+    'progress_event_percent_step' => 5,
+
     'accepted_audio_extensions' => [
         'mp3', 'm4a', 'm4b', 'flac', 'ogg', 'oga', 'wav', 'aac', 'wma', 'm4p', 'mp4', 'opus',
     ],

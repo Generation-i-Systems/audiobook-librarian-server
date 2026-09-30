@@ -455,6 +455,18 @@ Route::prefix('v1')->group(function () {
             Route::post('/drafts/{draftId}/approve', [ImportDraftController::class, 'approve'])
                 ->where('draftId', 'imp_[A-Za-z0-9]+')
                 ->middleware('imports.idempotency');
+            Route::post('/drafts/{draftId}/uploads', [ImportDraftController::class, 'createUploads'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+')
+                ->middleware(['imports.idempotency', 'throttle:import-upload-sessions']);
+            Route::match(['HEAD'], '/drafts/{draftId}/uploads/{fileId}', [ImportDraftController::class, 'uploadOffset'])
+                ->where(['draftId' => 'imp_[A-Za-z0-9]+', 'fileId' => '.+'])
+                ->middleware('throttle:import-upload-chunks');
+            Route::patch('/drafts/{draftId}/uploads/{fileId}', [ImportDraftController::class, 'appendUpload'])
+                ->where(['draftId' => 'imp_[A-Za-z0-9]+', 'fileId' => '.+'])
+                ->middleware('throttle:import-upload-chunks');
+            Route::post('/drafts/{draftId}/verify', [ImportDraftController::class, 'verify'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+')
+                ->middleware(['imports.idempotency', 'throttle:import-upload-sessions']);
 
             Route::get('/{importId}/status', [BookImportApiController::class, 'getImportStatus']);
         });
