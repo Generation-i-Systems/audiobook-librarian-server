@@ -3819,6 +3819,11 @@
                     "description": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "cover_artifact_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Artifact id of a cover image from the draft's artifacts."
                     }
                 }
             },
@@ -3957,6 +3962,85 @@
                     "recommendation": {
                         "$ref": "#/components/schemas/ImportsRecommendation"
                     },
+                    "interpretation_error": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Set when interpretation ended in needs_attention (e.g. no_audio_files) or failed (interpretation_failed).",
+                        "properties": {
+                            "code": {
+                                "type": "string"
+                            },
+                            "message": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "plan": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "The locked plan for the current approval; null until approved and after a post-approval edit invalidates it.",
+                        "properties": {
+                            "revision": {
+                                "type": "integer"
+                            },
+                            "approved_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "metadata": {
+                                "$ref": "#/components/schemas/ImportsMetadata"
+                            },
+                            "cover_artifact_id": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "target": {
+                                "type": "object",
+                                "properties": {
+                                    "candidate_id": {
+                                        "type": "string"
+                                    },
+                                    "relative_directory": {
+                                        "type": "string"
+                                    },
+                                    "duplicate_book_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    }
+                                }
+                            },
+                            "duplicate_action": {
+                                "type": "string",
+                                "enum": [
+                                    "create_new",
+                                    "merge",
+                                    "replace",
+                                    "skip"
+                                ]
+                            },
+                            "file_operation": {
+                                "type": "string",
+                                "enum": [
+                                    "move",
+                                    "copy",
+                                    "in_place"
+                                ]
+                            },
+                            "transfer_mode": {
+                                "type": "string",
+                                "enum": [
+                                    "upload",
+                                    "shared_stage"
+                                ]
+                            },
+                            "acknowledged_warning_ids": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
                     "transfer": {
                         "$ref": "#/components/schemas/ImportsTransferSummary"
                     }
@@ -3977,6 +4061,10 @@
                                 "properties": {
                                     "source": {
                                         "type": "string"
+                                    },
+                                    "source_id": {
+                                        "type": "string",
+                                        "description": "Machine-readable origin: embedded_tag, nfo, filename, library_series, external_enrichment, server_policy, user_edit. `source` is a short human-readable label."
                                     },
                                     "value": {},
                                     "confidence": {
@@ -4022,6 +4110,19 @@
                                 },
                                 "available": {
                                     "type": "boolean"
+                                },
+                                "duplicate_actions": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": [
+                                            "create_new",
+                                            "merge",
+                                            "replace",
+                                            "skip"
+                                        ]
+                                    },
+                                    "description": "Duplicate actions this destination can be approved with."
                                 }
                             }
                         }
@@ -4036,6 +4137,13 @@
                                 },
                                 "message": {
                                     "type": "string"
+                                },
+                                "code": {
+                                    "type": "string"
+                                },
+                                "requires_acknowledgment": {
+                                    "type": "boolean",
+                                    "description": "When true, the id must be listed in the approval's acknowledged_warning_ids."
                                 }
                             }
                         }
@@ -4055,9 +4163,31 @@
                                     "type": "array",
                                     "items": {}
                                 },
-                                "default": {}
+                                "default": {
+                                    "nullable": true,
+                                    "description": "Suggested value. For the target decision it is the first available candidate whose duplicate_actions include the duplicate_action decision's default, and null when none fits (for example no candidates, or the usual folder is occupied and no renamed folder is offered)."
+                                },
+                                "plan_field": {
+                                    "type": "string",
+                                    "description": "Approval payload field this decision fills, e.g. duplicate_action or target.candidate_id."
+                                },
+                                "related_book_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "Existing library book a duplicate_action decision refers to."
+                                }
                             }
                         }
+                    },
+                    "identifiers": {
+                        "type": "object",
+                        "properties": {
+                            "isbn": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "description": "Identifiers found in the observation, used for duplicate checks."
                     }
                 }
             },
@@ -4273,6 +4403,86 @@
                                 "type": "boolean"
                             }
                         }
+                    }
+                }
+            },
+            "ImportsDraftEventPage": {
+                "type": "object",
+                "required": [
+                    "contract_version",
+                    "draft",
+                    "data",
+                    "next_cursor",
+                    "has_more"
+                ],
+                "properties": {
+                    "contract_version": {
+                        "$ref": "#/components/schemas/ImportsContractVersion"
+                    },
+                    "draft": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "revision": {
+                                "type": "integer"
+                            },
+                            "state": {
+                                "$ref": "#/components/schemas/ImportsDraftState"
+                            }
+                        }
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ImportsDraftEvent"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string",
+                        "description": "Cursor to pass as `after` next time; unchanged when there were no new events."
+                    },
+                    "has_more": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ImportsDraftEvent": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "event",
+                    "draft_id",
+                    "revision",
+                    "data"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Monotonic event id; usable as a cursor."
+                    },
+                    "event": {
+                        "type": "string",
+                        "description": "Event type, e.g. state_changed, metadata_updated, plan_invalidated, targets_refreshed (data: trigger approval|review_patch, unavailable_candidate_ids).",
+                        "example": "state_changed"
+                    },
+                    "draft_id": {
+                        "type": "string"
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "description": "Draft revision after the event."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "User-safe payload. state_changed carries `state` and, for failures, `error_code`."
                     }
                 }
             }
@@ -6423,6 +6633,11 @@
                                             "type": "string",
                                             "example": "ablibrarian-full"
                                         },
+                                        "serverName": {
+                                            "type": "string",
+                                            "description": "Display name of this library server (the configured application name). Clients show it as the library's name.",
+                                            "example": "AB Librarian"
+                                        },
                                         "syncApiVersion": {
                                             "type": "string",
                                             "example": "1"
@@ -7432,6 +7647,135 @@
                         "BearerAuth": []
                     }
                 ]
+            },
+            "patch": {
+                "operationId": "updateImportDraft",
+                "summary": "Save reviewed metadata edits (JSON merge patch)",
+                "description": "Merges metadata edits, records `user_edit` provenance and re-derives duplicates, targets and required decisions. Invalid values are rejected, never rewritten. A no-op edit rechecks destination availability from the stored metadata: if duplicates, destinations, policy warnings or required decisions change, the revision is bumped once and a `targets_refreshed` event is recorded; otherwise the draft is returned with the same revision. On an approved draft such a change returns 409 `approved_plan_stale` instead. Editing an approved draft invalidates its plan (`plan_invalidated` event) and returns it to `awaiting_review`. `local_ai_artifacts` is not supported yet and returns 422 `local_ai_artifacts_not_supported`.",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "If-Match",
+                        "in": "header",
+                        "required": true,
+                        "description": "Quoted draft revision; missing returns 428 revision_required, stale returns 409 draft_revision_conflict.",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\"[1-9][0-9]*\"$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/merge-patch+json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportsDraftPatch"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportsDraftPatch"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Current import draft",
+                        "headers": {
+                            "ETag": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "\"4\""
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsImportDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Stale revision (draft_revision_conflict), draft not editable (invalid_state_transition), or a no-op edit of an approved draft whose destination recheck would change its recommendation (approved_plan_stale, details: plan_revision, current_revision; nothing is changed)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid edit (validation_failed, local_ai_artifacts_not_supported)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "428": {
+                        "description": "If-Match header is required (revision_required)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Draft or transfer not found/visible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Authenticated caller lacks import permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Imports"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
             }
         },
         "/imports/drafts/{draftId}/cancel": {
@@ -7505,6 +7849,236 @@
                     },
                     "409": {
                         "description": "Draft changed since caller opened it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Draft or transfer not found/visible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Authenticated caller lacks import permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Imports"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/imports/drafts/{draftId}/events": {
+            "get": {
+                "operationId": "listImportDraftEvents",
+                "summary": "Poll a draft's append-only event log",
+                "description": "Returns events after the `after` cursor (or the `Last-Event-ID` header), oldest first. `next_cursor` is always set: pass it back unchanged to receive only newer events. Polling this endpoint (or GET /imports/drafts/{draftId}) is the supported way to follow progress; a server-sent event stream is not offered yet (capabilities `sse: false`).",
+                "parameters": [
+                    {
+                        "name": "draftId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^imp_[A-Za-z0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "after",
+                        "in": "query",
+                        "required": false,
+                        "description": "Opaque event cursor from a previous response's next_cursor.",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "Last-Event-ID",
+                        "in": "header",
+                        "required": false,
+                        "description": "Alternative to `after`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A page of draft events",
+                        "headers": {
+                            "ETag": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "\"4\""
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsDraftEventPage"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid cursor",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Draft or transfer not found/visible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Authenticated caller lacks import permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Imports"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/imports/drafts/{draftId}/approve": {
+            "post": {
+                "operationId": "approveImportDraft",
+                "summary": "Approve the reviewed draft and lock an immutable plan",
+                "description": "Validates the approval against the current recommendation and stores the plan exactly as approved. Metadata must equal the reviewed recommendation for title, authors, narrators, series and genres (save edits via PATCH first) or 422 `metadata_not_reviewed` is returned. Other 422 codes: validation_failed, invalid_genre (details.suggestion), invalid_duplicate_action, invalid_target, target_incompatible, target_unavailable (the draft's destinations are refreshed first; details: candidate_id, current_revision, targets_refreshed; when targets_refreshed is true the revision was bumped and a `targets_refreshed` event recorded, so reload the draft and approve again with current_revision), invalid_file_operation, invalid_transfer_mode, invalid_cover_artifact, unknown_warning, warnings_not_acknowledged.",
+                "parameters": [
+                    {
+                        "name": "draftId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^imp_[A-Za-z0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "If-Match",
+                        "in": "header",
+                        "required": false,
+                        "description": "Quoted draft revision; must agree with expected_revision.",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\"[1-9][0-9]*\"$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportsPlanApproval"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Current import draft",
+                        "headers": {
+                            "ETag": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "\"4\""
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsImportDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Stale revision (draft_revision_conflict) or draft not awaiting review (invalid_state_transition)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Approval rejected by plan validation",
                         "content": {
                             "application/json": {
                                 "schema": {

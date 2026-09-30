@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\Imports;
 
 use App\Enums\PermissionKey;
+use App\Jobs\InterpretImportDraftJob;
 use App\Models\Imports\ImportDraft;
 use App\Models\Imports\ImportEvent;
 use App\Models\Permission;
 use App\Models\User;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Api\ApiTestCase;
@@ -22,6 +24,19 @@ class ImportDraftApiTest extends ApiTestCase
         parent::setUp();
         config(['import_drafts.enabled' => true]);
         $this->grantImportPermission($this->user);
+        // Draft lifecycle only; interpretation is covered by ImportDraftInterpretationTest.
+        Queue::fake();
+    }
+
+    public function testCreateDraftQueuesInterpretation(): void
+    {
+        $draftId = (string) $this->postDraft($this->observation())->assertCreated()->json('draft.id');
+
+        $internalId = ImportDraft::query()->where('public_id', $draftId)->value('id');
+        Queue::assertPushed(
+            InterpretImportDraftJob::class,
+            static fn (InterpretImportDraftJob $job): bool => $job->draftId === $internalId
+        );
     }
 
     public function testCapabilitiesReportDraftsEnabledForPermittedUser(): void
@@ -181,6 +196,30 @@ class ImportDraftApiTest extends ApiTestCase
         $observation['source']['artifacts'][0]['sha256'] = str_repeat('0', 64);
 
         $this->postDraft($observation)->assertStatus(422);
+    }
+
+    #[DataProvider('untrimmedInlineTextProvider')]
+    public function testCreateDraftKeepsInlineTextByteForByte(string $text): void
+    {
+        $observation = $this->observation();
+        $observation['source']['artifacts'][0]['inline_utf8'] = $text;
+        $observation['source']['artifacts'][0]['sha256'] = hash('sha256', $text);
+
+        $draftId = (string) $this->postDraft($observation)->assertCreated()->json('draft.id');
+
+        $draft = ImportDraft::query()->where('public_id', $draftId)->firstOrFail();
+        $this->assertSame($text, $draft->artifacts()->value('inline_text'));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function untrimmedInlineTextProvider(): array
+    {
+        return [
+            'trailing newline' => ["Title: Test\n"],
+            'leading spaces' => ["  Title: Test"],
+        ];
     }
 
     public function testUserWithoutImportPermissionIsForbidden(): void

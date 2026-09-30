@@ -3667,6 +3667,19 @@ class BookImportService
     }
 
     /**
+     * Parse .nfo text already in memory: XML when it contains markup, otherwise "Key: value" lines.
+     * Pure; shared by the filesystem importer and the imports.v1 draft interpreter.
+     */
+    public function parseNfoContent(string $content): array
+    {
+        if (strpos($content, '<') !== false) {
+            return $this->parseXmlNfo($content);
+        }
+
+        return $this->parsePlainTextNfo($content);
+    }
+
+    /**
      * Extract metadata from .nfo files if present
      */
     public function extractNfoData(string $directoryPath, ?callable $infoCallback = null): ?array
@@ -3683,13 +3696,7 @@ class BookImportService
             return null;
         }
 
-        $nfoData = [];
-
-        if (strpos($nfoContent, '<') !== false) {
-            $nfoData = $this->parseXmlNfo($nfoContent);
-        } else {
-            $nfoData = $this->parsePlainTextNfo($nfoContent);
-        }
+        $nfoData = $this->parseNfoContent($nfoContent);
 
         if (!empty($nfoData) && $infoCallback) {
             $infoCallback("📄 Found .nfo file with metadata");
@@ -7660,7 +7667,7 @@ class BookImportService
      *
      * @return array<int, string>
      */
-    private function splitMultiValueNameTag(string $value): array
+    public function splitMultiValueNameTag(string $value): array
     {
         $pattern = '/\s*(?:,|&|\/|\band\b)\s*/i';
 
@@ -11186,7 +11193,7 @@ class BookImportService
      * lets the user accept, so a directory collision is something they resolve as part
      * of confirming — never something discovered for the first time at move time.
      */
-    protected function directoryPathHasRealConflict(string $relativePath, string $ownCurrentPath = ''): bool
+    public function directoryPathHasRealConflict(string $relativePath, string $ownCurrentPath = ''): bool
     {
         $relativePath = trim($relativePath, '/');
         if ($relativePath === '') {
