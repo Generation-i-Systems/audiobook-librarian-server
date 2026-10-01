@@ -224,7 +224,7 @@ class BookTagService
      */
     private function groupRowsByTag(Collection $rows): Collection
     {
-        /** @var array<string, array{tag: string, books: Collection<int, Book>}> $byTag */
+        /** @var array<string, array{tag: string, books: list<Book>}> $byTag */
         $byTag = [];
 
         foreach ($rows as $row) {
@@ -234,12 +234,18 @@ class BookTagService
 
             foreach ($row->tags as $tag) {
                 $key = mb_strtolower($tag);
-                $byTag[$key] ??= ['tag' => $tag, 'books' => collect()];
-                $byTag[$key]['books']->push($row->book);
+                $byTag[$key] ??= ['tag' => $tag, 'books' => []];
+                $byTag[$key]['books'][] = $row->book;
             }
         }
 
-        return collect($byTag)->sortBy('tag')->values();
+        $grouped = array_values($byTag);
+        usort($grouped, static fn (array $a, array $b): int => $a['tag'] <=> $b['tag']);
+
+        return collect(array_map(
+            static fn (array $entry): array => ['tag' => $entry['tag'], 'books' => collect($entry['books'])],
+            $grouped
+        ));
     }
 
     /**

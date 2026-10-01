@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\BookStorageUnavailableException;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
@@ -29,11 +30,7 @@ class BookExportController extends Controller
 
             $files = Storage::disk('books')->files($directoryPath);
         } catch (\League\Flysystem\UnableToCreateDirectory $e) {
-            $bookStoragePath = config('filesystems.disks.books.root');
-            throw new \RuntimeException(
-                "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
-                "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
-            );
+            throw BookStorageUnavailableException::forRoot(config('filesystems.disks.books.root'), $e);
         }
 
         if (empty($files)) {

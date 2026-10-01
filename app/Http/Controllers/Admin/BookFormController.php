@@ -240,11 +240,9 @@ class BookFormController extends Controller
                     }
                 }
             } catch (\League\Flysystem\UnableToCreateDirectory $e) {
-                $bookStoragePath = config('filesystems.disks.books.root');
-                throw new \RuntimeException(
-                    "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
-                    "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
-                );
+                \Illuminate\Support\Facades\Log::warning('Book storage unavailable; skipping cover candidates', [
+                    'root' => config('filesystems.disks.books.root'),
+                ]);
             }
         }
         // Always fetch genreList as array for the form

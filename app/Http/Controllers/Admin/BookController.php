@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\BookStorageUnavailableException;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
@@ -154,11 +155,9 @@ class BookController extends Controller
                     }
                 }
             } catch (\League\Flysystem\UnableToCreateDirectory $e) {
-                $bookStoragePath = config('filesystems.disks.books.root');
-                throw new \RuntimeException(
-                    "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
-                    "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
-                );
+                \Illuminate\Support\Facades\Log::warning('Book storage unavailable; skipping cover candidates', [
+                    'root' => config('filesystems.disks.books.root'),
+                ]);
             }
         }
         // Set coverAuto to the filename of the book's coverImage if present
@@ -787,11 +786,7 @@ class BookController extends Controller
                     $validated['coverImage'] = $coverName;
                     $coverProcessed = true;
                 } catch (\League\Flysystem\UnableToCreateDirectory $e) {
-                    $bookStoragePath = config('filesystems.disks.books.root');
-                    throw new \RuntimeException(
-                        "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
-                        "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
-                    );
+                    throw BookStorageUnavailableException::forRoot(config('filesystems.disks.books.root'), $e);
                 }
             } else {
                 Log::error('Failed to update cover image', [

@@ -93,6 +93,7 @@ These features require real directory trees and file contents on disk.
   `is_readable()`, `disk_free_space()`, `disk_total_space()`. Tests use `/tmp` as a stand-in;
   they cannot verify that the actual production mounts (e.g. `/media/audiobooks/books`) are
   mounted, readable, or have sufficient free space.
+- **`BookStorageUnavailableException` handling** (`BookController::edit/update`, `BookFormController`, `BookExportController`) — tests prove the 503 rendering, but not that Flysystem actually throws `UnableToCreateDirectory` for a real unmounted `/media/audiobooks/books` (it depends on the adapter and filesystem permissions); an unmount that surfaces as a different exception would still be a 500.
 - **`AppRefreshCommand`** (`app:refresh`) — recursively updates filesystem permissions of all storage/cache directories on disk, runs database migrations, restarts queue workers, resets SAPI/CLI OPcaches, and reloads SAPI `php-fpm` via systemd (`systemctl reload`). Automated tests run in an isolated sandbox where real system privileges, group ownerships, SAPI process state, and systemctl commands are stubbed/skipped, so tests cannot verify SAPI reload or permissions updates in production.
 - **Admin badge image upload** (`Admin\BadgeController::storeUploadedImage()`) — writes to
   `storage/app/public/badges` on the `public` disk. Tests use `Storage::fake('public')`, which

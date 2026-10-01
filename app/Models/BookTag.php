@@ -44,6 +44,9 @@ class BookTag extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return BelongsTo<Book, $this>
+     */
     public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class);

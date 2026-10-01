@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- Book storage unavailable (`BOOK_STORAGE_PATH` unmounted or missing): export and cover upload now return a clean `503` (JSON for API/JSON requests, the standard 503 page otherwise) with a message that no longer exposes the configured path (browsers get a friendly "Book storage is unavailable" page, not a framework error page), instead of an unhandled `RuntimeException` 500. The book edit forms still open, without cover candidates. The path is logged server-side.
 - Metadata contributions: `POST /books/{book}/contributions` now accepts only the editable fields (`title`, `description`, `author`, `narrator`, `genre`, `series`, `seriesNumber`), each with only `original`/`new`, and rejects anything else with 422. Approving a contribution locks the contribution and book rows, so a contribution cannot be applied twice, and refuses with `409` plus `stale_fields` when the book changed after submission, instead of overwriting the newer edit.
 - Security: updated laravel/framework to 13.34.0 (debug-page XSS), league/flysystem to 3.36.0 with flysystem-local 3.35.3 (path normaliser bypass) and phpseclib to 3.0.57 (X25519 timing leak), which `composer audit` flagged on 2026-09-29.
 - Security: updated brace-expansion to 5.0.12 (three denial-of-service advisories), which `npm audit` flagged on 2026-09-29.
