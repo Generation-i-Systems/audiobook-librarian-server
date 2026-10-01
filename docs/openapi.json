@@ -19863,27 +19863,6 @@
                         }
                     }
                 ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "description": "The server validates these body fields in addition to the path parameters; send the same values as the path.",
-                                "properties": {
-                                    "followable_type": {
-                                        "type": "string",
-                                        "enum": ["author", "series"]
-                                    },
-                                    "followable_id": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": ["followable_type", "followable_id"]
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "201": {
                         "description": "Followed successfully",
@@ -19896,11 +19875,14 @@
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Already following (follow only)",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                "example": {
+                                    "error": "Already following."
                                 }
                             }
                         }
@@ -19961,27 +19943,6 @@
                         }
                     }
                 ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "description": "The server validates these body fields in addition to the path parameters; send the same values as the path.",
-                                "properties": {
-                                    "followable_type": {
-                                        "type": "string",
-                                        "enum": ["author", "series"]
-                                    },
-                                    "followable_id": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "required": ["followable_type", "followable_id"]
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "200": {
                         "description": "Unfollowed successfully",

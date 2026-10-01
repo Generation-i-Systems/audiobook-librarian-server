@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use App\Contracts\DocumentStoreServiceInterface;
 
 class FollowApiController extends Controller
@@ -20,17 +21,9 @@ class FollowApiController extends Controller
 
     public function follow(Request $request, string $followableType, string $followableId)
     {
-        // Validate input
-        $request->validate([
-            'followable_type' => 'required|in:author,series',
-            'followable_id' => 'required|integer',
-        ]);
+        $this->validateTarget($followableType, $followableId);
 
         $userId = Auth::id();
-
-        if ($userId === $followableId) {
-            return response()->json(['error' => 'You cannot follow yourself.'], 400);
-        }
 
         // Check if already following
         if ($this->documentStore->followExists($userId, $followableType, $followableId)) {
@@ -50,11 +43,7 @@ class FollowApiController extends Controller
 
     public function unfollow(Request $request, string $followableType, string $followableId)
     {
-        // Validate input
-        $request->validate([
-            'followable_type' => 'required|in:author,series',
-            'followable_id' => 'required|integer',
-        ]);
+        $this->validateTarget($followableType, $followableId);
 
         $userId = Auth::id();
 
@@ -66,5 +55,16 @@ class FollowApiController extends Controller
         }
 
         return response()->json(['message' => 'Successfully unfollowed!'], 200);
+    }
+
+    /**
+     * The target comes from the URL; the request body is not consulted.
+     */
+    private function validateTarget(string $followableType, string $followableId): void
+    {
+        Validator::make(
+            ['followable_type' => $followableType, 'followable_id' => $followableId],
+            ['followable_type' => 'required|in:author,series', 'followable_id' => 'required|integer|min:1']
+        )->validate();
     }
 }
