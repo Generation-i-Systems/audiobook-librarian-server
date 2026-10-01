@@ -413,7 +413,7 @@ class EmailOtpController extends Controller
         ]);
 
         return response()->json([
-            'id' => (string) ($user['id'] ?? ''),
+            'id' => isset($user['id']) ? (int) $user['id'] : null,
             'name' => $user['name'] ?? null,
             'username' => $user['username'] ?? null,
             'email' => $user['email'] ?? null,

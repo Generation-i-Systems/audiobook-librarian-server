@@ -95,19 +95,8 @@ Route::prefix('v1')->group(function () {
         ->name('api.v1.themes.download');
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
-        Route::get('/user', function (Request $request) {
-            $user = $request->user();
-            $user->setAttribute(
-                'groups',
-                $user->groups()->get(['groups.id', 'groups.name'])
-            );
-            $user->setAttribute(
-                'permissions',
-                method_exists($user, 'permissionKeys') ? $user->permissionKeys() : []
-            );
-
-            return $user;
-        });
+        Route::get('/user', [UserApiController::class, 'show']);
+        Route::put('/user', [UserApiController::class, 'update']);
 
         Route::get('/me', [UserApiController::class, 'me']);
 

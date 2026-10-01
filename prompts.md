@@ -602,3 +602,9 @@ Fix the import draft review contract gap: when approval fails with target_unavai
 ## 2026-09-30
 
 Implement importer rebuild phase 5 on the server (branch feature/import-transfer): resumable remote transfer per the imports.v1 contract - POST /imports/drafts/{id}/uploads, HEAD/PATCH /uploads/{fileId} with tus-compatible offsets, chunk limits and completion hashing, POST /verify binding verified files to draft_id + plan_revision, staged-byte cleanup on cancel and a scheduled purge, plan invalidation resetting the transfer, separate rate limits, additive migration, tests and openapi.json. Do not queue or import anything.
+
+## 2026-10-01
+
+Handle an unavailable BOOK_STORAGE_PATH gracefully in the API and the web (clean 503 page instead of a framework exception). Then: openapi.json needs to be correct and support what the mobile client expects - add the missing PUT /user profile endpoint, make auth ids integers, and do a full validation of the accuracy of docs/openapi.json against the routes, validation rules and real responses.
+
+Fantasy has more than 4,500 books, but `GET /api/v1/genres/Fantasy/books?sort=recent&page=1&per_page=24` returned an empty page. Fix the data and block the directory validator when the storage path is missing.

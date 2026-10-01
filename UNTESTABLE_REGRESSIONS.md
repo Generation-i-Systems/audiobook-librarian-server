@@ -81,7 +81,7 @@ These features require real directory trees and file contents on disk.
   OpenAudible directory layout.
 - **`CoverImageAnalysisService::isTextOnWhiteCover()`** — reads real image pixels via
   Intervention\Image; cannot determine cover quality from a mock.
-- **`ValidateAudioFilesCommand`, `ValidateBookDirectoriesCommand`** — walk real filesystem.
+- **`ValidateAudioFilesCommand`, `ValidateBookDirectoriesCommand`** — walk real filesystem. The directory validator now aborts before changing records when the storage root is absent, but tests cannot prove that the production mount stays available during a long scan or that every stored relative path matches a real directory.
 - **`CacheBookFileChunkHashes`** (`books:cache-file-chunk-hashes`) — walks real book
   directories and reads full file bytes to pre-generate manifest chunk hashes; fake-disk tests
   cannot prove production mount permissions, I/O contention, or hash throughput on real files.
@@ -103,6 +103,8 @@ These features require real directory trees and file contents on disk.
   deployment silently produces badges with broken image links.
 
 ---
+
+- **OpenAPI spec vs real responses** (`docs/openapi.json`) — `OpenApiIntegrityTest` and `OpenApiClientContractTest` prove structure, auth, path parameters and the real responses of the client's auth/user endpoints. The request bodies, query parameters and status codes of the other ~250 operations were derived from controller source by static analysis, and their response *bodies* are not checked against the schemas at runtime; endpoints whose success path needs external services (Google/Apple/Discord/Facebook sign-in, email delivery, the skin/theme gallery proxy, imports.v1 transfers) cannot be exercised, so their documented responses can drift from the code unnoticed.
 
 ## 5. Interactive Terminal UI
 
