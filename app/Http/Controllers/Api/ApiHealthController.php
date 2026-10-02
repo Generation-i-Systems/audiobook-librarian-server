@@ -153,22 +153,41 @@ class ApiHealthController extends Controller
             'serverType' => 'ablibrarian-full',
             'serverName' => (string) config('app.name'),
             'syncApiVersion' => '1',
-            'capabilities' => [
-                'BROWSE',
-                'DOWNLOAD',
-                'HISTORY_SYNC',
-                'STATS',
-                'BOOKMARKS_SYNC',
-                'RECOMMENDATIONS',
-                'METADATA_MATCH',
-                'SKINS_GALLERY',
-                'PLAYLISTS',
-                'BADGES',
-            ],
+            'capabilities' => $this->capabilityTokens(),
             'requiresAuth' => true,
             'authMethods' => $authMethods,
             'community' => CommunityStatus::toArray(),
         ]);
+    }
+
+    /**
+     * Feature tokens clients use to decide what to show. MESSAGING means history, read state and
+     * the sync summary are served; DIRECT_MESSAGING adds user-to-user sending, which follows the
+     * community rules and so is only advertised while community features are available.
+     *
+     * @return list<string>
+     */
+    private function capabilityTokens(): array
+    {
+        $tokens = [
+            'BROWSE',
+            'DOWNLOAD',
+            'HISTORY_SYNC',
+            'STATS',
+            'BOOKMARKS_SYNC',
+            'RECOMMENDATIONS',
+            'METADATA_MATCH',
+            'SKINS_GALLERY',
+            'PLAYLISTS',
+            'BADGES',
+            'MESSAGING',
+        ];
+
+        if (CommunityStatus::mode() === CommunityStatus::MODE_FULL) {
+            $tokens[] = 'DIRECT_MESSAGING';
+        }
+
+        return $tokens;
     }
 
     /**

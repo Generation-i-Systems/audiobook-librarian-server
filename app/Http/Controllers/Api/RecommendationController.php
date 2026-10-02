@@ -132,16 +132,20 @@ class RecommendationController extends Controller
         ], 201);
     }
 
-    /** GET /recommendations/inbox — open (not acknowledged or dismissed) recommendations, newest first */
+    /** GET /recommendations/inbox — open (not acknowledged or dismissed) recommendations, newest first; ?status=all includes the rest */
     public function inbox(Request $request): JsonResponse
     {
         /** @var User $user */
         $user = Auth::user();
 
-        $recommendations = UserRecommendation::with(['sender', 'book:id,title,cover_image', 'group:id,name'])
-            ->where('recipient_id', $user->id)
-            ->whereNull('acknowledged_at')
-            ->whereNull('dismissed_at')
+        $query = UserRecommendation::with(['sender', 'book:id,title,cover_image', 'group:id,name'])
+            ->where('recipient_id', $user->id);
+        // status=all is the history view: acknowledged and dismissed recommendations too.
+        if ($request->query('status') !== 'all') {
+            $query->whereNull('acknowledged_at')->whereNull('dismissed_at');
+        }
+
+        $recommendations = $query
             ->orderByDesc('id')
             ->limit($this->pageSize($request))
             ->get()

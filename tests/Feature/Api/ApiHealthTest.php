@@ -225,7 +225,7 @@ class ApiHealthTest extends TestCase
         ]);
         $response->assertJsonPath('serverType', 'ablibrarian-full');
         $response->assertJsonPath('syncApiVersion', '1');
-        $response->assertJsonCount(10, 'capabilities');
+        $response->assertJsonCount(12, 'capabilities');
     }
 
     #[Test]

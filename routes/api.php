@@ -439,6 +439,7 @@ Route::prefix('v1')->group(function () {
 
         // Message Routes
         Route::get('/messages', [MessageApiController::class, 'index']);
+        Route::get('/messages/history', [MessageApiController::class, 'history']);
         Route::post('/messages', [MessageApiController::class, 'store']);
         Route::post('/messages/{id}/acknowledge', [MessageApiController::class, 'acknowledge']);
 

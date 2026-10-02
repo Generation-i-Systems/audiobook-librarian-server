@@ -217,6 +217,7 @@ class EventController extends Controller
                 'nextSyncAfter'   => $nextSyncAfter,
                 'badgesEarned'    => $badgesEarned,
                 'notifications'   => $this->notificationSummary($user->id),
+                'messages'        => app(\App\Services\MessageHistoryService::class)->summary($user->id),
             ]);
         } catch (\Exception $e) {
             ControllerDatabase::rollBack();
