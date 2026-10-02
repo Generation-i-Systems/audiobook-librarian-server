@@ -2,6 +2,7 @@
 
 ### Fixed
 
+- `books:validate-directories` now exits with failure, logging the storage root, when the book storage root is missing instead of marking every book's directory as gone, so an unmounted drive no longer empties the catalog in API listings.
 - API: `POST /follow/{type}/{id}` and `DELETE /unfollow/{type}/{id}` now work. They validated body fields instead of the URL (so a path-only call always got 422), and the `follows` table they write to had no migration since the document-store clean-up (so a call with a body got 500). The target is now read from the path, the meaningless self-follow check is gone, and a new additive migration creates `follows` (run `php artisan migrate`). `openapi.json` no longer documents a request body for them.
 - Directory validation now fails before changing book availability when the configured storage root is missing. After the 03:00 validation ran during a missing mount, a verified database backup was taken and availability was restored only for books whose directories currently exist.
 - Book storage unavailable (`BOOK_STORAGE_PATH` unmounted or missing): export and cover upload now return a clean `503` (JSON for API/JSON requests, the standard 503 page otherwise) with a message that no longer exposes the configured path (browsers get a friendly "Book storage is unavailable" page, not a framework error page), instead of an unhandled `RuntimeException` 500. The book edit forms still open, without cover candidates. The path is logged server-side.

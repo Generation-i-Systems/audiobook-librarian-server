@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
 use App\Models\Book;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 class ValidateBookDirectoriesCommand extends Command
 {
@@ -30,6 +33,15 @@ class ValidateBookDirectoriesCommand extends Command
     {
         $force = $this->option('force');
         $storageRoot = rtrim(config('app.book_root', storage_path('app/books')), '/');
+
+        if (!File::isDirectory($storageRoot)) {
+            $this->error('Book storage root is unavailable; directory availability was not changed.');
+            Log::error('Book directory validation skipped because the storage root is unavailable', [
+                'storage_root' => $storageRoot,
+            ]);
+
+            return self::FAILURE;
+        }
 
         $this->info('Validating book directories...');
 

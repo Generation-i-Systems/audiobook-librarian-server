@@ -6,6 +6,8 @@ Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporti
 
 The API now supports host-based library profile resolution in a single runtime: incoming host name selects an active library profile (for example `main` vs `librivox`) and switches database connection plus book storage roots at request time while preserving the same API routes and response contract.
 
+The scheduled `books:validate-directories` command checks that the configured book storage root exists before it updates `directory_exists`. When storage is unavailable, it exits with failure and leaves book availability unchanged; a missing mount must not make the catalog disappear from API listings.
+
 ## Reading Progress & Statistics Requirements
 
 See `docs/requirements/reading-progress-and-stats.md`.
