@@ -608,3 +608,7 @@ Implement importer rebuild phase 5 on the server (branch feature/import-transfer
 Handle an unavailable BOOK_STORAGE_PATH gracefully in the API and the web (clean 503 page instead of a framework exception). Then: openapi.json needs to be correct and support what the mobile client expects - add the missing PUT /user profile endpoint, make auth ids integers, and do a full validation of the accuracy of docs/openapi.json against the routes, validation rules and real responses.
 
 Fantasy has more than 4,500 books, but `GET /api/v1/genres/Fantasy/books?sort=recent&page=1&per_page=24` returned an empty page. Fix the data and block the directory validator when the storage path is missing.
+
+## 2026-10-03
+
+Fix npm security issues. When this is done, push.

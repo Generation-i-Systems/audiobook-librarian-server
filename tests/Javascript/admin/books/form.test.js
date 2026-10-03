@@ -177,16 +177,11 @@ describe("Book Form", () => {
 
     describe("Raw JSON Edit", () => {
         test("should get bookId from URL if form action is missing", () => {
+            window.history.replaceState({}, "", "/admin/books/456");
             document.body.innerHTML = `
                 <button type="button" id="raw-json-edit-btn">Raw JSON</button>
                 <div id="rawJsonModal" class="modal"><textarea id="raw-json-textarea"></textarea></div>
             `;
-            delete window.location;
-            window.location = {
-                pathname: "/admin/books/456",
-                reload: jest.fn(),
-            };
-
             $.get = jest.fn().mockReturnValue({ fail: jest.fn() });
 
             bookForm.initRawJsonEdit();
@@ -196,9 +191,10 @@ describe("Book Form", () => {
                 "/admin/books/456/raw-json",
                 expect.any(Function),
             );
+            window.history.replaceState({}, "", "/");
         });
 
-        test("should load and save JSON", (done) => {
+        test("should load and save JSON", () => {
             setupTest();
             const mockData = { title: "Test" };
             $.get = jest.fn().mockImplementation((url, cb) => {
@@ -210,16 +206,22 @@ describe("Book Form", () => {
             expect($("#raw-json-textarea").val()).toContain("Test");
 
             $("#raw-json-textarea").val(JSON.stringify({ title: "Updated" }));
-            delete window.location;
-            window.location = { reload: jest.fn() };
             $.ajax = jest.fn().mockImplementation(({ success }) => {
                 success();
                 return Promise.resolve();
             });
 
             $("#save-raw-json-btn").click();
-            expect(window.location.reload).toHaveBeenCalled();
-            done();
+            expect($.ajax).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    url: "/admin/books/123/raw-json",
+                    type: "POST",
+                    data: {
+                        _token: "test-token",
+                        json: JSON.stringify({ title: "Updated" }),
+                    },
+                }),
+            );
         });
 
         test("should handle load failure", () => {

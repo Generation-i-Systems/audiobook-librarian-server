@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- Security: upgraded Jest and its jsdom environment to 30.5.2, removing the vulnerable `braces` dependency path reported by `npm audit`. Updated the book-form tests for jsdom's read-only location object.
 - Import book discovery: documented and tested that `mode: scan` works from an audio-files-only listing (what the Kotlin apps send for a base directory) and from several requests that each hold whole subtrees, giving the same books as `scanForAudiobooks`. No server code changed.
 - Discovery: a book now appears on at most one recommendation shelf. `RecommendationEngine::recompute` lets earlier shelves claim books first, drops shelves left empty, and renumbers `sort_order` and ranks; dismissed shelves no longer claim books. Takes effect on the next recompute.
 - Import drafts: the AI processor built by the container now follows `GEMINI_PAID_TIER` like `book:import` does. It was always built on the free tier, so after 15 requests in a minute interpretation slept 60 seconds, which made batch imports take about twice as long.
