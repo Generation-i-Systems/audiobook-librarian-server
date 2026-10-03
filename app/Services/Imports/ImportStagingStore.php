@@ -39,6 +39,32 @@ class ImportStagingStore
     }
 
     /**
+     * Where an audio sample the client sent for an evidence request is kept until interpretation has used it.
+     */
+    public function evidencePath(string $draftPublicId, string $requestId): string
+    {
+        if (preg_match('/^ev_[A-Za-z0-9]+$/', $requestId) !== 1) {
+            throw new RuntimeException('Refusing an evidence path for an invalid request id.');
+        }
+
+        return $this->root() . '/' . $this->draftDirectoryName($draftPublicId) . '/evidence/' . $requestId . '.bin';
+    }
+
+    public function writeEvidence(string $draftPublicId, string $requestId, string $bytes): string
+    {
+        $path = $this->evidencePath($draftPublicId, $requestId);
+        File::ensureDirectoryExists(dirname($path), 0755);
+        File::put($path, $bytes, true);
+
+        return $path;
+    }
+
+    public function deleteEvidence(string $draftPublicId, string $requestId): void
+    {
+        File::delete($this->evidencePath($draftPublicId, $requestId));
+    }
+
+    /**
      * Copies a request body into a temporary stream, refusing more than $maxBytes.
      *
      * @param resource $body
@@ -86,6 +112,7 @@ class ImportStagingStore
     public function append(string $relativePath, int $offset, $chunk, int $bytes): void
     {
         $path = $this->absolutePath($relativePath);
+        $this->assertWritableLocation($path);
         File::ensureDirectoryExists(dirname($path), 0750);
         $handle = fopen($path, 'c+b');
         if ($handle === false) {
@@ -107,6 +134,7 @@ class ImportStagingStore
     public function createEmpty(string $relativePath): void
     {
         $path = $this->absolutePath($relativePath);
+        $this->assertWritableLocation($path);
         File::ensureDirectoryExists(dirname($path), 0750);
         if (file_put_contents($path, '') === false) {
             throw new RuntimeException('Could not create a staged file.');
@@ -164,5 +192,20 @@ class ImportStagingStore
         }
 
         return $draftPublicId;
+    }
+
+    private function assertWritableLocation(string $path): void
+    {
+        $directory = dirname($path);
+        while (!is_dir($directory) && dirname($directory) !== $directory) {
+            $directory = dirname($directory);
+        }
+        if (!is_writable($directory)) {
+            throw new ImportApiException(
+                507,
+                'staging_unwritable',
+                'The library cannot save uploaded books right now. Ask its owner to check import storage permissions.'
+            );
+        }
     }
 }

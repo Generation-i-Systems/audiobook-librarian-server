@@ -75,6 +75,7 @@ class ImportObservationInterpreterTest extends TestCase
                     'genre' => 'Fantasy',
                     'language' => 'en',
                     'description' => '<p>A long walk.</p>',
+                    'year' => '2020-09-01',
                 ],
                 [
                     'title' => 'Dust Road',
@@ -85,6 +86,7 @@ class ImportObservationInterpreterTest extends TestCase
                     'tags' => [],
                     'language' => 'en',
                     'description' => 'A long walk.',
+                    'year' => 2020,
                     'cover_artifact_id' => 'cover_01',
                 ],
             ],
@@ -99,6 +101,7 @@ class ImportObservationInterpreterTest extends TestCase
                     'tags' => [],
                     'language' => null,
                     'description' => null,
+                    'year' => null,
                     'cover_artifact_id' => 'cover_01',
                 ],
             ],
@@ -113,6 +116,7 @@ class ImportObservationInterpreterTest extends TestCase
                     'tags' => [],
                     'language' => null,
                     'description' => null,
+                    'year' => null,
                     'cover_artifact_id' => 'cover_01',
                 ],
             ],
@@ -130,13 +134,56 @@ class ImportObservationInterpreterTest extends TestCase
         $provenance = $this->interpreter->provenance($sources, $metadata);
 
         $this->assertSame([
-            ['source' => 'library rules', 'source_id' => 'server_policy', 'value' => 'Dust Road', 'confidence' => 1.0],
-            ['source' => 'file tags', 'source_id' => 'embedded_tag', 'value' => 'Dust Road (Unabridged)', 'confidence' => 1.0],
             ['source' => 'folder name', 'source_id' => 'filename', 'value' => 'Dust Road', 'confidence' => 0.5],
+            ['source' => 'file tags', 'source_id' => 'embedded_tag', 'value' => 'Dust Road (Unabridged)', 'confidence' => 1.0],
         ], $provenance['title']);
         $this->assertSame([
             ['source' => 'folder name', 'source_id' => 'filename', 'value' => ['Jane Author'], 'confidence' => 0.5],
         ], $provenance['authors']);
         $this->assertArrayNotHasKey('series', $provenance);
+    }
+
+    /**
+     * @param array<string, mixed> $tags
+     * @param array<string, mixed> $extracted
+     * @param array<string, mixed> $expected
+     */
+    #[DataProvider('tagTitleProvider')]
+    public function testTagTitleIsCheckedAgainstTheSourceName(array $tags, string $sourceName, array $extracted, array $expected): void
+    {
+        $this->assertSame($expected, $this->interpreter->reconcileTagTitle($extracted, $tags, $sourceName));
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>, string, array<string, mixed>, array<string, mixed>}>
+     */
+    public static function tagTitleProvider(): array
+    {
+        return [
+            'album from another book loses to the title tag that matches the folder' => [
+                ['album' => 'USS Hamilton', 'title' => 'USS Crusader: Echoes of Sheentah', 'artist' => 'Mark Wayne McGinnis'],
+                '16 - USS Crusader-Mark Wayne McGinnis',
+                ['title' => 'USS Hamilton', 'author' => ['Mark Wayne McGinnis']],
+                ['title' => 'USS Crusader: Echoes of Sheentah', 'author' => ['Mark Wayne McGinnis']],
+            ],
+            'album that matches the folder is kept' => [
+                ['album' => 'Dust Road', 'title' => 'Chapter 1'],
+                'Dust Road',
+                ['title' => 'Dust Road'],
+                ['title' => 'Dust Road'],
+            ],
+            'nothing matches so the tag extraction stands' => [
+                ['album' => 'Alpha', 'title' => 'Beta'],
+                'Gamma',
+                ['title' => 'Alpha'],
+                ['title' => 'Alpha'],
+            ],
+            'no title tag leaves the extraction alone' => [
+                ['album' => 'USS Hamilton'],
+                '16 - USS Crusader',
+                ['title' => 'USS Hamilton'],
+                ['title' => 'USS Hamilton'],
+            ],
+        ];
     }
 }

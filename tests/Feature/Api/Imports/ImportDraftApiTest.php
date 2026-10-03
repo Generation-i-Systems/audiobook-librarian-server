@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\Imports;
 
 use App\Enums\PermissionKey;
+use App\Enums\ImportDraftState;
 use App\Jobs\InterpretImportDraftJob;
 use App\Models\Imports\ImportDraft;
 use App\Models\Imports\ImportEvent;
@@ -37,6 +38,40 @@ class ImportDraftApiTest extends ApiTestCase
             InterpretImportDraftJob::class,
             static fn (InterpretImportDraftJob $job): bool => $job->draftId === $internalId
         );
+    }
+
+    public function testRecheckReusesSavedObservationBeforeApproval(): void
+    {
+        $draftId = (string) $this->postDraft($this->observation())->assertCreated()->json('draft.id');
+        $draft = ImportDraft::query()->where('public_id', $draftId)->firstOrFail();
+        $draft->state = ImportDraftState::AWAITING_REVIEW;
+        $draft->revision = 3;
+        $draft->recommendation = ['metadata' => ['title' => 'Old suggestion']];
+        $draft->save();
+        $fileCount = $draft->files()->count();
+
+        $this->withHeaders(['Idempotency-Key' => (string) Str::uuid(), 'If-Match' => '"3"'])
+            ->postJson(self::DRAFTS_URL . '/' . $draftId . '/recheck')
+            ->assertOk()
+            ->assertJsonPath('draft.revision', 4)
+            ->assertJsonPath('draft.state', 'created')
+            ->assertJsonPath('draft.recommendation', null);
+
+        $this->assertSame($fileCount, $draft->files()->count());
+        Queue::assertPushed(InterpretImportDraftJob::class, 2);
+
+        $this->withHeaders(['Idempotency-Key' => (string) Str::uuid(), 'If-Match' => '"3"'])
+            ->postJson(self::DRAFTS_URL . '/' . $draftId . '/recheck')
+            ->assertStatus(409);
+    }
+
+    public function testRelativeContextCannotEscapeTheChosenRoot(): void
+    {
+        $observation = $this->observation();
+        $observation['source']['relative_context'] = '../private/book';
+
+        $this->postDraft($observation)->assertUnprocessable();
+        Queue::assertNotPushed(InterpretImportDraftJob::class);
     }
 
     public function testCapabilitiesReportDraftsEnabledForPermittedUser(): void

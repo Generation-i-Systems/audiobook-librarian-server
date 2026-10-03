@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed>|null $recommendation
  * @property array<string, mixed> $transfer_summary
  * @property array<string, mixed>|null $interpretation_error
+ * @property array<int, array<string, mixed>>|null $evidence_requests
  * @property string|null $cancel_reason
  * @property \Illuminate\Support\Carbon|null $expires_at
  * @property \Illuminate\Support\Carbon|null $queued_at
@@ -56,6 +57,7 @@ class ImportDraft extends Model
         'recommendation',
         'transfer_summary',
         'interpretation_error',
+        'evidence_requests',
         'cancel_reason',
         'expires_at',
         'queued_at',
@@ -77,6 +79,7 @@ class ImportDraft extends Model
         'recommendation' => 'array',
         'transfer_summary' => 'array',
         'interpretation_error' => 'array',
+        'evidence_requests' => 'array',
         'expires_at' => 'datetime',
         'queued_at' => 'datetime',
         'completed_at' => 'datetime',

@@ -54,9 +54,9 @@ class ImportDraftReviewService
         if ($expectedRevision === null) {
             throw ImportApiException::revisionRequired();
         }
-        $patch = $this->validateBody($body);
+        [$patch, $customDirectory] = $this->validateBody($body);
 
-        $updated = DB::transaction(function () use ($draft, $expectedRevision, $patch): ImportDraft {
+        $updated = DB::transaction(function () use ($draft, $expectedRevision, $patch, $customDirectory): ImportDraft {
             /** @var ImportDraft $locked */
             $locked = ImportDraft::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
             $this->draftService->assertRevision($locked->load('files'), $expectedRevision);
@@ -74,6 +74,15 @@ class ImportDraftReviewService
                     => ($current[$field] ?? null) !== ($edited[$field] ?? null),
                 ARRAY_FILTER_USE_BOTH
             ));
+            $directoryChanged = $customDirectory['present']
+                && ($recommendation['custom_directory'] ?? null) !== $customDirectory['value'];
+            if ($directoryChanged) {
+                $recommendation['custom_directory'] = $customDirectory['value'];
+                if ($customDirectory['value'] === null) {
+                    unset($recommendation['custom_directory']);
+                }
+                $changed[] = 'custom_directory';
+            }
             if ($changed === []) {
                 $this->refreshTargets($locked, self::TRIGGER_REVIEW_PATCH);
 
@@ -97,6 +106,28 @@ class ImportDraftReviewService
         }
 
         return $updated;
+    }
+
+    /**
+     * The online lookup compared with this draft's current details; read-only.
+     *
+     * @return array{draft: ImportDraft, fields: array<int, array{field: string, current: mixed, enriched: mixed}>}
+     */
+    public function enrichmentComparison(User $user, string $publicId): array
+    {
+        $draft = $this->draftService->findForUser($user, $publicId);
+        if ($draft->state !== ImportDraftState::AWAITING_REVIEW) {
+            throw ImportApiException::invalidState($draft->state->value, 'looked up');
+        }
+        $recommendation = (array) $draft->recommendation;
+
+        return [
+            'draft' => $draft,
+            'fields' => $this->interpreter->enrichmentComparison(
+                (array) ($recommendation['metadata'] ?? []),
+                (array) ($recommendation['identifiers'] ?? [])
+            ),
+        ];
     }
 
     /**
@@ -137,7 +168,7 @@ class ImportDraftReviewService
 
     /**
      * @param array<string, mixed> $body
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: array{present: bool, value: string|null}}
      */
     private function validateBody(array $body): array
     {
@@ -147,7 +178,7 @@ class ImportDraftReviewService
                 'This server does not accept local AI results yet.'
             );
         }
-        $unknown = array_diff(array_keys($body), ['contract_version', 'metadata']);
+        $unknown = array_diff(array_keys($body), ['contract_version', 'metadata', 'custom_directory']);
         if ($unknown !== []) {
             throw ImportApiException::validation(
                 'Only book details can be edited.',
@@ -159,7 +190,13 @@ class ImportDraftReviewService
             throw ImportApiException::validation('Unsupported contract version.');
         }
 
-        return $this->metadataValidator->validatePatch($body['metadata'] ?? []);
+        return [
+            $this->metadataValidator->validatePatch($body['metadata'] ?? []),
+            [
+                'present' => array_key_exists('custom_directory', $body),
+                'value' => array_key_exists('custom_directory', $body) ? $this->metadataValidator->validateCustomDirectory($body['custom_directory']) : null,
+            ],
+        ];
     }
 
     private function invalidatePlan(ImportDraft $draft): void
@@ -192,7 +229,7 @@ class ImportDraftReviewService
         array $changed
     ): array {
         $provenance = (array) ($recommendation['field_provenance'] ?? []);
-        foreach ($changed as $field) {
+        foreach (array_diff($changed, ['custom_directory']) as $field) {
             $entries = array_values(array_filter(
                 (array) ($provenance[$field] ?? []),
                 static fn (array $entry): bool
@@ -234,7 +271,8 @@ class ImportDraftReviewService
             $draft,
             $metadata,
             (array) ($recommendation['identifiers'] ?? []),
-            $keptWarnings
+            $keptWarnings,
+            isset($recommendation['custom_directory']) ? (string) $recommendation['custom_directory'] : null
         );
 
         return array_merge($recommendation, $derived);

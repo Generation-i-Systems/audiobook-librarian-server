@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\Imports;
 
 use App\Models\Imports\ImportDraft;
+use App\Services\AIBookProcessor;
 use App\Services\Imports\ImportMetadataEnricher;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -266,7 +267,7 @@ class ImportDraftInterpretationTest extends ApiTestCase
         config(['import_drafts.enrichment.enabled' => true]);
         $enricher = Mockery::mock(ImportMetadataEnricher::class);
         $enricher->shouldReceive('enrich')->once()->andReturn([
-            'title' => 'Ignored Because Tags Won',
+            'title' => 'Dust Road',
             'series' => 'Road Saga',
             'series_number' => 2,
             'description' => 'From the web.',
@@ -282,6 +283,122 @@ class ImportDraftInterpretationTest extends ApiTestCase
         $this->assertSame(['name' => 'Road Saga', 'number' => 2], $metadata['series']);
         $this->assertSame('From the web.', $metadata['description']);
         $this->assertSame('external_enrichment', $draft['recommendation']['field_provenance']['series'][0]['source_id']);
+    }
+
+    public function testObservedFolderUsesExistingImporterAnalysis(): void
+    {
+        config(['import_drafts.ai_enabled' => true]);
+        $ai = Mockery::mock(AIBookProcessor::class);
+        $ai->shouldReceive('processBookDirectory')->once()->with(
+            '/observed/16 - USS Crusader-Mark Wayne McGinnis/USS_Crusader.m4b',
+            ['USS_Crusader.m4b'],
+            ['USS_Crusader.m4b' => [
+                'title' => 'USS Crusader: Echoes of Sheentah',
+                'album' => 'USS Hamilton',
+                'artist' => 'Mark Wayne McGinnis',
+                'track' => '16',
+            ]],
+            null,
+            []
+        )->andReturn([
+            'title' => 'USS Crusader-Mark Wayne McGinnis',
+            'author' => ['Mark Wayne McGinnis'],
+            'series' => 'USS Crusader: Echoes of Sheentah',
+            'series_number' => 16,
+            'genre' => 'Science Fiction',
+            'confidence' => 25,
+        ]);
+        $this->app->instance(AIBookProcessor::class, $ai);
+
+        $observation = $this->observation('USS_Crusader.m4b', [
+            $this->audioFile('f_01', 'USS_Crusader.m4b', [
+                'title' => ['USS Crusader: Echoes of Sheentah'],
+                'album' => ['USS Hamilton'],
+                'artist' => ['Mark Wayne McGinnis'],
+                'track' => ['16'],
+            ]),
+        ]);
+        $observation['source']['relative_context'] = '16 - USS Crusader-Mark Wayne McGinnis/USS_Crusader.m4b';
+        $draft = $this->createInterpretedDraft($observation);
+
+        $this->assertSame('awaiting_review', $draft['state']);
+        $this->assertSame('USS Crusader: Echoes of Sheentah', $draft['recommendation']['metadata']['title']);
+        $this->assertSame(
+            ['name' => 'USS Hamilton', 'number' => 16],
+            $draft['recommendation']['metadata']['series']
+        );
+        $this->assertSame(['Science Fiction'], $draft['recommendation']['metadata']['genres']);
+        $this->assertSame('embedded_tag', $draft['recommendation']['field_provenance']['title'][0]['source_id']);
+        $this->assertSame('embedded_tag', $draft['recommendation']['field_provenance']['series'][0]['source_id']);
+        $this->assertSame('USS Crusader: Echoes of Sheentah', $draft['source_evidence']['files'][0]['raw_tags']['title'][0]);
+        $this->assertSame('USS Hamilton', $draft['source_evidence']['files'][0]['raw_tags']['album'][0]);
+    }
+
+    public function testColonTitleFromFileTagsSurvivesWithoutAi(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $draft = $this->createInterpretedDraft($this->observation('16 - USS Crusader-Mark Wayne McGinnis', [
+            $this->audioFile('f_01', 'USS_Crusader.m4b', [
+                'title' => ['USS Crusader: Echoes of Sheentah'],
+                'album' => ['USS Hamilton'],
+                'artist' => ['Mark Wayne McGinnis'],
+            ]),
+        ]));
+
+        $this->assertSame('USS Crusader: Echoes of Sheentah', $draft['recommendation']['metadata']['title']);
+        $this->assertSame('embedded_tag', $draft['recommendation']['field_provenance']['title'][0]['source_id']);
+    }
+
+    public function testObservedMetadataJsonKeepsExistingImporterAuthority(): void
+    {
+        config(['import_drafts.ai_enabled' => true]);
+        $ai = Mockery::mock(AIBookProcessor::class);
+        $ai->shouldReceive('processBookDirectory')->once()->andReturn([
+            'title' => 'Wrong guess', 'author' => ['Jane Author'], 'genre' => 'Other', 'confidence' => 20,
+        ]);
+        $this->app->instance(AIBookProcessor::class, $ai);
+        $json = json_encode(['title' => 'Dust Road', 'authors' => ['Jane Author'], 'genres' => ['Fantasy']]);
+        $artifactId = 'text_metadata';
+        $observation = $this->observation('Dust Road', [
+            $this->audioFile('f_01', 'book.m4b'),
+            [
+                'file_id' => 'f_json', 'relative_path' => 'metadata.json', 'role' => 'sidecar',
+                'bytes' => strlen($json), 'text_artifact_id' => $artifactId,
+            ],
+        ], [[
+            'artifact_id' => $artifactId, 'kind' => 'text', 'media_type' => 'text/plain',
+            'sha256' => hash('sha256', $json), 'inline_utf8' => $json,
+        ]]);
+
+        $draft = $this->createInterpretedDraft($observation);
+
+        $this->assertSame('awaiting_review', $draft['state']);
+        $this->assertSame('Dust Road', $draft['recommendation']['metadata']['title']);
+        $this->assertSame(['Fantasy'], $draft['recommendation']['metadata']['genres']);
+    }
+
+    public function testObservedMetadataJsonKeepsItsAuthorityWhenAiIsUnavailable(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $json = json_encode(['title' => 'Dust Road', 'authors' => ['Jane Author'], 'genres' => ['Fantasy']]);
+        $observation = $this->observation('Dust Road', [
+            $this->audioFile('f_01', 'book.m4b', ['title' => ['Wrong title'], 'album' => ['Wrong album']]),
+            [
+                'file_id' => 'f_json', 'relative_path' => 'metadata.json', 'role' => 'sidecar',
+                'bytes' => strlen($json), 'text_artifact_id' => 'text_metadata',
+            ],
+        ], [[
+            'artifact_id' => 'text_metadata', 'kind' => 'text', 'media_type' => 'text/plain',
+            'sha256' => hash('sha256', $json), 'inline_utf8' => $json,
+        ]]);
+
+        $draft = $this->createInterpretedDraft($observation);
+
+        $this->assertSame('awaiting_review', $draft['state']);
+        $this->assertSame('Dust Road', $draft['recommendation']['metadata']['title']);
+        $this->assertSame(['Jane Author'], $draft['recommendation']['metadata']['authors']);
+        $this->assertSame(['Fantasy'], $draft['recommendation']['metadata']['genres']);
+        $this->assertSame('metadata_json', $draft['recommendation']['field_provenance']['title'][0]['source_id']);
     }
 
     public function testEnrichmentIsSkippedWhenNotRequested(): void

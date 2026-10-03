@@ -7,6 +7,8 @@ namespace App\Services\Imports;
 use App\Models\Imports\ImportArtifact;
 use App\Models\Imports\ImportDraft;
 use App\Models\Imports\ImportDraftFile;
+use App\Services\AIBookProcessor;
+use App\Services\BookEnrichmentService;
 use App\Services\BookImportService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -17,26 +19,32 @@ use Throwable;
  * NFO text) into the legacy importer's metadata helpers and produces an
  * imports.v1 recommendation with per-field provenance.
  *
- * Precedence is the legacy fill-missing order: embedded tags, then NFO, then the
- * file/folder name, then (optionally) library series genre and external
- * enrichment. The merged result then goes through the same pre-review
- * normalization book:import applies (BookImportService::postProcessAIResult).
+ * The client supplies observations only. The server feeds them to the existing
+ * book:import AI and metadata helpers before producing a review recommendation.
  */
 class ImportObservationInterpreter
 {
     public const SOURCE_EMBEDDED_TAG = 'embedded_tag';
+    public const SOURCE_METADATA_JSON = 'metadata_json';
+    public const SOURCE_AI = 'existing_importer_ai';
     public const SOURCE_NFO = 'nfo';
+    public const SOURCE_AUDIO = 'audio_analysis';
     public const SOURCE_FILENAME = 'filename';
     public const SOURCE_LIBRARY_SERIES = 'library_series';
+    public const SOURCE_AUTHOR_HISTORY = 'author_history';
     public const SOURCE_EXTERNAL = 'external_enrichment';
     public const SOURCE_POLICY = 'server_policy';
     public const SOURCE_USER_EDIT = 'user_edit';
 
     public const CONFIDENCE = [
         self::SOURCE_EMBEDDED_TAG => 1.0,
+        self::SOURCE_METADATA_JSON => 1.0,
+        self::SOURCE_AI => 0.75,
         self::SOURCE_NFO => 0.9,
+        self::SOURCE_AUDIO => 0.7,
         self::SOURCE_FILENAME => 0.5,
         self::SOURCE_LIBRARY_SERIES => 0.7,
+        self::SOURCE_AUTHOR_HISTORY => 0.7,
         self::SOURCE_EXTERNAL => 0.8,
         self::SOURCE_USER_EDIT => 1.0,
     ];
@@ -46,9 +54,13 @@ class ImportObservationInterpreter
      */
     public const SOURCE_LABELS = [
         self::SOURCE_EMBEDDED_TAG => 'file tags',
+        self::SOURCE_METADATA_JSON => 'metadata.json',
+        self::SOURCE_AI => 'library analysis',
         self::SOURCE_NFO => 'NFO',
+        self::SOURCE_AUDIO => 'audio analysis',
         self::SOURCE_FILENAME => 'folder name',
         self::SOURCE_LIBRARY_SERIES => 'library series',
+        self::SOURCE_AUTHOR_HISTORY => 'author history',
         self::SOURCE_EXTERNAL => 'online lookup',
         self::SOURCE_POLICY => 'library rules',
         self::SOURCE_USER_EDIT => 'your edit',
@@ -60,7 +72,7 @@ class ImportObservationInterpreter
         'hardcover' => 'Hardcover',
     ];
 
-    public const METADATA_FIELDS = ['title', 'authors', 'narrators', 'series', 'genres', 'language', 'description'];
+    public const METADATA_FIELDS = ['title', 'authors', 'narrators', 'series', 'genres', 'language', 'description', 'year'];
 
     private const LEGACY_KEYS = [
         'title', 'author', 'narrator', 'series', 'series_number', 'genre', 'description', 'language', 'isbn', 'year',
@@ -69,15 +81,17 @@ class ImportObservationInterpreter
 
     public function __construct(
         private readonly BookImportService $importService,
+        private readonly AIBookProcessor $aiProcessor,
         private readonly ImportRecommendationPolicy $policy,
         private readonly ImportMetadataEnricher $enricher,
+        private readonly BookEnrichmentService $enrichmentService,
     ) {
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function interpret(ImportDraft $draft): array
+    public function interpret(ImportDraft $draft, ?array $audioMetadata = null): array
     {
         $files = $draft->files()->get();
         $audio = $files->where('role', 'audio')->sortBy('relative_path', SORT_NATURAL | SORT_FLAG_CASE)->values();
@@ -91,13 +105,30 @@ class ImportObservationInterpreter
         if ($sourceName !== $draft->source_display_name || $this->isFileName($sourceName)) {
             $labels[self::SOURCE_FILENAME] = 'file name';
         }
-        $sources = array_filter([
-            self::SOURCE_EMBEDDED_TAG => $this->tagMetadata($audio),
+        $context = $draft->client_metadata['relative_context'] ?? $sourceName;
+        $metadataJson = $this->metadataJsonText($files, $artifacts);
+        $observedSources = array_filter([
+            self::SOURCE_METADATA_JSON => $metadataJson === null ? [] : ($this->importService->parseMetadataJsonContent($metadataJson) ?? []),
+            self::SOURCE_EMBEDDED_TAG => $this->tagMetadata($audio, $sourceName . ' ' . $context),
             self::SOURCE_NFO => $this->nfoMetadata($files, $artifacts),
             self::SOURCE_FILENAME => $this->importService->parseFilenameForMetadata($sourceName),
+            // Fills only what the files left empty: spoken evidence never overrides tags or the NFO.
+            self::SOURCE_AUDIO => $audioMetadata,
         ]);
         $warnings = $this->observationWarnings($draft, $audio);
 
+        $aiMetadata = (bool) config('import_drafts.ai_enabled') ? $this->analyzeWithExistingImporter(
+            $sourceName,
+            $context,
+            $audio,
+            $observedSources[self::SOURCE_NFO] ?? [],
+            $metadataJson,
+            $this->additionalText($files, $artifacts)
+        ) : null;
+        if ($aiMetadata !== null) {
+            $this->preferDirectTagEvidence($aiMetadata, $observedSources, $sourceName, (string) $context, $audio);
+        }
+        $sources = $aiMetadata === null ? $observedSources : [self::SOURCE_METADATA_JSON => $observedSources[self::SOURCE_METADATA_JSON] ?? [], self::SOURCE_AI => $aiMetadata] + $observedSources;
         $merged = [];
         foreach ($sources as $metadata) {
             $merged = $this->importService->mergeMetadataFillMissing($merged, $metadata);
@@ -115,13 +146,34 @@ class ImportObservationInterpreter
             $enriched = $this->enrich($merged, $warnings, $labels);
             if ($enriched !== []) {
                 $sources[self::SOURCE_EXTERNAL] = $enriched;
-                $merged = $this->importService->mergeMetadataFillMissing($merged, $enriched);
+                // book:import accepts validated external results over its AI result.
+                $merged = $aiMetadata === null ? $this->importService->mergeMetadataFillMissing($merged, $enriched) : array_merge($merged, $enriched);
             }
         }
 
+        // Same last-resort author history lookup as book:import, after enrichment.
+        $genre = $merged['genre'] ?? '';
+        $genre = is_array($genre) ? ($genre[0] ?? '') : $genre;
+        if (in_array($genre, ['General Fiction', 'Action', 'Other', 'Unknown', ''], true)) {
+            $preferred = $this->importService->getAuthorPreferredGenre($merged['author'] ?? []);
+            if ($preferred !== null && !in_array($preferred, ['General Fiction', 'Action', 'Other', 'Unknown', ''], true)) {
+                $merged['genre'] = [$preferred];
+                $sources[self::SOURCE_AUTHOR_HISTORY] = ['genre' => [$preferred]];
+            }
+        }
+
+        $directTagTitle = $observedSources[self::SOURCE_EMBEDDED_TAG]['title'] ?? null;
+        $rawTagTitle = $this->legacyTags((array) ($audio->first()?->media_observation['raw_tags'] ?? []))['title'] ?? null;
+        $preserveTaggedTitle = is_string($directTagTitle) && $directTagTitle !== ''
+            && $directTagTitle === $rawTagTitle && ($merged['title'] ?? null) === $directTagTitle
+            && empty($observedSources[self::SOURCE_METADATA_JSON]['title']);
         $normalized = $this->importService->postProcessAIResult($merged, [
             'path' => '/' . str_replace('/', ' ', $sourceName),
         ]);
+        if ($preserveTaggedTitle) {
+            // The legacy colon cleanup can shorten an actual tagged title even when its series is different.
+            $normalized['title'] = $directTagTitle;
+        }
         $metadata = $this->contractMetadata($normalized, $this->coverArtifactId($files, $audio, $artifacts));
         $identifiers = ['isbn' => $this->stringOrNull($normalized['isbn'] ?? null)];
         $derived = $this->policy->derive($draft, $metadata, $identifiers, $warnings);
@@ -135,6 +187,54 @@ class ImportObservationInterpreter
             'required_decisions' => $derived['required_decisions'],
             'identifiers' => $identifiers,
         ];
+    }
+
+    /**
+     * A fresh online lookup for the book as it now stands, compared with its current details, as in the importer's
+     * "Request enrichment" step. Nothing is stored: the person chooses which values to take and saves them as an
+     * ordinary edit.
+     *
+     * @param array<string, mixed> $metadata contract-shaped current metadata
+     * @param array<string, mixed> $identifiers
+     * @return array<int, array{field: string, current: mixed, enriched: mixed}>
+     */
+    public function enrichmentComparison(array $metadata, array $identifiers = []): array
+    {
+        if (!(bool) config('import_drafts.enrichment.enabled')) {
+            throw ImportApiException::policy(
+                'enrichment_not_available',
+                'This library does not look up book details online.'
+            );
+        }
+
+        $legacy = $this->policy->toLegacyMetadata($metadata, $identifiers);
+        try {
+            $enriched = $this->enricher->enrich($legacy);
+        } catch (Throwable $e) {
+            Log::warning('Import draft enrichment request failed', ['error' => $e->getMessage()]);
+            throw ImportApiException::policy(
+                'enrichment_unavailable',
+                'Online book details could not be looked up right now.'
+            );
+        }
+        if (!$this->enrichmentService->isValidEnrichment($legacy, $enriched)) {
+            throw ImportApiException::policy(
+                'enrichment_no_match',
+                'Online book details did not match this book.'
+            );
+        }
+
+        $proposed = $this->contractMetadata(array_intersect_key($enriched, array_flip(self::LEGACY_KEYS)));
+        $rows = [];
+        foreach (['title', 'authors', 'narrators', 'series', 'year', 'genres', 'description'] as $field) {
+            $value = $proposed[$field] ?? null;
+            if ($value === null || $value === [] || $value === '' || $value === ($metadata[$field] ?? null)) {
+                continue;
+            }
+            $rows[] = ['field' => $field, 'current' => $metadata[$field] ?? null, 'enriched' => $value];
+        }
+
+        return $rows;
     }
 
     /**
@@ -160,8 +260,22 @@ class ImportObservationInterpreter
             'tags' => [],
             'language' => $this->stringOrNull($legacy['language'] ?? null),
             'description' => $description === null ? null : $this->importService->cleanDescription($description),
+            'year' => $this->yearOrNull($legacy['year'] ?? null),
             'cover_artifact_id' => $coverArtifactId,
         ];
+    }
+
+    private function yearOrNull(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            $year = $value;
+        } elseif (is_string($value) && preg_match('/^\s*(\d{4})(?:\D|$)/', $value, $matches) === 1) {
+            $year = (int) $matches[1];
+        } else {
+            return null;
+        }
+
+        return $year >= 1000 && $year <= 9999 ? $year : null;
     }
 
     /**
@@ -189,7 +303,10 @@ class ImportObservationInterpreter
             if ($final === null || $final === []) {
                 continue;
             }
-            if ($entries === [] || $entries[0]['value'] != $final) {
+            $winner = array_search($final, array_column($entries, 'value'), false);
+            if ($winner !== false && $winner !== 0) {
+                array_unshift($entries, ...array_splice($entries, $winner, 1));
+            } elseif ($winner === false) {
                 array_unshift($entries, $this->provenanceEntry(
                     self::SOURCE_POLICY,
                     $final,
@@ -250,10 +367,85 @@ class ImportObservationInterpreter
     }
 
     /**
+     * Sends a short audio sample the client supplied through the existing audio-analysis AI path.
+     *
+     * @return array<string, mixed>|null legacy-shaped metadata, or null when nothing usable was heard
+     */
+    public function analyzeAudioSample(string $path, string $hint): ?array
+    {
+        $result = $this->aiProcessor->processAudioSample($path, $hint);
+        if (!is_array($result)) {
+            return null;
+        }
+        $metadata = array_intersect_key($result, array_flip(self::LEGACY_KEYS));
+        foreach (['author', 'narrator'] as $key) {
+            if (isset($metadata[$key]) && is_string($metadata[$key])) {
+                $metadata[$key] = $this->importService->splitMultiValueNameTag($metadata[$key]);
+            }
+        }
+        if (isset($metadata['genre']) && is_string($metadata['genre'])) {
+            $metadata['genre'] = [$metadata['genre']];
+        }
+        $metadata = array_filter($metadata, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+
+        return $metadata === [] ? null : $metadata;
+    }
+
+    /**
+     * book:import takes the album tag as the title, but an album tag is often the wrong book (a series
+     * name, or the previous book of the series). When the title tag matches the folder or file name
+     * better than the album-derived title does, the title tag is the better evidence.
+     *
+     * @param array<string, mixed> $metadata extractMetadataFromFileTags output
+     * @param array<string, mixed> $tags legacyTags output
+     * @return array<string, mixed>
+     */
+    public function reconcileTagTitle(array $metadata, array $tags, string $sourceName): array
+    {
+        $titleTag = isset($tags['title']) && is_string($tags['title']) ? trim($tags['title']) : '';
+        $current = isset($metadata['title']) && is_string($metadata['title']) ? $metadata['title'] : '';
+        if ($titleTag === '' || $current === '' || strcasecmp($titleTag, $current) === 0) {
+            return $metadata;
+        }
+
+        $nameTokens = $this->titleTokens($sourceName);
+        if ($nameTokens === []) {
+            return $metadata;
+        }
+        $overlap = static fn (string $title): int => count(array_intersect(
+            self::titleTokensOf($title),
+            $nameTokens
+        ));
+
+        if ($overlap($titleTag) > $overlap($current)) {
+            $metadata['title'] = $titleTag;
+        }
+
+        return $metadata;
+    }
+
+    /** @return array<int, string> */
+    private function titleTokens(string $name): array
+    {
+        return self::titleTokensOf(pathinfo($name, PATHINFO_FILENAME) ?: $name);
+    }
+
+    /** @return array<int, string> */
+    private static function titleTokensOf(string $text): array
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_values(array_unique(array_filter(
+            $words,
+            static fn (string $word): bool => !ctype_digit($word) && !in_array($word, ['the', 'a', 'an', 'of', 'and', 'book'], true)
+        )));
+    }
+
+    /**
      * @param Collection<int, ImportDraftFile> $audio
      * @return array<string, mixed>
      */
-    private function tagMetadata(Collection $audio): array
+    private function tagMetadata(Collection $audio, string $sourceName): array
     {
         foreach ($audio as $file) {
             $tags = $this->legacyTags((array) ($file->media_observation['raw_tags'] ?? []));
@@ -261,6 +453,7 @@ class ImportObservationInterpreter
                 continue;
             }
             $metadata = $this->importService->extractMetadataFromFileTags([basename($file->relative_path) => $tags]);
+            $metadata = $this->reconcileTagTitle($metadata, $tags, $sourceName);
             if (isset($tags['language']) && is_string($tags['language'])) {
                 $metadata['language'] = $tags['language'];
             }
@@ -269,6 +462,116 @@ class ImportObservationInterpreter
         }
 
         return [];
+    }
+
+    /**
+     * The existing importer analysis can echo a folder name as a title and mistake the tagged title for a
+     * series. When that happens, keep its other findings but let the already reconciled file tags win these fields.
+     *
+     * @param array<string, mixed> $aiMetadata
+     * @param array<string, array<string, mixed>> $observedSources
+     * @param Collection<int, ImportDraftFile> $audio
+     */
+    private function preferDirectTagEvidence(array &$aiMetadata, array &$observedSources, string $sourceName, string $context, Collection $audio): void
+    {
+        $tagTitle = $observedSources[self::SOURCE_EMBEDDED_TAG]['title'] ?? null;
+        $aiTitle = $aiMetadata['title'] ?? null;
+        if (!is_string($tagTitle) || !is_string($aiTitle) || $tagTitle === '') {
+            return;
+        }
+
+        $folderNames = array_unique(array_merge([$sourceName], explode('/', $context)));
+        $folderTitles = array_map(
+            static fn (string $name): string => trim((string) preg_replace('/^\s*\d+\s*[-._]\s*/', '', pathinfo($name, PATHINFO_FILENAME) ?: $name)),
+            $folderNames
+        );
+        if (!in_array($aiTitle, $folderTitles, true) || strcasecmp($tagTitle, $aiTitle) === 0) {
+            return;
+        }
+
+        unset($aiMetadata['title']);
+        $tags = $this->legacyTags((array) ($audio->first()?->media_observation['raw_tags'] ?? []));
+        $album = $tags['album'] ?? null;
+        $track = $tags['track'] ?? null;
+        if (
+            is_string($album) && $album !== '' && strcasecmp($album, $tagTitle) !== 0
+            && ($aiMetadata['series'] ?? null) === $tagTitle && is_scalar($track) && preg_match('/^\d+$/', (string) $track) === 1
+        ) {
+            $observedSources[self::SOURCE_EMBEDDED_TAG]['series'] = $album;
+            $observedSources[self::SOURCE_EMBEDDED_TAG]['series_number'] = (int) $track;
+            unset($aiMetadata['series'], $aiMetadata['series_number']);
+        }
+    }
+
+    /**
+     * Send observed facts through the same analysis path as book:import. Audio
+     * bytes are not needed; the client may include small NFO text artifacts.
+     *
+     * @param Collection<int, ImportDraftFile> $audio
+     * @param array<string, mixed> $nfo
+     * @return array<string, mixed>|null
+     */
+    private function analyzeWithExistingImporter(
+        string $sourceName,
+        string $context,
+        Collection $audio,
+        array $nfo,
+        ?string $metadataJson,
+        array $additionalText = []
+    ): ?array {
+        $tags = [];
+        $names = [];
+        foreach ($audio as $file) {
+            $names[] = $file->relative_path;
+            $values = $this->legacyTags((array) ($file->media_observation['raw_tags'] ?? []));
+            if ($values !== []) {
+                $tags[$file->relative_path] = $values;
+            }
+        }
+
+        return $this->importService->processWithAI([
+            'path' => '/observed/' . $context,
+            'name' => $sourceName,
+            'files' => $names,
+            'observed_file_tags' => $tags,
+            'observed_nfo_data' => $nfo ?: null,
+            'observed_metadata_json' => $metadataJson,
+            'observed_additional_text' => $additionalText,
+        ], $this->aiProcessor);
+    }
+
+    /**
+     * Small text files the client inlined, other than the NFO and metadata.json that are parsed on their own.
+     *
+     * @param Collection<int, ImportDraftFile> $files
+     * @param Collection<int, ImportArtifact> $artifacts
+     * @return array<string, string>
+     */
+    private function additionalText(Collection $files, Collection $artifacts): array
+    {
+        $text = [];
+        foreach ($files as $file) {
+            if ($file->text_artifact_id === null || $file->role === 'nfo' || strtolower(basename($file->relative_path)) === 'metadata.json') {
+                continue;
+            }
+            $inline = $artifacts->firstWhere('artifact_id', $file->text_artifact_id)?->inline_text;
+            if (is_string($inline) && trim($inline) !== '') {
+                $text[$file->relative_path] = $inline;
+            }
+        }
+
+        return $text;
+    }
+
+    /** @param Collection<int, ImportDraftFile> $files
+     *  @param Collection<int, ImportArtifact> $artifacts
+     */
+    private function metadataJsonText(Collection $files, Collection $artifacts): ?string
+    {
+        $file = $files->first(static fn (ImportDraftFile $file): bool =>
+            strtolower(basename($file->relative_path)) === 'metadata.json' && $file->text_artifact_id !== null);
+
+        return $file === null ? null : $artifacts->firstWhere('artifact_id', $file->text_artifact_id)?->inline_text;
     }
 
     /**
@@ -312,7 +615,7 @@ class ImportObservationInterpreter
     private function sourceName(ImportDraft $draft, Collection $audio): string
     {
         $first = $audio->first();
-        if ($audio->count() === 1 && $first !== null && !str_contains($first->relative_path, '/')) {
+        if ($audio->count() === 1 && $first !== null && $this->isFileName($draft->source_display_name)) {
             return $first->relative_path;
         }
 
@@ -338,6 +641,17 @@ class ImportObservationInterpreter
                 'id' => 'enrichment_unavailable',
                 'code' => 'enrichment_unavailable',
                 'message' => 'Online book details could not be looked up. The recommendation uses the files only.',
+                'requires_acknowledgment' => false,
+            ];
+
+            return [];
+        }
+
+        if (!$this->enrichmentService->isValidEnrichment($metadata, $enriched)) {
+            $warnings[] = [
+                'id' => 'enrichment_mismatch',
+                'code' => 'enrichment_mismatch',
+                'message' => 'Online book details did not match this book, so they were ignored.',
                 'requires_acknowledgment' => false,
             ];
 

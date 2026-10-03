@@ -466,6 +466,15 @@ Route::prefix('v1')->group(function () {
             Route::patch('/drafts/{draftId}', [ImportDraftController::class, 'update'])
                 ->where('draftId', 'imp_[A-Za-z0-9]+')
                 ->middleware('imports.idempotency');
+            Route::post('/drafts/{draftId}/recheck', [ImportDraftController::class, 'recheck'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+')
+                ->middleware(['imports.idempotency', 'throttle:10,1']);
+            // Stateless: decides what counts as a book from a names-and-sizes listing (no persistence).
+            Route::post('/discoveries', [\App\Http\Controllers\Api\ImportDiscoveryController::class, 'store'])
+                ->middleware('throttle:60,1');
+            Route::post('/drafts/{draftId}/enrichment', [ImportDraftController::class, 'enrichment'])
+                ->where('draftId', 'imp_[A-Za-z0-9]+')
+                ->middleware('throttle:10,1');
             Route::post('/drafts/{draftId}/approve', [ImportDraftController::class, 'approve'])
                 ->where('draftId', 'imp_[A-Za-z0-9]+')
                 ->middleware('imports.idempotency');
@@ -478,6 +487,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('/drafts/{draftId}/uploads/{fileId}', [ImportDraftController::class, 'appendUpload'])
                 ->where(['draftId' => 'imp_[A-Za-z0-9]+', 'fileId' => '.+'])
                 ->middleware('throttle:import-upload-chunks');
+            Route::post('/drafts/{draftId}/evidence/{requestId}', [ImportDraftController::class, 'answerEvidence'])
+                ->where(['draftId' => 'imp_[A-Za-z0-9]+', 'requestId' => 'ev_[A-Za-z0-9]+'])
+                ->middleware(['imports.idempotency', 'throttle:import-upload-sessions']);
             Route::post('/drafts/{draftId}/verify', [ImportDraftController::class, 'verify'])
                 ->where('draftId', 'imp_[A-Za-z0-9]+')
                 ->middleware(['imports.idempotency', 'throttle:import-upload-sessions']);

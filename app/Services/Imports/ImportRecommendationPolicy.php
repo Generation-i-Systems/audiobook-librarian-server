@@ -21,6 +21,8 @@ class ImportRecommendationPolicy
     public const TARGET_RECOMMENDED = 'recommended';
     public const TARGET_RENAMED = 'renamed';
     public const TARGET_EXISTING_BOOK = 'existing_book';
+    public const TARGET_CUSTOM = 'custom';
+    public const TARGET_SERIES_LOCATION_PREFIX = 'series_location_';
 
     public const DECISION_DUPLICATE_ACTION = 'duplicate_action';
     public const DECISION_TARGET = 'target';
@@ -55,8 +57,13 @@ class ImportRecommendationPolicy
      *     required_decisions: array<int, array<string, mixed>>
      * }
      */
-    public function derive(ImportDraft $draft, array $metadata, array $identifiers, array $otherWarnings): array
-    {
+    public function derive(
+        ImportDraft $draft,
+        array $metadata,
+        array $identifiers,
+        array $otherWarnings,
+        ?string $customDirectory = null
+    ): array {
         $legacy = $this->toLegacyMetadata($metadata, $identifiers);
         $hasTitle = ($legacy['title'] ?? '') !== '';
         $hasAuthor = $legacy['author'] !== [];
@@ -90,7 +97,19 @@ class ImportRecommendationPolicy
         if ($hasTitle && $hasAuthor) {
             $targetCandidates = $this->targetCandidates($legacy, $existingBook, $existingHasAudio);
         }
-        $recommended = $targetCandidates[0] ?? null;
+        if ($customDirectory !== null) {
+            array_unshift($targetCandidates, $this->targetCandidate(
+                self::TARGET_CUSTOM,
+                $customDirectory,
+                !$this->isTargetOccupied($customDirectory),
+                ['create_new', 'skip']
+            ));
+        }
+        $recommended = $targetCandidates[array_search(
+            self::TARGET_RECOMMENDED,
+            array_column($targetCandidates, 'id'),
+            true
+        ) ?: 0] ?? null;
         if ($recommended !== null && $recommended['id'] === self::TARGET_RECOMMENDED && !$recommended['available']) {
             $warnings[] = $this->warning(
                 'target_unavailable',
@@ -141,6 +160,7 @@ class ImportRecommendationPolicy
             'series' => $series['name'] ?? null,
             'series_number' => $series['number'] ?? null,
             'genre' => array_values($metadata['genres'] ?? []),
+            'year' => $metadata['year'] ?? null,
             'isbn' => $identifiers['isbn'] ?? null,
         ], static fn (mixed $value): bool => $value !== null);
     }
@@ -276,6 +296,12 @@ class ImportRecommendationPolicy
             }
         }
 
+        if ($recommended !== null) {
+            foreach ($this->seriesLocationCandidates($legacy, $recommended, $newBookActions) as $candidate) {
+                $candidates[] = $candidate;
+            }
+        }
+
         $existingDirectory = null;
         if ($existingBook !== null) {
             $existingDirectory = $this->relativeDirectory((string) $existingBook->directory_path);
@@ -287,6 +313,48 @@ class ImportRecommendationPolicy
                 true,
                 $existingHasAudio ? ['replace', 'skip'] : ['merge', 'skip']
             );
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * The same series, already shelved under another genre or author combination in the library, as in the
+     * importer's "Use an existing series location instead?" question. Offered, never the default.
+     *
+     * @param array<string, mixed> $legacy
+     * @param array<int, string> $newBookActions
+     * @return array<int, array<string, mixed>>
+     */
+    private function seriesLocationCandidates(array $legacy, string $recommended, array $newBookActions): array
+    {
+        $series = trim((string) ($legacy['series'] ?? ''));
+        $authors = array_values(array_filter(array_map('trim', (array) ($legacy['author'] ?? []))));
+        if ($series === '' || $authors === []) {
+            return [];
+        }
+        $genre = (string) (($legacy['genre'][0] ?? '') ?: 'Unknown');
+        $alternates = $this->importService->findAlternateSeriesDirectories(
+            $authors,
+            $this->importService->cleanSeriesName($series, $authors),
+            $genre,
+            $this->importService->formatAuthorsForDirectory($authors)
+        );
+        $titleSegment = basename($recommended);
+        $candidates = [];
+        foreach (array_values($alternates) as $index => $alternate) {
+            $directory = $this->relativeDirectory($alternate['relative_path'] . '/' . $titleSegment);
+            if ($directory === null) {
+                continue;
+            }
+            $candidate = $this->targetCandidate(
+                self::TARGET_SERIES_LOCATION_PREFIX . ($index + 1),
+                $directory,
+                !$this->isTargetOccupied($directory),
+                $newBookActions
+            );
+            $candidate['book_count'] = (int) $alternate['book_count'];
+            $candidates[] = $candidate;
         }
 
         return $candidates;
@@ -342,6 +410,9 @@ class ImportRecommendationPolicy
         ));
         $defaultTarget = null;
         foreach ($availableTargets as $candidate) {
+            if (str_starts_with($candidate['id'], self::TARGET_SERIES_LOCATION_PREFIX)) {
+                continue;
+            }
             if (in_array($duplicateOptions['default'], $candidate['duplicate_actions'], true)) {
                 $defaultTarget = $candidate['id'];
                 break;

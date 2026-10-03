@@ -29,6 +29,12 @@ class AppServiceProvider extends ServiceProvider
             return new \App\Services\AI\AIAssistantService($provider, $model);
         });
 
+        // Container-built processors (the import-draft interpreter, BookImportService) must use the
+        // configured tier like book:import does; the free tier sleeps 60s after 15 requests a minute.
+        $this->app->bind(\App\Services\AIBookProcessor::class, function () {
+            return new \App\Services\AIBookProcessor(null, (bool) config('services.gemini.paid_tier', false));
+        });
+
         $this->app->bind(
             \App\Services\Imports\ImportMetadataEnricher::class,
             \App\Services\Imports\ExternalImportMetadataEnricher::class

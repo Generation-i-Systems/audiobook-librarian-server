@@ -3721,6 +3721,12 @@ class BookImportService
             return null;
         }
 
+        return $this->parseMetadataJsonContent($content, $directoryPath);
+    }
+
+    /** Parse metadata.json content from either a file or a draft observation. */
+    public function parseMetadataJsonContent(string $content, ?string $directoryPath = null): ?array
+    {
         $data = json_decode($content, true);
         if (!is_array($data) || empty($data)) {
             return null;
@@ -3780,7 +3786,7 @@ class BookImportService
             $result['abridged'] = (bool) $data['abridged'];
         }
 
-        if (!empty($data['chapters']) && is_array($data['chapters'])) {
+        if ($directoryPath !== null && !empty($data['chapters']) && is_array($data['chapters'])) {
             $chapters = $this->normalizeMetadataJsonChapters($data['chapters'], $directoryPath);
             if (!empty($chapters)) {
                 $result['chapters'] = $chapters;
@@ -5105,7 +5111,10 @@ class BookImportService
     public function processWithAI(array $audiobook, AIBookProcessor $aiProcessor): ?array
     {
         try {
-            $nfoData = $this->extractNfoData($audiobook['path']);
+            // Drafts supply the same observations without transferring the audio first.
+            // Keep the legacy AI, tag merge and post-processing path shared.
+            $observed = array_key_exists('observed_file_tags', $audiobook);
+            $nfoData = $observed ? ($audiobook['observed_nfo_data'] ?? null) : $this->extractNfoData($audiobook['path']);
 
             $fileTags = [];
             $fileNames = [];
@@ -5114,14 +5123,14 @@ class BookImportService
                 $fileName = basename($filePath);
                 $fileNames[] = $fileName;
 
-                $tags = $aiProcessor->extractFileTags($filePath);
+                $tags = $observed ? ($audiobook['observed_file_tags'][$filePath] ?? $audiobook['observed_file_tags'][$fileName] ?? []) : $aiProcessor->extractFileTags($filePath);
                 if (!empty($tags)) {
                     $fileTags[$fileName] = $tags;
                 }
             }
 
             // Check for OpenAudible metadata to get better genre hints
-            $openAudibleMetadata = $this->lookupOpenAudibleMetadata($audiobook);
+            $openAudibleMetadata = $observed ? null : $this->lookupOpenAudibleMetadata($audiobook);
             if ($openAudibleMetadata !== null && !empty($openAudibleMetadata['original_genre'])) {
                 // Inject OpenAudible genre into file tags for AI prompt
                 $firstFile = array_key_first($fileTags) ?? $fileNames[0] ?? 'file';
@@ -5133,12 +5142,14 @@ class BookImportService
             }
 
             $aiDirectoryContext = $audiobook['ai_directory_context'] ?? $audiobook['path'];
+            $additionalText = $observed ? (array) ($audiobook['observed_additional_text'] ?? []) : [];
             $aiResult = $aiProcessor->processBookDirectory(
                 (string) $aiDirectoryContext,
                 $fileNames,
                 $fileTags,
                 $nfoData,
-                $this->getParentDirectoryPatternHints($audiobook)
+                $this->getParentDirectoryPatternHints($audiobook),
+                ...($additionalText === [] ? [] : [$additionalText])
             );
 
             if ($aiResult) {
@@ -5172,7 +5183,7 @@ class BookImportService
                 ]);
 
                 // metadata.json is fully authoritative — override AI for all provided fields
-                $metadataJson = $this->readMetadataJson($audiobook['path']);
+                $metadataJson = $observed ? (isset($audiobook['observed_metadata_json']) ? $this->parseMetadataJsonContent((string) $audiobook['observed_metadata_json']) : null) : $this->readMetadataJson($audiobook['path']);
                 if ($metadataJson !== null) {
                     $aiResult = array_merge($aiResult, $metadataJson);
                     $aiResult['confidence'] = 100;
@@ -5193,7 +5204,7 @@ class BookImportService
                     }
                 }
 
-                foreach ($this->findAllCoversInSourceDirectory($audiobook['path']) as $sourceCover) {
+                foreach ($observed ? [] : $this->findAllCoversInSourceDirectory($audiobook['path']) as $sourceCover) {
                     $coverSources[] = [
                         'type' => 'file',
                         'path' => $sourceCover,
@@ -11640,7 +11651,7 @@ class BookImportService
     /**
      * Check if files share a common prefix (indicating they're parts of the same audiobook)
      */
-    protected function filesShareCommonPrefix(array $files): bool
+    public function filesShareCommonPrefix(array $files): bool
     {
         if (count($files) < 2) {
             return false;

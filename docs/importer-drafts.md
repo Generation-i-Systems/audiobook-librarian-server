@@ -21,6 +21,8 @@ user and which limits apply.
 | `POST /imports/drafts` | Create a draft from a `SourceObservation` (requires `Idempotency-Key`) |
 | `GET /imports/drafts` | Caller's drafts, newest first, `?state=` and `?cursor=` |
 | `GET /imports/drafts/{draftId}` | One draft; `ETag` is the quoted revision, `If-None-Match` returns 304 |
+| `POST /imports/discoveries` | Decide book boundaries from a bounded names-and-sizes listing; may request selected file tags |
+| `POST /imports/drafts/{draftId}/recheck` | Reinterpret a review draft from its saved observation (`If-Match` and `Idempotency-Key`) |
 | `POST /imports/drafts/{draftId}/cancel` | Cancel; optional `If-Match` guards against stale revisions |
 | `GET /imports/drafts/{draftId}/events` | Event log for polling, `?after=<cursor>` (phase 2) |
 | `PATCH /imports/drafts/{draftId}` | Save reviewed metadata edits; `If-Match` + `Idempotency-Key` required (phase 3) |
@@ -29,6 +31,7 @@ user and which limits apply.
 | `HEAD /imports/drafts/{draftId}/uploads/{fileId}` | Confirmed `Upload-Offset` / `Upload-Length` (phase 5) |
 | `PATCH /imports/drafts/{draftId}/uploads/{fileId}` | Append one chunk at `Upload-Offset` (phase 5) |
 | `POST /imports/drafts/{draftId}/verify` | Re-hash staged files and bind them to the plan revision (phase 5) |
+| `POST /imports/drafts/{draftId}/evidence/{requestId}` | Answer an optional short-audio evidence request |
 
 ## Interpretation (phase 2)
 
@@ -43,15 +46,31 @@ The interpreter reuses the `book:import` helpers so both paths agree:
 
 | Evidence | Helper | Provenance `source_id` / `source` |
 |---|---|---|
+| Inline `metadata.json` | `parseMetadataJsonContent` | `metadata_json` / "metadata.json" |
 | Raw tags of the first tagged audio file | `extractMetadataFromFileTags` | `embedded_tag` / "file tags" |
 | Inline NFO text (role `nfo`) | `parseNfoContent` | `nfo` / "NFO" |
 | Single root audio file name, else the display name | `parseFilenameForMetadata` | `filename` / "file name" or "folder name" |
+| Existing `book:import` analysis (when enabled) | `processWithAI` | `existing_importer_ai` / "library analysis" |
+| Optional client-supplied audio sample | `processAudioSample` | `audio_analysis` / "audio analysis" |
 | Genre of an existing book in the same series | `lookupGenreFromExistingSeries` | `library_series` |
 | Online lookup (opt-in, see below) | `BookEnrichmentService::enrichWithExternalData` | `external_enrichment` / provider name |
 
-Sources are merged fill-missing in that order, then normalized with `postProcessAIResult`
-(author clean-up, genre mapping, series/title clean-up). When normalization changes the winning
-value, a `server_policy` ("library rules") entry leads that field's provenance list.
+`metadata.json` is first. When existing importer AI is enabled, its result precedes other
+observations, except that a title which merely echoes the folder gives way to a distinct direct
+file title tag. Without AI, tags, NFO, file name and audio evidence fill missing fields in that
+order. Online enrichment and author history follow; the result is normalized with
+`postProcessAIResult`. A direct tagged title that won is preserved if the legacy colon clean-up
+would shorten it incorrectly. The winning source leads each field's provenance list.
+
+Draft responses include bounded `source_evidence`: the relative folder context and up to 20
+relative file names with roles, sizes and raw tags. Clients can show this evidence beside the
+editable recommendation; the server never returns a local absolute path.
+
+`POST /imports/drafts/{draftId}/recheck` is available only before approval, in
+`awaiting_review`. It clears the old recommendation, advances the revision, and queues the same
+interpretation job against the saved observation. It does not ask the client to select or upload
+the files again. The response may be `created` while a worker is still interpreting; follow the
+draft until it returns to review. A stale `If-Match` returns a revision conflict.
 
 Online enrichment runs only when `IMPORT_DRAFTS_ENRICHMENT_ENABLED=true` **and** the observation
 requested `external_enrichment`. Failures add an `enrichment_unavailable` warning; they never fail
@@ -174,6 +193,38 @@ the recommendation snapshot. The draft becomes `approved`, `revision` and `plan_
 become the plan revision, and `draft.plan` returns the locked plan. A retry with the same
 `Idempotency-Key` replays the response; a second approval of an approved draft is rejected.
 
+### Review menus: year, typed folder, series locations, online lookup
+
+The terminal importer mirrors the old `book:import` edit menu, so a review needs a few more things
+from the server. All are additive.
+
+- **Year.** `metadata.year` is an integer 1000-9999 or `null`. It is read from the tags
+  (`year`, `2020-09-01` gives 2020), shown in `field_provenance.year`, and edited with `PATCH` like any
+  other detail. Other values are `422 validation_failed`.
+- **A typed destination folder.** `PATCH` accepts `{"custom_directory": "Genre/Author/Title (Narrator)"}`
+  next to (or instead of) `metadata`. A valid folder becomes the `custom` target candidate, listed
+  first and made the default `target`; `null` clears it. The folder must be relative to the book root:
+  an absolute path, a `..` or empty segment, a backslash, a control character, surrounding spaces or
+  more than 500 characters is `422 validation_failed` and is never rewritten, so the folder stored in
+  the approved plan is exactly the one that was typed. Its `available` flag says whether the folder
+  already has files; an occupied one is not approvable (`target_unavailable`).
+- **Existing series locations.** When the book has a series that already lives in the library under
+  another genre or author combination (the old "Use an existing series location instead?" question),
+  each location is a target candidate `series_location_N` with `book_count`, never the default.
+  Candidates are recomputed on every `PATCH`, so ids are numbered afresh: match by
+  `relative_directory`, not id, across versions.
+- **Online lookup on demand.** `POST /imports/drafts/{draftId}/enrichment` (no body, awaiting_review
+  only, 10 requests a minute) runs the online lookup for the book as it now stands and returns
+  `{"draft_revision": n, "fields": [{"field", "current", "enriched"}]}` for each of `title`, `authors`,
+  `narrators`, `series`, `year`, `genres`, `description` where the looked-up value is not empty and
+  differs. Nothing is stored; to take a value, `PATCH` it. `422` codes: `enrichment_not_available`
+  (the library has it off), `enrichment_unavailable` (the lookup failed), `enrichment_no_match` (it
+  found a different book).
+
+Not provided (the terminal importer shows these menu entries but says so): renaming the existing
+folder, choosing a cover from the person's own pictures (artifact upload does not exist yet), and
+listing or playing the library's existing audio.
+
 ## Resumable uploads (phase 5)
 
 After approval a client with `transfer_mode: upload` sends every manifest file with more than
@@ -230,3 +281,53 @@ nginx `client_max_body_size`, PHP `post_max_size`.
 - Retrying a POST with the same `Idempotency-Key` and body replays the stored response
   (`Idempotent-Replayed: true`); a different body with the same key is `422 idempotency_key_reused`.
 - Only the owner (or an admin) can read or cancel a draft; others get 404.
+
+## Audio sample requests (evidence)
+
+Opt-in: `IMPORT_DRAFTS_AUDIO_EVIDENCE_ENABLED=true` together with `IMPORT_DRAFTS_AI_ENABLED=true`, after
+`php artisan migrate` has added `import_drafts.evidence_requests` (additive, nullable JSON). Capabilities then report
+`imports.audio_evidence: true`.
+
+When the title or the authors are not proven by a real source (an embedded tag, NFO, online lookup or an earlier
+edit at confidence >= `audio_evidence.proven_confidence`; the folder name and the AI's own guess do not count) and the
+client's observation listed the `audio_snippet` capability, interpretation does not finish. It stores the
+recommendation it already has, keeps the draft `interpreting`, and adds one entry to `draft.evidence_requests`:
+
+```json
+{"id": "ev_k3...", "type": "audio_snippet", "status": "pending", "file_id": "f_01", "start_ms": 0,
+ "duration_ms": 20000, "max_bytes": 2097152, "media_types": ["audio/mpeg", "audio/mp4", ...],
+ "expires_at": "2026-10-03T00:25:00Z"}
+```
+
+plus an `evidence_requested` event (`data`: `request_id`, `type`, `file_id`, `expires_at`). The client answers with
+`POST /imports/drafts/{id}/evidence/{requestId}`: `{"status":"unavailable"}` or
+`{"status":"provided","media_type":"audio/mpeg","sha256":"<hex>","data_base64":"..."}` (an `evidence_answered`
+event follows). A provided sample goes through `AIBookProcessor::processAudioSample`; whatever it hears fills only
+fields the files left empty (provenance `audio_analysis`, confidence 0.7) and interpretation completes. An
+unavailable answer, or no answer within `request_ttl_seconds` (a delayed job closes it), completes with the
+recommendation already made plus an `audio_evidence_unavailable` / `audio_evidence_expired` warning. The sample is
+deleted after use and is never kept with the draft.
+
+## Book discovery (`POST /api/v1/imports/discoveries`)
+
+The Kotlin clients never decide what is one book. They send the names and sizes of what the person chose and the
+library applies the `book:import` rules (`ImportBookDiscovery`, no filesystem, nothing stored):
+
+| Old rule | Where |
+|---|---|
+| `processSpecificPaths`: a chosen file is a single-file book (over 10 MB unless `force_include`); a chosen folder is a container only when more than one non-`extras/artwork/scans/covers/sample` sub-folder holds audio and it has no `CD/Disc N` folders, then each such sub-folder is a book; otherwise the folder is ONE book with all audio beneath it | `mode: paths` |
+| `scanForAudiobooks`: every folder that directly holds audio is a candidate, `CD/Disc N` folders merge into their parent, a folder containing another candidate is a container, the scan root is never a book, books must exceed 10 MB | `mode: scan` |
+| `detectMultiBookPattern` (`Series [2-4]`, `Series - [2-4]`, `Series (2-4)`) + `analyzeMultiBookFiles` | `multi_book_part` per number, or `multi_book_combined` when fewer than two numbers match |
+| `detectFlatArchive` (names, common prefix, then up to three files' album/title tags) | the folder stays one book and `evidence_needed` lists the files whose `album`/`title` tags are wanted; resend them in `tags` |
+| Merge into Parent Book / Reprocess as Multi-Book Archive | `overrides: [{path, action: single\|split}]` |
+
+Parts carry only their own files plus `metadata.json` / `cover.*` beside the first file. Paths are relative,
+forward-slashed and start with the chosen item's own name; absolute or escaping paths are a 422. Limits:
+`import_drafts.discovery` (`IMPORT_DISCOVERY_MAX_ENTRIES`). Older servers lack `imports.book_discovery`.
+
+The Kotlin apps send a base directory in `mode: scan` with only its audio files as `file` entries (the server derives every folder
+from the paths, so no `dir` entries are needed) and one selection, the base directory's own name. A base directory too big for one
+request (`discovery.max_entries`) is split by the client into several requests with the same selection, keeping whole subtrees
+(including all `CD/Disc N` folders of a book) in one request, so the books found are identical to one big request; one folder with
+more audio files than a request allows cannot be split and is refused client-side. The result for the real `/media/download`
+(1,780 folders, 10,250 audio files) is 1,501 books.

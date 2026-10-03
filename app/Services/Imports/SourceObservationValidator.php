@@ -34,6 +34,9 @@ class SourceObservationValidator
 
         $observation = $validator->validated();
         $this->assertTransferModeOffered((string) $observation['source']['mode']);
+        if (isset($observation['source']['relative_context'])) {
+            $observation['source']['relative_context'] = $this->pathNormalizer->normalize($observation['source']['relative_context']);
+        }
         $observation['source']['files'] = $this->normalizeFiles($observation['source']['files']);
         $this->assertBoundedObservations($observation['source']['files']);
         $this->assertBoundedInlineArtifacts($observation['source']['artifacts'] ?? []);
@@ -63,6 +66,7 @@ class SourceObservationValidator
             'client.capabilities.*' => 'string|max:64',
             'source' => 'required|array',
             'source.display_name' => 'required|string|max:500',
+            'source.relative_context' => 'sometimes|nullable|string|max:1024',
             'source.mode' => 'required|string|in:upload,shared_stage',
             'source.root_fingerprint' => 'sometimes|nullable|string|max:512',
             'source.warnings' => 'sometimes|array|max:500',

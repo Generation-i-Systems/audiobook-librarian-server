@@ -3966,6 +3966,12 @@
                     "metadata": {
                         "$ref": "#/components/schemas/ImportsMetadata"
                     },
+                    "custom_directory": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 500,
+                        "description": "A destination folder typed by the person, relative to the library's book root (for example Genre/Author/Title). It becomes the `custom` target candidate and the default destination. null clears it. A folder that is absolute, has a `..` or empty segment, a backslash, a control character or surrounding spaces is rejected with 422 validation_failed, never rewritten."
+                    },
                     "local_ai_artifacts": {
                         "type": "array",
                         "items": {
@@ -4026,6 +4032,13 @@
                     "description": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "year": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 9999,
+                        "nullable": true,
+                        "description": "Publication year."
                     },
                     "cover_artifact_id": {
                         "type": "string",
@@ -4166,6 +4179,29 @@
                             }
                         }
                     },
+                    "source_evidence": {
+                        "type": "object",
+                        "description": "Bounded relative file names and raw tags used for the recommendation; no absolute paths.",
+                        "properties": {
+                            "relative_context": {"type": "string", "nullable": true},
+                            "omitted_file_count": {"type": "integer", "minimum": 0},
+                            "files": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "relative_path": {"type": "string"},
+                                        "role": {"type": "string"},
+                                        "bytes": {"type": "integer"},
+                                        "raw_tags": {
+                                            "type": "object",
+                                            "additionalProperties": {"type": "array", "items": {"type": "string"}}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "recommendation": {
                         "$ref": "#/components/schemas/ImportsRecommendation"
                     },
@@ -4179,6 +4215,24 @@
                             },
                             "message": {
                                 "type": "string"
+                            }
+                        }
+                    },
+                    "evidence_requests": {
+                        "type": "array",
+                        "description": "Evidence the server asked this client for. A pending `audio_snippet` request keeps the draft in `interpreting` until it is answered via POST /imports/drafts/{draftId}/evidence/{requestId} or expires (then interpretation finishes without audio and adds an `audio_evidence_expired` warning). Only asked of clients whose observation lists the `audio_snippet` capability.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string", "pattern": "^ev_[A-Za-z0-9]+$"},
+                                "type": {"type": "string", "enum": ["audio_snippet"]},
+                                "status": {"type": "string", "enum": ["pending", "answered", "unavailable", "expired"]},
+                                "file_id": {"type": "string", "description": "The observed audio file to sample."},
+                                "start_ms": {"type": "integer"},
+                                "duration_ms": {"type": "integer"},
+                                "max_bytes": {"type": "integer"},
+                                "media_types": {"type": "array", "items": {"type": "string"}},
+                                "expires_at": {"type": "string", "format": "date-time"}
                             }
                         }
                     },
@@ -4317,6 +4371,10 @@
                                 },
                                 "available": {
                                     "type": "boolean"
+                                },
+                                "book_count": {
+                                    "type": "integer",
+                                    "description": "Only on `series_location_N` candidates: how many books the existing series folder already holds."
                                 },
                                 "duplicate_actions": {
                                     "type": "array",
@@ -4475,6 +4533,252 @@
                     }
                 }
             },
+            "ImportsDiscoveryRequest": {
+                "type": "object",
+                "required": [
+                    "mode",
+                    "selections",
+                    "entries"
+                ],
+                "properties": {
+                    "contract_version": {
+                        "type": "string"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "paths",
+                            "scan"
+                        ],
+                        "description": "paths: what the person chose (book:import PATH). scan: find every book under the chosen folders (book:import with no paths)."
+                    },
+                    "force_include": {
+                        "type": "boolean",
+                        "description": "Keep single audio files under 10 MB."
+                    },
+                    "selections": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "string",
+                            "maxLength": 1024
+                        },
+                        "description": "Chosen files and folders, relative, starting with the chosen item's own name."
+                    },
+                    "entries": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "$ref": "#/components/schemas/ImportsDiscoveryEntry"
+                        },
+                        "description": "Everything under the selections, selections included. Names and sizes only."
+                    },
+                    "overrides": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "path",
+                                "action"
+                            ],
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "action": {
+                                    "type": "string",
+                                    "enum": [
+                                        "single",
+                                        "split"
+                                    ],
+                                    "description": "single: Merge into Parent Book. split: Reprocess as Multi-Book Archive."
+                                }
+                            }
+                        }
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "path"
+                            ],
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "album": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            }
+                        },
+                        "description": "Album/title tags for the files named in evidence_needed."
+                    }
+                }
+            },
+            "ImportsDiscoveryEntry": {
+                "type": "object",
+                "required": [
+                    "path",
+                    "kind"
+                ],
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "maxLength": 1024
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "file",
+                            "dir"
+                        ]
+                    },
+                    "bytes": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "ImportsDiscoveryResponse": {
+                "type": "object",
+                "required": [
+                    "contract_version",
+                    "mode",
+                    "books",
+                    "evidence_needed",
+                    "skipped"
+                ],
+                "properties": {
+                    "contract_version": {
+                        "type": "string"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "paths",
+                            "scan"
+                        ]
+                    },
+                    "books": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ImportsDiscoveredBook"
+                        }
+                    },
+                    "evidence_needed": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "files": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "fields": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "skipped": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "enum": [
+                                        "not_found",
+                                        "non_audio",
+                                        "too_small",
+                                        "no_audio",
+                                        "not_a_folder"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "ImportsDiscoveredBook": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "relative_path",
+                    "name",
+                    "kind",
+                    "files",
+                    "total_bytes"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "relative_path": {
+                        "type": "string",
+                        "description": "The file or folder the book lives in. A multi-book part names the shared parent."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "book",
+                            "single_file",
+                            "container_child",
+                            "multi_disc",
+                            "multi_book_part",
+                            "multi_book_combined"
+                        ]
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "Exactly the files that belong to this book."
+                    },
+                    "total_bytes": {
+                        "type": "integer"
+                    },
+                    "parent_path": {
+                        "type": "string"
+                    },
+                    "split": {
+                        "type": "object",
+                        "description": "Multi-book detail: series_name, number, title, numbers, flat."
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    }
+                }
+            },
             "ImportsImportCapabilitiesResponse": {
                 "type": "object",
                 "required": [
@@ -4528,6 +4832,14 @@
                             },
                             "local_ai_artifacts": {
                                 "type": "boolean"
+                            },
+                            "audio_evidence": {
+                                "type": "boolean",
+                                "description": "True when the server may ask for a short audio sample during interpretation of a client that advertises the `audio_snippet` capability."
+                            },
+                            "book_discovery": {
+                                "type": "boolean",
+                                "description": "POST /imports/discoveries is available."
                             },
                             "sse": {
                                 "type": "boolean"
@@ -4791,7 +5103,7 @@
                     },
                     "event": {
                         "type": "string",
-                        "description": "Event type, e.g. state_changed, metadata_updated, plan_invalidated, targets_refreshed (data: trigger approval|review_patch, unavailable_candidate_ids).",
+                        "description": "Event type, e.g. state_changed, metadata_updated, plan_invalidated, targets_refreshed (data: trigger approval|review_patch, unavailable_candidate_ids); evidence_requested (data: request_id, type, file_id, expires_at) and evidence_answered (data: request_id, status).",
                         "example": "state_changed"
                     },
                     "draft_id": {
@@ -8709,6 +9021,73 @@
                 "description": "Reports whether the imports.v1 draft workflow is enabled for the caller (requires the import-books permission and IMPORT_DRAFTS_ENABLED on the server) and its limits."
             }
         },
+        "/imports/discoveries": {
+            "post": {
+                "operationId": "discoverImportBooks",
+                "summary": "Decide what counts as a book from a folder listing",
+                "description": "Stateless. The client sends the names and sizes of what it has chosen (never contents, tags or absolute paths); the library applies the same book:import rules (container folders, multi-disc folders, loose files, multi-book archives) and returns the proposed books. Flat folders of unrelated titles may come back with evidence_needed: send the requested album/title tags in a second request. Nothing is stored.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportsDiscoveryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Proposed books",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsDiscoveryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Authenticated caller lacks import permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The listing was not valid or was too large",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Imports"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
         "/imports/drafts": {
             "get": {
                 "operationId": "listImportDrafts",
@@ -9088,6 +9467,21 @@
                         "BearerAuth": []
                     }
                 ]
+            }
+        },
+        "/imports/drafts/{draftId}/recheck": {
+            "post": {
+                "operationId": "recheckImportDraft",
+                "summary": "Re-run server importer rules against a draft's saved observation before approval",
+                "parameters": [
+                    {"name": "draftId", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "If-Match", "in": "header", "required": true, "schema": {"type": "string"}},
+                    {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {"description": "Draft rechecked or queued for recheck", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ImportsImportDraftResponse"}}}},
+                    "409": {"description": "Draft revision or state changed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ImportsErrorResponse"}}}}
+                }
             }
         },
         "/imports/drafts/{draftId}/cancel": {
@@ -9826,6 +10220,188 @@
                         "BearerAuth": []
                     }
                 ]
+            }
+        },
+        "/imports/drafts/{draftId}/enrichment": {
+            "post": {
+                "operationId": "compareImportDraftEnrichment",
+                "summary": "Look the book up online and compare it with the current details",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Runs the online lookup (Audible, Google Books, Hardcover) for the book as it now stands and returns, per field, the current value and the looked-up one, only where they differ and the looked-up one is not empty. Nothing is stored; to take a value, send it in an ordinary PATCH. Only while the draft awaits review. 422 codes: enrichment_not_available (the library has it off), enrichment_unavailable (the lookup failed), enrichment_no_match (the result is a different book).",
+                "parameters": [
+                    {
+                        "name": "draftId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^imp_[A-Za-z0-9]+$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The comparison",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["contract_version", "draft_revision", "fields"],
+                                    "properties": {
+                                        "contract_version": {"$ref": "#/components/schemas/ImportsContractVersion"},
+                                        "draft_revision": {"type": "integer"},
+                                        "fields": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "required": ["field", "current", "enriched"],
+                                                "properties": {
+                                                    "field": {"type": "string", "enum": ["title", "authors", "narrators", "series", "year", "genres", "description"]},
+                                                    "current": {"description": "The current value, shaped like the matching metadata field.", "nullable": true},
+                                                    "enriched": {"description": "The looked-up value, shaped like the matching metadata field."}
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Draft not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The draft is not awaiting review",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The lookup is not available or did not match",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/imports/drafts/{draftId}/evidence/{requestId}": {
+            "post": {
+                "operationId": "answerImportDraftEvidence",
+                "summary": "Answer a server request for an audio sample",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Answers an `evidence_requests` entry. Body: `{\"status\":\"unavailable\"}` when the client cannot or will not provide it, or `{\"status\":\"provided\",\"media_type\":\"audio/mpeg\",\"sha256\":\"<hex>\",\"data_base64\":\"...\"}` with at most `max_bytes` of audio of an accepted `media_types` value, verified against the SHA-256. The sample is analysed once and then deleted. Repeating the same answer returns the draft unchanged; a different answer, or an answer to an expired or already-closed request, is 409 `evidence_request_closed`. Unknown request: 404 `evidence_request_not_found`. Bad body: 422 `validation_failed`.",
+                "parameters": [
+                    {
+                        "name": "draftId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^imp_[A-Za-z0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "requestId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^ev_[A-Za-z0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["status"],
+                                "properties": {
+                                    "status": {"type": "string", "enum": ["provided", "unavailable"]},
+                                    "media_type": {"type": "string"},
+                                    "sha256": {"$ref": "#/components/schemas/ImportsSha256"},
+                                    "data_base64": {"type": "string"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Current import draft",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsImportDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Draft or request not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The request is closed or already answered differently",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid answer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/imports/drafts/{draftId}/verify": {

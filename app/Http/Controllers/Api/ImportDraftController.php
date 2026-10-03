@@ -11,6 +11,7 @@ use App\Services\Imports\ImportApiException;
 use App\Services\Imports\ImportDraftPresenter;
 use App\Services\Imports\ImportDraftReviewService;
 use App\Services\Imports\ImportDraftService;
+use App\Services\Imports\ImportEvidenceService;
 use App\Services\Imports\ImportPlanService;
 use App\Services\Imports\ImportTransferService;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +29,7 @@ class ImportDraftController extends Controller
         private readonly ImportDraftReviewService $reviewService,
         private readonly ImportPlanService $planService,
         private readonly ImportTransferService $transferService,
+        private readonly ImportEvidenceService $evidenceService,
     ) {
     }
 
@@ -79,6 +81,24 @@ class ImportDraftController extends Controller
         );
 
         return $this->draftResponse($draft, 200);
+    }
+
+    public function recheck(Request $request, string $draftId): JsonResponse
+    {
+        $draft = $this->draftService->recheck($this->user($request), $draftId, $this->expectedRevision($request));
+
+        return $this->draftResponse($draft, 200);
+    }
+
+    public function enrichment(Request $request, string $draftId): JsonResponse
+    {
+        $result = $this->reviewService->enrichmentComparison($this->user($request), $draftId);
+
+        return response()->json([
+            'contract_version' => config('import_drafts.contract_version'),
+            'draft_revision' => $result['draft']->revision,
+            'fields' => $result['fields'],
+        ]);
     }
 
     public function approve(Request $request, string $draftId): JsonResponse
@@ -175,6 +195,13 @@ class ImportDraftController extends Controller
         $draft = $this->transferService->verify($this->user($request), $draftId, $this->expectedRevision($request));
 
         return $this->draftResponse($draft, 202);
+    }
+
+    public function answerEvidence(Request $request, string $draftId, string $requestId): JsonResponse
+    {
+        $draft = $this->evidenceService->answer($this->user($request), $draftId, $requestId, $this->jsonBody($request));
+
+        return $this->draftResponse($draft, 200);
     }
 
     private function uploadResponse(int $offset): Response

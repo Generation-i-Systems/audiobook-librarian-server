@@ -52,11 +52,37 @@ return [
     // Queue for InterpretImportDraftJob; null uses the default queue.
     'interpretation_queue' => env('IMPORT_DRAFT_INTERPRETATION_QUEUE'),
 
+    // Uses BookImportService::processWithAI with client-observed tags and paths.
+    // Explicitly enabled on installations with a configured AI provider.
+    'ai_enabled' => (bool) env('IMPORT_DRAFTS_AI_ENABLED', false),
+
     // Optional external metadata lookup (Audible/Google Books/Hardcover) during
     // interpretation. Off by default; failures never block a draft.
     'enrichment' => [
         'enabled' => (bool) env('IMPORT_DRAFTS_ENRICHMENT_ENABLED', false),
         'sources' => ['audible', 'google_books', 'hardcover'],
+    ],
+
+    // The server may ask the client for a short audio sample when tags, NFO and online lookups leave the
+    // title or author unproven. Opt-in; needs ai_enabled, a client that advertises `audio_snippet`, and the
+    // additive `evidence_requests` column (php artisan migrate).
+    'audio_evidence' => [
+        'enabled' => (bool) env('IMPORT_DRAFTS_AUDIO_EVIDENCE_ENABLED', false),
+        // A request nobody answers in this time is closed and interpretation finishes without audio.
+        'request_ttl_seconds' => (int) env('IMPORT_DRAFTS_AUDIO_EVIDENCE_TTL', 300),
+        'snippet_seconds' => 20,
+        'max_bytes' => 2 * 1024 * 1024,
+        'media_types' => ['audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/webm'],
+        // A title/author is "proven" by a source at or above this confidence that is neither the folder name
+        // nor the AI's own guess.
+        'proven_confidence' => 0.75,
+    ],
+
+    // POST /imports/discoveries: names and sizes only, bounded so one request stays small.
+    'discovery' => [
+        'max_entries' => (int) env('IMPORT_DISCOVERY_MAX_ENTRIES', 20000),
+        'max_selections' => 200,
+        'max_tags' => 600,
     ],
 
     'max_duplicate_candidates' => 5,

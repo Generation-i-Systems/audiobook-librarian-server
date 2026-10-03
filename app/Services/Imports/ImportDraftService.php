@@ -50,6 +50,10 @@ class ImportDraftService
                 'max_upload_chunk_bytes' => (int) config('import_drafts.max_upload_chunk_bytes'),
                 'accepted_audio_extensions' => config('import_drafts.accepted_audio_extensions'),
                 'local_ai_artifacts' => false,
+                'audio_evidence' => $enabled
+                    && (bool) config('import_drafts.audio_evidence.enabled')
+                    && (bool) config('import_drafts.ai_enabled'),
+                'book_discovery' => $enabled,
                 'sse' => false,
                 'shared_stage_targets' => [],
             ],
@@ -93,6 +97,7 @@ class ImportDraftService
                     'client_kind' => $observation['client']['client_kind'],
                     'client_version' => $observation['client']['client_version'],
                     'capabilities' => $observation['client']['capabilities'] ?? [],
+                    'relative_context' => $source['relative_context'] ?? null,
                 ],
                 'analysis_request' => ['requested' => $observation['analysis']['requested']],
                 'transfer_summary' => [
@@ -141,6 +146,32 @@ class ImportDraftService
         }
 
         return $draft;
+    }
+
+    /** Re-run the server's importer rules against the saved observation without asking for the files again. */
+    public function recheck(User $user, string $publicId, int $expectedRevision): ImportDraft
+    {
+        $draft = $this->findForUser($user, $publicId);
+        $reset = DB::transaction(function () use ($draft, $expectedRevision): ImportDraft {
+            /** @var ImportDraft $locked */
+            $locked = ImportDraft::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
+            $this->assertRevision($locked, $expectedRevision);
+            if ($locked->state !== ImportDraftState::AWAITING_REVIEW || $locked->plan_revision !== null) {
+                throw ImportApiException::invalidState($locked->state->value, 'rechecked');
+            }
+            $locked->state = ImportDraftState::CREATED;
+            $locked->recommendation = null;
+            $locked->interpretation_error = null;
+            $locked->evidence_requests = [];
+            $locked->revision++;
+            $locked->save();
+            $this->recordEvent($locked, 'state_changed', ['state' => $locked->state->value, 'reason' => 'recheck']);
+
+            return $locked;
+        });
+
+        InterpretImportDraftJob::dispatch($reset->id);
+        return $reset->refresh()->load('files');
     }
 
     /**

@@ -424,13 +424,14 @@ class AIBookProcessor
         array $fileNames = [],
         array $fileTags = [],
         array $nfoData = null,
-        array $patternHints = []
+        array $patternHints = [],
+        array $additionalText = []
     ): array {
         try {
             // Check rate limits before making request
             $this->respectRateLimit();
 
-            $prompt = $this->buildPrompt($directoryPath, $fileNames, $fileTags, $nfoData, $patternHints);
+            $prompt = $this->buildPrompt($directoryPath, $fileNames, $fileTags, $nfoData, $patternHints, $additionalText);
             $response = $this->callAIAPI($prompt);
 
             return $this->parseAIResponse($response);
@@ -452,7 +453,8 @@ class AIBookProcessor
         array $fileNames,
         array $fileTags,
         array $nfoData = null,
-        array $patternHints = []
+        array $patternHints = [],
+        array $additionalText = []
     ): string {
         $prompt = "Extract audiobook metadata from this data and return JSON only:\n\n";
 
@@ -514,6 +516,32 @@ class AIBookProcessor
                 $prompt .= implode(', ', $tagParts) . "\n";
             } else {
                 $prompt .= "No useful metadata tags found\n";
+            }
+
+            // Every other tag the client observed (narrator in composer, album artist, grouping, ...).
+            $otherParts = [];
+            foreach ($firstFileTags as $key => $value) {
+                if (in_array($key, $importantTags, true) || $key === 'picture' || !is_scalar($value)) {
+                    continue;
+                }
+                $text = trim((string) $value);
+                if ($text !== '') {
+                    $otherParts[] = $key . ':' . mb_substr($text, 0, 300);
+                }
+                if (count($otherParts) >= 25) {
+                    break;
+                }
+            }
+            if ($otherParts !== []) {
+                $prompt .= 'Other tags: ' . implode(', ', $otherParts) . "\n";
+            }
+        }
+
+        if ($additionalText !== []) {
+            $prompt .= "\nADDITIONAL FILES (supporting context from small text files in the folder; " .
+                "tags and the NFO take precedence):\n";
+            foreach ($additionalText as $name => $text) {
+                $prompt .= '--- ' . $name . " ---\n" . mb_substr(trim((string) $text), 0, 2000) . "\n";
             }
         }
 

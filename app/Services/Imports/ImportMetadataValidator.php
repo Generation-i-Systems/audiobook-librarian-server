@@ -19,8 +19,10 @@ class ImportMetadataValidator
         'tags' => [50, 100],
     ];
 
+    private const MAX_DIRECTORY_LENGTH = 500;
+
     private const FIELDS = [
-        'title', 'authors', 'narrators', 'series', 'genres', 'tags', 'language', 'description', 'cover_artifact_id',
+        'title', 'authors', 'narrators', 'series', 'genres', 'tags', 'language', 'description', 'year', 'cover_artifact_id',
     ];
 
     /**
@@ -124,6 +126,9 @@ class ImportMetadataValidator
         ) {
             $errors['metadata.language'] = 'The language must be text of at most 32 characters.';
         }
+        if (array_key_exists('year', $metadata) && $metadata['year'] !== null && !$this->isYear($metadata['year'])) {
+            $errors['metadata.year'] = 'The year must be a four-digit number or null.';
+        }
         if (
             array_key_exists('cover_artifact_id', $metadata) && $metadata['cover_artifact_id'] !== null
             && !$this->isText($metadata['cover_artifact_id'], 128)
@@ -161,6 +166,47 @@ class ImportMetadataValidator
         }
 
         return null;
+    }
+
+    private function isYear(mixed $value): bool
+    {
+        return is_int($value) && $value >= 1000 && $value <= 9999;
+    }
+
+    /**
+     * A destination folder typed by the person, relative to the book root. Anything unsafe is rejected rather
+     * than rewritten, so the folder that is stored is exactly the one that was confirmed.
+     *
+     * @return string|null the folder, or null to clear a previously typed one
+     */
+    public function validateCustomDirectory(mixed $directory): ?string
+    {
+        if ($directory === null) {
+            return null;
+        }
+        $valid = is_string($directory)
+            && mb_strlen($directory) <= self::MAX_DIRECTORY_LENGTH
+            && trim($directory) === $directory
+            && $directory !== ''
+            && !str_starts_with($directory, '/')
+            && !str_ends_with($directory, '/')
+            && !str_contains($directory, '\\')
+            && preg_match('/[\x00-\x1F\x7F]/', $directory) !== 1;
+        if ($valid) {
+            foreach (explode('/', (string) $directory) as $segment) {
+                if ($segment === '' || $segment === '.' || $segment === '..' || trim($segment) !== $segment) {
+                    $valid = false;
+                    break;
+                }
+            }
+        }
+        if (!$valid) {
+            throw ImportApiException::validation('The destination folder was not valid.', [
+                'fields' => ['custom_directory' => 'Use a folder inside the library, like Genre/Author/Title.'],
+            ]);
+        }
+
+        return (string) $directory;
     }
 
     private function isText(mixed $value, int $maxLength): bool

@@ -31,11 +31,59 @@ class ImportDraftPresenter
                 'file_count' => $files->count(),
                 'bytes' => (int) $files->sum('bytes'),
             ],
+            'source_evidence' => $this->sourceEvidence($draft, $files),
             'recommendation' => $draft->recommendation,
             'interpretation_error' => $draft->interpretation_error,
+            'evidence_requests' => $this->evidenceRequests($draft),
             'plan' => $this->plan($draft),
             'transfer' => $draft->transfer_summary,
         ];
+    }
+
+    /**
+     * The observations used for this recommendation, with relative names only. Bound the response for large books.
+     *
+     * @param \Illuminate\Support\Collection<int, \App\Models\Imports\ImportDraftFile> $files
+     * @return array<string, mixed>
+     */
+    private function sourceEvidence(ImportDraft $draft, $files): array
+    {
+        $shown = $files->take(20);
+        return [
+            'relative_context' => $draft->client_metadata['relative_context'] ?? null,
+            'files' => $shown->values()->map(static function ($file): array {
+                $tags = (array) ($file->media_observation['raw_tags'] ?? []);
+                $tags = array_slice($tags, 0, 40, true);
+                return [
+                    'relative_path' => $file->relative_path,
+                    'role' => $file->role,
+                    'bytes' => (int) $file->bytes,
+                    'raw_tags' => array_map(
+                        static fn ($values): array => array_map(
+                            static fn ($value): string => mb_substr((string) $value, 0, 500),
+                            array_slice((array) $values, 0, 4)
+                        ),
+                        $tags
+                    ),
+                ];
+            })->all(),
+            'omitted_file_count' => max(0, $files->count() - $shown->count()),
+        ];
+    }
+
+    /**
+     * What the server asked the client for (an audio sample) and how each request ended.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function evidenceRequests(ImportDraft $draft): array
+    {
+        $public = ['id', 'type', 'status', 'file_id', 'start_ms', 'duration_ms', 'max_bytes', 'media_types', 'expires_at'];
+
+        return array_map(
+            static fn (array $request): array => array_intersect_key($request, array_flip($public)),
+            array_values((array) ($draft->evidence_requests ?? []))
+        );
     }
 
     /**
