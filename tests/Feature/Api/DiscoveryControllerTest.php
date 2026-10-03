@@ -11,6 +11,7 @@ use App\Models\Genre;
 use App\Models\RecommendationShelf;
 use App\Models\Series;
 use App\Models\User;
+use App\Models\UserBookStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -110,6 +111,42 @@ class DiscoveryControllerTest extends TestCase
         $response = $this->getJson('/api/v1/discovery/shelves');
 
         $response->assertOk()->assertJson(['data' => []]);
+    }
+
+    public function testBooksMarkedReadOrFinishedAreHiddenFromCachedShelvesImmediately(): void
+    {
+        [$unread, $read, $finished] = Book::factory()->count(3)->create()->all();
+        $shelf = RecommendationShelf::create([
+            'user_id' => $this->user->id,
+            'shelf_key' => 'new_for_you',
+            'title' => 'New for You',
+            'sort_order' => 0,
+            'computed_at' => now(),
+        ]);
+        $shelf->shelfBooks()->create(['book_id' => $unread->id, 'rank' => 0, 'score' => null]);
+        $shelf->shelfBooks()->create(['book_id' => $read->id, 'rank' => 1, 'score' => null]);
+        $shelf->shelfBooks()->create(['book_id' => $finished->id, 'rank' => 2, 'score' => null]);
+        UserBookStatus::create([
+            'user_id' => $this->user->id,
+            'book_id' => $read->id,
+            'status' => 'queue',
+            'order' => 0,
+            'marked_read_at' => now(),
+        ]);
+        UserBookStatus::create([
+            'user_id' => $this->user->id,
+            'book_id' => $finished->id,
+            'status' => 'completed',
+            'order' => 0,
+            'finished_at' => now(),
+        ]);
+
+        $shelves = $this->getJson('/api/v1/discovery/shelves')->assertOk()->json('data');
+        $this->assertSame([$unread->id], array_column($shelves[0]['books'], 'id'));
+
+        $page = $this->getJson('/api/v1/discovery/shelves/new_for_you/books')->assertOk();
+        $this->assertSame([$unread->id], array_column($page->json('data'), 'id'));
+        $this->assertSame(1, $page->json('meta.total'));
     }
 
     public function testShelfBooksPaginatesASingleShelf(): void

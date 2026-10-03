@@ -39,6 +39,8 @@ trait BookTransformTrait
         // this must be nested here or the client silently ignores it.
         $tags = $book['userTags'] ?? $book['user_tags'] ?? $book['user_data']['tags'] ?? $book['tags'] ?? [];
         $isRead = $book['isRead'] ?? $book['is_read'] ?? $book['user_data']['is_read'] ?? false;
+        $markedReadAt = $book['markedReadAt'] ?? $book['marked_read_at'] ?? $book['user_data']['marked_read_at'] ?? null;
+        $finishedAt = $book['finishedAt'] ?? $book['finished_at'] ?? $book['user_data']['finished_at'] ?? null;
 
         if (array_key_exists('userTags', $book)
             || array_key_exists('user_tags', $book)
@@ -50,6 +52,8 @@ trait BookTransformTrait
             $transformedBook['user_data'] = [
                 'tags' => $this->normalizeArray($tags),
                 'is_read' => (bool) $isRead,
+                'marked_read_at' => $markedReadAt,
+                'finished_at' => $finishedAt,
             ];
         }
 

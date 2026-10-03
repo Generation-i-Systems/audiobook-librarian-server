@@ -12,6 +12,7 @@ use App\Models\RecommendationShelfBook;
 use App\Models\RecommendationShelfDismissal;
 use App\Models\Series;
 use App\Models\User;
+use App\Models\UserBookStatus;
 use App\Services\BookCompletionService;
 use App\Services\BookDataTransformer;
 use App\Services\Recommendations\FavoredGenreResolver;
@@ -53,13 +54,16 @@ class DiscoveryController extends Controller
             $this->blockFilter->applyToBookQuery($bookQuery, $userId);
         };
 
+        $readBookIds = $this->consumedBookIds($userId);
+
         $shelves = RecommendationShelf::where('user_id', $userId)
             ->orderBy('sort_order')
-            ->withCount(['shelfBooks as shelf_books_count' => function (Builder $query) use ($visibleBooks): void {
-                $query->whereHas('book', $visibleBooks);
+            ->withCount(['shelfBooks as shelf_books_count' => function (Builder $query) use ($visibleBooks, $readBookIds): void {
+                $query->whereHas('book', $visibleBooks)->whereNotIn('book_id', $readBookIds);
             }])
-            ->with(['shelfBooks' => function ($query) use ($previewSize, $visibleBooks): void {
+            ->with(['shelfBooks' => function ($query) use ($previewSize, $visibleBooks, $readBookIds): void {
                 $query->whereHas('book', $visibleBooks)
+                    ->whereNotIn('book_id', $readBookIds)
                     ->limit($previewSize)
                     ->with(['book.authors', 'book.narrators', 'book.series', 'book.genres']);
             }])
@@ -79,6 +83,26 @@ class DiscoveryController extends Controller
         return response()->json(['data' => $data]);
     }
 
+    /**
+     * Books the user marked as read or finished listening to. Shelves are cached until the queued
+     * recompute runs, so they are filtered here as well, otherwise such a book reappears until then.
+     *
+     * @return array<int, int>
+     */
+    private function consumedBookIds(int $userId): array
+    {
+        $markedRead = UserBookStatus::where('user_id', $userId)
+            ->whereNotNull('marked_read_at')
+            ->whereNotNull('book_id')
+            ->pluck('book_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        $completed = app(BookCompletionService::class)->getCompletedBookIdsForUser($userId);
+
+        return array_values(array_unique(array_merge($markedRead, $completed)));
+    }
+
     public function shelfBooks(Request $request, string $shelfKey): JsonResponse
     {
         $userId = Auth::id();
@@ -96,9 +120,11 @@ class DiscoveryController extends Controller
         $visibleBooks = function (Builder $bookQuery) use ($userId): void {
             $this->blockFilter->applyToBookQuery($bookQuery, $userId);
         };
-        $total = $shelf->shelfBooks()->whereHas('book', $visibleBooks)->count();
+        $readBookIds = $this->consumedBookIds($userId);
+        $total = $shelf->shelfBooks()->whereHas('book', $visibleBooks)->whereNotIn('book_id', $readBookIds)->count();
         $shelfBooks = $shelf->shelfBooks()
             ->whereHas('book', $visibleBooks)
+            ->whereNotIn('book_id', $readBookIds)
             ->with(['book.authors', 'book.narrators', 'book.series', 'book.genres'])
             ->forPage($page, $perPage)
             ->get();

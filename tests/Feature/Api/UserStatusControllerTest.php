@@ -245,6 +245,8 @@ class UserStatusControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('user_data.is_read', true);
+        $this->assertNotNull($response->json('user_data.marked_read_at'));
+        $response->assertJsonPath('user_data.finished_at', null);
     }
 
     public function test_can_get_reading_goals(): void

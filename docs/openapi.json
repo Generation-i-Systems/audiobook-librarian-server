@@ -977,6 +977,20 @@
                                 "type": "boolean",
                                 "description": "Whether the user manually marked this book as read. Independent of status/finished_at — never counted toward completion stats, badges, or goals.",
                                 "example": false
+                            },
+                            "marked_read_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true,
+                                "description": "When the user marked the book as read (typically read in print or another app); null when not marked.",
+                                "example": "2026-09-30T14:03:00+00:00"
+                            },
+                            "finished_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true,
+                                "description": "When the user finished listening in the app; null when not finished.",
+                                "example": "2026-09-12T20:41:00+00:00"
                             }
                         }
                     }

@@ -249,6 +249,8 @@ class BookDataTransformer
             'recommendation' => null,
             'userTags' => [],
             'isRead' => false,
+            'markedReadAt' => null,
+            'finishedAt' => null,
         ];
 
         if ($book->relationLoaded('progress') && $book->progress->isNotEmpty()) {
@@ -273,6 +275,8 @@ class BookDataTransformer
                 'readCount' => $status->read_count,
             ];
             $userData['isRead'] = $status->marked_read_at !== null;
+            $userData['markedReadAt'] = $status->marked_read_at?->toIso8601String();
+            $userData['finishedAt'] = $status->finished_at?->toIso8601String();
         }
 
         if ($book->relationLoaded('recommendations') && $book->recommendations->isNotEmpty()) {
