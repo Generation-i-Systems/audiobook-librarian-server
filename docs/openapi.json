@@ -9481,7 +9481,8 @@
                 "responses": {
                     "200": {"description": "Draft rechecked or queued for recheck", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ImportsImportDraftResponse"}}}},
                     "409": {"description": "Draft revision or state changed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ImportsErrorResponse"}}}}
-                }
+                },
+                "security": [{"BearerAuth": []}]
             }
         },
         "/imports/drafts/{draftId}/cancel": {
