@@ -17023,6 +17023,44 @@
                 }
             }
         },
+        "/discovery/refresh": {
+            "post": {
+                "tags": ["Discovery"],
+                "summary": "Request a recompute of the discovery shelves",
+                "description": "Recomputes the current user's recommendation shelves synchronously and responds once the cached rows are replaced (about 2 seconds for a large library, longer if embedding or AI providers are slow), so GET /discovery/shelves immediately afterwards returns the new rows. Throttled to 6 requests per minute.",
+                "operationId": "postDiscoveryRefresh",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Shelves recomputed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Recommendations refreshed"
+                                        }
+                                    },
+                                    "required": ["message"]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "429": {
+                        "description": "Too many refresh requests"
+                    }
+                }
+            }
+        },
         "/discovery/shelves/{shelfKey}": {
             "delete": {
                 "tags": ["Discovery"],

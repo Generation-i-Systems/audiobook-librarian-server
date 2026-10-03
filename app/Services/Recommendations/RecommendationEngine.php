@@ -13,16 +13,21 @@ use Illuminate\Support\Facades\Log;
 /**
  * Runs every enabled RecommendationStrategyInterface for a user and replaces their
  * cached recommendation_shelves/recommendation_shelf_books rows with the result.
- * Always run from a queued job or scheduled command — never inline during an HTTP
- * request (see EmbeddingPipeline's vector-store cost notes).
+ * Normally run from a queued job or scheduled command (see EmbeddingPipeline's
+ * vector-store cost notes); the only inline use is a user's explicit POST /discovery/refresh.
  */
 class RecommendationEngine
 {
     /**
      * @param RecommendationStrategyInterface[] $strategies
+     * @param int $jitter max places a book may move on a shelf (0 = keep strategy order)
+     * @param (\Closure(): float)|null $random returns a float in [0, 1); injectable for tests
      */
-    public function __construct(private readonly array $strategies)
-    {
+    public function __construct(
+        private readonly array $strategies,
+        private readonly int $jitter = 0,
+        private readonly ?\Closure $random = null,
+    ) {
     }
 
     public static function fromConfig(): self
@@ -32,13 +37,12 @@ class RecommendationEngine
             config('recommendations.strategies', [])
         );
 
-        return new self($strategies);
+        return new self($strategies, max(0, (int) config('recommendations.jitter', 0)));
     }
 
     public function recompute(User $user): void
     {
-        $sortOrder = 0;
-        $shelves = [];
+        $results = [];
 
         foreach ($this->strategies as $strategy) {
             if (!$strategy->isEnabled()) {
@@ -47,7 +51,7 @@ class RecommendationEngine
 
             try {
                 foreach ($strategy->generate($user) as $result) {
-                    $shelves[] = ['result' => $result, 'sort_order' => $sortOrder++];
+                    $results[] = $result;
                 }
             } catch (\Throwable $e) {
                 // One failing strategy must not prevent the others from producing shelves.
@@ -60,7 +64,29 @@ class RecommendationEngine
         }
 
         $dismissedKeys = RecommendationShelfDismissal::where('user_id', $user->id)->pluck('shelf_key')->all();
-        $shelves = array_values(array_filter($shelves, fn (array $entry): bool => !in_array($entry['result']->shelfKey, $dismissedKeys, true)));
+        $results = array_values(array_filter($results, fn (ShelfResult $result): bool => !in_array($result->shelfKey, $dismissedKeys, true)));
+
+        $results = array_map(fn (ShelfResult $result): ShelfResult => $this->jittered($result), $results);
+
+        // Each book appears on at most one shelf: earlier shelves claim books first, and a
+        // shelf left with no books is dropped. Dismissed shelves are filtered out above so
+        // they never claim books from the shelves the user still sees.
+        $claimed = [];
+        $shelves = [];
+        foreach ($results as $result) {
+            $books = [];
+            foreach ($result->books as $book) {
+                if (isset($claimed[$book['book_id']])) {
+                    continue;
+                }
+                $claimed[$book['book_id']] = true;
+                $books[] = $book;
+            }
+            if ($books === []) {
+                continue;
+            }
+            $shelves[] = ['result' => new ShelfResult($result->shelfKey, $result->title, $books), 'sort_order' => count($shelves)];
+        }
 
         DB::transaction(function () use ($user, $shelves): void {
             RecommendationShelf::where('user_id', $user->id)->delete();
@@ -86,5 +112,26 @@ class RecommendationEngine
                 }
             }
         });
+    }
+
+    /** Nudge each book up to `$jitter` places from its strategy rank, so shelves vary between recomputes. */
+    private function jittered(ShelfResult $result): ShelfResult
+    {
+        if ($this->jitter <= 0) {
+            return $result;
+        }
+
+        $random = $this->random ?? static fn (): float => mt_rand() / (mt_getrandmax() + 1);
+        $keyed = [];
+        foreach ($result->books as $position => $book) {
+            $keyed[] = ['key' => $position + $random() * $this->jitter, 'book' => $book];
+        }
+        usort($keyed, fn (array $a, array $b): int => $a['key'] <=> $b['key']);
+
+        return new ShelfResult(
+            $result->shelfKey,
+            $result->title,
+            array_map(static fn (array $entry): array => $entry['book'], $keyed),
+        );
     }
 }

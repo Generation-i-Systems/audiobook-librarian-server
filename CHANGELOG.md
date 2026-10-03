@@ -1,7 +1,13 @@
 ## [Unreleased]
 
+### Added
+
+- Discovery: a little randomness. On each recompute every book is nudged up to `recommendations.jitter` places (default 5, `RECOMMENDATIONS_JITTER`, 0 disables) on its shelf, so the same recommendations are not always shown in the same order and books near the preview cut-off rotate in. "Continue Your Series" shuffles which in-progress series come first (and which make the cut of 20), still offering each series' next book.
+- Discovery: `POST /api/v1/discovery/refresh` lets a user request a recompute of their shelves. It runs synchronously (about 2s on a large library) and responds once the new shelves are stored; throttled to 6 per minute.
+
 ### Fixed
 
+- Discovery: a book now appears on at most one recommendation shelf. `RecommendationEngine::recompute` lets earlier shelves claim books first, drops shelves left empty, and renumbers `sort_order` and ranks; dismissed shelves no longer claim books. Takes effect on the next recompute.
 - `books:validate-directories` now exits with failure, logging the storage root, when the book storage root is missing instead of marking every book's directory as gone, so an unmounted drive no longer empties the catalog in API listings.
 - API: `POST /follow/{type}/{id}` and `DELETE /unfollow/{type}/{id}` now work. They validated body fields instead of the URL (so a path-only call always got 422), and the `follows` table they write to had no migration since the document-store clean-up (so a call with a body got 500). The target is now read from the path, the meaningless self-follow check is gone, and a new additive migration creates `follows` (run `php artisan migrate`). `openapi.json` no longer documents a request body for them.
 - Directory validation now fails before changing book availability when the configured storage root is missing. After the 03:00 validation ran during a missing mount, a verified database backup was taken and availability was restored only for books whose directories currently exist.

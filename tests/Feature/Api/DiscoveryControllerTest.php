@@ -28,6 +28,43 @@ class DiscoveryControllerTest extends TestCase
         Sanctum::actingAs($this->user);
     }
 
+    public function testRefreshRecomputesTheCurrentUsersShelvesBeforeResponding(): void
+    {
+        $stale = RecommendationShelf::create([
+            'user_id' => $this->user->id,
+            'shelf_key' => 'stale',
+            'title' => 'Stale',
+            'sort_order' => 0,
+            'computed_at' => now()->subDay(),
+        ]);
+        $other = User::factory()->create();
+        $otherShelf = RecommendationShelf::create([
+            'user_id' => $other->id,
+            'shelf_key' => 'other',
+            'title' => 'Other',
+            'sort_order' => 0,
+            'computed_at' => now()->subDay(),
+        ]);
+        config(['recommendations.strategies' => []]);
+
+        $this->postJson('/api/v1/discovery/refresh')
+            ->assertOk()
+            ->assertExactJson(['message' => 'Recommendations refreshed']);
+
+        $this->assertDatabaseMissing('recommendation_shelves', ['id' => $stale->id]);
+        $this->assertDatabaseHas('recommendation_shelves', ['id' => $otherShelf->id]);
+    }
+
+    public function testRefreshIsThrottled(): void
+    {
+        config(['recommendations.strategies' => []]);
+
+        for ($i = 0; $i < 6; $i++) {
+            $this->postJson('/api/v1/discovery/refresh')->assertOk();
+        }
+        $this->postJson('/api/v1/discovery/refresh')->assertStatus(429);
+    }
+
     public function testShelvesReturnsEmptyListWhenUserHasNoCachedShelves(): void
     {
         $response = $this->getJson('/api/v1/discovery/shelves');

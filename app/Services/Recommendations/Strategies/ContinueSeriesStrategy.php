@@ -74,6 +74,10 @@ class ContinueSeriesStrategy implements RecommendationStrategyInterface
             return [];
         }
 
+        // Which series come first (or make the cut when more than MAX_BOOKS are in progress)
+        // is arbitrary, so vary it on every recompute. Each series still offers its next book.
+        shuffle($books);
+
         return [
             new ShelfResult(
                 shelfKey: 'continue_series',

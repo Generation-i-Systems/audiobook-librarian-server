@@ -92,4 +92,31 @@ class ContinueSeriesStrategyTest extends TestCase
 
         $this->assertSame([], $shelves);
     }
+
+    public function testSeriesOrderVariesAndSelectionRotatesWhenMoreSeriesThanTheShelfHolds(): void
+    {
+        $user = User::factory()->create();
+        $nextBookIds = [];
+        for ($i = 0; $i < 30; $i++) {
+            $series = Series::factory()->create();
+            $first = Book::factory()->create();
+            $series->books()->attach($first->id, ['series_number' => '1']);
+            UserBookStatus::factory()->create(['user_id' => $user->id, 'book_id' => $first->id, 'status' => 'completed', 'finished_at' => now()]);
+            $next = Book::factory()->create();
+            $series->books()->attach($next->id, ['series_number' => '2']);
+            $nextBookIds[] = $next->id;
+        }
+
+        $runs = [];
+        foreach ([1, 2, 3, 4, 5] as $seed) {
+            mt_srand($seed);
+            $runs[] = collect((new ContinueSeriesStrategy())->generate($user)[0]->books)->pluck('book_id')->all();
+        }
+
+        foreach ($runs as $bookIds) {
+            $this->assertCount(20, $bookIds);
+            $this->assertSame([], array_diff($bookIds, $nextBookIds));
+        }
+        $this->assertGreaterThan(1, count(array_unique(array_map('json_encode', $runs))));
+    }
 }

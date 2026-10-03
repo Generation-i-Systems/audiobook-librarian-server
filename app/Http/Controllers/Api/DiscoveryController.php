@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\Book;
 use App\Models\RecommendationShelf;
 use App\Models\RecommendationShelfBook;
@@ -116,6 +117,14 @@ class DiscoveryController extends Controller
                 'last_page' => max(1, (int) ceil($total / $perPage)),
             ],
         ]);
+    }
+
+    /** Recompute the current user's shelves now (about 2s for a large library) and respond once they are replaced. */
+    public function refresh(): JsonResponse
+    {
+        RecomputeRecommendationsJob::dispatchSync((int) Auth::id());
+
+        return response()->json(['message' => 'Recommendations refreshed']);
     }
 
     /** Permanently hide this recommendation row for the current user, including after recomputes. */

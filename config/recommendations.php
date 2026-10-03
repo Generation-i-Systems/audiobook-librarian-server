@@ -14,6 +14,13 @@ return [
     | and register it here — no schema or client changes required.
     |
     */
+    /*
+    | Randomness: each book's position on a shelf is nudged by a random amount up to
+    | this many places on every recompute, so the same books are not always shown in
+    | the same order. 0 disables it.
+    */
+    'jitter' => (int) env('RECOMMENDATIONS_JITTER', 5),
+
     'strategies' => [
         \App\Services\Recommendations\Strategies\SimilarToRecentBooksStrategy::class,
         \App\Services\Recommendations\Strategies\NewForYouStrategy::class,

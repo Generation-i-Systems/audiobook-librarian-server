@@ -118,4 +118,105 @@ class RecommendationEngineTest extends TestCase
         $this->assertSame('shelf_new', $shelves[0]->shelf_key);
         $this->assertDatabaseCount('recommendation_shelf_books', 1);
     }
+
+    public function testBookAppearsOnlyOnTheFirstShelfThatContainsIt(): void
+    {
+        $user = User::factory()->create();
+        $books = Book::factory()->count(4)->create();
+        [$a, $b, $c, $d] = $books->pluck('id')->all();
+
+        $strategy = Mockery::mock(RecommendationStrategyInterface::class);
+        $strategy->shouldReceive('isEnabled')->andReturn(true);
+        $strategy->shouldReceive('key')->andReturn('strategy');
+        $strategy->shouldReceive('generate')->andReturn([
+            new ShelfResult('one', 'One', [['book_id' => $a, 'score' => 0.9], ['book_id' => $b, 'score' => 0.8]]),
+            new ShelfResult('two', 'Two', [['book_id' => $b, 'score' => 0.7], ['book_id' => $c, 'score' => 0.6]]),
+            new ShelfResult('three', 'Three', [['book_id' => $a, 'score' => 0.5], ['book_id' => $c, 'score' => 0.4]]),
+            new ShelfResult('four', 'Four', [['book_id' => $d, 'score' => 0.3], ['book_id' => $a, 'score' => 0.2]]),
+        ]);
+
+        (new RecommendationEngine([$strategy]))->recompute($user);
+
+        $actual = [];
+        $shelves = RecommendationShelf::where('user_id', $user->id)->orderBy('sort_order')->with('shelfBooks')->get();
+        foreach ($shelves as $shelf) {
+            $pairs = [];
+            foreach ($shelf->shelfBooks->sortBy('rank') as $shelfBook) {
+                $pairs[] = [$shelfBook->book_id, $shelfBook->rank];
+            }
+            $actual[] = [$shelf->shelf_key, $shelf->sort_order, $pairs];
+        }
+
+        $this->assertSame([
+            ['one', 0, [[$a, 0], [$b, 1]]],
+            ['two', 1, [[$c, 0]]],
+            ['four', 2, [[$d, 0]]],
+        ], $actual);
+    }
+
+    public function testDismissedShelfDoesNotClaimBooksFromVisibleShelves(): void
+    {
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+        \App\Models\RecommendationShelfDismissal::create(['user_id' => $user->id, 'shelf_key' => 'dismissed']);
+
+        $strategy = Mockery::mock(RecommendationStrategyInterface::class);
+        $strategy->shouldReceive('isEnabled')->andReturn(true);
+        $strategy->shouldReceive('key')->andReturn('strategy');
+        $strategy->shouldReceive('generate')->andReturn([
+            new ShelfResult('dismissed', 'Dismissed', [['book_id' => $book->id, 'score' => null]]),
+            new ShelfResult('visible', 'Visible', [['book_id' => $book->id, 'score' => null]]),
+        ]);
+
+        (new RecommendationEngine([$strategy]))->recompute($user);
+
+        $shelves = RecommendationShelf::where('user_id', $user->id)->get();
+        $this->assertSame(['visible'], $shelves->pluck('shelf_key')->all());
+        $this->assertDatabaseCount('recommendation_shelf_books', 1);
+    }
+
+    public function testJitterReordersShelves(): void
+    {
+        $user = User::factory()->create();
+        $ids = Book::factory()->count(4)->create()->pluck('id')->all();
+        $asBooks = fn (array $list): array => array_map(fn (int $id): array => ['book_id' => $id, 'score' => null], $list);
+
+        $strategy = Mockery::mock(RecommendationStrategyInterface::class);
+        $strategy->shouldReceive('isEnabled')->andReturn(true);
+        $strategy->shouldReceive('key')->andReturn('strategy');
+        $strategy->shouldReceive('generate')->andReturn([
+            new ShelfResult('shuffled', 'Shuffled', $asBooks($ids)),
+        ]);
+
+        // jitter 10 with fixed randoms; the last value is consumed by the 4th book.
+        $values = [0.9, 0.5, 0.1, 0.0];
+        $random = function () use (&$values): float {
+            return array_shift($values) ?? 0.0;
+        };
+
+        (new RecommendationEngine([$strategy], 10, $random))->recompute($user);
+
+        $shelves = RecommendationShelf::where('user_id', $user->id)->orderBy('sort_order')->with('shelfBooks')->get();
+        $order = fn (RecommendationShelf $shelf): array => $shelf->shelfBooks->sortBy('rank')->pluck('book_id')->values()->all();
+
+        // keys: 0+9=9, 1+5=6, 2+1=3, 3+0=3 (tie keeps original order) -> ids[2], ids[3], ids[1], ids[0]
+        $this->assertSame([$ids[2], $ids[3], $ids[1], $ids[0]], $order($shelves[0]));
+    }
+
+    public function testZeroJitterKeepsStrategyOrder(): void
+    {
+        $user = User::factory()->create();
+        $ids = Book::factory()->count(3)->create()->pluck('id')->all();
+
+        $strategy = Mockery::mock(RecommendationStrategyInterface::class);
+        $strategy->shouldReceive('isEnabled')->andReturn(true);
+        $strategy->shouldReceive('key')->andReturn('strategy');
+        $strategy->shouldReceive('generate')->andReturn([
+            new ShelfResult('s', 'S', array_map(fn (int $id): array => ['book_id' => $id, 'score' => null], $ids)),
+        ]);
+
+        (new RecommendationEngine([$strategy], 0, fn (): float => 0.99))->recompute($user);
+
+        $this->assertSame($ids, RecommendationShelf::where('user_id', $user->id)->first()->shelfBooks()->orderBy('rank')->pluck('book_id')->all());
+    }
 }
