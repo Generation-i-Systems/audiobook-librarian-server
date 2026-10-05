@@ -31,6 +31,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->appendOutputTo(storage_path('logs/backup-cron.log'));
         }
 
+        // Opt-in (AUDIT_ARCHIVE_SCHEDULED): move audits older than 30 days to archive files, Sundays 4:00 AM
+        // (after the nightly 2:00 and weekly 3:00 database backups, which the command requires).
+        if (config('audits.archive_scheduled')) {
+            $schedule->command('audits:archive --force')
+                ->weeklyOn(0, '04:00')
+                ->appendOutputTo(storage_path('logs/audit-archive.log'));
+        }
+
         // Compress log files older than 1 day, daily at 1:00 AM
         $schedule->command('logs:compress')
             ->dailyAt('01:00')

@@ -426,6 +426,14 @@ about whether the image actually builds, boots, serves traffic, or persists data
   tested, but a broken selector or payload key fails silently (the page still works, it just stops remembering).
   The `users.book_list_preferences` migration must also be applied on live before saves succeed.
 
+- **Audit archive** (`AuditArchiveService`, `audits:archive`, `audits:restore`) — tests run on SQLite with
+  small fixtures. Not provable there: how the live MySQL `audits` `old_values`/`new_values` columns (utf8mb4_bin
+  text/JSON) round-trip through export and `audits:restore` for odd real payloads; runtime and memory for the first
+  ~150k-row backlog run; the permissions, free space and persistence of the real `AUDIT_ARCHIVE_PATH` offline
+  mount (a path left inside the backed-up storage defeats the purpose); and that InnoDB actually shrinks
+  `mysqldump` output after the deletes. The command deletes live rows — after the first real run, spot-check one
+  archive file and run `audits:restore` against a copy before trusting it.
+
 ---
 
 ## Adding New Items
