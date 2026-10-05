@@ -123,6 +123,8 @@ class UserAccountService
             'must_change_password' => $data['must_change_password'] ?? false,
         ]);
 
+        app(UserTagFilterService::class)->applyDefaultFilters($user);
+
         return (string) $user->id;
     }
 
@@ -306,7 +308,7 @@ class UserAccountService
                 ->where('id', $id)
                 ->update(['status' => 'approved', 'updated_at' => now()]);
 
-            User::create([
+            $newUser = User::create([
                 'name' => $request->name ?? '',
                 'email' => $request->email ?? '',
                 'username' => $request->username ?? '',
@@ -314,6 +316,7 @@ class UserAccountService
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+            app(UserTagFilterService::class)->applyDefaultFilters($newUser);
 
             DB::commit();
 

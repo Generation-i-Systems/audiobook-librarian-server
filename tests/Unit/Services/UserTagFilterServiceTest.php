@@ -188,4 +188,29 @@ class UserTagFilterServiceTest extends TestCase
 
         $this->assertSame([$allowed->id], $query->pluck('id')->all());
     }
+
+    public function testApplyDefaultFiltersCreatesPersonalBanAndRequireFiltersFromConfig(): void
+    {
+        $banned = 'spicy';
+        $required = 'cozy';
+        config(['app.default_tag_filters' => " -{$banned}, {$required} "]);
+        $user = User::factory()->create();
+
+        $this->service->applyDefaultFilters($user);
+
+        $this->assertEquals(
+            [$required => UserTagFilter::MODE_REQUIRE, $banned => UserTagFilter::MODE_BAN],
+            $this->service->userFiltersFor($user)->pluck('mode', 'tag')->all()
+        );
+    }
+
+    public function testApplyDefaultFiltersDoesNothingWhenConfigEmpty(): void
+    {
+        config(['app.default_tag_filters' => '']);
+        $user = User::factory()->create();
+
+        $this->service->applyDefaultFilters($user);
+
+        $this->assertCount(0, $this->service->userFiltersFor($user));
+    }
 }

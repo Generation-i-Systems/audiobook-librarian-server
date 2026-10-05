@@ -128,6 +128,13 @@ return [
     'demo_mode' => (bool) env('DEMO_MODE', false),
 
     /*
+    | Tag filters applied to every newly created user (personal scope, so the user can still
+    | remove them). Comma-separated; prefix a tag with "-" to ban it, otherwise it is required.
+    | e.g. DEFAULT_TAG_FILTERS=-spicy
+    */
+    'default_tag_filters' => (string) env('DEFAULT_TAG_FILTERS', ''),
+
+    /*
     |--------------------------------------------------------------------------
     | Local Debug Routes
     |--------------------------------------------------------------------------

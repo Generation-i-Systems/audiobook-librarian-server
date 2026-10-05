@@ -2,6 +2,7 @@
 
 ### Added
 
+- Tag filters: `DEFAULT_TAG_FILTERS` (e.g. `-spicy`) gives every newly created user those personal filters (`-` bans a tag, otherwise required). Users can still remove them; existing users are unchanged.
 - Discovery: a little randomness. On each recompute every book is nudged up to `recommendations.jitter` places (default 5, `RECOMMENDATIONS_JITTER`, 0 disables) on its shelf, so the same recommendations are not always shown in the same order and books near the preview cut-off rotate in. "Continue Your Series" shuffles which in-progress series come first (and which make the cut of 20), still offering each series' next book.
 - Discovery: `POST /api/v1/discovery/refresh` lets a user request a recompute of their shelves. It runs synchronously (about 2s on a large library) and responds once the new shelves are stored; throttled to 6 per minute.
 - Import drafts: the terminal importer's review menus. `metadata.year` (read from tags, editable); a typed destination folder via `PATCH` `custom_directory` (offered as the `custom` destination, validated and stored exactly as typed); existing series locations as `series_location_N` destinations with `book_count`; and `POST /imports/drafts/{id}/enrichment`, an on-demand online lookup compared field by field with the current details, as the old importer's "Request enrichment". `docs/openapi.json` and `docs/importer-drafts.md` describe them.

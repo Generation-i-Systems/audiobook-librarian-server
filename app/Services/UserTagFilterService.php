@@ -28,6 +28,22 @@ class UserTagFilterService
         return $scope === UserTagFilter::SCOPE_SYSTEM ? 'account:' . $target->accountRootId() : 'user:' . $target->id;
     }
 
+    /**
+     * Gives a newly created user the server's default personal tag filters
+     * (config app.default_tag_filters, e.g. "-spicy").
+     */
+    public function applyDefaultFilters(User $user): void
+    {
+        $parsed = self::parseTagSpecs((string) config('app.default_tag_filters', ''));
+
+        foreach ($parsed['required'] as $tag) {
+            $this->setFilter($user, $user, $tag, UserTagFilter::MODE_REQUIRE, UserTagFilter::SCOPE_USER);
+        }
+        foreach ($parsed['banned'] as $tag) {
+            $this->setFilter($user, $user, $tag, UserTagFilter::MODE_BAN, UserTagFilter::SCOPE_USER);
+        }
+    }
+
     public function setFilter(User $actor, User $target, string $tag, string $mode, string $scope): UserTagFilter
     {
         $tag = mb_strtolower(trim($tag));
