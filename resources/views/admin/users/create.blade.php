@@ -21,7 +21,7 @@
             <label for="role" class="form-label">Role</label>
             <select name="role" id="role" class="form-control" required>
                 @foreach($assignableRoles as $roleKey => $roleLabel)
-                    <option value="{{ $roleKey }}" @selected(old('role') === $roleKey)>{{ $roleLabel }}</option>
+                    <option value="{{ $roleKey }}" @selected(old('role', 'library-user') === $roleKey)>{{ $roleLabel }}</option>
                 @endforeach
             </select>
         </div>

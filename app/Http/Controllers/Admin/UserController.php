@@ -56,7 +56,7 @@ class UserController extends Controller
             'username' => 'required|string|max:255',
             'email' => 'required|email',
             'password' => [$sendOtpRequested ? 'nullable' : 'required', 'string', 'min:6', 'confirmed'],
-            'role' => ['required', 'string', Rule::in(Role::keyList())],
+            'role' => ['required', 'string', Rule::in(array_keys(Role::assignable()))],
             'send_otp_email' => 'sometimes|boolean',
         ]);
         // Uniqueness check
@@ -151,11 +151,17 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
+        $currentRole = $this->documentStoreService->getUserById($id)['role'] ?? null;
+        $assignableRoles = array_keys(Role::assignable());
+        if ($currentRole === 'user') {
+            $assignableRoles[] = 'user';
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
             'email' => 'required|email',
-            'role' => ['required', 'string', Rule::in(Role::keyList())],
+            'role' => ['required', 'string', Rule::in($assignableRoles)],
             'password' => 'nullable|string|min:6|confirmed',
             'required_tags' => 'nullable|string|max:2000',
             'ignored_tags' => 'nullable|string|max:2000',

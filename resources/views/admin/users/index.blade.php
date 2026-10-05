@@ -73,7 +73,7 @@
                                             <span class="badge bg-success">Verified</span>
                                         @endif
                                     </td>
-                                    <td>{{ ucfirst($user['role'] ?? 'user') }}</td>
+                                    <td>{{ ucfirst($user['role'] ?? 'library-user') }}</td>
                                     <td>
                                         @if(!empty($user['last_used_at']))
                                             <span title="{{ \Illuminate\Support\Carbon::parse($user['last_used_at'])->toDayDateTimeString() }}">
@@ -145,13 +145,6 @@
                     </div>
                     <div class="modal-footer flex-wrap gap-2">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <form id="verifyPlayerForm" method="POST" class="d-inline">
-                            @csrf
-                            <input type="hidden" name="role" value="user">
-                            <button type="submit" class="btn btn-outline-secondary">
-                                <i class="fas fa-play"></i> Player Only
-                            </button>
-                        </form>
                         <form id="verifyLibraryForm" method="POST" class="d-inline">
                             @csrf
                             <input type="hidden" name="role" value="library-user">
@@ -187,7 +180,7 @@
 
             document.getElementById('verifyUserName').textContent = userName;
 
-            ['verifyPlayerForm', 'verifyLibraryForm', 'verifyLibrivoxForm', 'verifyHybridForm'].forEach(function(id) {
+            ['verifyLibraryForm', 'verifyLibrivoxForm', 'verifyHybridForm'].forEach(function(id) {
                 document.getElementById(id).setAttribute('action', baseUrl);
             });
         });

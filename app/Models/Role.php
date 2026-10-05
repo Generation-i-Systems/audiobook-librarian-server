@@ -94,14 +94,14 @@ class Role extends Model implements PermissionGroup
     }
 
     /**
-     * Role key => label for roles assignable from the admin user forms.
-     * `disabled` is applied through account workflows, not chosen directly.
+     * Role key => label for new admin assignments. Legacy `user` accounts
+     * remain readable, while `disabled` is applied through account workflows.
      *
      * @return array<string, string>
      */
     public static function assignable(): array
     {
-        return array_diff_key(self::ROLE_LABELS, array_flip(['disabled']));
+        return array_diff_key(self::ROLE_LABELS, array_flip(['user', 'disabled']));
     }
 
     /**
@@ -111,7 +111,7 @@ class Role extends Model implements PermissionGroup
      */
     public static function verifiable(): array
     {
-        return array_diff_key(self::ROLE_LABELS, array_flip(['unverified', 'disabled']));
+        return array_diff_key(self::ROLE_LABELS, array_flip(['user', 'unverified', 'disabled']));
     }
 
     /**

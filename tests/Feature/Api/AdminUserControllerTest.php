@@ -104,6 +104,7 @@ class AdminUserControllerTest extends TestCase
         ]);
 
         $response->assertStatus(201);
+        $response->assertJsonPath('user.role', 'library-user');
 
         Mail::assertSent(WelcomeMail::class, function (WelcomeMail $mail) {
             return $mail->hasTo('newuser@example.com');
@@ -138,11 +139,11 @@ class AdminUserControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/users/' . $target->id . '/verify');
 
         $response->assertStatus(200)
-            ->assertJsonPath('user.role', 'user')
+            ->assertJsonPath('user.role', 'library-user')
             ->assertJsonPath('message', 'User verified successfully.');
 
         $target->refresh();
-        $this->assertSame('user', $target->role);
+        $this->assertSame('library-user', $target->role);
         $this->assertNotNull($target->email_verified_at);
 
         Mail::assertSent(WelcomeMail::class, function (WelcomeMail $mail) {
@@ -172,6 +173,20 @@ class AdminUserControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/users/' . $target->id . '/verify', ['role' => 'not-a-role']);
 
         $response->assertStatus(422);
+        Mail::assertNothingSent();
+    }
+
+    public function test_verify_rejects_legacy_user_role(): void
+    {
+        Mail::fake();
+        $this->actingAs($this->admin());
+
+        $target = User::factory()->create(['role' => 'unverified']);
+
+        $this->postJson('/api/v1/admin/users/' . $target->id . '/verify', ['role' => 'user'])
+            ->assertUnprocessable();
+
+        $this->assertSame('unverified', $target->fresh()->role);
         Mail::assertNothingSent();
     }
 

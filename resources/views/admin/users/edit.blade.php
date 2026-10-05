@@ -83,6 +83,9 @@
         <div class="mb-3">
             <label for="role" class="form-label">Role</label>
             <select name="role" id="role" class="form-control" required>
+                @if(($user['role'] ?? '') === 'user')
+                    <option value="user" @selected(old('role', $user['role']) === 'user')>User (legacy)</option>
+                @endif
                 @foreach($assignableRoles as $roleKey => $roleLabel)
                     <option value="{{ $roleKey }}" @selected(old('role', $user['role'] ?? '') === $roleKey)>{{ $roleLabel }}</option>
                 @endforeach
@@ -93,9 +96,6 @@
             <div class="alert alert-warning">
                 <p class="mb-2">This user is not yet verified. Choose their access type:</p>
                 <div class="d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-outline-secondary btn-sm verify-role-btn" data-role="user">
-                        <i class="fas fa-play"></i> Player Only
-                    </button>
                     <button type="button" class="btn btn-success btn-sm verify-role-btn" data-role="library-user">
                         <i class="fas fa-book"></i> Library User
                     </button>
@@ -246,7 +246,7 @@
     @if(($user['role'] ?? '') === 'unverified')
         <form id="verify-user-form" action="{{ route('admin.users.verify', $user['id']) }}" method="POST" class="d-none">
             @csrf
-            <input type="hidden" name="role" id="verify-role-input" value="user">
+            <input type="hidden" name="role" id="verify-role-input" value="library-user">
         </form>
         <script>
             document.querySelectorAll('.verify-role-btn').forEach(function(btn) {

@@ -196,6 +196,63 @@ class RolePermissionsTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function testAdminCreationOffersLibraryUserByDefaultWithoutLegacyUser(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
+        $this->get('/admin/users/create')
+            ->assertOk()
+            ->assertSee('value="library-user" selected', false)
+            ->assertDontSee('value="user"', false);
+
+        $this->post('/admin/users', [
+            'name' => 'Legacy Role',
+            'username' => 'legacy-role',
+            'email' => 'legacy-role@example.com',
+            'role' => 'user',
+            'send_otp_email' => '0',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertSessionHasErrors('role');
+
+        $this->assertDatabaseMissing('users', ['username' => 'legacy-role']);
+    }
+
+    public function testApiAdminCreationRejectsLegacyUserRole(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
+        $this->postJson('/api/v1/admin/users', [
+            'name' => 'Legacy Role',
+            'username' => 'legacy-role',
+            'email' => 'legacy-role@example.com',
+            'role' => 'user',
+            'send_otp_email' => false,
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseMissing('users', ['username' => 'legacy-role']);
+    }
+
+    public function testExistingLegacyUserCanBeEditedWithoutChangingRoleButCannotBeNewlyAssigned(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        $legacy = User::factory()->create(['role' => 'user']);
+        $regular = User::factory()->create(['role' => 'library-user']);
+
+        $this->get('/admin/users/' . $legacy->id . '/edit')
+            ->assertOk()
+            ->assertSee('User (legacy)');
+
+        $this->put('/admin/users/' . $regular->id, [
+            'name' => $regular->name,
+            'username' => $regular->username,
+            'email' => $regular->email,
+            'role' => 'user',
+        ])->assertSessionHasErrors('role');
+
+        $this->assertSame('library-user', $regular->fresh()->role);
+    }
+
     public function testAdminUserEditPageAnnotatesRoleGrantedPermissions(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']));

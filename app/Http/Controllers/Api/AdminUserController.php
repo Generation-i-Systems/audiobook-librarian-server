@@ -74,7 +74,7 @@ class AdminUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255',
             'username' => 'required|string|max:255|alpha_dash',
-            'role' => ['sometimes', 'string', Rule::in(Role::keyList())],
+            'role' => ['sometimes', 'string', Rule::in(array_keys(Role::assignable()))],
             'send_otp_email' => 'sometimes|boolean',
         ]);
 
@@ -98,7 +98,7 @@ class AdminUserController extends Controller
             'email' => $email,
             'username' => $username,
             'password' => Hash::make(Str::random(32)),
-            'role' => $request->input('role', 'user'),
+            'role' => $request->input('role', 'library-user'),
             'must_change_password' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -184,7 +184,7 @@ class AdminUserController extends Controller
             return response()->json(['message' => 'User is already verified.']);
         }
 
-        $role = $request->input('role', 'user');
+        $role = $request->input('role', 'library-user');
         if (!in_array($role, array_keys(Role::verifiable()), true)) {
             return response()->json(['message' => 'Invalid role selected.'], 422);
         }

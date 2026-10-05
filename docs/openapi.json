@@ -23612,8 +23612,9 @@
                                     },
                                     "role": {
                                         "type": "string",
-                                        "enum": ["user", "library-user", "librivox-user", "hybrid-user", "admin", "super-admin", "unverified", "disabled"],
-                                        "description": "Canonical role keys. Roles are groups of permissions; ordinary library roles imply the standard library-management bundle."
+                                        "enum": ["library-user", "librivox-user", "hybrid-user", "admin", "super-admin", "unverified"],
+                                        "default": "library-user",
+                                        "description": "Assignable role keys. The legacy user role remains readable for existing accounts but cannot be assigned to new accounts."
                                     },
                                     "send_otp_email": {
                                         "type": "boolean"
@@ -23942,8 +23943,9 @@
                                 "properties": {
                                     "role": {
                                         "type": "string",
-                                        "enum": ["user", "library-user", "librivox-user", "hybrid-user", "admin", "super-admin"],
-                                        "description": "Defaults to 'user'."
+                                        "enum": ["library-user", "librivox-user", "hybrid-user", "admin", "super-admin"],
+                                        "default": "library-user",
+                                        "description": "Defaults to library-user."
                                     }
                                 }
                             }

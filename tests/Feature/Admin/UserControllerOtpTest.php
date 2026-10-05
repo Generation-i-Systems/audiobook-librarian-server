@@ -216,7 +216,7 @@ class UserControllerOtpTest extends TestCase
             'name' => 'New Guy',
             'username' => 'newguy',
             'email' => 'newguy@example.com',
-            'role' => 'user',
+            'role' => 'library-user',
         ]);
 
         $response->assertRedirect(route('admin.users.index'));
@@ -236,7 +236,7 @@ class UserControllerOtpTest extends TestCase
             'name' => 'Password User',
             'username' => 'pwuser',
             'email' => 'pwuser@example.com',
-            'role' => 'user',
+            'role' => 'library-user',
             'send_otp_email' => '0',
         ]);
 
@@ -253,7 +253,7 @@ class UserControllerOtpTest extends TestCase
             'name' => 'Password User',
             'username' => 'pwuser2',
             'email' => 'pwuser2@example.com',
-            'role' => 'user',
+            'role' => 'library-user',
             'send_otp_email' => '0',
             'password' => 'secret123',
             'password_confirmation' => 'secret123',

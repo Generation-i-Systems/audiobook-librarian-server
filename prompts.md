@@ -612,3 +612,7 @@ Fantasy has more than 4,500 books, but `GET /api/v1/genres/Fantasy/books?sort=re
 ## 2026-10-03
 
 Fix npm security issues. When this is done, push.
+
+## 2026-10-05
+
+Get rid of `user` as an account role choice. Default new users created in admin to `library-user`.
