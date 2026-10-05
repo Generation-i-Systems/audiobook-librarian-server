@@ -25,14 +25,12 @@ class UserTagFilterService
 {
     public function ownerKeyForScope(string $scope, User $target): string
     {
-        return $scope === UserTagFilter::SCOPE_SYSTEM
-            ? 'account:' . $target->accountRootId()
-            : 'user:' . $target->id;
+        return $scope === UserTagFilter::SCOPE_SYSTEM ? 'account:' . $target->accountRootId() : 'user:' . $target->id;
     }
 
     public function setFilter(User $actor, User $target, string $tag, string $mode, string $scope): UserTagFilter
     {
-        $tag = trim($tag);
+        $tag = mb_strtolower(trim($tag));
         $this->authorize($actor, $target, $scope);
 
         $ownerKey = $this->ownerKeyForScope($scope, $target);
@@ -113,12 +111,15 @@ class UserTagFilterService
             abort(403, 'Only an admin or a designated account manager can change a system tag filter.');
         }
 
+        // Book tags are stored lowercase and matched case-sensitively, so a filter saved as "Spicy"
+        // blocked nothing, and re-saving it as "spicy" collided with it on the case-insensitive
+        // unique index (HTTP 500). Filters are therefore always stored lowercase.
         $filters = [];
         foreach ($requiredTags as $tag) {
-            $filters[trim($tag)] = UserTagFilter::MODE_REQUIRE;
+            $filters[mb_strtolower(trim($tag))] = UserTagFilter::MODE_REQUIRE;
         }
         foreach ($bannedTags as $tag) {
-            $filters[trim($tag)] = UserTagFilter::MODE_BAN;
+            $filters[mb_strtolower(trim($tag))] = UserTagFilter::MODE_BAN;
         }
         unset($filters['']);
 
@@ -129,14 +130,15 @@ class UserTagFilterService
             $existingFilters = UserTagFilter::where('owner_key', $ownerKey)
                 ->lockForUpdate()
                 ->get()
-                ->keyBy('tag');
+                ->keyBy(fn (UserTagFilter $existing): string => mb_strtolower($existing->tag));
 
-            UserTagFilter::where('owner_key', $ownerKey)
-                ->when(
-                    $filters !== [],
-                    fn (Builder $query) => $query->whereNotIn('tag', array_keys($filters))
-                )
-                ->delete();
+            $staleIds = $existingFilters
+                ->reject(fn (UserTagFilter $existing, string $key): bool => array_key_exists($key, $filters))
+                ->pluck('id')
+                ->all();
+            if ($staleIds !== []) {
+                UserTagFilter::whereIn('id', $staleIds)->delete();
+            }
 
             foreach ($filters as $tag => $mode) {
                 $filter = $existingFilters->get($tag) ?? new UserTagFilter([
@@ -145,6 +147,7 @@ class UserTagFilterService
                     'scope' => UserTagFilter::SCOPE_SYSTEM,
                     'tag' => $tag,
                 ]);
+                $filter->tag = $tag;
                 $filter->mode = $mode;
                 $filter->save();
             }
