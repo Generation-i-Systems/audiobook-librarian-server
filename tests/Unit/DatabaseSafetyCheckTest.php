@@ -100,4 +100,47 @@ class DatabaseSafetyCheckTest extends BaseTestCase
             "Session driver should be 'array' in tests for isolation."
         );
     }
+
+    /**
+     * The pre-bootstrap check must remove cached config (it can force MySQL) but must leave the
+     * shared package manifest alone: parallel workers boot at the same moment, and one that finds
+     * packages.php/services.php deleted loads no package providers (laravel/ui → Auth::routes()).
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('database-safety')]
+    public function testPreBootstrapCheckRemovesCachedConfigButKeepsPackageManifest(): void
+    {
+        $root = sys_get_temp_dir() . '/db-safety-check-' . getmypid() . '-' . bin2hex(random_bytes(4));
+        mkdir($root . '/bootstrap/cache', 0775, true);
+        copy(__DIR__ . '/../../bootstrap/database-safety-check.php', $root . '/bootstrap/database-safety-check.php');
+        file_put_contents($root . '/.env.testing', "DB_CONNECTION=sqlite\nDB_DATABASE=:memory:\nDB_HOST=\n");
+
+        $removed = ['config.php', 'routes-v7.php', 'routes.php', 'events.php'];
+        $kept = ['packages.php', 'services.php'];
+        foreach (array_merge($removed, $kept) as $file) {
+            file_put_contents($root . '/bootstrap/cache/' . $file, '<?php return [];');
+        }
+
+        // The check only acts when argv[0] looks like a test runner.
+        $runner = $root . '/phpunit-runner.php';
+        file_put_contents($runner, '<?php require ' . var_export($root . '/bootstrap/database-safety-check.php', true) . ';');
+        exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner) . ' 2>&1', $output, $exitCode);
+
+        $present = array_values(array_filter(
+            array_merge($removed, $kept),
+            fn (string $file): bool => is_file($root . '/bootstrap/cache/' . $file)
+        ));
+
+        foreach (glob($root . '/bootstrap/cache/*') ?: [] as $file) {
+            unlink($file);
+        }
+        foreach ([$runner, $root . '/bootstrap/database-safety-check.php', $root . '/.env.testing'] as $file) {
+            unlink($file);
+        }
+        rmdir($root . '/bootstrap/cache');
+        rmdir($root . '/bootstrap');
+        rmdir($root);
+
+        $this->assertSame(['exit' => 0, 'present' => $kept], ['exit' => $exitCode, 'present' => $present], implode("\n", $output));
+    }
 }

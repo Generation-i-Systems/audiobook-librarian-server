@@ -10,17 +10,33 @@ use Tests\TestCase;
 
 class AppRefreshCommandTest extends TestCase
 {
-    /** @var array<string, string> */
-    private array $bootstrapCacheBackup = [];
+    private const BOOTSTRAP_CACHE_ENV = [
+        'APP_PACKAGES_CACHE' => 'packages.php',
+        'APP_SERVICES_CACHE' => 'services.php',
+        'APP_CONFIG_CACHE' => 'config.php',
+        'APP_ROUTES_CACHE' => 'routes-v7.php',
+        'APP_EVENTS_CACHE' => 'events.php',
+    ];
+
+    private string $isolatedBootstrapCachePath;
 
     private string $isolatedViewCachePath;
 
     protected function setUp(): void
     {
-        // Back up shared bootstrap cache files BEFORE parent::setUp() so we
-        // capture the clean state. app:refresh runs compiled:clear which deletes
-        // services.php and packages.php — shared between parallel workers.
-        $this->snapshotBootstrapCache();
+        // app:refresh runs optimize:clear, which deletes bootstrap/cache/packages.php
+        // and services.php. Those are shared by every parallel worker: a worker that
+        // boots while they are missing loads no package providers (e.g. laravel/ui,
+        // so Auth::routes() throws). Point this test's app at its own cache files
+        // before it is created so the shared ones are never touched.
+        $this->isolatedBootstrapCachePath = dirname(__DIR__, 2)
+            . '/storage/framework/testing/app-refresh-test-bootstrap-' . getmypid();
+        if (!is_dir($this->isolatedBootstrapCachePath)) {
+            mkdir($this->isolatedBootstrapCachePath, 0775, true);
+        }
+        foreach (self::BOOTSTRAP_CACHE_ENV as $key => $file) {
+            $this->setEnvironmentValue($key, $this->isolatedBootstrapCachePath . '/' . $file);
+        }
 
         parent::setUp();
 
@@ -40,36 +56,29 @@ class AppRefreshCommandTest extends TestCase
     {
         File::deleteDirectory($this->isolatedViewCachePath);
 
-        // Atomically restore the shared cache files before destroying the app so
-        // other workers never see an absent or partially-written file.
-        $this->restoreBootstrapCache();
-
         parent::tearDown();
+
+        foreach (array_keys(self::BOOTSTRAP_CACHE_ENV) as $key) {
+            $this->setEnvironmentValue($key, null);
+        }
+        foreach (glob($this->isolatedBootstrapCachePath . '/*') ?: [] as $file) {
+            unlink($file);
+        }
+        rmdir($this->isolatedBootstrapCachePath);
     }
 
-    private function snapshotBootstrapCache(): void
+    private function setEnvironmentValue(string $key, ?string $value): void
     {
-        $dir = dirname(__DIR__, 2) . '/bootstrap/cache';
+        if ($value === null) {
+            unset($_SERVER[$key], $_ENV[$key]);
+            putenv($key);
 
-        foreach (['packages.php', 'services.php'] as $file) {
-            $path = "{$dir}/{$file}";
-
-            if (is_file($path)) {
-                $this->bootstrapCacheBackup[$file] = file_get_contents($path);
-            }
+            return;
         }
-    }
 
-    private function restoreBootstrapCache(): void
-    {
-        $dir = dirname(__DIR__, 2) . '/bootstrap/cache';
-
-        foreach ($this->bootstrapCacheBackup as $file => $content) {
-            $path = "{$dir}/{$file}";
-            $tmp = "{$path}.tmp." . getmypid();
-            file_put_contents($tmp, $content);
-            rename($tmp, $path);
-        }
+        $_SERVER[$key] = $value;
+        $_ENV[$key] = $value;
+        putenv("{$key}={$value}");
     }
 
     public function test_it_runs_with_all_steps_skipped(): void

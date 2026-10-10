@@ -63,13 +63,15 @@ if ($isTestRunner) {
     $_SERVER['QUEUE_CONNECTION'] = 'sync';
 
     // Ensure no cached config can force MySQL during tests.
+    // packages.php and services.php are deliberately NOT removed: they only list package service
+    // providers (no config), and deleting them races parallel workers that are booting at the
+    // same moment — a worker that finds them missing loads no package providers (e.g. laravel/ui,
+    // so Auth::routes() throws).
     $basePath = dirname(__DIR__);
     $cacheFiles = [
         $basePath . '/bootstrap/cache/config.php',
         $basePath . '/bootstrap/cache/routes-v7.php',
         $basePath . '/bootstrap/cache/routes.php',
-        $basePath . '/bootstrap/cache/packages.php',
-        $basePath . '/bootstrap/cache/services.php',
         $basePath . '/bootstrap/cache/events.php',
     ];
     foreach ($cacheFiles as $cacheFile) {

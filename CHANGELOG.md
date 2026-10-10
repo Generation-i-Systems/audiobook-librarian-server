@@ -15,6 +15,7 @@
 ### Fixed
 
 - Security: updated Vite to 6.4.5, follow-redirects to 1.16.1, and the shell-quote override to 1.12.0, resolving the high and critical npm advisories that failed the CI security job.
+- Tests: parallel runs intermittently failed with `Auth::routes()` asking for `laravel/ui`. Every test process deleted the shared `bootstrap/cache/packages.php` and `services.php` at startup (`bootstrap/database-safety-check.php`), so a worker booting at the same moment loaded no package providers. The safety check now only removes the cached config/routes/events files, which is all it needs to keep tests off MySQL. `AppRefreshCommandTest` also runs `app:refresh` against its own bootstrap cache files instead of the shared ones.
 - Library data: moved 106 unavailable records that matched available replacements to recoverable trash after a verified database backup and a book-linked activity audit. No audio files were moved; the reviewed ID mapping is in `docs/data-repairs/2026-10-09-unavailable-duplicates.csv`.
 - Admin user creation and pending-account approval now default to `library-user`. The legacy `user` role is no longer offered or accepted for new assignments; existing accounts retain it until explicitly changed.
 - Security: upgraded Jest and its jsdom environment to 30.5.2, removing the vulnerable `braces` dependency path reported by `npm audit`. Updated the book-form tests for jsdom's read-only location object.
