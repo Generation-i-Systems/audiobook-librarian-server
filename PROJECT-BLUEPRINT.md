@@ -8,6 +8,8 @@ The API now supports host-based library profile resolution in a single runtime: 
 
 The scheduled `books:validate-directories` command checks that the configured book storage root exists before it updates `directory_exists`. When storage is unavailable, it exits with failure and leaves book availability unchanged; a missing mount must not make the catalog disappear from API listings.
 
+Unavailable catalog records are audited against available replacements by book ID, metadata, and real directory presence before cleanup. A verified database backup and user-activity check precede recoverable trash moves; near matches with different editions or narrators remain for review.
+
 ## Reading Progress & Statistics Requirements
 
 See `docs/requirements/reading-progress-and-stats.md`.

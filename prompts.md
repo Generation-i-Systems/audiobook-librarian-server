@@ -617,6 +617,12 @@ Fix npm security issues. When this is done, push.
 
 Get rid of `user` as an account role choice. Default new users created in admin to `library-user`.
 
+## 2026-10-09
+
+in those unavailable books look for duplicates that are already replaced in the library but not quite the same so the unavailable book sshould be deleted
+
+is there a directory for any of those? or are they all missing directories?
+
 ## 2026-10-21
 
 Implement phase 3 of the text-sync plan on the server: optional Whisper speech-to-text endpoints. A faster-whisper sidecar behind a `transcription` docker-compose profile (default model `base.en`); `POST /api/v1/books/{book}/files/{file}/transcriptions` (JSON `startMs`, `durationMs`, `language?`, `expectedSize`, `expectedChunkHash?`; ffmpeg cut to 16 kHz mono WAV, 404/409/422 checks) and `POST /api/v1/transcriptions` (multipart WAV/FLAC up to 30 s and 1 MB), both returning `{words[{text,startMs,endMs,confidence}], language, model, durationMs, source}`; 503/504 for an unavailable or slow sidecar; one shared per-user rate limit; store nothing; `TRANSCRIPTION` and `TRANSCRIPTION_SERVER_FILES` capability tokens; tests, Bruno requests, OpenAPI and docs.
