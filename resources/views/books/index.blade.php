@@ -475,30 +475,20 @@ $canManageBooks = $canManageBooks ?? false;
             <div class="dropdown">
                 <button class="btn btn-secondary dropdown-toggle" type="button" id="perPageDropdown"
                     data-bs-toggle="dropdown" aria-expanded="false">
-                    <span id="current-per-page">{{ $savedPerPage }}</span> per page
+                    <span id="current-per-page">{{ $mainPerPage }}</span> per page
                 </button>
                 <ul class="dropdown-menu" aria-labelledby="perPageDropdown">
-                    <li><a class="dropdown-item per-page-option" href="#" data-per-page="24">24</a></li>
-                    <li><a class="dropdown-item per-page-option" href="#" data-per-page="36">36</a></li>
-                    <li><a class="dropdown-item per-page-option" href="#" data-per-page="48">48</a></li>
-                    <li><a class="dropdown-item per-page-option" href="#" data-per-page="72">72</a></li>
-                    <li><a class="dropdown-item per-page-option" href="#" data-per-page="96">96</a></li>
+                    @foreach($perPageUrls as $size => $url)
+                        <li><a class="dropdown-item {{ $size === $mainPerPage ? 'active' : '' }}" href="{{ $url }}">{{ $size }}</a></li>
+                    @endforeach
                 </ul>
             </div>
         </div>
 
         <!-- Main Books Container -->
         <div id="main-books-container">
-            <!-- Loading Spinner -->
-            <div class="loading-spinner" id="main-loading-spinner">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Loading books...</p>
-            </div>
-
             <!-- Grid View -->
-            <div class="row" id="main-books-grid" style="display: none;">
+            <div class="row" id="main-books-grid" @if($mainViewType !== 'grid') style="display: none;" @endif>
                 <!-- Server-render initial page for non-JS and tests -->
                 @if(isset($books) && count($books) > 0)
                     @foreach($books as $book)
@@ -584,7 +574,7 @@ $canManageBooks = $canManageBooks ?? false;
             </div>
 
             <!-- Compact View -->
-            <div class="row" id="main-books-compact" style="display: none;">
+            <div class="row" id="main-books-compact" @if($mainViewType !== 'compact') style="display: none;" @endif>
                 @if(isset($books) && count($books) > 0)
                     @foreach($books as $book)
                         @php
@@ -669,13 +659,15 @@ $canManageBooks = $canManageBooks ?? false;
             </div>
 
             <!-- List View -->
-            <div class="table-responsive" id="main-books-list" style="display: none;">
+            <div class="table-responsive" id="main-books-list" @if($mainViewType !== 'list') style="display: none;" @endif>
                 <table class="table table-hover">
                     <thead>
                         <tr>
                             <th style="width: 60px;">Cover</th>
                             <th>Title</th>
                             <th>Author</th>
+                            <th>Series</th>
+                            <th style="width: 60px; text-align: center;">#</th>
                             <th>Genre</th>
                             <th style="width: 90px;">Length</th>
                             <th style="width: 100px;">Actions</th>
@@ -691,16 +683,6 @@ $canManageBooks = $canManageBooks ?? false;
                                     $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
                                     $authorsList = !empty($book['authors']) && is_array($book['authors']) ? $book['authors'] : [];
                                     $genresList = !empty($book['genres']) && is_array($book['genres']) ? $book['genres'] : [];
-                                    $seriesText = '';
-                                    if (!empty($book['series']) && is_array($book['series'])) {
-                                        $tmp = [];
-                                        foreach ($book['series'] as $s) {
-                                            if (isset($s['seriesName'])) {
-                                                $tmp[] = $s['seriesName'] . (isset($s['number']) ? ' (Book ' . $s['number'] . ')' : '');
-                                            }
-                                        }
-                                        $seriesText = implode(', ', $tmp);
-                                    }
                                     $directoryMissing = isset($book['directoryExists']) && $book['directoryExists'] === false;
                                 @endphp
                                 <tr>
@@ -716,9 +698,6 @@ $canManageBooks = $canManageBooks ?? false;
                                         @if($directoryMissing)
                                             <span class="badge bg-danger ms-1" title="Directory not found">⚠️ Missing Files</span>
                                         @endif
-                                        @if($seriesText)
-                                            <div class="small text-muted">{{ $seriesText }}</div>
-                                        @endif
                                     </td>
                                     <td>
                                         @forelse($authorsList as $author)
@@ -726,6 +705,16 @@ $canManageBooks = $canManageBooks ?? false;
                                         @empty
                                             Unknown
                                         @endforelse
+                                    </td>
+                                    <td>
+                                        @foreach($book['series'] ?? [] as $s)
+                                            <a href="{{ route('books.index', ['series' => $s['seriesName']]) }}" class="text-decoration-none">{{ $s['seriesName'] }}</a>@if(!$loop->last)<br>@endif
+                                        @endforeach
+                                    </td>
+                                    <td class="text-center">
+                                        @foreach($book['series'] ?? [] as $s)
+                                            {{ $s['number'] ?? '' }}@if(!$loop->last)<br>@endif
+                                        @endforeach
                                     </td>
                                     <td>
                                         @forelse($genresList as $genre)
@@ -760,12 +749,14 @@ $canManageBooks = $canManageBooks ?? false;
             </div>
         </div>
 
-        <!-- Pagination -->
-        <div class="pagination-container" id="main-pagination">
-            <!-- Pagination will be generated here via JavaScript -->
-        </div>
+        @if(count($books) === 0)
+            <div class="alert alert-info">No books found matching your criteria.</div>
+        @endif
 
-        <!-- Server-side pagination removed - now handled via JavaScript -->
+        <!-- Pagination: plain links, so the page is always described by its query string -->
+        <div class="pagination-container" id="main-pagination">
+            {{ $books->onEachSide(2)->links('pagination::bootstrap-5') }}
+        </div>
 
     </div>
 @endsection
@@ -821,8 +812,6 @@ $canManageBooks = $canManageBooks ?? false;
             $(`#recent-${initialRecentView}-btn`).addClass('active').removeClass('btn-outline-secondary').addClass('btn-secondary');
 
             // Variables for pagination and view state
-            let currentMainPage = 1;
-            let mainPerPage = 24;
             let mainViewType = librivoxListOnly ? 'list' : '{{ $mainViewType }}';
 
             // Route variables with placeholders
@@ -832,16 +821,6 @@ $canManageBooks = $canManageBooks ?? false;
             const bookEditRoute = '{{ route("admin.books.edit", ":id") }}';
             const bookAutofillRoute = '{{ route("admin.books.autofillFromPath", ":id") }}';
             const bookDestroyRoute = '{{ route("admin.books.destroy", ":id") }}';
-            let mainSearchParams = {{ Illuminate\Support\Js::from([
-                'search' => request()->input('search', ''),
-                'genre' => request()->input('genre', ''),
-                'author' => request()->input('author', ''),
-                'series' => request()->input('series', ''),
-                'tag' => request()->input('tag', ''),
-                'sort' => $sort,
-                'semantic' => request()->boolean('semantic') ? '1' : '',
-            ]) }};
-
             function hasCoverImage(book) {
                 return book.hasCoverImage === true || (typeof book.coverImage === 'string' && book.coverImage.trim() !== '');
             }
@@ -877,274 +856,6 @@ $canManageBooks = $canManageBooks ?? false;
                 return '<span class="book-list-media-fallback"><i class="fas fa-headphones-alt" aria-hidden="true"></i></span>';
             }
 
-            // Function to render main books based on current view type
-            function renderMainBooks(books, canManageBooks) {
-                // Clear all containers
-                $('#main-books-grid').empty();
-                $('#main-books-compact').empty();
-                $('#main-books-list tbody').empty();
-
-                // Hide all containers first
-                $('#main-books-grid, #main-books-compact, #main-books-list').hide();
-
-                // Show the active container based on view type
-                $('#main-books-' + mainViewType).show();
-
-                // Log for debugging
-                console.log('View type:', mainViewType);
-                console.log('Books count:', books.length);
-
-                if (books.length === 0) {
-                    $('#main-books-' + mainViewType).html('<div class="alert alert-info">No books found matching your criteria.</div>');
-                    return;
-                }
-
-                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                const authorLink = (name) => `${bookIndexRoute}?author=${encodeURIComponent(name)}`;
-                const genreLink = (name) => `${bookIndexRoute}?genre=${encodeURIComponent(name)}`;
-                const authorLinks = (authors) => (authors && authors.length > 0)
-                    ? authors.map(a => `<a href="${authorLink(a)}" class="text-decoration-none">${a}</a>`).join(', ')
-                    : 'Unknown';
-                const genreLinks = (genres) => (genres && genres.length > 0)
-                    ? genres.map(g => `<a href="${genreLink(g)}" class="text-decoration-none">${g}</a>`).join(', ')
-                    : 'Unknown';
-                const manageActions = (book, title) => canManageBooks ? `
-                                                                <div class="d-flex gap-1 mt-1">
-                                                                    <a href="${bookEditRoute.replace(':id', book.id)}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                                                                    <form action="${bookAutofillRoute.replace(':id', book.id)}" method="POST" class="d-inline">
-                                                                        <input type="hidden" name="_token" value="${csrfToken}">
-                                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
-                                                                    </form>
-                                                                    <form action="${bookDestroyRoute.replace(':id', book.id)}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete ${String(title).replace(/'/g, "\\'")}?')">
-                                                                        <input type="hidden" name="_token" value="${csrfToken}">
-                                                                        <input type="hidden" name="_method" value="DELETE">
-                                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
-                                                                    </form>
-                                                                </div>
-                                                            ` : '';
-                const missingBadge = (book) => (book.directoryExists === false)
-                    ? '<span class="badge bg-danger mt-1">⚠️ Missing Files</span>'
-                    : '';
-
-                // Render books based on view type
-                books.forEach(function (book) {
-                    const title = book.title || 'Unknown Title';
-
-                    // Generate series text if available
-                    let seriesText = '';
-                    if (book.series && book.series.length > 0) {
-                        seriesText = book.series.map(s => `${s.seriesName}${s.number ? ' (Book ' + s.number + ')' : ''}`).join(', ');
-                    }
-
-                    // Grid view (4 columns)
-                    if (mainViewType === 'grid') {
-                        $('#main-books-grid').append(`
-                                                                <div class="col-md-3 mb-4">
-                                                                    <div class="card h-100">
-                                                                        <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link book-card-hover" style="color:inherit; cursor:pointer;">
-                                                                            ${createGridMedia(book, title, 160)}
-                                                                            <div class="card-body p-2 pb-0">
-                                                                                <h6 class="card-title small mb-0">${title}</h6>
-                                                                                ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
-                                                                                ${missingBadge(book)}
-                                                                            </div>
-                                                                        </a>
-                                                                        <div class="card-body pt-1 pb-2 px-2">
-                                                                            <p class="card-text small mb-0">${authorLinks(book.authors)}</p>
-                                                                            ${manageActions(book, title)}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            `);
-                    }
-                    // Compact view (6 columns)
-                    else if (mainViewType === 'compact') {
-                        $('#main-books-compact').append(`
-                                                                <div class="col-md-2 mb-3">
-                                                                    <div class="card h-100">
-                                                                        <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link book-card-hover" style="color:inherit; cursor:pointer;">
-                                                                            ${createGridMedia(book, title, 120)}
-                                                                            <div class="card-body p-2 pb-0">
-                                                                                <h6 class="card-title small mb-0" style="font-size: 0.8rem;">${title}</h6>
-                                                                                ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
-                                                                                ${missingBadge(book)}
-                                                                            </div>
-                                                                        </a>
-                                                                        <div class="card-body pt-1 pb-2 px-2">
-                                                                            <p class="card-text small mb-0" style="font-size: 0.75rem;">${authorLinks(book.authors)}</p>
-                                                                            ${manageActions(book, title)}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            `);
-                    }
-                    // List view
-                    else if (mainViewType === 'list') {
-                        $('#main-books-list tbody').append(`
-                                                                <tr>
-                                                                    <td>
-                                                                        ${createListMedia(book, title)}
-                                                                    </td>
-                                                                    <td>
-                                                                        <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none">${title}</a>
-                                                                        ${missingBadge(book)}
-                                                                        ${seriesText ? `<div class="small text-muted">${seriesText}</div>` : ''}
-                                                                    </td>
-                                                                    <td>${authorLinks(book.author && book.author.length ? book.author : book.authors)}</td>
-                                                                    <td>${genreLinks(book.genre && book.genre.length ? book.genre : book.genres)}</td>
-                                                                    <td class="text-muted small">${book.duration && book.duration !== '00:00:00' ? book.duration : ''}</td>
-                                                                    <td>
-                                                                        <a href="${bookDownloadRoute.replace(':id', book.id)}" class="btn btn-sm btn-secondary" title="Download"><i class="fas fa-download"></i></a>
-                                                                        ${canManageBooks ? `
-                                                                        <a href="${bookEditRoute.replace(':id', book.id)}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                                                                        <form action="${bookAutofillRoute.replace(':id', book.id)}" method="POST" class="d-inline">
-                                                                            <input type="hidden" name="_token" value="${csrfToken}">
-                                                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
-                                                                        </form>
-                                                                        <form action="${bookDestroyRoute.replace(':id', book.id)}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete ${String(title).replace(/'/g, "\\'")}?')">
-                                                                            <input type="hidden" name="_token" value="${csrfToken}">
-                                                                            <input type="hidden" name="_method" value="DELETE">
-                                                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
-                                                                        </form>
-                                                                        ` : ''}
-                                                                    </td>
-                                                                </tr>
-                                                            `);
-                    }
-                });
-
-                // Initialize click handlers for the new elements
-                initializeClickHandlers();
-            }
-
-            // Function to render pagination controls
-            function renderPagination(pagination) {
-                const paginationContainer = $('#main-pagination');
-                paginationContainer.empty();
-
-                const bookCount = $('#main-book-count');
-                if (bookCount.length) {
-                    const shownBooks = Math.min(
-                        pagination.per_page,
-                        Math.max(0, pagination.total - ((pagination.current_page - 1) * pagination.per_page))
-                    );
-                    bookCount.html(`<span>Total books: <strong>${pagination.total}</strong></span><span class="ms-3">Showing ${shownBooks} of ${pagination.total} books</span>`);
-                }
-
-                if (pagination.total <= pagination.per_page) {
-                    return; // No pagination needed
-                }
-
-                const totalPages = Math.ceil(pagination.total / pagination.per_page);
-                let html = '<ul class="pagination">';
-
-                // Previous button
-                const prevDisabled = pagination.current_page === 1 ? 'disabled' : '';
-                html += '<li class="page-item ' + prevDisabled + '"><a class="page-link" href="#" data-page="' + (pagination.current_page - 1) + '">&laquo;</a></li>';
-
-                // Page numbers with ellipsis
-                const maxPagesToShow = 5;
-                let startPage = Math.max(1, pagination.current_page - Math.floor(maxPagesToShow / 2));
-                let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-
-                if (endPage - startPage + 1 < maxPagesToShow) {
-                    startPage = Math.max(1, endPage - maxPagesToShow + 1);
-                }
-
-                if (startPage > 1) {
-                    html += '<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>';
-                    if (startPage > 2) {
-                        html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                    }
-                }
-
-                for (let i = startPage; i <= endPage; i++) {
-                    const active = i === pagination.current_page ? 'active' : '';
-                    html += '<li class="page-item ' + active + '"><a class="page-link" href="#" data-page="' + i + '">' + i + '</a></li>';
-                }
-
-                if (endPage < totalPages) {
-                    if (endPage < totalPages - 1) {
-                        html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
-                    }
-                    html += '<li class="page-item"><a class="page-link" href="#" data-page="' + totalPages + '">' + totalPages + '</a></li>';
-                }
-
-                // Next button
-                const nextDisabled = pagination.current_page === totalPages ? 'disabled' : '';
-                html += '<li class="page-item ' + nextDisabled + '"><a class="page-link" href="#" data-page="' + (pagination.current_page + 1) + '">&raquo;</a></li>';
-
-                html += '</ul>';
-                paginationContainer.html(html);
-
-                // Handle pagination clicks
-                paginationContainer.find('.page-link').on('click', function (e) {
-                    e.preventDefault();
-                    const page = $(this).data('page');
-                    if (!$(this).parent().hasClass('disabled') && !$(this).parent().hasClass('active')) {
-                        currentMainPage = page;
-                        loadMainBooks();
-                    }
-                });
-            }
-
-            // Function to load main books via AJAX
-            function loadMainBooks() {
-                if (librivoxListOnly) {
-                    mainViewType = 'list';
-                }
-
-                // Show loading spinner
-                $('#main-loading-spinner').show();
-                $('#main-books-grid, #main-books-compact, #main-books-list').hide();
-
-                // Collect all search parameters
-                const params = {
-                    page: currentMainPage,
-                    per_page: mainPerPage,
-                    view_type: mainViewType,
-                    request_type: 'main_books'
-                };
-
-                // Add search parameters if they exist
-                if (mainSearchParams) {
-                    Object.keys(mainSearchParams).forEach(key => {
-                        params[key] = mainSearchParams[key];
-                    });
-                }
-
-                // Make AJAX request
-                console.log('Sending AJAX request with params:', params);
-
-                // Convert params to query string
-                const queryString = Object.keys(params)
-                    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
-                    .join('&');
-
-                fetch(`{{ url('/api/books/json') }}?${queryString}`)
-                    .then(response => response.json())
-                    .then(function (response) {
-                        // Hide loading spinner
-                        $('#main-loading-spinner').hide();
-                        console.log('AJAX response received:', response);
-
-                        // Update view type if returned from server
-                        if (response.view_type) {
-                            mainViewType = response.view_type;
-                            updateMainViewButtons();
-                        }
-
-                        // Render books and pagination
-                        renderMainBooks(response.books, !!response.canManageBooks);
-                        renderPagination(response.pagination);
-                    })
-                    .catch(function (error) {
-                        console.error('AJAX request failed:', error);
-                        $('#main-loading-spinner').hide();
-                        alert('Failed to load books. Please try again.');
-                    });
-            }
-
             // Function to update main view buttons
             function updateMainViewButtons() {
                 // Update button styling
@@ -1175,27 +886,6 @@ $canManageBooks = $canManageBooks ?? false;
                 updateMainViewButtons();
 
                 saveBookPreference('main_view_type', viewType);
-
-                // Reload books with new view type
-                loadMainBooks();
-            });
-
-            // Handle per-page dropdown
-            $('.per-page-option').on('click', function (e) {
-                e.preventDefault();
-                const perPage = parseInt($(this).data('per-page'));
-
-                // Update per page value
-                mainPerPage = perPage;
-                $('#current-per-page').text(perPage);
-
-                // Reset to first page
-                currentMainPage = 1;
-
-                saveBookPreference('main_per_page', perPage);
-
-                // Reload books with new per page value
-                loadMainBooks();
             });
 
             // Remember the chosen sort per user
@@ -1203,42 +893,10 @@ $canManageBooks = $canManageBooks ?? false;
                 saveBookPreference('main_sort', $(this).val());
             });
 
-            // Handle search form submission
-            $('form').on('submit', function (e) {
-                e.preventDefault();
-
-                // Collect search parameters
-                mainSearchParams = {
-                    "search": $('#search').val(),
-                    "genre": $('#genre').val(),
-                    "author": $('#author').val(),
-                    "series": $('#series').val(),
-                    "tag": $('#tag').val(),
-                    "sort": $('#sort').val() || 'title_asc',
-                    "semantic": $('#semantic').is(':checked') ? '1' : ''
-                };
-
-                // Reset to first page
-                currentMainPage = 1;
-
-                // Load books with search parameters
-                loadMainBooks();
-            });
-
             // Initialize main books section
             $(document).ready(function () {
                 // Set initial view type button state
                 updateMainViewButtons();
-
-                // Set initial per-page dropdown value
-                const storedPerPage = '{{ $savedPerPage }}';
-                if (storedPerPage) {
-                    mainPerPage = parseInt(storedPerPage);
-                    $('#current-per-page').text(mainPerPage);
-                }
-
-                // Load main books on page load
-                loadMainBooks();
 
                 // Debug initial view type
                 console.log('Initial view type:', mainViewType);

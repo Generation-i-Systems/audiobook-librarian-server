@@ -85,7 +85,6 @@ class BookControllerIndexTest extends TestCase
         $this->get(route('books.index'))
             ->assertOk()
             ->assertViewHas('mainPerPage', 48)
-            ->assertViewHas('savedPerPage', 48)
             ->assertViewHas('mainViewType', 'list')
             ->assertViewHas('recentViewType', 'compact')
             ->assertViewHas('recentOpen', false)

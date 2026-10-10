@@ -78,6 +78,9 @@ class BookController extends Controller
         $page = max(1, (int) $request->get('page', 1));
         $savedPerPage = $this->bookListPreferences->get($request, 'per_page', 24);
         $perPage = $this->bookListPreferences->normalize('per_page', $request->input('per_page')) ?? $savedPerPage;
+        if ($perPage !== $savedPerPage && $request->filled('per_page')) {
+            $this->bookListPreferences->set($request, 'per_page', $perPage);
+        }
 
         // Get filters from request
         $filters = [];
@@ -232,7 +235,10 @@ class BookController extends Controller
             'isLibrivoxMode' => $isLibrivoxMode,
             'mainViewType' => $mainViewType,
             'mainPerPage' => $perPage,
-            'savedPerPage' => $savedPerPage,
+            // Changing page size keeps the search but starts again from the first page.
+            'perPageUrls' => collect([24, 36, 48, 72, 96])->mapWithKeys(fn (int $size) => [
+                $size => route('books.index', array_merge($request->except(['page', 'per_page']), ['per_page' => $size])),
+            ])->all(),
             'recentViewType' => $isLibrivoxMode ? 'list' : $this->bookListPreferences->get($request, 'recent_view_type', 'grid'),
             'recentOpen' => $this->bookListPreferences->get($request, 'recent_open', 'open') !== 'closed',
             'currentFilters' => $filters,
@@ -700,6 +706,13 @@ class BookController extends Controller
                         'number' => is_numeric($sn) && str_contains((string) $sn, '.') ? (float) $sn : (int) $sn,
                     ];
                 }
+                // listBooks() relation shape: {name, series_number, is_collection}
+                if (isset($seriesItem['name']) && array_key_exists('series_number', $seriesItem)) {
+                    return [
+                        'seriesName' => $seriesItem['name'],
+                        'number' => $seriesItem['series_number'],
+                    ];
+                }
                 // If it's a simple string, assume it's the series name and number is 1
                 if (is_string($seriesItem)) {
                     return [
@@ -724,26 +737,37 @@ class BookController extends Controller
      */
     protected function ensureBookFieldsMinimal(array $book): array
     {
-        // Handle authors
+        // Handle authors (listBooks() returns them as `author`, other sources as `authors`)
+        $authorList = !empty($book['authors']) ? $book['authors'] : ($book['author'] ?? null);
         $authors = ['Unknown'];
-        if (isset($book['authors']) && is_array($book['authors'])) {
+        if (is_array($authorList)) {
             $authors = array_map(function ($author) {
                 return is_array($author) && isset($author['name']) ? $author['name'] : (string) $author;
-            }, array_slice($book['authors'], 0, 2));
+            }, $authorList);
         }
 
-        // Handle genres
+        // Handle genres (listBooks() returns them as `genre`, other sources as `genres`)
+        $genreList = !empty($book['genres']) ? $book['genres'] : ($book['genre'] ?? null);
         $genres = ['Unknown'];
-        if (isset($book['genres']) && is_array($book['genres'])) {
+        if (is_array($genreList)) {
             $genres = array_map(function ($genre) {
                 return is_array($genre) && isset($genre['name']) ? $genre['name'] : (string) $genre;
-            }, array_slice($book['genres'], 0, 1));
+            }, $genreList);
         }
 
-        // Handle series
+        // Handle series: listBooks() returns {name, series_number}, the view reads {seriesName, number}
         $series = [];
         if (isset($book['series']) && is_array($book['series'])) {
-            $series = array_slice($book['series'], 0, 1);
+            foreach ($book['series'] as $item) {
+                $name = is_array($item) ? ($item['seriesName'] ?? $item['name'] ?? null) : null;
+                if (!is_string($name) || $name === '') {
+                    continue;
+                }
+                $series[] = [
+                    'seriesName' => $name,
+                    'number' => $item['number'] ?? $item['series_number'] ?? $item['pivot']['series_number'] ?? null,
+                ];
+            }
         }
 
         // coverImage can arrive as an array (e.g. {"path": "..."} or a plain
@@ -762,6 +786,7 @@ class BookController extends Controller
             'hasCoverImage' => !empty($book['coverImage']),
             'description' => substr($book['description'] ?? 'No description available.', 0, 200),
             'series' => $series,
+            'duration' => $book['duration'] ?? null,
             'source' => $book['source'] ?? null,
         ];
     }
