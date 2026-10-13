@@ -37,9 +37,16 @@
                         </thead>
                         <tbody>
                             @forelse($messages as $message)
-                                <tr class="{{ $message['is_read'] ?? false ? '' : 'table-info' }}">
+                                @php
+                                    // Messages arrive from toArray() with camelCase keys.
+                                    $isAcknowledged = !empty($message['acknowledgedAt']);
+                                    $createdAt = \Carbon\Carbon::parse($message['createdAt'] ?? now());
+                                    $sender = collect($users)->firstWhere('id', $message['senderId'] ?? null);
+                                    $senderName = $sender ? ($sender['name'] ?? $sender['email'] ?? __('Unknown')) : __('System');
+                                @endphp
+                                <tr class="{{ $isAcknowledged ? '' : 'table-info' }}">
                                     <td>
-                                        @if(!($message['is_read'] ?? false))
+                                        @if(!$isAcknowledged)
                                             <span class="badge bg-warning text-dark">{{ __('New') }}</span>
                                         @else
                                             <span class="badge bg-light text-secondary">{{ __('Read') }}</span>
@@ -51,14 +58,11 @@
                                         </a>
                                     </td>
                                     <td>
-                                        @php
-                                            $sender = collect($users)->firstWhere('id', $message['from_user_id'] ?? null);
-                                        @endphp
-                                        {{ $sender ? ($sender['name'] ?? $sender['email'] ?? 'Unknown') : 'System' }}
+                                        {{ $senderName }}
                                     </td>
-                                    <td>{{ \Carbon\Carbon::parse($message['created_at'] ?? now())->diffForHumans() }}</td>
+                                    <td>{{ $createdAt->diffForHumans() }}</td>
                                     <td>
-                                        @if(!($message['acknowledged_at'] ?? false))
+                                        @if(!$isAcknowledged)
                                             <form action="{{ route('admin.messages.acknowledge', $message['id']) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-success" title="{{ __('Acknowledge') }}">
@@ -80,14 +84,14 @@
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                                             </div>
                                             <div class="modal-body">
-                                                <p><strong>{{ __('From:') }}</strong> {{ $sender ? ($sender['name'] ?? $sender['email'] ?? 'Unknown') : 'System' }}</p>
-                                                <p><strong>{{ __('Date:') }}</strong> {{ \Carbon\Carbon::parse($message['created_at'] ?? now())->format('M j, Y g:i A') }}</p>
+                                                <p><strong>{{ __('From:') }}</strong> {{ $senderName }}</p>
+                                                <p><strong>{{ __('Date:') }}</strong> {{ $createdAt->format('M j, Y g:i A') }}</p>
                                                 <hr>
                                                 <p>{{ $message['content'] ?? '' }}</p>
                                             </div>
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
-                                                @if(!($message['acknowledged_at'] ?? false))
+                                                @if(!$isAcknowledged)
                                                     <form action="{{ route('admin.messages.acknowledge', ['messageId' => $message['id']]) }}" method="POST" class="d-inline">
                                                         @csrf
                                                         <button type="submit" class="btn btn-success">{{ __('Acknowledge') }}</button>
