@@ -50,4 +50,13 @@ class TranslatedViewsTest extends TestCase
         $response->assertSee('¿Olvidó su contraseña?', false);
         $response->assertSee('Iniciar sesión', false);
     }
+
+    public function testLoginViewWithEmailCodeSignInRendersTranslatedButtons(): void
+    {
+        config(['mail.default' => 'smtp', 'mail.mailers.smtp.transport' => 'smtp', 'mail.mailers.smtp.host' => 'mail.test']);
+        $html = $this->get('/login')->assertOk()->getContent();
+
+        $this->assertStringContainsString('Send sign-in code', $html);
+        $this->assertStringContainsString("window.__('Verify code')", $html);
+    }
 }

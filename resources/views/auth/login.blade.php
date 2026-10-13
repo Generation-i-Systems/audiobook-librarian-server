@@ -111,7 +111,7 @@
                                 <div class="row mb-0">
                                     <div class="col-md-8 offset-md-4">
                                         <button type="button" id="send-otp-btn" class="btn btn-outline-primary">
-                                            {{ __(window.__('Send sign-in code')) }}
+                                            {{ __('Send sign-in code') }}
                                         </button>
                                         <span id="otp-status" class="ms-2" style="display:none;"></span>
                                     </div>
@@ -128,7 +128,7 @@
                                 <div class="row mb-0 mt-2" id="otp-verify-row" style="display:none;">
                                     <div class="col-md-8 offset-md-4">
                                         <button type="button" id="verify-otp-btn" class="btn btn-primary">
-                                            {{ __(window.__('Verify code')) }}
+                                            {{ __('Verify code') }}
                                         </button>
                                         <span id="otp-verify-status" class="ms-2" style="display:none;"></span>
                                     </div>

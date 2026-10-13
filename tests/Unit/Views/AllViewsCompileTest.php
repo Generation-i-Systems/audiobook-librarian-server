@@ -29,4 +29,20 @@ class AllViewsCompileTest extends TestCase
         $this->assertSame([], $broken);
         $this->assertGreaterThan(0, $tokenCount);
     }
+
+    public function testNoBladeEchoCallsJavaScriptHelpers(): void
+    {
+        $offenders = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('views')));
+        foreach ($files as $file) {
+            if (!str_ends_with($file->getFilename(), '.blade.php')) {
+                continue;
+            }
+            if (preg_match('/\{\{[^}]*\bwindow\./', (string) file_get_contents($file->getPathname())) === 1) {
+                $offenders[] = $file->getPathname();
+            }
+        }
+
+        $this->assertSame([], $offenders);
+    }
 }
