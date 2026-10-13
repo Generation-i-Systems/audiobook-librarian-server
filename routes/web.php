@@ -242,6 +242,7 @@ Route::middleware(['auth', 'library'])->group(function (): void {
     Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');
     Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
 });
+Route::post('/locale', [\App\Http\Controllers\LocaleController::class, 'update'])->name('locale.update');
 Route::post('/books/set-preference', [BookController::class, 'setPreference'])->name('books.set-preference');
 
 // General image proxy for covers and previews. These serve arbitrary files from

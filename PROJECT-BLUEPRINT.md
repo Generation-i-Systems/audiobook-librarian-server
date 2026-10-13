@@ -221,3 +221,5 @@ This blueprint summarizes the architecture, features, and design up to this poin
 - `GET /statistics/trends` uses daily buckets for week/month views and portable in-process monthly buckets for the year view.
 - Automatic `backup:database` scheduling is registered only for SQLite, MySQL/MariaDB, and PostgreSQL; installations on other SQL drivers need a database-native backup scheduler.
 - `/books` renders saved display preferences on the first response. The grid/compact/list toggle only switches between the three server-rendered views (and saves the choice); `?per_page=` both sizes the page and is remembered. Failed preference saves are visible inline so a settings problem is not mistaken for a successful save.
+
+Localization: `config/locales.php` (supported locales), `App\Http\Middleware\SetLocale` (user > session > Accept-Language > default), `LocaleController` (`POST /locale`), nullable `users.locale`, `App\Support\JsTranslations` + `resources/js/i18n.js` for JavaScript strings, `lang/` for translation files. Only English is enabled; see `docs/LOCALIZATION.md`.

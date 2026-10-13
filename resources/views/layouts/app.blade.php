@@ -40,6 +40,8 @@
     <!-- Bootstrap dropdown fix: ensure dropdown-menu is above navbar and other elements -->
     <link rel="stylesheet" href="/css/bootstrap-dropdown-zfix.css">
 
+    <script>window.APP_I18N = @json(\App\Support\JsTranslations::forCurrentLocale());</script>
+
     <!-- Scripts -->
     @if (!app()->environment('testing'))
         @vite([

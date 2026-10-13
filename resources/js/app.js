@@ -1,4 +1,5 @@
 import "./bootstrap";
+import "./i18n";
 import QRCode from "qrcode";
 import { initializeAppConnectQrs } from "./app-connect-qr";
 

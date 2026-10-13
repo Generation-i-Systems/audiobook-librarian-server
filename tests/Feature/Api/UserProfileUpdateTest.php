@@ -105,6 +105,37 @@ class UserProfileUpdateTest extends TestCase
         $this->withHeaders(['Authorization' => ''])->putJson('/api/v1/user', ['name' => 'x'])->assertStatus(401);
     }
 
+    public function testPutUserStoresASupportedLocaleAndReturnsIt(): void
+    {
+        config(['locales.supported' => ['en' => 'English', 'es' => 'Español']]);
+        $user = User::factory()->create(['role' => 'library-user']);
+
+        $this->withHeaders($this->bearer($user))->putJson('/api/v1/user', ['locale' => 'es'])
+            ->assertOk()
+            ->assertJson(['locale' => 'es']);
+
+        $this->assertSame('es', $user->fresh()->locale);
+    }
+
+    public function testPutUserClearsTheLocaleWithNull(): void
+    {
+        config(['locales.supported' => ['en' => 'English', 'es' => 'Español']]);
+        $user = User::factory()->create(['role' => 'library-user', 'locale' => 'es']);
+
+        $this->withHeaders($this->bearer($user))->putJson('/api/v1/user', ['locale' => null])->assertOk();
+
+        $this->assertNull($user->fresh()->locale);
+    }
+
+    public function testPutUserRejectsAnUnsupportedLocale(): void
+    {
+        $user = User::factory()->create(['role' => 'library-user']);
+
+        $this->withHeaders($this->bearer($user))->putJson('/api/v1/user', ['locale' => 'xx'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('locale');
+    }
+
     public function testLoginReturnsAnIntegerId(): void
     {
         $user = User::factory()->create(['role' => 'library-user', 'password' => Hash::make('secret-pass-1')]);

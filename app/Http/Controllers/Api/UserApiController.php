@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class UserApiController extends Controller
 {
@@ -43,8 +44,8 @@ class UserApiController extends Controller
     }
 
     /**
-     * Update the authenticated user's own profile (PUT /user). Only name, username and
-     * email are editable; every other field in the payload is ignored.
+     * Update the authenticated user's own profile (PUT /user). Only name, username, email and
+     * locale are editable; every other field in the payload is ignored.
      */
     public function update(Request $request, DocumentStoreServiceInterface $documentStoreService): JsonResponse|User
     {
@@ -52,12 +53,17 @@ class UserApiController extends Controller
         $user = $request->user();
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required_without_all:username,email|string|max:255',
-            'username' => 'required_without_all:name,email|string|max:255',
-            'email' => 'required_without_all:name,username|string|email|max:255',
+            'name' => 'sometimes|required|string|max:255',
+            'username' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|string|email|max:255',
+            'locale' => ['sometimes', 'nullable', 'string', Rule::in(array_keys((array) config('locales.supported', [])))],
         ]);
 
         $validator->after(function ($validator) use ($request, $user, $documentStoreService): void {
+            if (!$request->hasAny(['name', 'username', 'email', 'locale'])) {
+                $validator->errors()->add('name', 'Send at least one of name, username, email or locale.');
+            }
+
             foreach (['email' => 'getUserByEmail', 'username' => 'getUserByUsername'] as $field => $lookup) {
                 if (!is_string($request->input($field)) || $validator->errors()->has($field)) {
                     continue;

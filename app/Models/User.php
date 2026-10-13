@@ -101,6 +101,7 @@ class User extends Authenticatable implements Permissible
         'is_filter_manager',
         'community_family_only',
         'community_share_progress',
+        'locale',
     ];
 
     /**

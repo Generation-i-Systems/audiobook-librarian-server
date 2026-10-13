@@ -3,7 +3,7 @@
     "info": {
         "title": "Audiobook Librarian API",
         "version": "1.0.0",
-        "description": "API documentation for the Audiobook Librarian application.\n\nThis specification covers all endpoints available in the Audiobook Librarian API v1. Authentication uses opaque Bearer tokens returned by the login endpoint.",
+        "description": "API documentation for the Audiobook Librarian application.\n\nThis specification covers all endpoints available in the Audiobook Librarian API v1. Authentication uses opaque Bearer tokens returned by the login endpoint.\n\nLocalization: send an Accept-Language header to choose the language of server-generated text. The server applies the best locale it supports (see config/locales.php), and a user's saved locale (PUT /user) takes precedence on web sessions. English is used when nothing matches.",
         "contact": {
             "name": "API Support",
             "email": "support@librarian.local"
@@ -184,7 +184,9 @@
                     },
                     "permissions": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": {
+                            "type": "string"
+                        },
                         "description": "Effective permission keys: the user's role bundle plus any direct per-user grants (every permission for admins). Returned by GET /user.",
                         "example": ["manage-books", "manage-authors"]
                     },
@@ -206,6 +208,12 @@
                         "format": "date-time",
                         "description": "Last update timestamp",
                         "example": "2024-01-01T12:00:00Z"
+                    },
+                    "locale": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Preferred UI language code (one of the server's supported locales, e.g. en). null means follow the device/browser language.",
+                        "example": "en"
                     }
                 }
             },
@@ -5243,7 +5251,7 @@
             },
             "UpdateProfileRequest": {
                 "type": "object",
-                "description": "Editable profile fields. At least one must be sent; any other field is ignored.",
+                "description": "Editable profile fields. At least one must be sent (locale may be null to clear it); any other field is ignored.",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -5260,6 +5268,12 @@
                         "format": "email",
                         "maxLength": 255,
                         "example": "john@example.com"
+                    },
+                    "locale": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Preferred UI language code (one of the server's supported locales, e.g. en). null means follow the device/browser language.",
+                        "example": "en"
                     }
                 },
                 "anyOf": [
@@ -5271,6 +5285,9 @@
                     },
                     {
                         "required": ["email"]
+                    },
+                    {
+                        "required": ["locale"]
                     }
                 ]
             },
@@ -11683,7 +11700,7 @@
             "put": {
                 "tags": ["Authentication"],
                 "summary": "Update the current user's profile",
-                "description": "Updates the authenticated user's name, username and/or email. Only the fields sent are changed; send at least one. The email and username must not belong to another account. Returns the updated user in the same shape as GET /user.",
+                "description": "Updates the authenticated user's name, username, email and/or locale. Only the fields sent are changed; send at least one. The email and username must not belong to another account, and the locale must be one the server supports. Returns the updated user in the same shape as GET /user.",
                 "operationId": "updateUser",
                 "security": [
                     {

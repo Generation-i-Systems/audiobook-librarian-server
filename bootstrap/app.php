@@ -137,6 +137,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(\App\Http\Middleware\ResolveLibraryProfileFromHost::class);
         $middleware->append(\App\Http\Middleware\DemoMode::class);
+        $middleware->web(append: [\App\Http\Middleware\SetLocale::class]);
+        $middleware->api(append: [\App\Http\Middleware\SetLocale::class]);
 
         // imports.v1 drafts carry checksummed inline text and user-confirmed metadata;
         // both must reach the server byte-for-byte, so never trim or null them.
