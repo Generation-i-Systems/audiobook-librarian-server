@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="container">
-        <h1>Import from Directory</h1>
+        <h1>{{ __('Import from Directory') }}</h1>
         @if(session('success'))
             <div class="alert alert-success">
                 {{ session('success') }}
@@ -13,9 +13,9 @@
 
         <div class="mb-3 d-flex align-items-center gap-3">
             <div>
-                <label>Filter by first letter:</label>
+                <label>{{ __('Filter by first letter:') }}</label>
                 <div id="letter-filter" class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary" data-letter="">All</button>
+                    <button type="button" class="btn btn-outline-secondary" data-letter="">{{ __('All') }}</button>
                     @foreach(range('A', 'Z') as $letter)
                         <button type="button" class="btn btn-outline-secondary"
                             data-letter="{{ $letter }}">{{ $letter }}</button>
@@ -24,7 +24,7 @@
             </div>
             <div>
                 <input type="text" id="search-filter" class="form-control form-control-sm"
-                    placeholder="Search directories..." style="width: 200px; display: inline-block;" />
+                    placeholder="{{ __('Search directories...') }}" style="width: 200px; display: inline-block;" />
             </div>
         </div>
 
@@ -37,14 +37,14 @@
 
         <div class="table-responsive">
             <div id="directory-loading-spinner" class="text-center" style="display:none;">
-                <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+                <div class="spinner-border" role="status"><span class="visually-hidden">{{ __('Loading...') }}</span></div>
             </div>
             <table class="table table-bordered table-hover align-middle" id="directory-browser-table">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Actions</th>
+                        <th>{{ __('Name') }}</th>
+                        <th>{{ __('Type') }}</th>
+                        <th>{{ __('Actions') }}</th>
                     </tr>
                 </thead>
                 <tbody id="directory-browser"></tbody>
@@ -130,12 +130,12 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="addBookModalLabel">Add Book</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="addBookModalLabel">{{ __('Add Book') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body" id="addBookModalBody">
                         <div class="text-center">
-                            <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+                            <div class="spinner-border" role="status"><span class="visually-hidden">{{ __('Loading...') }}</span></div>
                         </div>
                     </div>
                 </div>
@@ -147,8 +147,8 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="editBookModalLabel">Edit Book</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="editBookModalLabel">{{ __('Edit Book') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body p-0" id="edit-book-modal-body"></div>
                 </div>
@@ -175,7 +175,7 @@
 
                 $('#bulk-import-btn').on('click', function (e) {
                     e.preventDefault();
-                    $('#bulk-import-status').text('Starting bulk import...');
+                    $('#bulk-import-status').text(window.__('Starting bulk import...'));
                     $.ajax({
                         url: '{{ route("admin.books.bulkImportDir") }}',
                         type: 'POST',
@@ -575,7 +575,7 @@
                                 $('#alerts-container').append(errorAlert);
 
                                 setTimeout(() => {
-                                    errorAlert.alert('close');
+                                    errorAlert.alert(window.__('close'));
                                 }, 5000);
                             }
                         });
@@ -606,7 +606,7 @@
 
                         // Auto-dismiss the alert after 3 seconds
                         setTimeout(() => {
-                            successAlert.alert('close');
+                            successAlert.alert(window.__('close'));
                         }, 3000);
 
                         // Ensure the row is visible in case it was in a collapsed section

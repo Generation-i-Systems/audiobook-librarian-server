@@ -49,7 +49,7 @@
                             @foreach($conversation as $message)
                                 @if($message['role'] === 'user')
                                     <div class="mb-3">
-                                        <div class="badge bg-info mb-1">You</div>
+                                        <div class="badge bg-info mb-1">{{ __('You') }}</div>
                                         <div class="p-2 bg-light rounded">
                                             {{ $message['content'] }}
                                         </div>
@@ -57,7 +57,7 @@
                                     </div>
                                 @else
                                     <div class="mb-3">
-                                        <div class="badge bg-success mb-1">AI Assistant</div>
+                                        <div class="badge bg-success mb-1">{{ __('AI Assistant') }}</div>
                                         <div class="p-2 bg-light rounded border">
                                             {{ $message['content'] }}
                                         </div>
@@ -73,7 +73,7 @@
                             <form action="{{ route('admin.ai-assistant.refine', ['sessionId' => $session->id]) }}" method="POST">
                                 @csrf
                                 <div class="mb-2">
-                                    <label for="refine-message" class="form-label small">Refine your request:</label>
+                                    <label for="refine-message" class="form-label small">{{ __('Refine your request:') }}</label>
                                     <textarea
                                         class="form-control form-control-sm"
                                         id="refine-message"
@@ -101,17 +101,17 @@
                             </h5>
                             <div>
                                 @if($session->status === 'pending_approval')
-                                    <span class="badge bg-warning">Pending Approval</span>
+                                    <span class="badge bg-warning">{{ __('Pending Approval') }}</span>
                                 @elseif($session->status === 'completed')
-                                    <span class="badge bg-success">Completed</span>
+                                    <span class="badge bg-success">{{ __('Completed') }}</span>
                                 @elseif($session->status === 'partially_completed')
-                                    <span class="badge bg-warning">Partially Completed</span>
+                                    <span class="badge bg-warning">{{ __('Partially Completed') }}</span>
                                 @endif
                             </div>
                         </div>
                         <div class="card-body">
                             @if(empty($operations))
-                                <p class="text-muted">No operations to preview</p>
+                                <p class="text-muted">{{ __('No operations to preview') }}</p>
                             @else
                                 <form action="{{ route('admin.ai-assistant.execute', ['sessionId' => $session->id]) }}" method="POST" id="execute-form">
                                     @csrf
@@ -119,8 +119,8 @@
                                     <!-- Select All/None -->
                                     @if($session->status === 'pending_approval')
                                     <div class="mb-3">
-                                        <button type="button" class="btn btn-sm btn-outline-primary" id="select-all">Select All</button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="select-none">Select None</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="select-all">{{ __('Select All') }}</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="select-none">{{ __('Select None') }}</button>
                                     </div>
                                     @endif
 
@@ -131,10 +131,10 @@
                                                     @if($session->status === 'pending_approval')
                                                     <th width="40"></th>
                                                     @endif
-                                                    <th>Operation</th>
-                                                    <th>Title</th>
-                                                    <th>Details</th>
-                                                    <th>Status</th>
+                                                    <th>{{ __('Operation') }}</th>
+                                                    <th>{{ __('Title') }}</th>
+                                                    <th>{{ __('Details') }}</th>
+                                                    <th>{{ __('Status') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -150,13 +150,13 @@
                                                     @endif
                                                     <td>
                                                         @if($operation['type'] === 'update')
-                                                            <span class="badge bg-warning">Update</span>
+                                                            <span class="badge bg-warning">{{ __('Update') }}</span>
                                                         @elseif($operation['type'] === 'delete')
-                                                            <span class="badge bg-danger">Delete</span>
+                                                            <span class="badge bg-danger">{{ __('Delete') }}</span>
                                                         @elseif($operation['type'] === 'create')
-                                                            <span class="badge bg-success">Create</span>
+                                                            <span class="badge bg-success">{{ __('Create') }}</span>
                                                         @else
-                                                            <span class="badge bg-info">Display</span>
+                                                            <span class="badge bg-info">{{ __('Display') }}</span>
                                                         @endif
                                                     </td>
                                                     <td>
@@ -222,7 +222,7 @@
                                         <form action="{{ route('admin.ai-assistant.cancel', ['sessionId' => $session->id]) }}"
                                               method="POST"
                                               class="d-inline"
-                                              onsubmit="return confirm('Are you sure you want to cancel this session?')">
+                                              onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to cancel this session?')) }})">
                                             @csrf
                                             <button type="submit" class="btn btn-outline-danger">
                                                 <i class="bi bi-x-circle"></i> Cancel Session
@@ -235,7 +235,7 @@
                                 <!-- Execution Results -->
                                 @if($session->status === 'completed' || $session->status === 'partially_completed')
                                 <div class="mt-4">
-                                    <h6>Execution Summary:</h6>
+                                    <h6>{{ __('Execution Summary:') }}</h6>
                                     <ul>
                                         <li>Executed: {{ count($executionResults['results'] ?? []) }} operations</li>
                                         @if(!empty($executionResults['errors']))
@@ -245,7 +245,7 @@
 
                                     @if(!empty($executionResults['errors']))
                                     <div class="alert alert-danger">
-                                        <h6>Errors:</h6>
+                                        <h6>{{ __('Errors:') }}</h6>
                                         <ul>
                                             @foreach($executionResults['errors'] as $error)
                                             <li>{{ $error['error'] }}</li>
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const checkedCount = document.querySelectorAll('.operation-checkbox:checked').length;
             if (checkedCount === 0) {
                 e.preventDefault();
-                alert('Please select at least one operation to execute');
+                alert(window.__('Please select at least one operation to execute'));
                 return false;
             }
 

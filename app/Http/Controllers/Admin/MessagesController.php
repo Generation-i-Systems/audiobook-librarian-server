@@ -76,7 +76,7 @@ class MessagesController extends Controller
         $recipientId = $data['to_user_id'] ?? null;
 
         if (! is_int($recipientId)) {
-            return redirect()->route('admin.messages.index')->with('error', 'Recipient is required.');
+            return redirect()->route('admin.messages.index')->with('error', __('Recipient is required.'));
         }
 
         $content = $data['subject'] . "\n\n" . $data['body'];
@@ -88,9 +88,9 @@ class MessagesController extends Controller
         ]);
 
         if (! is_string($messageId) || $messageId === '') {
-            return redirect()->route('admin.messages.index')->with('error', 'Failed to send message.');
+            return redirect()->route('admin.messages.index')->with('error', __('Failed to send message.'));
         }
 
-        return redirect()->route('admin.messages.index')->with('success', 'Message sent.');
+        return redirect()->route('admin.messages.index')->with('success', __('Message sent.'));
     }
 }

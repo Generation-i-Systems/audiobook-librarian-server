@@ -2,16 +2,16 @@
 
 @section('content')
     <div class="container">
-        <h1>Admin Dashboard</h1>
+        <h1>{{ __('Admin Dashboard') }}</h1>
 
         <div class="list-group">
-            <a href="{{ route('genres.index') }}" class="list-group-item list-group-item-action">Manage Genres</a>
-            <a href="{{ route('authors.index') }}" class="list-group-item list-group-item-action">Manage Authors</a>
-            <a href="{{ route('admin.books.index') }}" class="list-group-item list-group-item-action">Manage Books</a>
-            <a href="{{ route('admin.messages.index') }}" class="list-group-item list-group-item-action">View Messages</a>
+            <a href="{{ route('genres.index') }}" class="list-group-item list-group-item-action">{{ __('Manage Genres') }}</a>
+            <a href="{{ route('authors.index') }}" class="list-group-item list-group-item-action">{{ __('Manage Authors') }}</a>
+            <a href="{{ route('admin.books.index') }}" class="list-group-item list-group-item-action">{{ __('Manage Books') }}</a>
+            <a href="{{ route('admin.messages.index') }}" class="list-group-item list-group-item-action">{{ __('View Messages') }}</a>
             <a href="{{ route('admin.account_requests.index') }}" class="list-group-item list-group-item-action">Account
                 Requests</a>
-            <a href="{{ url('/') }}" class="list-group-item list-group-item-action">Public View</a>
+            <a href="{{ url('/') }}" class="list-group-item list-group-item-action">{{ __('Public View') }}</a>
         </div>
     </div>
 @endsection

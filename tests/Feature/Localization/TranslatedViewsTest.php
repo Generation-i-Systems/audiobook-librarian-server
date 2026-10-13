@@ -40,4 +40,14 @@ class TranslatedViewsTest extends TestCase
         $response->assertOk();
         $response->assertSee('Forgot Your Password?', false);
     }
+
+    public function testLoginPageOffersTheLanguageSwitcherAndRendersSpanish(): void
+    {
+        $response = $this->withHeader('Accept-Language', 'es')->get('/login');
+
+        $response->assertOk();
+        $response->assertSee('<option value="es" selected>Español</option>', false);
+        $response->assertSee('¿Olvidó su contraseña?', false);
+        $response->assertSee('Iniciar sesión', false);
+    }
 }

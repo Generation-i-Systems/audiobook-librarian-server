@@ -5,13 +5,13 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1>
             @if($browseBy === 'genre')
-                <a href="{{ route('admin.librivox.genres') }}" class="text-decoration-none text-muted small me-2">Genres</a>
+                <a href="{{ route('admin.librivox.genres') }}" class="text-decoration-none text-muted small me-2">{{ __('Genres') }}</a>
             @else
-                <a href="{{ route('admin.librivox.authors') }}" class="text-decoration-none text-muted small me-2">Authors</a>
+                <a href="{{ route('admin.librivox.authors') }}" class="text-decoration-none text-muted small me-2">{{ __('Authors') }}</a>
             @endif
             {{ $label }}
         </h1>
-        <a href="{{ route('admin.librivox.index') }}" class="btn btn-outline-secondary">Imported Books</a>
+        <a href="{{ route('admin.librivox.index') }}" class="btn btn-outline-secondary">{{ __('Imported Books') }}</a>
     </div>
 
     @if(session('success'))
@@ -26,9 +26,9 @@
     @endif
 
     <form action="{{ request()->url() }}" method="GET" class="mb-3 d-flex gap-2 align-items-center">
-        <label class="form-label mb-0 text-muted small">Language:</label>
+        <label class="form-label mb-0 text-muted small">{{ __('Language:') }}</label>
         <select name="language" class="form-select form-select-sm" style="max-width:160px;" onchange="this.form.submit()">
-            <option value="" @selected(($language ?? '') === '')>All languages</option>
+            <option value="" @selected(($language ?? '') === '')>{{ __('All languages') }}</option>
             <option value="English" @selected(($language ?? 'English') === 'English')>English</option>
             <option value="German" @selected(($language ?? '') === 'German')>German</option>
             <option value="Spanish" @selected(($language ?? '') === 'Spanish')>Spanish</option>
@@ -77,10 +77,10 @@
                             <span class="small text-muted">ID: {{ $book['id'] }}</span>
                             <div class="d-flex gap-2 align-items-center">
                                 @if(!empty($book['url_librivox']))
-                                    <a href="{{ $book['url_librivox'] }}" target="_blank" class="small">LibriVox ↗</a>
+                                    <a href="{{ $book['url_librivox'] }}" target="_blank" class="small">{{ __('LibriVox ↗') }}</a>
                                 @endif
                                 @if(!empty($book['_local_id']))
-                                    <a href="{{ route('admin.books.show', $book['_local_id']) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                                    <a href="{{ route('admin.books.show', $book['_local_id']) }}" class="btn btn-sm btn-outline-secondary">{{ __('View') }}</a>
                                 @endif
                             </div>
                         </div>

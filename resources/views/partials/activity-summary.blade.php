@@ -3,7 +3,7 @@
     <div class="col-12 mb-4">
         <div class="card h-100">
             <div class="card-header">
-                <h5 class="mb-0">Next Achievements</h5>
+                <h5 class="mb-0">{{ __('Next Achievements') }}</h5>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -12,7 +12,7 @@
                             <div class="d-flex align-items-center p-3 border rounded bg-light h-100">
                                 <div class="me-3 text-muted">
                                     @if($tip['icon'])
-                                        <img src="{{ $tip['icon'] }}" alt="Badge" style="width: 40px; height: 40px; opacity: 0.6;">
+                                        <img src="{{ $tip['icon'] }}" alt="{{ __('Badge') }}" style="width: 40px; height: 40px; opacity: 0.6;">
                                     @elseif(isset($tip['emoji']) && $tip['emoji'])
                                         <span style="font-size: 2.5rem; opacity: 0.6;">{{ $tip['emoji'] }}</span>
                                     @else
@@ -27,7 +27,7 @@
                         </div>
                     @empty
                         <div class="col-12 text-center text-muted">
-                            <p class="mb-0">You are doing great! Keep listening to discover new achievements.</p>
+                            <p class="mb-0">{{ __('You are doing great! Keep listening to discover new achievements.') }}</p>
                         </div>
                     @endforelse
                 </div>
@@ -39,31 +39,31 @@
 <!-- Activity Tabs -->
 <div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0">User Activity</h5>
+        <h5 class="mb-0">{{ __('User Activity') }}</h5>
     </div>
     <div class="card-body">
         <ul class="nav nav-tabs mb-3" id="activityTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="badges-tab" data-bs-toggle="tab" data-bs-target="#badges" type="button" role="tab">Badges</button>
+                <button class="nav-link active" id="badges-tab" data-bs-toggle="tab" data-bs-target="#badges" type="button" role="tab">{{ __('Badges') }}</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="progress-tab" data-bs-toggle="tab" data-bs-target="#progress" type="button" role="tab">Reading Progress</button>
+                <button class="nav-link" id="progress-tab" data-bs-toggle="tab" data-bs-target="#progress" type="button" role="tab">{{ __('Reading Progress') }}</button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="statuses-tab" data-bs-toggle="tab" data-bs-target="#statuses" type="button" role="tab">Books & Downloads</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews" type="button" role="tab">Reviews</button>
+                <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews" type="button" role="tab">{{ __('Reviews') }}</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="recommendations-tab" data-bs-toggle="tab" data-bs-target="#recommendations" type="button" role="tab">Recommendations</button>
+                <button class="nav-link" id="recommendations-tab" data-bs-toggle="tab" data-bs-target="#recommendations" type="button" role="tab">{{ __('Recommendations') }}</button>
             </li>
             @if(isset($userId))
                 <li class="nav-item ms-auto" role="presentation">
-                    <a class="nav-link" href="{{ route('admin.events.timeline', $userId) }}">Event Timeline</a>
+                    <a class="nav-link" href="{{ route('admin.events.timeline', $userId) }}">{{ __('Event Timeline') }}</a>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <a class="nav-link" href="{{ route('admin.books.positions', $userId) }}">Books in Progress</a>
+                    <a class="nav-link" href="{{ route('admin.books.positions', $userId) }}">{{ __('Books in Progress') }}</a>
                 </li>
             @endif
         </ul>
@@ -94,7 +94,7 @@
 
                                         @if($item['is_earned'])
                                             <span class="position-absolute top-0 start-100 translate-middle p-1 bg-success border border-light rounded-circle" style="width: 8px; height: 8px;">
-                                                <span class="visually-hidden">Earned</span>
+                                                <span class="visually-hidden">{{ __('Earned') }}</span>
                                             </span>
                                         @endif
                                     </div>
@@ -103,7 +103,7 @@
                             </div>
                         </div>
                     @empty
-                        <div class="col-12 text-center text-muted p-4">No badges found in the system.</div>
+                        <div class="col-12 text-center text-muted p-4">{{ __('No badges found in the system.') }}</div>
                     @endforelse
                 </div>
             </div>
@@ -114,10 +114,10 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Book</th>
-                                <th>Progress</th>
-                                <th>Last Listened</th>
-                                <th>Status</th>
+                                <th>{{ __('Book') }}</th>
+                                <th>{{ __('Progress') }}</th>
+                                <th>{{ __('Last Listened') }}</th>
+                                <th>{{ __('Status') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -133,16 +133,16 @@
                                     <td>{{ $item['last_listened_at'] ? \Carbon\Carbon::parse($item['last_listened_at'])->diffForHumans() : 'Never' }}</td>
                                     <td>
                                         @if($item['status'] === 'Finished')
-                                            <span class="badge bg-success">Completed</span>
+                                            <span class="badge bg-success">{{ __('Completed') }}</span>
                                         @elseif($item['status'] === 'Downloaded')
-                                            <span class="badge bg-secondary">Downloaded</span>
+                                            <span class="badge bg-secondary">{{ __('Downloaded') }}</span>
                                         @else
-                                            <span class="badge bg-primary">In Progress</span>
+                                            <span class="badge bg-primary">{{ __('In Progress') }}</span>
                                         @endif
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="4" class="text-center text-muted">No reading progress found.</td></tr>
+                                <tr><td colspan="4" class="text-center text-muted">{{ __('No reading progress found.') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -155,9 +155,9 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Book</th>
-                                <th>Status</th>
-                                <th>Updated</th>
+                                <th>{{ __('Book') }}</th>
+                                <th>{{ __('Status') }}</th>
+                                <th>{{ __('Updated') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -168,7 +168,7 @@
                                     <td>{{ \Carbon\Carbon::parse($item['updated_at'])->diffForHumans() }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="3" class="text-center text-muted">No book status data found.</td></tr>
+                                <tr><td colspan="3" class="text-center text-muted">{{ __('No book status data found.') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -193,7 +193,7 @@
                             <p class="mb-1">{{ $item['comment'] }}</p>
                         </div>
                     @empty
-                        <div class="text-center text-muted">No reviews submitted.</div>
+                        <div class="text-center text-muted">{{ __('No reviews submitted.') }}</div>
                     @endforelse
                 </div>
             </div>
@@ -207,7 +207,7 @@
                                 <h6 class="mb-1">{{ $item['book_title'] }}</h6>
                                 <small>{{ \Carbon\Carbon::parse($item['created_at'])->diffForHumans() }}</small>
                             </div>
-                            <p class="mb-1">Recommended by <strong>{{ $item['sender_name'] }}</strong></p>
+                            <p class="mb-1">{{ __('Recommended by') }} <strong>{{ $item['sender_name'] }}</strong></p>
                             @if($item['message'])
                                 <p class="mb-1 text-muted">"{{ $item['message'] }}"</p>
                             @endif
@@ -215,12 +215,12 @@
                                 @if($item['acknowledged_at'])
                                     <span class="text-success"><i class="fas fa-check-double"></i> Read {{ \Carbon\Carbon::parse($item['acknowledged_at'])->diffForHumans() }}</span>
                                 @else
-                                    <span class="text-muted"><i class="fas fa-clock"></i> Not yet read</span>
+                                    <span class="text-muted"><i class="fas fa-clock"></i> {{ __('Not yet read') }}</span>
                                 @endif
                             </small>
                         </div>
                     @empty
-                        <div class="text-center text-muted">No recommendations received.</div>
+                        <div class="text-center text-muted">{{ __('No recommendations received.') }}</div>
                     @endforelse
                 </div>
             </div>

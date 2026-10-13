@@ -17,7 +17,7 @@
                     <div class="col-md-10">
                         <h2 class="mb-2">{{ $book['title'] }}</h2>
                         <p class="mb-1">
-                            <strong>Author:</strong>
+                            <strong>{{ __('Author:') }}</strong>
                             @if(isset($book['authors']) && is_array($book['authors']) && !empty($book['authors']))
                                 {{ implode(', ', $book['authors']) }}
                             @else
@@ -26,12 +26,12 @@
                         </p>
                         @if(!empty($book['narrators']) && is_array($book['narrators']))
                             <p class="mb-1">
-                                <strong>Narrator:</strong> {{ implode(', ', $book['narrators']) }}
+                                <strong>{{ __('Narrator:') }}</strong> {{ implode(', ', $book['narrators']) }}
                             </p>
                         @endif
                         @if(!empty($book['duration']))
                             <p class="mb-0">
-                                <strong>Duration:</strong> {{ gmdate('H:i:s', $book['duration']) }}
+                                <strong>{{ __('Duration:') }}</strong> {{ gmdate('H:i:s', $book['duration']) }}
                             </p>
                         @endif
                     </div>
@@ -49,7 +49,7 @@
                                     src="{{ route('api.books.downloadFile', ['book' => $book['id'], 'file' => basename($audioFiles[0]['path'])]) }}"
                                     type="audio/mpeg">
                             @endif
-                            Your browser does not support the audio element.
+                            {{ __('Your browser does not support the audio element.') }}
                         </audio>
 
                         <!-- Progress Bar -->
@@ -66,19 +66,19 @@
 
                         <!-- Playback Controls -->
                         <div class="d-flex justify-content-center align-items-center gap-3 mb-3">
-                            <button class="btn btn-outline-secondary" id="rewind30" title="Rewind 30 seconds">
+                            <button class="btn btn-outline-secondary" id="rewind30" title="{{ __('Rewind 30 seconds') }}">
                                 <i class="bi bi-skip-backward-fill"></i> 30s
                             </button>
-                            <button class="btn btn-outline-secondary" id="rewind10" title="Rewind 10 seconds">
+                            <button class="btn btn-outline-secondary" id="rewind10" title="{{ __('Rewind 10 seconds') }}">
                                 <i class="bi bi-arrow-counterclockwise"></i> 10s
                             </button>
-                            <button class="btn btn-primary btn-lg" id="playPause" title="Play/Pause">
+                            <button class="btn btn-primary btn-lg" id="playPause" title="{{ __('Play/Pause') }}">
                                 <i class="bi bi-play-fill" id="playIcon"></i>
                             </button>
-                            <button class="btn btn-outline-secondary" id="forward10" title="Forward 10 seconds">
+                            <button class="btn btn-outline-secondary" id="forward10" title="{{ __('Forward 10 seconds') }}">
                                 10s <i class="bi bi-arrow-clockwise"></i>
                             </button>
-                            <button class="btn btn-outline-secondary" id="forward30" title="Forward 30 seconds">
+                            <button class="btn btn-outline-secondary" id="forward30" title="{{ __('Forward 30 seconds') }}">
                                 30s <i class="bi bi-skip-forward-fill"></i>
                             </button>
                         </div>
@@ -86,13 +86,13 @@
                         <!-- Playback Speed and Volume -->
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="playbackRate" class="form-label">Playback Speed: <span
+                                <label for="playbackRate" class="form-label">{{ __('Playback Speed:') }} <span
                                         id="rateDisplay">1.0x</span></label>
                                 <input type="range" class="form-range" id="playbackRate" min="0.5" max="2.0" step="0.1"
                                     value="1.0">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="volume" class="form-label">Volume: <span id="volumeDisplay">100%</span></label>
+                                <label for="volume" class="form-label">{{ __('Volume:') }} <span id="volumeDisplay">100%</span></label>
                                 <input type="range" class="form-range" id="volume" min="0" max="100" value="100">
                             </div>
                         </div>
@@ -100,7 +100,7 @@
                         <!-- File Selector (if multiple files) -->
                         @if(count($audioFiles) > 1)
                             <div class="mb-3">
-                                <label for="fileSelector" class="form-label">Audio File:</label>
+                                <label for="fileSelector" class="form-label">{{ __('Audio File:') }}</label>
                                 <select class="form-select" id="fileSelector">
                                     @foreach($audioFiles as $index => $file)
                                         <option value="{{ $index }}"
@@ -118,7 +118,7 @@
             <!-- Description -->
             @if(!empty($book['description']))
                 <div class="player-description p-4">
-                    <h5>Description</h5>
+                    <h5>{{ __('Description') }}</h5>
                     <p>{{ $book['description'] }}</p>
                 </div>
             @endif

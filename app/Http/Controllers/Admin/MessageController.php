@@ -36,7 +36,7 @@ class MessageController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to fetch messages: ' . $e->getMessage());
 
-            return back()->with('error', 'Failed to load messages. Please try again.');
+            return back()->with('error', __('Failed to load messages. Please try again.'));
         }
     }
 
@@ -53,14 +53,14 @@ class MessageController extends Controller
             $success = $this->documentStoreService->acknowledgeMessage($messageId);
 
             if ($success) {
-                return back()->with('success', 'Message acknowledged.');
+                return back()->with('success', __('Message acknowledged.'));
             }
 
-            return back()->with('error', 'Failed to acknowledge message.');
+            return back()->with('error', __('Failed to acknowledge message.'));
         } catch (\Exception $e) {
             Log::error('Failed to acknowledge message: ' . $e->getMessage());
 
-            return back()->with('error', 'An error occurred while acknowledging the message.');
+            return back()->with('error', __('An error occurred while acknowledging the message.'));
         }
     }
 }

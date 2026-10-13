@@ -1,9 +1,9 @@
 @extends('layouts.app')
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-6">Wishlist</h1>
+    <h1 class="text-3xl font-bold mb-6">{{ __('Wishlist') }}</h1>
     @if ($wishlist->isEmpty())
-        <p>Your wishlist is empty. Time to find some new audiobooks!</p>
+        <p>{{ __('Your wishlist is empty. Time to find some new audiobooks!') }}</p>
     @else
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach ($wishlist as $status)

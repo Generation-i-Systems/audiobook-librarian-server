@@ -160,7 +160,7 @@
 
 @section('content')
     <div class="container">
-        <h1>Book Archive</h1>
+        <h1>{{ __('Book Archive') }}</h1>
         <div id="book-preference-error" class="alert alert-warning d-none" role="alert"></div>
 
         @if(Auth::user()?->is_admin)
@@ -175,10 +175,10 @@ $canManageBooks = $canManageBooks ?? false;
 
         @can('manage-books')
             <div class="mb-3">
-                <a href="{{ route('admin.books.create') }}" class="btn btn-primary">Add New Book</a>
+                <a href="{{ route('admin.books.create') }}" class="btn btn-primary">{{ __('Add New Book') }}</a>
                 <a href="{{ route('admin.books.import') }}" class="btn btn-info">Import Book(s)</a>
-                <a href="{{ route('admin.books.importFile') }}" class="btn btn-warning ms-2">Import from File/Audio</a>
-                <a href="{{ route('admin.needs_review.index') }}" class="btn btn-outline-danger ms-2">Needs Review</a>
+                <a href="{{ route('admin.books.importFile') }}" class="btn btn-warning ms-2">{{ __('Import from File/Audio') }}</a>
+                <a href="{{ route('admin.needs_review.index') }}" class="btn btn-outline-danger ms-2">{{ __('Needs Review') }}</a>
             </div>
         @endcan
 
@@ -186,15 +186,15 @@ $canManageBooks = $canManageBooks ?? false;
         @if (!$showFilters && count($recentBooks) > 0)
             <div class="card mb-3">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Recent Books</h5>
+                    <h5 class="mb-0">{{ __('Recent Books') }}</h5>
                     @if(!$isLibrivoxMode)
-                        <div class="btn-group" role="group" aria-label="View options">
+                        <div class="btn-group" role="group" aria-label="{{ __('View options') }}">
                             <button class="btn btn-sm btn-outline-secondary view-toggle-btn {{ $recentViewType === 'grid' ? 'active' : '' }}" id="recent-grid-btn"
-                                data-view="grid"><i class="fas fa-th"></i> Grid</button>
+                                data-view="grid"><i class="fas fa-th"></i> {{ __('Grid') }}</button>
                             <button class="btn btn-sm btn-outline-secondary view-toggle-btn {{ $recentViewType === 'compact' ? 'active' : '' }}" id="recent-compact-btn"
-                                data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
+                                data-view="compact"><i class="fas fa-th-large"></i> {{ __('Compact') }}</button>
                             <button class="btn btn-sm btn-outline-secondary view-toggle-btn {{ $recentViewType === 'list' ? 'active' : '' }}" id="recent-list-btn"
-                                data-view="list"><i class="fas fa-list"></i> List</button>
+                                data-view="list"><i class="fas fa-list"></i> {{ __('List') }}</button>
                         </div>
                     @endif
                     <button class="btn btn-link text-decoration-none" id="toggle-recent-books" type="button" tabindex="0">
@@ -226,7 +226,7 @@ $canManageBooks = $canManageBooks ?? false;
                                             <div class="book-media-panel book-media-panel--coverless" data-source="{{ strtolower($sourceLabel) }}">
                                                 <span class="book-media-panel__badge">{{ $sourceLabel }}</span>
                                                 <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
-                                                <span class="book-media-panel__meta">Cover unavailable</span>
+                                                <span class="book-media-panel__meta">{{ __('Cover unavailable') }}</span>
                                             </div>
                                         @endif
                                         <div class="card-body p-2">
@@ -316,10 +316,10 @@ $canManageBooks = $canManageBooks ?? false;
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th style="width: 60px;">Cover</th>
-                                    <th>Title</th>
-                                    <th>Author</th>
-                                    <th style="width: 100px;">Actions</th>
+                                    <th style="width: 60px;">{{ __('Cover') }}</th>
+                                    <th>{{ __('Title') }}</th>
+                                    <th>{{ __('Author') }}</th>
+                                    <th style="width: 100px;">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -383,13 +383,13 @@ $canManageBooks = $canManageBooks ?? false;
         <form action="{{ route('books.index') }}" method="GET" class="mb-4">
             <div class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label for="search" class="form-label">Search:</label>
+                    <label for="search" class="form-label">{{ __('Search:') }}</label>
                     <input type="text" class="form-control" id="search" name="search" value="{{ request('search') }}">
                 </div>
                 <div class="col-md-2">
-                    <label for="genre" class="form-label">Genre:</label>
+                    <label for="genre" class="form-label">{{ __('Genre:') }}</label>
                     <select name="genre" id="genre" class="form-select">
-                        <option value="">All Genres</option>
+                        <option value="">{{ __('All Genres') }}</option>
                         @foreach ($genres as $genreId => $genreName)
                             <option value="{{ $genreName }}" {{ request('genre') == $genreName ? 'selected' : '' }}>
                                 {{ $genreName }}
@@ -398,42 +398,42 @@ $canManageBooks = $canManageBooks ?? false;
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label for="author" class="form-label">Author:</label>
+                    <label for="author" class="form-label">{{ __('Author:') }}</label>
                     <input type="text" class="form-control autocomplete-author" id="author" name="author" 
-                           value="{{ request('author') }}" placeholder="Type to search authors...">
+                           value="{{ request('author') }}" placeholder="{{ __('Type to search authors...') }}">
                 </div>
                 <div class="col-md-2">
-                    <label for="series" class="form-label">Series:</label>
+                    <label for="series" class="form-label">{{ __('Series:') }}</label>
                     <input type="text" class="form-control" id="series" name="series" value="{{ request('series') }}"
-                        placeholder="Filter by series">
+                        placeholder="{{ __('Filter by series') }}">
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary me-2">Filter</button>
-                    <a href="{{ route('books.index') }}" class="btn btn-secondary">Reset</a>
+                    <button type="submit" class="btn btn-primary me-2">{{ __('Filter') }}</button>
+                    <a href="{{ route('books.index') }}" class="btn btn-secondary">{{ __('Reset') }}</a>
                 </div>
             </div>
             <div class="row g-3 align-items-end mt-1">
                 <div class="col-md-3">
-                    <label for="tag" class="form-label">Tag:</label>
+                    <label for="tag" class="form-label">{{ __('Tag:') }}</label>
                     <input type="text" class="form-control" id="tag" name="tag"
-                        value="{{ request('tag') }}" placeholder="Filter by tag">
+                        value="{{ request('tag') }}" placeholder="{{ __('Filter by tag') }}">
                 </div>
                 @can('manage-books')
                     <div class="col-md-3">
-                        <label for="sort" class="form-label">Sort:</label>
+                        <label for="sort" class="form-label">{{ __('Sort:') }}</label>
                         <select name="sort" id="sort" class="form-select">
-                            <option value="recent_desc" {{ $sort === 'recent_desc' ? 'selected' : '' }}>Most Recent</option>
-                            <option value="recent_asc" {{ $sort === 'recent_asc' ? 'selected' : '' }}>Oldest</option>
-                            <option value="title_asc" {{ $sort === 'title_asc' ? 'selected' : '' }}>Title A-Z</option>
-                            <option value="title_desc" {{ $sort === 'title_desc' ? 'selected' : '' }}>Title Z-A</option>
-                            <option value="author_asc" {{ $sort === 'author_asc' ? 'selected' : '' }}>Author A-Z</option>
-                            <option value="author_desc" {{ $sort === 'author_desc' ? 'selected' : '' }}>Author Z-A</option>
-                            <option value="series_asc" {{ $sort === 'series_asc' ? 'selected' : '' }}>Series A-Z</option>
-                            <option value="series_desc" {{ $sort === 'series_desc' ? 'selected' : '' }}>Series Z-A</option>
-                            <option value="genre_asc" {{ $sort === 'genre_asc' ? 'selected' : '' }}>Genre A-Z</option>
-                            <option value="genre_desc" {{ $sort === 'genre_desc' ? 'selected' : '' }}>Genre Z-A</option>
-                            <option value="year_asc" {{ $sort === 'year_asc' ? 'selected' : '' }}>Year Asc</option>
-                            <option value="year_desc" {{ $sort === 'year_desc' ? 'selected' : '' }}>Year Desc</option>
+                            <option value="recent_desc" {{ $sort === 'recent_desc' ? 'selected' : '' }}>{{ __('Most Recent') }}</option>
+                            <option value="recent_asc" {{ $sort === 'recent_asc' ? 'selected' : '' }}>{{ __('Oldest') }}</option>
+                            <option value="title_asc" {{ $sort === 'title_asc' ? 'selected' : '' }}>{{ __('Title A-Z') }}</option>
+                            <option value="title_desc" {{ $sort === 'title_desc' ? 'selected' : '' }}>{{ __('Title Z-A') }}</option>
+                            <option value="author_asc" {{ $sort === 'author_asc' ? 'selected' : '' }}>{{ __('Author A-Z') }}</option>
+                            <option value="author_desc" {{ $sort === 'author_desc' ? 'selected' : '' }}>{{ __('Author Z-A') }}</option>
+                            <option value="series_asc" {{ $sort === 'series_asc' ? 'selected' : '' }}>{{ __('Series A-Z') }}</option>
+                            <option value="series_desc" {{ $sort === 'series_desc' ? 'selected' : '' }}>{{ __('Series Z-A') }}</option>
+                            <option value="genre_asc" {{ $sort === 'genre_asc' ? 'selected' : '' }}>{{ __('Genre A-Z') }}</option>
+                            <option value="genre_desc" {{ $sort === 'genre_desc' ? 'selected' : '' }}>{{ __('Genre Z-A') }}</option>
+                            <option value="year_asc" {{ $sort === 'year_asc' ? 'selected' : '' }}>{{ __('Year Asc') }}</option>
+                            <option value="year_desc" {{ $sort === 'year_desc' ? 'selected' : '' }}>{{ __('Year Desc') }}</option>
                         </select>
                     </div>
                     <div class="col-md-6 d-flex align-items-center">
@@ -443,8 +443,8 @@ $canManageBooks = $canManageBooks ?? false;
                     <div class="form-check">
                         <input type="checkbox" class="form-check-input" id="semantic" name="semantic" value="1"
                             {{ request('semantic') ? 'checked' : '' }}>
-                        <label class="form-check-label" for="semantic" title="Ranks results by meaning, not just exact word match — may be slower">
-                            Smart search (rank by meaning, not just exact word match)
+                        <label class="form-check-label" for="semantic" title="{{ __('Ranks results by meaning, not just exact word match — may be slower') }}">
+                            {{ __('Smart search (rank by meaning, not just exact word match)') }}
                         </label>
                     </div>
                 </div>
@@ -453,20 +453,20 @@ $canManageBooks = $canManageBooks ?? false;
 
         @can('manage-books')
             <div id="main-book-count" class="mb-2 text-muted small">
-                <span>Total books: <strong>{{ $books->total() }}</strong></span>
+                <span>{{ __('Total books:') }} <strong>{{ $books->total() }}</strong></span>
                 <span class="ms-3">Showing {{ $books->count() }} of {{ $books->total() }} books</span>
             </div>
         @endcan
 
         @if(!$isLibrivoxMode)
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="btn-group" role="group" aria-label="View options">
+                <div class="btn-group" role="group" aria-label="{{ __('View options') }}">
                     <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-grid-btn" data-view="grid"><i
-                            class="fas fa-th"></i> Grid</button>
+                            class="fas fa-th"></i> {{ __('Grid') }}</button>
                     <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-compact-btn"
-                        data-view="compact"><i class="fas fa-th-large"></i> Compact</button>
+                        data-view="compact"><i class="fas fa-th-large"></i> {{ __('Compact') }}</button>
                     <button class="btn btn-sm btn-outline-secondary view-toggle-btn" id="main-list-btn" data-view="list"><i
-                            class="fas fa-list"></i> List</button>
+                            class="fas fa-list"></i> {{ __('List') }}</button>
                 </div>
             </div>
         @endif
@@ -526,7 +526,7 @@ $canManageBooks = $canManageBooks ?? false;
                                         <div class="book-media-panel book-media-panel--coverless" data-source="{{ strtolower($sourceLabel) }}">
                                             <span class="book-media-panel__badge">{{ $sourceLabel }}</span>
                                             <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
-                                            <span class="book-media-panel__meta">Cover unavailable</span>
+                                            <span class="book-media-panel__meta">{{ __('Cover unavailable') }}</span>
                                         </div>
                                     @endif
                                     <div class="card-body p-2 pb-0">
@@ -538,7 +538,7 @@ $canManageBooks = $canManageBooks ?? false;
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;"><i class="fas fa-clock"></i> {{ $book['duration'] }}</p>
                                         @endif
                                         @if($directoryMissing)
-                                            <span class="badge bg-danger mt-1">⚠️ Missing Files</span>
+                                            <span class="badge bg-danger mt-1">{{ __('⚠️ Missing Files') }}</span>
                                         @endif
                                     </div>
                                 </a>
@@ -552,17 +552,17 @@ $canManageBooks = $canManageBooks ?? false;
                                     </p>
                                     @can('manage-books')
                                         <div class="d-flex gap-1 mt-1">
-                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
                                             <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <input type="hidden" name="return_url" value="{{ url()->full() }}">
                                                 <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill metadata from path-based best match (prefers Audible)"><i class="fas fa-magic"></i></button>
                                             </form>
-                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ addslashes($title) }}?')">
+                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
                                                 @csrf
                                                 @method('DELETE')
                                                 <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}"><i class="fas fa-trash-alt"></i></button>
                                             </form>
                                         </div>
                                     @endcan
@@ -611,7 +611,7 @@ $canManageBooks = $canManageBooks ?? false;
                                         <div class="book-media-panel book-media-panel--compact book-media-panel--coverless" data-source="{{ strtolower($sourceLabel) }}">
                                             <span class="book-media-panel__badge">{{ $sourceLabel }}</span>
                                             <i class="fas fa-headphones-alt book-media-panel__icon" aria-hidden="true"></i>
-                                            <span class="book-media-panel__meta">Cover unavailable</span>
+                                            <span class="book-media-panel__meta">{{ __('Cover unavailable') }}</span>
                                         </div>
                                     @endif
                                     <div class="card-body p-2 pb-0">
@@ -637,17 +637,17 @@ $canManageBooks = $canManageBooks ?? false;
                                     </p>
                                     @can('manage-books')
                                         <div class="d-flex gap-1 mt-1">
-                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
                                             <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="{{ __('Autofill') }}"><i class="fas fa-magic"></i></button>
                                             </form>
-                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ addslashes($title) }}?')">
+                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
                                                 @csrf
                                                 @method('DELETE')
                                                 <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}"><i class="fas fa-trash-alt"></i></button>
                                             </form>
                                         </div>
                                     @endcan
@@ -663,14 +663,14 @@ $canManageBooks = $canManageBooks ?? false;
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th style="width: 60px;">Cover</th>
-                            <th>Title</th>
-                            <th>Author</th>
-                            <th>Series</th>
+                            <th style="width: 60px;">{{ __('Cover') }}</th>
+                            <th>{{ __('Title') }}</th>
+                            <th>{{ __('Author') }}</th>
+                            <th>{{ __('Series') }}</th>
                             <th style="width: 60px; text-align: center;">#</th>
-                            <th>Genre</th>
-                            <th style="width: 90px;">Length</th>
-                            <th style="width: 100px;">Actions</th>
+                            <th>{{ __('Genre') }}</th>
+                            <th style="width: 90px;">{{ __('Length') }}</th>
+                            <th style="width: 100px;">{{ __('Actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -696,7 +696,7 @@ $canManageBooks = $canManageBooks ?? false;
                                     <td>
                                         <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none">{{ $title }}</a>
                                         @if($directoryMissing)
-                                            <span class="badge bg-danger ms-1" title="Directory not found">⚠️ Missing Files</span>
+                                            <span class="badge bg-danger ms-1" title="{{ __('Directory not found') }}">{{ __('⚠️ Missing Files') }}</span>
                                         @endif
                                     </td>
                                     <td>
@@ -725,19 +725,19 @@ $canManageBooks = $canManageBooks ?? false;
                                     </td>
                                     <td class="text-muted small">{{ (!empty($book['duration']) && $book['duration'] !== '00:00:00') ? $book['duration'] : '' }}</td>
                                     <td>
-                                        <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary" title="Download"><i class="fas fa-download"></i></a>
+                                        <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary" title="{{ __('Download') }}"><i class="fas fa-download"></i></a>
                                         @can('manage-books')
-                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
                                             <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill"><i class="fas fa-magic"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="{{ __('Autofill') }}"><i class="fas fa-magic"></i></button>
                                             </form>
-                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete {{ addslashes($title) }}?')">
+                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
                                                 @csrf
                                                 @method('DELETE')
                                                 <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}"><i class="fas fa-trash-alt"></i></button>
                                             </form>
                                         @endcan
                                     </td>
@@ -750,7 +750,7 @@ $canManageBooks = $canManageBooks ?? false;
         </div>
 
         @if(count($books) === 0)
-            <div class="alert alert-info">No books found matching your criteria.</div>
+            <div class="alert alert-info">{{ __('No books found matching your criteria.') }}</div>
         @endif
 
         <!-- Pagination: plain links, so the page is always described by its query string -->
@@ -780,7 +780,7 @@ $canManageBooks = $canManageBooks ?? false;
                 }).fail(function (xhr) {
                     console.error('[books] Failed to save display preference:', key, xhr.status);
                     $('#book-preference-error')
-                        .text('Your display setting could not be saved. Please try again.')
+                        .text(window.__('Your display setting could not be saved. Please try again.'))
                         .removeClass('d-none');
                 });
             }

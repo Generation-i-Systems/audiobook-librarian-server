@@ -1,6 +1,6 @@
 <div class="card">
     <div class="card-header bg-info text-white">
-        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Research Results</h5>
+        <h5 class="mb-0"><i class="fas fa-chart-bar"></i> {{ __('Research Results') }}</h5>
     </div>
     <div class="card-body">
         @if(isset($results['stats']) && count($results['stats']) > 0)
@@ -33,14 +33,14 @@
                             </div>
                         @else
                             <div class="alert alert-info">
-                                <strong>Result:</strong> {{ $stat['result'] }}
+                                <strong>{{ __('Result:') }}</strong> {{ $stat['result'] }}
                             </div>
                         @endif
                     @endif
                 </div>
             @endforeach
         @else
-            <p class="text-muted">No results available.</p>
+            <p class="text-muted">{{ __('No results available.') }}</p>
         @endif
     </div>
 </div>

@@ -50,7 +50,7 @@
                 function confirmBulkUpdate() {
                     const selected = document.querySelectorAll('.bulk-checkbox:checked').length;
                     if (selected === 0) {
-                        alert('Please select at least one item to update.');
+                        alert(window.__('Please select at least one item to update.'));
                         return false;
                     }
                     return confirm(`Are you sure you want to apply changes to ${selected} item(s)?`);
@@ -112,7 +112,7 @@
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        alert('An error occurred during refinement.');
+                        alert(window.__('An error occurred during refinement.'));
                     })
                     .finally(() => {
                         btn.innerHTML = originalBtnText;
@@ -126,25 +126,25 @@
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Refine Item</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <h5 class="modal-title">{{ __('Refine Item') }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                         </div>
                         <div class="modal-body">
                             <input type="hidden" id="refine_item_id">
                             <div class="mb-3">
-                                <label for="refine_instruction" class="form-label">Instruction</label>
+                                <label for="refine_instruction" class="form-label">{{ __('Instruction') }}</label>
                                 <textarea class="form-control" id="refine_instruction" rows="3" placeholder="e.g., Use the UK cover, Fix the title spelling..."></textarea>
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="button" class="btn btn-primary" id="btn-submit-refine" onclick="submitRefinement()">Apply Refinement</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                            <button type="button" class="btn btn-primary" id="btn-submit-refine" onclick="submitRefinement()">{{ __('Apply Refinement') }}</button>
                         </div>
                     </div>
                 </div>
             </div>
         @else
-            <p class="text-muted">No items to update.</p>
+            <p class="text-muted">{{ __('No items to update.') }}</p>
         @endif
     </div>
 </div>

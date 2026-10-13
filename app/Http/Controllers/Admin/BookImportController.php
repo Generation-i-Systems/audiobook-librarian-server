@@ -250,7 +250,7 @@ class BookImportController extends Controller
 
             // Return redirect response for both AJAX and regular requests (relative path for tests)
             return redirect('/admin/books/' . $id . '/edit')
-                ->with('success', 'Book imported successfully.');
+                ->with('success', __('Book imported successfully.'));
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::error('BookImportController@processImport: validation failed', [
                 'errors' => $ve->errors(),

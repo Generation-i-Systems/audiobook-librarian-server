@@ -9,7 +9,7 @@
         @endphp
         @if(!empty($user['photo_url']))
             <img src="{{ $user['photo_url'] }}"
-                 alt="Profile Photo"
+                 alt="{{ __('Profile Photo') }}"
                  class="rounded-circle me-3"
                  style="width: 64px; height: 64px; object-fit: cover;"
                  onerror="this.onerror=null; this.src='{{ $fallbackSvg }}';">
@@ -21,9 +21,9 @@
         <div>
             <h1 class="h3 mb-0">Edit User
                 @if(($user['role'] ?? '') === 'unverified')
-                    <span class="badge bg-warning text-dark">Unverified</span>
+                    <span class="badge bg-warning text-dark">{{ __('Unverified') }}</span>
                 @else
-                    <span class="badge bg-success">Verified</span>
+                    <span class="badge bg-success">{{ __('Verified') }}</span>
                 @endif
 
                 @if(!empty($user['google_id']))
@@ -35,7 +35,7 @@
             <div class="text-muted">
                 {{ $user['email'] ?? '' }}
                 @if(!empty($user['google_id']))
-                    <span class="ms-2" title="Google ID">
+                    <span class="ms-2" title="{{ __('Google ID') }}">
                         <i class="fab fa-google text-info"></i> {{ $user['google_id'] }}
                     </span>
                 @endif
@@ -43,13 +43,13 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.events.timeline', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
-                Event Timeline
+                {{ __('Event Timeline') }}
             </a>
             <a href="{{ route('admin.books.positions', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
-                Books in Progress
+                {{ __('Books in Progress') }}
             </a>
             <a href="{{ route('admin.users.show', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
-                View Profile
+                {{ __('View Profile') }}
             </a>
         </div>
     </div>
@@ -65,23 +65,23 @@
         @method('PUT')
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Profile Information</h5>
+                <h5 class="mb-0">{{ __('Profile Information') }}</h5>
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label for="name" class="form-label">Name</label>
+                    <label for="name" class="form-label">{{ __('Name') }}</label>
                     <input type="text" name="name" id="name" class="form-control" required value="{{ old('name', $user['name'] ?? '') }}">
                 </div>
         <div class="mb-3">
-            <label for="username" class="form-label">Username</label>
+            <label for="username" class="form-label">{{ __('Username') }}</label>
             <input type="text" name="username" id="username" class="form-control" required value="{{ old('username', $user['username'] ?? '') }}">
         </div>
         <div class="mb-3">
-            <label for="email" class="form-label">Email</label>
+            <label for="email" class="form-label">{{ __('Email') }}</label>
             <input type="email" name="email" id="email" class="form-control" required value="{{ old('email', $user['email'] ?? '') }}">
         </div>
         <div class="mb-3">
-            <label for="role" class="form-label">Role</label>
+            <label for="role" class="form-label">{{ __('Role') }}</label>
             <select name="role" id="role" class="form-control" required>
                 @if(($user['role'] ?? '') === 'user')
                     <option value="user" @selected(old('role', $user['role']) === 'user')>User (legacy)</option>
@@ -94,7 +94,7 @@
 
         @if(($user['role'] ?? '') === 'unverified')
             <div class="alert alert-warning">
-                <p class="mb-2">This user is not yet verified. Choose their access type:</p>
+                <p class="mb-2">{{ __('This user is not yet verified. Choose their access type:') }}</p>
                 <div class="d-flex gap-2 flex-wrap">
                     <button type="button" class="btn btn-success btn-sm verify-role-btn" data-role="library-user">
                         <i class="fas fa-book"></i> Library User
@@ -113,25 +113,25 @@
             <input type="password" name="password" id="password" class="form-control">
         </div>
         <div class="mb-3">
-            <label for="password_confirmation" class="form-label">Confirm Password</label>
+            <label for="password_confirmation" class="form-label">{{ __('Confirm Password') }}</label>
             <input type="password" name="password_confirmation" id="password_confirmation" class="form-control">
         </div>
         <div class="border-top pt-3 mt-4">
-            <h6>Content Tag Filters</h6>
-            <p class="text-muted small">Comma-separated tags. These administrator-managed filters apply to every book listing for this user.</p>
+            <h6>{{ __('Content Tag Filters') }}</h6>
+            <p class="text-muted small">{{ __('Comma-separated tags. These administrator-managed filters apply to every book listing for this user.') }}</p>
             <div class="mb-3">
-                <label for="required_tags" class="form-label">Required Tags</label>
+                <label for="required_tags" class="form-label">{{ __('Required Tags') }}</label>
                 <input type="text" name="required_tags" id="required_tags" class="form-control"
                        value="{{ old('required_tags', ($adminTagFilters[\App\Models\UserTagFilter::MODE_REQUIRE] ?? collect())->pluck('tag')->implode(', ')) }}"
                        placeholder="cozy, short">
-                <div class="form-text">Only books with all of these tags are shown.</div>
+                <div class="form-text">{{ __('Only books with all of these tags are shown.') }}</div>
             </div>
             <div class="mb-3">
-                <label for="ignored_tags" class="form-label">Ignored Tags</label>
+                <label for="ignored_tags" class="form-label">{{ __('Ignored Tags') }}</label>
                 <input type="text" name="ignored_tags" id="ignored_tags" class="form-control"
                        value="{{ old('ignored_tags', ($adminTagFilters[\App\Models\UserTagFilter::MODE_BAN] ?? collect())->pluck('tag')->implode(', ')) }}"
                        placeholder="spoilers, gore">
-                <div class="form-text">Books with any of these tags are hidden.</div>
+                <div class="form-text">{{ __('Books with any of these tags are hidden.') }}</div>
             </div>
         </div>
             </div>
@@ -157,7 +157,7 @@
     @if(isset($allPermissions))
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Permissions</h5>
+                <h5 class="mb-0">{{ __('Permissions') }}</h5>
             </div>
             <div class="card-body">
                 <p class="text-muted small">
@@ -197,7 +197,7 @@
     @if(!empty($user['email']))
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">One-time sign-in</h5>
+                <h5 class="mb-0">{{ __('One-time sign-in') }}</h5>
             </div>
             <div class="card-body d-flex gap-2">
                 <form action="{{ route('admin.users.sendOtp', $user['id']) }}" method="POST">
@@ -217,15 +217,15 @@
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="login-qr-modal-label">Scan to sign in</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="login-qr-modal-label">{{ __('Scan to sign in') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body text-center">
                         <p class="text-muted small">Scan this code with the app to sign {{ $user['name'] ?? 'this user' }} in without a password. It expires in 10 minutes.</p>
                         <div id="login-qr-container"
                              class="d-flex align-items-center justify-content-center border rounded bg-white mx-auto"
                              style="min-height: 220px; width: 220px;">
-                            <span class="text-muted small">Generating QR code...</span>
+                            <span class="text-muted small">{{ __('Generating QR code...') }}</span>
                         </div>
                         <div id="login-qr-details" class="text-start small mt-3" style="display:none;">
                             <div id="login-qr-server"></div>

@@ -3,15 +3,15 @@
 @section('content')
 <div class="container mx-auto px-4 py-8">
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold">Reading Queue</h1>
+        <h1 class="text-3xl font-bold">{{ __('Reading Queue') }}</h1>
         <a href="{{ route('my-library.goals') }}" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-            View Goals
+            {{ __('View Goals') }}
         </a>
     </div>
 
     @if ($queuedBooks->isEmpty())
         <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4" role="alert">
-            <p>Your reading queue is empty. Add some books to your queue!</p>
+            <p>{{ __('Your reading queue is empty. Add some books to your queue!') }}</p>
         </div>
     @else
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -55,7 +55,7 @@
                             data-target-date="{{ $status->target_date?->format('Y-m-d') }}"
                             onclick="openTargetModal(this)"
                             class="text-blue-600 hover:text-blue-800 text-sm font-bold">
-                            Set Target
+                            {{ __('Set Target') }}
                         </button>
                         <form action="{{ route('books.show', $status->book->id) }}" method="GET">
                             <button type="submit" class="text-gray-600 hover:text-gray-800 text-sm font-bold">
@@ -72,12 +72,12 @@
 <!-- Target Date Modal -->
 <div id="target-date-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50">
     <div class="bg-white p-8 rounded-lg shadow-xl w-96">
-        <h2 class="text-xl font-bold mb-4">Set Target Date</h2>
+        <h2 class="text-xl font-bold mb-4">{{ __('Set Target Date') }}</h2>
         <form id="target-date-form">
             <input type="hidden" id="modal-book-id">
             <div class="mb-4">
                 <label class="block text-gray-700 text-sm font-bold mb-2" for="target_date">
-                    Completion Goal
+                    {{ __('Completion Goal') }}
                 </label>
                 <input type="date" id="modal-target-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
@@ -133,7 +133,7 @@
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred.');
+            alert(window.__('An error occurred.'));
         });
     };
 </script>

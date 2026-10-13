@@ -3,22 +3,22 @@
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h3 mb-0">Books Needing Review</h1>
-        <a href="{{ route('admin.books.index') }}" class="btn btn-secondary">Back to Admin Books</a>
+        <h1 class="h3 mb-0">{{ __('Books Needing Review') }}</h1>
+        <a href="{{ route('admin.books.index') }}" class="btn btn-secondary">{{ __('Back to Admin Books') }}</a>
     </div>
 
     <form method="GET" action="{{ route('admin.needs_review.index') }}" class="row g-2 mb-3">
         <div class="col-sm-6 col-md-4">
-            <label for="reason" class="form-label">Filter by reason</label>
+            <label for="reason" class="form-label">{{ __('Filter by reason') }}</label>
             <select id="reason" name="reason" class="form-select" onchange="if(this.value === '') { window.location.href = '{{ route('admin.needs_review.index') }}?limit={{ $limit }}'; } else { this.form.submit(); }">
-                <option value="">All reasons</option>
+                <option value="">{{ __('All reasons') }}</option>
                 @foreach ($reasons as $r)
                     <option value="{{ $r }}" {{ ($selectedReason === $r) ? 'selected' : '' }}>{{ $r }}</option>
                 @endforeach
             </select>
         </div>
         <div class="col-sm-3 col-md-2">
-            <label for="limit" class="form-label">Per page</label>
+            <label for="limit" class="form-label">{{ __('Per page') }}</label>
             <select id="limit" name="limit" class="form-select" onchange="this.form.submit()">
                 @foreach ([10,20,50,100] as $opt)
                     <option value="{{ $opt }}" {{ ($limit == $opt) ? 'selected' : '' }}>{{ $opt }}</option>
@@ -28,17 +28,17 @@
     </form>
 
     @if ($books->count() === 0)
-        <div class="alert alert-info">No books are currently flagged for review.</div>
+        <div class="alert alert-info">{{ __('No books are currently flagged for review.') }}</div>
     @else
         <div class="table-responsive">
             <table class="table table-striped align-middle">
                 <thead>
                     <tr>
-                        <th scope="col">Title</th>
-                        <th scope="col">Directory</th>
-                        <th scope="col">Reasons</th>
-                        <th scope="col">Created</th>
-                        <th scope="col" class="text-end">Actions</th>
+                        <th scope="col">{{ __('Title') }}</th>
+                        <th scope="col">{{ __('Directory') }}</th>
+                        <th scope="col">{{ __('Reasons') }}</th>
+                        <th scope="col">{{ __('Created') }}</th>
+                        <th scope="col" class="text-end">{{ __('Actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -64,7 +64,7 @@
                             </td>
                             <td>{{ $book['createdAt'] ? \Illuminate\Support\Carbon::parse($book['createdAt'])->toDateString() : '' }}</td>
                             <td class="text-end">
-                                <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary">Edit</a>
+                                <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary">{{ __('Edit') }}</a>
                             </td>
                         </tr>
                     @endforeach

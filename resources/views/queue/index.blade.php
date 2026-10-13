@@ -2,21 +2,21 @@
 
 @section('content')
     <div class="container">
-        <h1>Import Queue Management</h1>
+        <h1>{{ __('Import Queue Management') }}</h1>
         <div class="mb-3">
-            <button id="refresh-queue" class="btn btn-secondary">Refresh Queue</button>
-            <button id="start-worker" class="btn btn-success">Start Worker</button>
+            <button id="refresh-queue" class="btn btn-secondary">{{ __('Refresh Queue') }}</button>
+            <button id="start-worker" class="btn btn-success">{{ __('Start Worker') }}</button>
             <span id="worker-status" class="ms-3"></span>
         </div>
         <table class="table table-bordered" id="import-queue-table">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Directory</th>
-                    <th>Attempts</th>
-                    <th>Available At</th>
-                    <th>Created At</th>
-                    <th>Action</th>
+                    <th>{{ __('ID') }}</th>
+                    <th>{{ __('Directory') }}</th>
+                    <th>{{ __('Attempts') }}</th>
+                    <th>{{ __('Available At') }}</th>
+                    <th>{{ __('Created At') }}</th>
+                    <th>{{ __('Action') }}</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -53,7 +53,7 @@
                 });
             });
             $(document).on('click', '.remove-job', function() {
-                if (confirm('Remove this job from the queue?')) {
+                if (confirm(window.__('Remove this job from the queue?'))) {
                     $.post(`/admin/queue/remove/${$(this).data('id')}`, {_token: '{{ csrf_token() }}'}, function(data) {
                         loadQueue();
                         loadWorkerStatus();

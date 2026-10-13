@@ -59,7 +59,7 @@ class AIAssistantController extends Controller
                 ->first();
 
             if (!$session) {
-                return back()->with('error', 'Session not found');
+                return back()->with('error', __('Session not found'));
             }
         }
 
@@ -77,7 +77,7 @@ class AIAssistantController extends Controller
             }
 
             return redirect()->route('admin.ai-assistant.session', ['sessionId' => $result['session_id']])
-                ->with('success', 'Request processed successfully');
+                ->with('success', __('Request processed successfully'));
         } catch (\Exception $e) {
             Log::error('AI assistant processing failed', [
                 'user_id' => Auth::id(),
@@ -136,7 +136,7 @@ class AIAssistantController extends Controller
         }
 
         if ($session->status !== 'pending_approval') {
-            return back()->with('error', 'This session has already been executed or cancelled');
+            return back()->with('error', __('This session has already been executed or cancelled'));
         }
 
         $selectedBooks = $request->input('selected_books', []);
@@ -191,7 +191,7 @@ class AIAssistantController extends Controller
             ]);
 
         return redirect()->route('admin.ai-assistant.index')
-            ->with('success', 'Session cancelled');
+            ->with('success', __('Session cancelled'));
     }
 
     /**

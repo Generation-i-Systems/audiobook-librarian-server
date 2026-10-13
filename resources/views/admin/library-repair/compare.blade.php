@@ -45,12 +45,12 @@ td:hover > div .btn-edit-field { opacity: 1; }
 <div class="container-fluid">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start mb-3 gap-3">
         <div>
-            <h1 class="h3 mb-1">Resolve Duplicate Directory</h1>
+            <h1 class="h3 mb-1">{{ __('Resolve Duplicate Directory') }}</h1>
             <p class="text-muted mb-0">
-                <strong>Shared path:</strong> <code>{{ $issue['directoryPath'] ?? '—' }}</code>
+                <strong>{{ __('Shared path:') }}</strong> <code>{{ $issue['directoryPath'] ?? '—' }}</code>
             </p>
         </div>
-        <a href="{{ route('admin.library-repair.index') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
+        <a href="{{ route('admin.library-repair.index') }}" class="btn btn-outline-secondary btn-sm">{{ __('← Back') }}</a>
     </div>
 
     @if(session('error'))
@@ -127,7 +127,7 @@ td:hover > div .btn-edit-field { opacity: 1; }
                                 <th class="book-identity text-center">
                                     <div class="fw-semibold">
                                         Book #{{ $book->id }}
-                                        @if($book->trashed())<span class="badge text-bg-danger ms-1">Trashed</span>@endif
+                                        @if($book->trashed())<span class="badge text-bg-danger ms-1">{{ __('Trashed') }}</span>@endif
                                         <a href="{{ route('admin.books.edit', $book->id) }}" target="_blank"
                                            class="ms-2 small link-light link-offset-1" onclick="event.stopPropagation()">Edit &rarr;</a>
                                     </div>
@@ -137,14 +137,14 @@ td:hover > div .btn-edit-field { opacity: 1; }
                         </tr>
                         {{-- Row 2: select-book action (coloured) --}}
                         <tr>
-                            <th class="table-light small text-muted fw-semibold text-uppercase align-middle" style="font-size:.7rem;">Select all</th>
+                            <th class="table-light small text-muted fw-semibold text-uppercase align-middle" style="font-size:.7rem;">{{ __('Select all') }}</th>
                             @foreach($books as $bi => $book)
                                 <th class="{{ $headerClasses[$bi % 4] }} text-center book-col-header py-2"
                                     data-book-id="{{ $book->id }}"
                                     style="cursor:pointer;"
                                     onclick="selectBook({{ $book->id }})"
-                                    title="Click to use all fields from this book">
-                                    <span class="small fw-semibold">↑ Use all from this book</span>
+                                    title="{{ __('Click to use all fields from this book') }}">
+                                    <span class="small fw-semibold">{{ __('↑ Use all from this book') }}</span>
                                 </th>
                             @endforeach
                         </tr>
@@ -152,13 +152,13 @@ td:hover > div .btn-edit-field { opacity: 1; }
                     <tbody>
                         {{-- Cover --}}
                         <tr class="row-odd">
-                            <td class="fw-semibold text-muted small text-uppercase table-light">Cover</td>
+                            <td class="fw-semibold text-muted small text-uppercase table-light">{{ __('Cover') }}</td>
                             @foreach($books as $index => $book)
                                 <td id="cell_cover_image_{{ $book->id }}"
                                     class="{{ $coversdiffer ? 'book-cell' : 'table-secondary' }}"
                                     @if($coversdiffer) style="cursor:pointer;" data-book-id="{{ $book->id }}" data-field="cover_image" onclick="selectCover({{ $book->id }})" @endif>
                                     @php $url = $coverUrls[$index] ?? asset('images/placeholder.png'); @endphp
-                                    <img src="{{ $url }}" alt="Cover" style="max-height:120px;max-width:100%;display:block;margin:0 auto;">
+                                    <img src="{{ $url }}" alt="{{ __('Cover') }}" style="max-height:120px;max-width:100%;display:block;margin:0 auto;">
                                 </td>
                             @endforeach
                         </tr>
@@ -220,7 +220,7 @@ td:hover > div .btn-edit-field { opacity: 1; }
                         @if($hasFiles)
                             <tr class="section-header">
                                 <td colspan="{{ $bookCount + 1 }}" class="fw-semibold small text-uppercase py-1">
-                                    Files in shared directory
+                                    {{ __('Files in shared directory') }}
                                     <span class="text-muted fw-normal">(checked = keep, unchecked = move to trash)</span>
                                 </td>
                             </tr>
@@ -338,18 +338,18 @@ td:hover > div .btn-edit-field { opacity: 1; }
                                 <th class="book-identity text-center">
                                     <div class="fw-semibold">
                                         Book #{{ $book->id }}
-                                        @if($book->trashed())<span class="badge text-bg-danger ms-1">Trashed</span>@endif
+                                        @if($book->trashed())<span class="badge text-bg-danger ms-1">{{ __('Trashed') }}</span>@endif
                                         <a href="{{ route('admin.books.edit', $book->id) }}" target="_blank"
                                            class="ms-2 small link-light link-offset-1">Edit &rarr;</a>
                                     </div>
                                     <div class="small text-truncate opacity-75">{{ $book->title ?: '(no title)' }}</div>
                                 </th>
                             @endforeach
-                            <th class="book-identity text-center align-middle small fw-semibold">Copy<br>to both</th>
+                            <th class="book-identity text-center align-middle small fw-semibold">{{ __('Copy') }}<br>to both</th>
                         </tr>
                         {{-- Row 2: directory inputs (plain light, not coloured) --}}
                         <tr>
-                            <th class="table-light small text-muted fw-semibold text-uppercase align-middle" style="font-size:.7rem;">Directory</th>
+                            <th class="table-light small text-muted fw-semibold text-uppercase align-middle" style="font-size:.7rem;">{{ __('Directory') }}</th>
                             @foreach($books as $bi => $book)
                                 @php
                                     $suffix     = $bi === 0 ? '' : ' (' . ($bi + 1) . ')';
@@ -360,7 +360,7 @@ td:hover > div .btn-edit-field { opacity: 1; }
                                         class="form-control form-control-sm split-dir-input"
                                         name="splits[{{ $bi }}][dir]"
                                         value="{{ $defaultDir }}"
-                                        placeholder="Relative directory path"
+                                        placeholder="{{ __('Relative directory path') }}"
                                         style="font-size:.75rem;">
                                     <input type="hidden" name="splits[{{ $bi }}][book_id]" value="{{ $book->id }}">
                                 </th>
@@ -372,11 +372,11 @@ td:hover > div .btn-edit-field { opacity: 1; }
                     <tbody>
                         {{-- Cover — spans all data cols --}}
                         <tr class="row-odd">
-                            <td class="fw-semibold text-muted small text-uppercase table-light">Cover</td>
+                            <td class="fw-semibold text-muted small text-uppercase table-light">{{ __('Cover') }}</td>
                             @foreach($books as $index => $book)
                                 <td class="table-secondary text-center">
                                     <img src="{{ $coverUrls[$index] ?? asset('images/placeholder.png') }}"
-                                         alt="Cover" style="max-height:100px;max-width:100%;display:block;margin:0 auto;">
+                                         alt="{{ __('Cover') }}" style="max-height:100px;max-width:100%;display:block;margin:0 auto;">
                                 </td>
                             @endforeach
                             <td class="table-secondary"></td>
@@ -435,13 +435,13 @@ td:hover > div .btn-edit-field { opacity: 1; }
                         @if($hasFiles)
                             {{-- File sub-header row with per-book colour --}}
                             <tr class="section-header">
-                                <td class="fw-semibold small text-uppercase py-1 text-muted">Files</td>
+                                <td class="fw-semibold small text-uppercase py-1 text-muted">{{ __('Files') }}</td>
                                 @foreach($books as $bi => $book)
                                     <td class="{{ $headerClasses[$bi % 4] }} text-center fw-semibold small py-1">
                                         Book #{{ $book->id }} only
                                     </td>
                                 @endforeach
-                                <td class="table-light text-center fw-semibold small py-1 text-muted">Copy</td>
+                                <td class="table-light text-center fw-semibold small py-1 text-muted">{{ __('Copy') }}</td>
                             </tr>
 
                             @php $fileRowIndex = 0; @endphp
@@ -542,7 +542,7 @@ td:hover > div .btn-edit-field { opacity: 1; }
                                 @endif
                             @endforeach
                         @else
-                            <tr><td colspan="{{ $splitDataCols + 1 }}" class="text-muted small py-2 ps-3">No files found in the shared directory.</td></tr>
+                            <tr><td colspan="{{ $splitDataCols + 1 }}" class="text-muted small py-2 ps-3">{{ __('No files found in the shared directory.') }}</td></tr>
                         @endif
 
                         {{-- Submit row --}}
@@ -551,7 +551,7 @@ td:hover > div .btn-edit-field { opacity: 1; }
                             <td colspan="{{ $splitDataCols }}" class="py-2">
                                 <div class="d-flex align-items-center gap-3 flex-wrap">
                                     <button type="submit" class="btn btn-warning btn-sm">✂️ Split &amp; Resolve</button>
-                                    <span class="text-muted small">Files are moved/copied and each book gets its own directory.</span>
+                                    <span class="text-muted small">{{ __('Files are moved/copied and each book gets its own directory.') }}</span>
                                 </div>
                             </td>
                         </tr>
@@ -573,12 +573,12 @@ td:hover > div .btn-edit-field { opacity: 1; }
             </div>
             <div class="modal-body py-3">
                 <div id="relations-rows"></div>
-                <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="relations-add-btn">+ Add</button>
+                <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="relations-add-btn">{{ __('+ Add') }}</button>
                 <div id="relations-error" class="text-danger small mt-2" style="display:none;"></div>
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" id="relations-save-btn">Save</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                <button type="button" class="btn btn-primary btn-sm" id="relations-save-btn">{{ __('Save') }}</button>
             </div>
         </div>
     </div>
@@ -593,7 +593,7 @@ td:hover > div .btn-edit-field { opacity: 1; }
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body text-center py-3">
-                <audio id="audioPlayer" controls style="width:100%;" preload="metadata">Your browser does not support audio.</audio>
+                <audio id="audioPlayer" controls style="width:100%;" preload="metadata">{{ __('Your browser does not support audio.') }}</audio>
             </div>
         </div>
     </div>

@@ -3,7 +3,7 @@
 @section('content')
     <div class="container">
         @if(empty($isModal))
-            <h1>Edit Book</h1>
+            <h1>{{ __('Edit Book') }}</h1>
         @endif
 
         @if ($errors->any())

@@ -32,7 +32,7 @@ class PlayerController extends Controller
 
             if (empty($audioFiles)) {
                 return redirect()->route('books.show', $id)
-                    ->with('error', 'No audio files found for this book');
+                    ->with('error', __('No audio files found for this book'));
             }
 
             // Get user progress if authenticated
@@ -49,7 +49,7 @@ class PlayerController extends Controller
             ]);
 
             return redirect()->route('books.index')
-                ->with('error', 'Unable to load player');
+                ->with('error', __('Unable to load player'));
         }
     }
 

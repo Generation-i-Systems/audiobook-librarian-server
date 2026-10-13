@@ -19,5 +19,6 @@ return [
 
     'supported' => [
         'en' => 'English',
+        'es' => 'Español',
     ],
 ];

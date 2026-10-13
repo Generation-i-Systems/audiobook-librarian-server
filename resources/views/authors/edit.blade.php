@@ -3,7 +3,7 @@
 @section('content')
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>Edit Author</h1>
+            <h1>{{ __('Edit Author') }}</h1>
             <a href="{{ route('authors.index') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Authors
             </a>
@@ -12,14 +12,14 @@
         <div class="row">
             <div class="col-md-4">
                 <div class="card">
-                    <div class="card-header">Author Details</div>
+                    <div class="card-header">{{ __('Author Details') }}</div>
                     <div class="card-body">
                         <form action="{{ route('authors.update', $author['id']) }}" method="POST">
                             @csrf
                             @method('PUT')
 
                             <div class="form-group mb-3">
-                                <label for="name">Name:</label>
+                                <label for="name">{{ __('Name:') }}</label>
                                 <input type="text" class="form-control" id="name" name="name" value="{{ $author['name'] }}" required>
                             </div>
 
@@ -32,11 +32,11 @@
                             @csrf
                             @method('DELETE')
                             @if($total > 0)
-                                <button type="button" class="btn btn-outline-danger w-100" disabled data-bs-toggle="tooltip" title="Cannot delete authors with books. Remove all books first.">
+                                <button type="button" class="btn btn-outline-danger w-100" disabled data-bs-toggle="tooltip" title="{{ __('Cannot delete authors with books. Remove all books first.') }}">
                                     <i class="fas fa-trash-alt"></i> Delete Author ({{ $total }} books)
                                 </button>
                             @else
-                                <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Are you sure you want to delete this author?')">
+                                <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete this author?')) }})">
                                     <i class="fas fa-trash-alt"></i> Delete Author
                                 </button>
                             @endif
@@ -59,10 +59,10 @@
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
-                                            <th>Title</th>
-                                            <th>Series</th>
-                                            <th>Genres</th>
-                                            <th>Actions</th>
+                                            <th>{{ __('Title') }}</th>
+                                            <th>{{ __('Series') }}</th>
+                                            <th>{{ __('Genres') }}</th>
+                                            <th>{{ __('Actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -89,10 +89,10 @@
                             </div>
 
                             @if($totalPages > 1)
-                                <nav aria-label="Books pagination">
+                                <nav aria-label="{{ __('Books pagination') }}">
                                     <ul class="pagination justify-content-center">
                                         <li class="page-item {{ $currentPage <= 1 ? 'disabled' : '' }}">
-                                            <a class="page-link" href="{{ route('authors.edit', ['author' => $author['id'], 'page' => $currentPage - 1]) }}">Previous</a>
+                                            <a class="page-link" href="{{ route('authors.edit', ['author' => $author['id'], 'page' => $currentPage - 1]) }}">{{ __('Previous') }}</a>
                                         </li>
 
                                         @for($i = max(1, $currentPage - 2); $i <= min($totalPages, $currentPage + 2); $i++)
@@ -102,13 +102,13 @@
                                         @endfor
 
                                         <li class="page-item {{ $currentPage >= $totalPages ? 'disabled' : '' }}">
-                                            <a class="page-link" href="{{ route('authors.edit', ['author' => $author['id'], 'page' => $currentPage + 1]) }}">Next</a>
+                                            <a class="page-link" href="{{ route('authors.edit', ['author' => $author['id'], 'page' => $currentPage + 1]) }}">{{ __('Next') }}</a>
                                         </li>
                                     </ul>
                                 </nav>
                             @endif
                         @else
-                            <p class="text-muted text-center py-4">No books found for this author.</p>
+                            <p class="text-muted text-center py-4">{{ __('No books found for this author.') }}</p>
                         @endif
                     </div>
                 </div>

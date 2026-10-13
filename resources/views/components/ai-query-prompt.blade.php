@@ -2,11 +2,11 @@
 <div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
     <div class="text-center">
         <div class="spinner-border text-light" role="status" style="width: 4rem; height: 4rem; border-width: 0.4rem;">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden">{{ __('Loading...') }}</span>
         </div>
         <div class="mt-3 text-white">
-            <h4><i class="fas fa-robot"></i> AI is thinking...</h4>
-            <p class="text-muted">This may take a few seconds</p>
+            <h4><i class="fas fa-robot"></i> {{ __('AI is thinking...') }}</h4>
+            <p class="text-muted">{{ __('This may take a few seconds') }}</p>
         </div>
     </div>
 </div>
@@ -61,9 +61,9 @@
                         <small class="form-text text-muted">
                             <strong>Examples:</strong>
                             <ul class="mb-0 mt-1">
-                                <li><strong>Research:</strong> "What author has published in the most genres?"</li>
-                                <li><strong>Find Books:</strong> "List books where the directory doesn't match the genre"</li>
-                                <li><strong>Bulk Update:</strong> "Move all books by Homer to the Classic genre"</li>
+                                <li><strong>{{ __('Research:') }}</strong> {{ __('"What author has published in the most genres?"') }}</li>
+                                <li><strong>{{ __('Find Books:') }}</strong> {{ __('"List books where the directory doesn\'t match the genre"') }}</li>
+                                <li><strong>{{ __('Bulk Update:') }}</strong> {{ __('"Move all books by Homer to the Classic genre"') }}</li>
                             </ul>
                         </small>
                     </div>

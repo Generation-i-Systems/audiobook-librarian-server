@@ -30,7 +30,7 @@ class FollowController extends Controller
             $followableId
         );
 
-        return back()->with('success', 'Successfully followed!');
+        return back()->with('success', __('Successfully followed!'));
     }
 
     public function unfollow(Request $request, $followableType, $followableId)
@@ -47,6 +47,6 @@ class FollowController extends Controller
             $followableId
         );
 
-        return back()->with('success', 'Successfully unfollowed!');
+        return back()->with('success', __('Successfully unfollowed!'));
     }
 }

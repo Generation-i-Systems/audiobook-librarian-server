@@ -32,7 +32,7 @@ class MessageController extends Controller
             $adminId = $admins[0]['id'] ?? null;
 
             if (! is_int($adminId)) {
-                return back()->with('error', 'No admin user available');
+                return back()->with('error', __('No admin user available'));
             }
 
             $senderId = Auth::check() ? Auth::id() : null;
@@ -46,14 +46,14 @@ class MessageController extends Controller
             $messageId = $this->documentStoreService->createMessage($messageData);
 
             if ($messageId) {
-                return back()->with('success', 'Message sent to admin!');
+                return back()->with('success', __('Message sent to admin!'));
             }
 
-            return back()->with('error', 'Failed to send message. Please try again.');
+            return back()->with('error', __('Failed to send message. Please try again.'));
         } catch (\Exception $e) {
             Log::error('Failed to send message: ' . $e->getMessage());
 
-            return back()->with('error', 'An error occurred while sending your message.');
+            return back()->with('error', __('An error occurred while sending your message.'));
         }
     }
 
@@ -80,14 +80,14 @@ class MessageController extends Controller
             $messageId = $this->documentStoreService->createMessage($messageData);
 
             if ($messageId) {
-                return back()->with('success', 'Message sent to user!');
+                return back()->with('success', __('Message sent to user!'));
             }
 
-            return back()->with('error', 'Failed to send message. Please try again.');
+            return back()->with('error', __('Failed to send message. Please try again.'));
         } catch (\Exception $e) {
             Log::error('Failed to send admin message: ' . $e->getMessage());
 
-            return back()->with('error', 'An error occurred while sending the message.');
+            return back()->with('error', __('An error occurred while sending the message.'));
         }
     }
 }

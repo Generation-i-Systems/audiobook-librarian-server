@@ -217,7 +217,7 @@ class UserController extends Controller
             'role_after_update' => $updatedUser['role'] ?? 'null',
         ]);
 
-        return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
+        return redirect()->route('admin.users.index')->with('success', __('User updated successfully.'));
     }
 
 
@@ -225,7 +225,7 @@ class UserController extends Controller
     {
         $user = $this->documentStoreService->getUserById($id);
         if (!$user) {
-            return back()->with('error', 'User not found.');
+            return back()->with('error', __('User not found.'));
         }
 
         $response = app(AdminUserController::class)->sendOtp($request, (string) $id);
@@ -258,14 +258,14 @@ class UserController extends Controller
 
         User::findOrFail($id)->permissions()->sync($permissionIds);
 
-        return back()->with('success', 'Permissions updated successfully.');
+        return back()->with('success', __('Permissions updated successfully.'));
     }
 
     public function destroy($id)
     {
         $this->documentStoreService->deleteUser($id);
 
-        return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
+        return redirect()->route('admin.users.index')->with('success', __('User deleted successfully.'));
     }
 
     /**

@@ -2,19 +2,19 @@
 
 @section('content')
     <div class="container">
-        <h1>Manage Authors</h1>
+        <h1>{{ __('Manage Authors') }}</h1>
 
         @if (session('success'))
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 {{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
 
         @if (session('error'))
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 {{ session('error') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
 
@@ -25,7 +25,7 @@
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
 
@@ -39,7 +39,7 @@
                     <h5 class="mb-0"><i class="fas fa-users-cog me-2"></i>Selected for Merge ({{ count($selectedAuthors) }})</h5>
                     <form action="{{ route('authors.clear-merge') }}" method="POST" class="d-inline">
                         @csrf
-                        <button type="submit" class="btn btn-sm btn-outline-dark">Clear All</button>
+                        <button type="submit" class="btn btn-sm btn-outline-dark">{{ __('Clear All') }}</button>
                     </form>
                 </div>
                 <div class="card-body">
@@ -60,9 +60,9 @@
                             <div class="col-md-4">
                                 <div class="row g-2 align-items-end">
                                     <div class="col-12">
-                                        <label for="primary_author_id" class="form-label">Primary Author</label>
+                                        <label for="primary_author_id" class="form-label">{{ __('Primary Author') }}</label>
                                         <select name="primary_author_id" id="primary_author_id" class="form-select" required>
-                                            <option value="">Select primary...</option>
+                                            <option value="">{{ __('Select primary...') }}</option>
                                             @foreach($selectedAuthors as $selAuthorOption)
                                                 <option value="{{ $selAuthorOption['id'] }}">{{ $selAuthorOption['name'] }}</option>
                                             @endforeach
@@ -85,26 +85,26 @@
         <form action="{{ route('authors.index') }}" method="GET" class="mb-3">
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">
-                    <label for="search" class="form-label">Search</label>
-                    <input type="text" id="search" class="form-control" placeholder="Search author name" name="search"
+                    <label for="search" class="form-label">{{ __('Search') }}</label>
+                    <input type="text" id="search" class="form-control" placeholder="{{ __('Search author name') }}" name="search"
                         value="{{ $search }}">
                 </div>
                 <div class="col-md-2">
-                    <label for="sort" class="form-label">Sort by</label>
+                    <label for="sort" class="form-label">{{ __('Sort by') }}</label>
                     <select name="sort" id="sort" class="form-select">
-                        <option value="name" {{ $sort === 'name' ? 'selected' : '' }}>Name</option>
-                        <option value="books" {{ $sort === 'books' ? 'selected' : '' }}>Book count</option>
+                        <option value="name" {{ $sort === 'name' ? 'selected' : '' }}>{{ __('Name') }}</option>
+                        <option value="books" {{ $sort === 'books' ? 'selected' : '' }}>{{ __('Book count') }}</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label for="direction" class="form-label">Direction</label>
+                    <label for="direction" class="form-label">{{ __('Direction') }}</label>
                     <select name="direction" id="direction" class="form-select">
-                        <option value="asc" {{ $direction === 'asc' ? 'selected' : '' }}>Ascending</option>
-                        <option value="desc" {{ $direction === 'desc' ? 'selected' : '' }}>Descending</option>
+                        <option value="asc" {{ $direction === 'asc' ? 'selected' : '' }}>{{ __('Ascending') }}</option>
+                        <option value="desc" {{ $direction === 'desc' ? 'selected' : '' }}>{{ __('Descending') }}</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label for="perPage" class="form-label">Per Page</label>
+                    <label for="perPage" class="form-label">{{ __('Per Page') }}</label>
                     <select name="perPage" id="perPage" class="form-select">
                         <option value="25" {{ request('perPage') == 25 ? 'selected' : '' }}>25</option>
                         <option value="50" {{ request('perPage') == 50 ? 'selected' : '' }}>50</option>
@@ -112,19 +112,19 @@
                     </select>
                 </div>
                 <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-secondary" type="submit">Apply</button>
+                    <button class="btn btn-outline-secondary" type="submit">{{ __('Apply') }}</button>
                 </div>
             </div>
         </form>
 
         @can('manage-authors')
             <div class="mb-3">
-                <a href="{{ route('authors.create') }}" class="btn btn-primary">Add New Author</a>
+                <a href="{{ route('authors.create') }}" class="btn btn-primary">{{ __('Add New Author') }}</a>
             </div>
         @endcan
 
         <div class="mb-2 text-muted small">
-            <span>Total authors: <strong>{{ $authors->total() }}</strong></span>
+            <span>{{ __('Total authors:') }} <strong>{{ $authors->total() }}</strong></span>
             <span class="ms-3">Showing {{ $authors->count() }} of {{ $authors->total() }} authors</span>
         </div>
 
@@ -132,10 +132,10 @@
             <thead>
                 <tr>
                     @can('manage-authors')
-                        <th>Merge</th>
+                        <th>{{ __('Merge') }}</th>
                     @endcan
-                    <th>Name</th>
-                    <th>Actions</th>
+                    <th>{{ __('Name') }}</th>
+                    <th>{{ __('Actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -156,15 +156,15 @@
                         </td>
                         <td>
                             <a href="{{ route('authors.browse', $author->id) }}"
-                                class="btn btn-sm btn-outline-secondary" title="Browse"><i class="fas fa-sitemap"></i></a>
+                                class="btn btn-sm btn-outline-secondary" title="{{ __('Browse') }}"><i class="fas fa-sitemap"></i></a>
                             @can('manage-authors')
                                 <a href="{{ route('admin.books.create') }}?author_id={{ $author->id }}"
-                                    class="btn btn-sm btn-outline-success" title="Add Book"><i
+                                    class="btn btn-sm btn-outline-success" title="{{ __('Add Book') }}"><i
                                         class="fas fa-plus-circle"></i></a>
                                 <a href="{{ route('authors.edit', $author->id) }}"
-                                    class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
-                                    onclick="if(confirm('Are you sure you want to delete author &quot;{{ addslashes($author->name) }}&quot;?')) { document.getElementById('delete-author-form').action = '{{ route('authors.destroy', $author->id) }}'; document.getElementById('delete-author-form').submit(); }">
+                                    class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}"
+                                    onclick="if(confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete author ":name"?', ['name' => $author->name])) }})) { document.getElementById('delete-author-form').action = '{{ route('authors.destroy', $author->id) }}'; document.getElementById('delete-author-form').submit(); }">
                                     <i class="fas fa-trash-alt"></i>
                                 </button>
                             @endcan
@@ -172,7 +172,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="3" class="text-center text-muted">No authors found.</td>
+                        <td colspan="3" class="text-center text-muted">{{ __('No authors found.') }}</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -217,7 +217,7 @@
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        alert('Failed to update merge selection.');
+                        alert(window.__('Failed to update merge selection.'));
                         this.checked = !isChecked; // Revert checkbox
                     });
                 });

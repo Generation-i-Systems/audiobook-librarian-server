@@ -57,22 +57,22 @@
         @endphp
         @if($coverUrl)
             <div class="mb-3">
-                <img src="{{ $coverUrl }}" alt="Book Cover" style="max-height: 200px; border:1px solid #ccc;">
+                <img src="{{ $coverUrl }}" alt="{{ __('Book Cover') }}" style="max-height: 200px; border:1px solid #ccc;">
             </div>
         @endif
         <h1>{{ is_array($book['title'] ?? null) ? ($book['title'][0] ?? 'No Title') : ($book['title'] ?? 'No Title') }}</h1>
         <ul class="list-group mb-4">
             <li class="list-group-item">
-                <strong>Author:</strong> {{ formatValue($book['author_name'] ?? $book['author'] ?? 'N/A') }}
+                <strong>{{ __('Author:') }}</strong> {{ formatValue($book['author_name'] ?? $book['author'] ?? 'N/A') }}
             </li>
             <li class="list-group-item">
-                <strong>Genre:</strong> {{ formatValue($book['genre'] ?? 'N/A') }}
+                <strong>{{ __('Genre:') }}</strong> {{ formatValue($book['genre'] ?? 'N/A') }}
             </li>
             <li class="list-group-item">
-                <strong>Series:</strong> {!! formatSeries($book['series'] ?? []) !!}
+                <strong>{{ __('Series:') }}</strong> {!! formatSeries($book['series'] ?? []) !!}
             </li>
             <li class="list-group-item">
-                <strong>Description:</strong>
+                <strong>{{ __('Description:') }}</strong>
                 {{ is_array($book['description'] ?? null) ? nl2br(e(implode("\n", $book['description']))) : e($book['description'] ?? 'No description available') }}
             </li>
             <li class="list-group-item">
@@ -83,14 +83,14 @@
                         $rdDisplay = preg_match('/^\d{4}-01-01$/', $rd) ? substr($rd, 0, 4) : $rd;
                     }
                 @endphp
-                <strong>Release Date:</strong> {{ $rdDisplay !== '' ? $rdDisplay : 'N/A' }}
+                <strong>{{ __('Release Date:') }}</strong> {{ $rdDisplay !== '' ? $rdDisplay : 'N/A' }}
             </li>
             <li class="list-group-item">
-                <strong>Date Added:</strong>
+                <strong>{{ __('Date Added:') }}</strong>
                 {{ is_array($book['createdAt'] ?? $book['created_at'] ?? null) ? (($book['createdAt'] ?? $book['created_at'])['date'] ?? 'N/A') : ($book['createdAt'] ?? $book['created_at'] ?? 'N/A') }}
             </li>
             <li class="list-group-item">
-                <strong>Directory Path:</strong> {{ $book['directoryPath'] ?? $book['directory_path'] ?? 'N/A' }}
+                <strong>{{ __('Directory Path:') }}</strong> {{ $book['directoryPath'] ?? $book['directory_path'] ?? 'N/A' }}
             </li>
         </ul>
         @php
@@ -98,8 +98,8 @@
             $backHref = $returnUrl ?: route('admin.books.index');
         @endphp
         <div class="mt-3">
-            <a href="{{ route('admin.books.edit', $book['id'] ?? 0) }}" class="btn btn-primary">Edit</a>
-            <a href="{{ $backHref }}" class="btn btn-secondary">Back to List</a>
+            <a href="{{ route('admin.books.edit', $book['id'] ?? 0) }}" class="btn btn-primary">{{ __('Edit') }}</a>
+            <a href="{{ $backHref }}" class="btn btn-secondary">{{ __('Back to List') }}</a>
             <a href="{{ route('admin.books.rawJson', $book['id'] ?? 0) }}" class="btn btn-info" target="_blank">View Raw
                 JSON</a>
         </div>

@@ -3,7 +3,7 @@
 @section('content')
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>Edit Genre</h1>
+            <h1>{{ __('Edit Genre') }}</h1>
             <a href="{{ route('genres.index') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Genres
             </a>
@@ -12,29 +12,29 @@
         <div class="row">
             <div class="col-md-4">
                 <div class="card">
-                    <div class="card-header">Genre Details</div>
+                    <div class="card-header">{{ __('Genre Details') }}</div>
                     <div class="card-body">
                         <form action="{{ route('genres.update', $genre['id']) }}" method="POST">
                             @csrf
                             @method('PUT')
 
                             <div class="form-group mb-3">
-                                <label for="name">Name:</label>
+                                <label for="name">{{ __('Name:') }}</label>
                                 <input type="text" class="form-control" id="name" name="name" value="{{ $genre['name'] }}" required>
                             </div>
 
                             <div class="form-group mb-3">
-                                <label for="emoji">Emoji:</label>
+                                <label for="emoji">{{ __('Emoji:') }}</label>
                                 <input type="text" class="form-control" id="emoji" name="emoji" value="{{ old('emoji', $genre['emoji'] ?? '') }}" maxlength="16">
                             </div>
 
                             <div class="form-group mb-3">
-                                <label for="icon_path">Icon path:</label>
+                                <label for="icon_path">{{ __('Icon path:') }}</label>
                                 <input type="text" class="form-control" id="icon_path" name="icon_path" value="{{ old('icon_path', $genre['icon_path'] ?? '') }}" placeholder="/images/genres/fantasy.svg">
                             </div>
 
                             <div class="mb-3">
-                                <div class="text-muted small mb-2">Preview</div>
+                                <div class="text-muted small mb-2">{{ __('Preview') }}</div>
                                 <div class="d-flex align-items-center gap-2">
                                     @if(!empty($genre['icon_path']))
                                         <img src="{{ $genre['icon_path'] }}" alt="{{ $genre['name'] }} icon" style="width: 36px; height: 36px; object-fit: contain;">
@@ -52,11 +52,11 @@
                             @csrf
                             @method('DELETE')
                             @if($total > 0)
-                                <button type="button" class="btn btn-outline-danger w-100" disabled data-bs-toggle="tooltip" title="Cannot delete genres with books. Remove all books first.">
+                                <button type="button" class="btn btn-outline-danger w-100" disabled data-bs-toggle="tooltip" title="{{ __('Cannot delete genres with books. Remove all books first.') }}">
                                     <i class="fas fa-trash-alt"></i> Delete Genre ({{ $total }} books)
                                 </button>
                             @else
-                                <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Are you sure you want to delete this genre?')">
+                                <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete this genre?')) }})">
                                     <i class="fas fa-trash-alt"></i> Delete Genre
                                 </button>
                             @endif
@@ -79,10 +79,10 @@
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
-                                            <th>Title</th>
-                                            <th>Authors</th>
-                                            <th>Series</th>
-                                            <th>Actions</th>
+                                            <th>{{ __('Title') }}</th>
+                                            <th>{{ __('Authors') }}</th>
+                                            <th>{{ __('Series') }}</th>
+                                            <th>{{ __('Actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -109,10 +109,10 @@
                             </div>
 
                             @if($totalPages > 1)
-                                <nav aria-label="Books pagination">
+                                <nav aria-label="{{ __('Books pagination') }}">
                                     <ul class="pagination justify-content-center">
                                         <li class="page-item {{ $currentPage <= 1 ? 'disabled' : '' }}">
-                                            <a class="page-link" href="{{ route('genres.edit', ['genre' => $genre['id'], 'page' => $currentPage - 1]) }}">Previous</a>
+                                            <a class="page-link" href="{{ route('genres.edit', ['genre' => $genre['id'], 'page' => $currentPage - 1]) }}">{{ __('Previous') }}</a>
                                         </li>
 
                                         @for($i = max(1, $currentPage - 2); $i <= min($totalPages, $currentPage + 2); $i++)
@@ -122,13 +122,13 @@
                                         @endfor
 
                                         <li class="page-item {{ $currentPage >= $totalPages ? 'disabled' : '' }}">
-                                            <a class="page-link" href="{{ route('genres.edit', ['genre' => $genre['id'], 'page' => $currentPage + 1]) }}">Next</a>
+                                            <a class="page-link" href="{{ route('genres.edit', ['genre' => $genre['id'], 'page' => $currentPage + 1]) }}">{{ __('Next') }}</a>
                                         </li>
                                     </ul>
                                 </nav>
                             @endif
                         @else
-                            <p class="text-muted text-center py-4">No books found in this genre.</p>
+                            <p class="text-muted text-center py-4">{{ __('No books found in this genre.') }}</p>
                         @endif
                     </div>
                 </div>

@@ -2,11 +2,11 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-6">Reading Goals</h1>
+    <h1 class="text-3xl font-bold mb-6">{{ __('Reading Goals') }}</h1>
 
     @if ($goals->isEmpty())
         <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4" role="alert">
-            <p>You haven't set any reading goals yet. Go to your <a href="{{ route('my-library.queue') }}" class="font-bold underline">Queue</a> and set target dates!</p>
+            <p>{{ __('You haven\'t set any reading goals yet. Go to your') }} <a href="{{ route('my-library.queue') }}" class="font-bold underline">{{ __('Queue') }}</a> and set target dates!</p>
         </div>
     @else
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -47,14 +47,14 @@
                         
                         <div class="mt-6 flex justify-between items-center">
                             <a href="{{ route('books.show', $status->book->id) }}" class="text-sm font-bold text-blue-600 hover:text-blue-800">
-                                View Book
+                                {{ __('View Book') }}
                             </a>
                             <button 
                                 data-book-id="{{ $status->book->id }}"
                                 data-target-date="{{ $status->target_date->format('Y-m-d') }}"
                                 onclick="openGoalModal(this)"
                                 class="text-sm font-bold text-gray-500 hover:text-gray-700">
-                                Edit Goal
+                                {{ __('Edit Goal') }}
                             </button>
                         </div>
                     </div>
@@ -67,12 +67,12 @@
 <!-- Simple Goal Edit Modal (Placeholder for actual JS implementation) -->
 <div id="goal-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
     <div class="bg-white p-8 rounded-lg shadow-xl w-96">
-        <h2 class="text-xl font-bold mb-4">Edit Reading Goal</h2>
+        <h2 class="text-xl font-bold mb-4">{{ __('Edit Reading Goal') }}</h2>
         <form id="goal-form">
             <input type="hidden" id="goal-book-id">
             <div class="mb-4">
                 <label class="block text-gray-700 text-sm font-bold mb-2" for="target_date">
-                    Target Completion Date
+                    {{ __('Target Completion Date') }}
                 </label>
                 <input type="date" id="goal-target-date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
@@ -81,7 +81,7 @@
                     Cancel
                 </button>
                 <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-                    Save Goal
+                    {{ __('Save Goal') }}
                 </button>
             </div>
         </form>
@@ -129,7 +129,7 @@
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while updating the goal.');
+            alert(window.__('An error occurred while updating the goal.'));
         });
     };
 </script>

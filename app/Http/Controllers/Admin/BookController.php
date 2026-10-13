@@ -393,7 +393,7 @@ class BookController extends Controller
 
             $returnUrl = $request->input('returnUrl') ?? session('last_admin_list_url');
             if ($returnUrl) {
-                return redirect($returnUrl)->with('success', 'Book created successfully.');
+                return redirect($returnUrl)->with('success', __('Book created successfully.'));
             }
 
             Log::debug('BookController@store: Method completed successfully', ['bookId' => $bookId]);
@@ -401,10 +401,10 @@ class BookController extends Controller
             // Ensure we have a valid book ID before redirecting
             if (empty($bookId)) {
                 Log::error('BookController@store: No bookId returned from createBook');
-                return redirect()->route('admin.books.index')->with('error', 'Book creation failed - no ID returned.');
+                return redirect()->route('admin.books.index')->with('error', __('Book creation failed - no ID returned.'));
             }
 
-            return redirect()->route('admin.books.edit', $bookId)->with('success', 'Book created successfully.');
+            return redirect()->route('admin.books.edit', $bookId)->with('success', __('Book created successfully.'));
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Book creation validation failed', ['errors' => $e->errors(), 'input' => $request->all()]);
             if ($request->ajax()) {
@@ -424,7 +424,7 @@ class BookController extends Controller
                     ->withInput($request->except(['cover', 'coverImage']));
             }
 
-            return redirect()->back()->with('error', 'An unexpected error occurred while creating the book.')
+            return redirect()->back()->with('error', __('An unexpected error occurred while creating the book.'))
                 ->withInput($request->except(['cover', 'coverImage']));
         }
     }
@@ -1061,7 +1061,7 @@ class BookController extends Controller
 
         // Redirect to returnUrl if present, else fallback to last list or main index
         $returnUrl = $request->input('returnUrl') ?? session('last_admin_list_url') ?? route('admin.books.index');
-        return redirect($returnUrl)->with('success', 'Book updated successfully');
+        return redirect($returnUrl)->with('success', __('Book updated successfully'));
     }
 
     public function autofillFromPath(Request $request, string $book)
@@ -1070,28 +1070,28 @@ class BookController extends Controller
         $bookData = $this->documentStoreService->getBook($book);
 
         if (!$bookData) {
-            return redirect($returnUrl)->with('error', 'Book not found.');
+            return redirect($returnUrl)->with('error', __('Book not found.'));
         }
 
         $directoryPath = trim((string) ($bookData['directoryPath'] ?? ''));
         if ($directoryPath === '') {
-            return redirect($returnUrl)->with('error', 'Cannot autofill: book has no directory path.');
+            return redirect($returnUrl)->with('error', __('Cannot autofill: book has no directory path.'));
         }
 
         $seed = $this->buildAutofillSearchSeed($directoryPath);
         if ($seed['title'] === '') {
-            return redirect($returnUrl)->with('error', 'Could not derive a title from the directory path.');
+            return redirect($returnUrl)->with('error', __('Could not derive a title from the directory path.'));
         }
 
         $match = $this->findBestAutofillMatch($seed['title'], $seed['author']);
         if ($match === null) {
             return redirect($returnUrl)
-                ->with('error', 'No metadata match found from path-derived search (Audible/Google/AudiobookBay/Hardcover).');
+                ->with('error', __('No metadata match found from path-derived search (Audible/Google/AudiobookBay/Hardcover).'));
         }
 
         $updates = $this->buildAutofillUpdatesFromResult($match['result'], $match['source'], $bookData, $seed);
         if (empty($updates)) {
-            return redirect($returnUrl)->with('error', 'Autofill match found, but no usable metadata was returned.');
+            return redirect($returnUrl)->with('error', __('Autofill match found, but no usable metadata was returned.'));
         }
 
         $this->documentStoreService->updateBook($book, $updates);
@@ -1511,15 +1511,15 @@ class BookController extends Controller
         $bookData = $documentStore->getBook($book);
         if (!$bookData) {
             if ($returnUrl) {
-                return redirect($returnUrl)->with('error', 'Book not found');
+                return redirect($returnUrl)->with('error', __('Book not found'));
             }
             $queryParams = $request->query();
             if (empty($queryParams)) {
                 return redirect()->route('admin.books.index')
-                    ->with('error', 'Book not found');
+                    ->with('error', __('Book not found'));
             }
             return redirect()->route('admin.books.index', $queryParams)
-                ->with('error', 'Book not found');
+                ->with('error', __('Book not found'));
         }
 
         $directoryPath = $bookData['directoryPath'] ?? null;
@@ -1532,7 +1532,7 @@ class BookController extends Controller
             if ($isShared) {
                 // Directory is shared - return back with confirmation request
                 return redirect()->back()
-                    ->with('error', 'This book shares a directory with other books. You can only delete the database record.')
+                    ->with('error', __('This book shares a directory with other books. You can only delete the database record.'))
                     ->with('requires_confirmation', true)
                     ->with('book_id', $bookId)
                     ->with('book_title', $bookData['title'] ?? 'Unknown')

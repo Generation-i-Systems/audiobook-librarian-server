@@ -27,23 +27,23 @@
                     <thead>
                         <tr>
                             @if($entityType === 'books')
-                                <th>Title</th>
-                                <th>Authors</th>
-                                <th>Genres</th>
-                                <th>Series</th>
-                                <th>Directory Path</th>
+                                <th>{{ __('Title') }}</th>
+                                <th>{{ __('Authors') }}</th>
+                                <th>{{ __('Genres') }}</th>
+                                <th>{{ __('Series') }}</th>
+                                <th>{{ __('Directory Path') }}</th>
                             @elseif(in_array($entityType, ['authors', 'genres', 'series', 'narrators']))
-                                <th>Name</th>
-                                <th>Book Count</th>
+                                <th>{{ __('Name') }}</th>
+                                <th>{{ __('Book Count') }}</th>
                             @else
-                                <th>ID</th>
+                                <th>{{ __('ID') }}</th>
                                 @foreach(array_keys($items[0] ?? []) as $key)
                                     @if($key !== 'id' && $key !== 'edit_url')
                                         <th>{{ ucfirst(str_replace('_', ' ', $key)) }}</th>
                                     @endif
                                 @endforeach
                             @endif
-                            <th>Actions</th>
+                            <th>{{ __('Actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -98,10 +98,10 @@
             </div>
 
             @if($totalPages > 1)
-                <nav aria-label="Results pagination" class="mt-3">
+                <nav aria-label="{{ __('Results pagination') }}" class="mt-3">
                     <ul class="pagination justify-content-center">
                         <li class="page-item {{ $page <= 1 ? 'disabled' : '' }}">
-                            <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $page - 1]) }}">Previous</a>
+                            <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $page - 1]) }}">{{ __('Previous') }}</a>
                         </li>
 
                         @for($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++)
@@ -111,7 +111,7 @@
                         @endfor
 
                         <li class="page-item {{ $page >= $totalPages ? 'disabled' : '' }}">
-                            <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $page + 1]) }}">Next</a>
+                            <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $page + 1]) }}">{{ __('Next') }}</a>
                         </li>
                     </ul>
                     <p class="text-center text-muted small">

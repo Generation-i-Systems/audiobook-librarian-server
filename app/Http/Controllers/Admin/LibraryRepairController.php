@@ -94,12 +94,12 @@ class LibraryRepairController extends Controller
         if (!$resolved) {
             return redirect()
                 ->back()
-                ->with('error', 'Unable to resolve library repair issue. It may have already been resolved.');
+                ->with('error', __('Unable to resolve library repair issue. It may have already been resolved.'));
         }
 
         return redirect()
             ->back()
-            ->with('success', 'Library repair issue resolved.');
+            ->with('success', __('Library repair issue resolved.'));
     }
 
     public function rescan(int $issueId): RedirectResponse
@@ -159,7 +159,7 @@ class LibraryRepairController extends Controller
 
             return redirect()
                 ->route('admin.library-repair.index')
-                ->with('success', 'Library repair scan started. The page will refresh to show updated results.');
+                ->with('success', __('Library repair scan started. The page will refresh to show updated results.'));
         } catch (\Throwable $e) {
             Log::error('Library repair refresh failed', [
                 'error' => $e->getMessage(),
@@ -177,12 +177,12 @@ class LibraryRepairController extends Controller
 
         if ($issue === null || ($issue['issueType'] ?? '') !== LibraryRepairIssueType::DUPLICATE_DIRECTORY->value) {
             return redirect()->route('admin.library-repair.index')
-                ->with('error', 'Issue not found or not a duplicate directory issue.');
+                ->with('error', __('Issue not found or not a duplicate directory issue.'));
         }
 
         if (($issue['status'] ?? '') !== 'pending') {
             return redirect()->route('admin.library-repair.index')
-                ->with('info', 'This issue is already resolved.');
+                ->with('info', __('This issue is already resolved.'));
         }
 
         $bookIds = $issue['metadata']['book_ids'] ?? [];
@@ -281,14 +281,14 @@ class LibraryRepairController extends Controller
 
         if ($issue === null || ($issue['issueType'] ?? '') !== LibraryRepairIssueType::DUPLICATE_DIRECTORY->value) {
             return redirect()->route('admin.library-repair.index')
-                ->with('error', 'Issue not found or not a duplicate directory issue.');
+                ->with('error', __('Issue not found or not a duplicate directory issue.'));
         }
 
         $bookIds = $issue['metadata']['book_ids'] ?? [];
         $keepBookId = (int) $request->input('keep_book_id');
 
         if (!in_array($keepBookId, $bookIds, true)) {
-            return redirect()->back()->with('error', 'The selected book is not part of this duplicate issue.');
+            return redirect()->back()->with('error', __('The selected book is not part of this duplicate issue.'));
         }
 
         $books = Book::withTrashed()->with(['authors', 'narrators', 'series', 'genres'])
@@ -299,7 +299,7 @@ class LibraryRepairController extends Controller
         $keeper = $books->get($keepBookId);
 
         if ($keeper === null) {
-            return redirect()->back()->with('error', 'Keeper book not found.');
+            return redirect()->back()->with('error', __('Keeper book not found.'));
         }
 
         // Step 1: Apply any inline-edited field values to each book
@@ -345,7 +345,7 @@ class LibraryRepairController extends Controller
         }
 
         return redirect()->route('admin.library-repair.index')
-            ->with('success', 'Duplicate resolved. Keeper book updated and duplicates trashed.');
+            ->with('success', __('Duplicate resolved. Keeper book updated and duplicates trashed.'));
     }
 
     public function splitDuplicate(Request $request, int $issueId): RedirectResponse
@@ -367,7 +367,7 @@ class LibraryRepairController extends Controller
 
         if ($issue === null || ($issue['issueType'] ?? '') !== LibraryRepairIssueType::DUPLICATE_DIRECTORY->value) {
             return redirect()->route('admin.library-repair.index')
-                ->with('error', 'Issue not found or not a duplicate directory issue.');
+                ->with('error', __('Issue not found or not a duplicate directory issue.'));
         }
 
         $directoryPath = $issue['directoryPath'] ?? '';
@@ -395,7 +395,7 @@ class LibraryRepairController extends Controller
         }
 
         return redirect()->route('admin.library-repair.index')
-            ->with('success', 'Directory split successfully. Each book now has its own directory.');
+            ->with('success', __('Directory split successfully. Each book now has its own directory.'));
     }
 
     /**

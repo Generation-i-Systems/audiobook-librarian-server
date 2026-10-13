@@ -97,7 +97,7 @@ class JobController extends Controller
         // would falsely mark a job "queued" when nothing was actually requeued.
         return redirect()
             ->route('admin.jobs.show', $id)
-            ->with('error', 'Retry is not yet implemented for this job.');
+            ->with('error', __('Retry is not yet implemented for this job.'));
     }
 
 
@@ -119,7 +119,7 @@ class JobController extends Controller
         if (!in_array($job['status'] ?? null, ['queued', 'processing'])) {
             return redirect()
                 ->route('admin.jobs.show', $id)
-                ->with('error', 'Only queued or processing jobs can be cancelled.');
+                ->with('error', __('Only queued or processing jobs can be cancelled.'));
         }
 
         // Cancel is not implemented: there is no way to actually stop a running job
@@ -128,7 +128,7 @@ class JobController extends Controller
         // running and later overwrite this fake status itself.
         return redirect()
             ->route('admin.jobs.show', $id)
-            ->with('error', 'Cancel is not yet implemented for this job.');
+            ->with('error', __('Cancel is not yet implemented for this job.'));
     }
 
 

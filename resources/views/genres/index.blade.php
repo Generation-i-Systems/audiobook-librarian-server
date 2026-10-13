@@ -2,21 +2,21 @@
 
 @section('content')
     <div class="container">
-        <h1>Genres</h1>
+        <h1>{{ __('Genres') }}</h1>
 
         @include('components.ai-query-prompt')
 
         @if(session('success'))
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 {{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
 
         @if (session('error'))
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 {{ session('error') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
 
@@ -27,35 +27,35 @@
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
 
         <form action="{{ route('genres.index') }}" method="GET" class="mb-3">
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">
-                    <label for="sort" class="form-label">Sort by</label>
+                    <label for="sort" class="form-label">{{ __('Sort by') }}</label>
                     <select name="sort" id="sort" class="form-select">
-                        <option value="name" {{ ($sort ?? 'name') === 'name' ? 'selected' : '' }}>Name</option>
-                        <option value="books" {{ ($sort ?? 'name') === 'books' ? 'selected' : '' }}>Book count</option>
-                        <option value="authors" {{ ($sort ?? 'name') === 'authors' ? 'selected' : '' }}>Author count</option>
+                        <option value="name" {{ ($sort ?? 'name') === 'name' ? 'selected' : '' }}>{{ __('Name') }}</option>
+                        <option value="books" {{ ($sort ?? 'name') === 'books' ? 'selected' : '' }}>{{ __('Book count') }}</option>
+                        <option value="authors" {{ ($sort ?? 'name') === 'authors' ? 'selected' : '' }}>{{ __('Author count') }}</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label for="direction" class="form-label">Direction</label>
+                    <label for="direction" class="form-label">{{ __('Direction') }}</label>
                     <select name="direction" id="direction" class="form-select">
-                        <option value="asc" {{ ($direction ?? 'asc') === 'asc' ? 'selected' : '' }}>Ascending</option>
-                        <option value="desc" {{ ($direction ?? 'asc') === 'desc' ? 'selected' : '' }}>Descending</option>
+                        <option value="asc" {{ ($direction ?? 'asc') === 'asc' ? 'selected' : '' }}>{{ __('Ascending') }}</option>
+                        <option value="desc" {{ ($direction ?? 'asc') === 'desc' ? 'selected' : '' }}>{{ __('Descending') }}</option>
                     </select>
                 </div>
                 <div class="col-md-2 d-grid">
-                    <button class="btn btn-outline-secondary" type="submit">Apply</button>
+                    <button class="btn btn-outline-secondary" type="submit">{{ __('Apply') }}</button>
                 </div>
             </div>
         </form>
 
         @can('manage-genres')
-            <a href="{{ route('genres.create') }}" class="btn btn-primary mb-3">Create New Genre</a>
+            <a href="{{ route('genres.create') }}" class="btn btn-primary mb-3">{{ __('Create New Genre') }}</a>
         @endcan
 
         <form action="{{ route('genres.merge') }}" method="POST">
@@ -64,11 +64,11 @@
                 <thead>
                     <tr>
                         @can('manage-genres')
-                            <th>Select</th>
+                            <th>{{ __('Select') }}</th>
                         @endcan
-                        <th>Icon</th>
-                        <th>Name</th>
-                        <th>Actions</th>
+                        <th>{{ __('Icon') }}</th>
+                        <th>{{ __('Name') }}</th>
+                        <th>{{ __('Actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -98,13 +98,13 @@
                             <td>
                                 @can('manage-genres')
                                     <a href="{{ route('genres.edit', $genre['id']) }}" class="btn btn-sm btn-outline-primary"
-                                        title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                                        title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
                                 @endcan
                                 <a href="{{ route('genres.authors', $genre['id']) }}"
-                                    class="btn btn-sm btn-outline-secondary" title="View Authors"><i
+                                    class="btn btn-sm btn-outline-secondary" title="{{ __('View Authors') }}"><i
                                         class="fas fa-users"></i></a>
                                 @can('manage-genres')
-                                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                    <button type="button" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}"
                                         data-confirm-message="Are you sure you want to delete genre &quot;{{ $genre['name'] }}&quot;?"
                                         data-action-url="{{ route('genres.destroy', $genre['id']) }}"
                                         onclick="if(confirm(this.dataset.confirmMessage)) { document.getElementById('delete-genre-form').action = this.dataset.actionUrl; document.getElementById('delete-genre-form').submit(); }">
@@ -120,7 +120,7 @@
             @can('manage-genres')
                 <div class="row align-items-end mb-3">
                     <div class="col-md-4">
-                        <label for="primary_genre_id" class="form-label">Primary genre</label>
+                        <label for="primary_genre_id" class="form-label">{{ __('Primary genre') }}</label>
                         <select name="primary_genre_id" id="primary_genre_id" class="form-select">
                             @foreach($genres as $genreOption)
                                 <option value="{{ $genreOption['id'] }}">{{ $genreOption['name'] }}</option>

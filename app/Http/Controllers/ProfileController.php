@@ -75,10 +75,10 @@ class ProfileController extends Controller
         ]);
 
         if ($success) {
-            return back()->with('success', 'Profile updated successfully!');
+            return back()->with('success', __('Profile updated successfully!'));
         }
 
-        return back()->with('error', 'Failed to update profile. Please try again.');
+        return back()->with('error', __('Failed to update profile. Please try again.'));
     }
 
 
@@ -101,10 +101,10 @@ class ProfileController extends Controller
         ]);
 
         if ($success) {
-            return back()->with('success', 'Password changed successfully!');
+            return back()->with('success', __('Password changed successfully!'));
         }
 
-        return back()->with('error', 'Failed to update password. Please try again.');
+        return back()->with('error', __('Failed to update password. Please try again.'));
     }
 
 
@@ -118,13 +118,13 @@ class ProfileController extends Controller
         $adminId = $admins[0]['id'] ?? null;
 
         if (! is_int($adminId)) {
-            return back()->with('error', 'No admin user available');
+            return back()->with('error', __('No admin user available'));
         }
 
         $senderId = Auth::id();
 
         if (! is_int($senderId)) {
-            return back()->with('error', 'Unauthenticated');
+            return back()->with('error', __('Unauthenticated'));
         }
 
         $payload = [
@@ -139,10 +139,10 @@ class ProfileController extends Controller
         ]);
 
         if ($messageId) {
-            return back()->with('success', 'Admin permission request sent!');
+            return back()->with('success', __('Admin permission request sent!'));
         }
 
-        return back()->with('error', 'Failed to send admin request. Please try again.');
+        return back()->with('error', __('Failed to send admin request. Please try again.'));
     }
 
 
@@ -159,7 +159,7 @@ class ProfileController extends Controller
         $user = $userId === null ? null : User::find($userId);
 
         if ($user === null) {
-            return back()->with('error', 'Unable to verify your account.');
+            return back()->with('error', __('Unable to verify your account.'));
         }
 
         $request->validate([

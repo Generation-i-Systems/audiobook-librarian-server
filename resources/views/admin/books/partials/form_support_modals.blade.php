@@ -3,27 +3,27 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="renameSeriesModalLabel">Rename Series</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="renameSeriesModalLabel">{{ __('Rename Series') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Warning:</strong> This will rename the series for ALL books in this series, not just this book.
+                            <strong>{{ __('Warning:') }}</strong> This will rename the series for ALL books in this series, not just this book.
                         </div>
                         <div class="mb-3">
-                            <label for="old-series-name" class="form-label">Current Series Name</label>
+                            <label for="old-series-name" class="form-label">{{ __('Current Series Name') }}</label>
                             <input type="text" class="form-control" id="old-series-name" readonly>
                         </div>
                         <div class="mb-3">
-                            <label for="new-series-name" class="form-label">New Series Name</label>
-                            <input type="text" class="form-control" id="new-series-name" placeholder="Enter new series name">
+                            <label for="new-series-name" class="form-label">{{ __('New Series Name') }}</label>
+                            <input type="text" class="form-control" id="new-series-name" placeholder="{{ __('Enter new series name') }}">
                         </div>
                         <div id="rename-series-feedback"></div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="confirm-rename-series-btn">Rename Series</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        <button type="button" class="btn btn-primary" id="confirm-rename-series-btn">{{ __('Rename Series') }}</button>
                     </div>
                 </div>
             </div>
@@ -34,20 +34,20 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="relatedBooksModalLabel">Other Books</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="relatedBooksModalLabel">{{ __('Other Books') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <div id="related-books-list">
                             <div class="text-center p-4">
                                 <div class="spinner-border" role="status">
-                                    <span class="visually-hidden">Loading...</span>
+                                    <span class="visually-hidden">{{ __('Loading...') }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                     </div>
                 </div>
             </div>
@@ -58,12 +58,12 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="directoryBrowserModalLabel">Browse Directories</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="directoryBrowserModalLabel">{{ __('Browse Directories') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Current Path:</label>
+                            <label class="form-label">{{ __('Current Path:') }}</label>
                             <div class="d-flex align-items-center">
                                 <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="dir-browser-up-btn" disabled>
                                     <i class="fas fa-arrow-up"></i> Up
@@ -73,13 +73,13 @@
                         </div>
                         <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
                             <div id="dir-browser-list">
-                                <div class="text-center text-muted">Loading...</div>
+                                <div class="text-center text-muted">{{ __('Loading...') }}</div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="dir-browser-select-btn">Select This Directory</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        <button type="button" class="btn btn-primary" id="dir-browser-select-btn">{{ __('Select This Directory') }}</button>
                     </div>
                 </div>
             </div>
@@ -93,18 +93,18 @@
                         <h5 class="modal-title" id="directoryConflictModalLabel">
                             <i class="fas fa-exclamation-triangle me-2"></i>Directory Path Conflict
                         </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-warning">
-                            <strong>Warning:</strong> The directory path you entered is already used by another book.
+                            <strong>{{ __('Warning:') }}</strong> The directory path you entered is already used by another book.
                         </div>
                         <div id="conflict-book-info" class="mb-3">
-                            <p class="mb-2"><strong>Conflicting book:</strong></p>
+                            <p class="mb-2"><strong>{{ __('Conflicting book:') }}</strong></p>
                             <ul id="conflict-book-list" class="list-unstyled ms-3">
                             </ul>
                         </div>
-                        <p class="mb-3">What would you like to do?</p>
+                        <p class="mb-3">{{ __('What would you like to do?') }}</p>
                         <div class="d-grid gap-2">
                             <button type="button" class="btn btn-primary" id="conflict-change-path-btn">
                                 <i class="fas fa-edit me-2"></i>Change This Book's Directory Path
@@ -118,7 +118,7 @@
                         </div>
                         <div class="mt-3">
                             <small class="text-muted">
-                                <strong>Note:</strong> Merging will combine all files from both directories. Moving will relocate the other book's files.
+                                <strong>{{ __('Note:') }}</strong> Merging will combine all files from both directories. Moving will relocate the other book's files.
                             </small>
                         </div>
                     </div>
@@ -131,21 +131,21 @@
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="audioMetadataModalLabel">Audio File Metadata</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="audioMetadataModalLabel">{{ __('Audio File Metadata') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <div id="metadata-content">
                             <div class="text-center p-4">
                                 <div class="spinner-border" role="status">
-                                    <span class="visually-hidden">Loading...</span>
+                                    <span class="visually-hidden">{{ __('Loading...') }}</span>
                                 </div>
-                                <p class="mt-2 text-muted">Loading metadata...</p>
+                                <p class="mt-2 text-muted">{{ __('Loading metadata...') }}</p>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                     </div>
                 </div>
             </div>
@@ -250,16 +250,16 @@
           <div class="modal-dialog modal-lg">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title" id="rawJsonModalLabel">Edit Book Raw JSON</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="rawJsonModalLabel">{{ __('Edit Book Raw JSON') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
               </div>
               <div class="modal-body">
                 <div id="raw-json-error" class="alert alert-danger d-none" role="alert" style="display:none;"></div>
                 <textarea id="raw-json-textarea" class="form-control font-monospace" rows="18" style="font-size:0.98em;"></textarea>
               </div>
               <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="save-raw-json-btn">Save JSON</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                <button type="button" class="btn btn-primary" id="save-raw-json-btn">{{ __('Save JSON') }}</button>
               </div>
             </div>
           </div>
@@ -269,32 +269,32 @@
           <div class="modal-dialog modal-lg">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title" id="autofillModalLabel">Autofill Book Metadata</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="autofillModalLabel">{{ __('Autofill Book Metadata') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
               </div>
               <div class="modal-body autofill-modal-scrollable">
                 <div id="autofill-search-form" class="mb-3">
                   <div class="row g-2 mb-2">
                     <div class="col-md-3">
-                      <label for="autofill-title" class="form-label">Title</label>
+                      <label for="autofill-title" class="form-label">{{ __('Title') }}</label>
                       <input type="text" class="form-control" id="autofill-title" name="title" maxlength="120" autocomplete="off">
                     </div>
                     <div class="col-md-3">
-                      <label for="autofill-author" class="form-label">Author</label>
+                      <label for="autofill-author" class="form-label">{{ __('Author') }}</label>
                       <input type="text" class="form-control" id="autofill-author" name="author" maxlength="120" autocomplete="off">
                     </div>
                     <div class="col-md-3">
-                      <label for="autofill-series" class="form-label">Series</label>
+                      <label for="autofill-series" class="form-label">{{ __('Series') }}</label>
                       <input type="text" class="form-control" id="autofill-series" name="series" maxlength="120" autocomplete="off">
                     </div>
                     <div class="col-md-3">
                       <label for="autofill-api-id" class="form-label">API ID (Optional)</label>
-                      <input type="text" class="form-control" id="autofill-api-id" name="api_id" placeholder="ASIN, Google ID, etc" autocomplete="off">
+                      <input type="text" class="form-control" id="autofill-api-id" name="api_id" placeholder="{{ __('ASIN, Google ID, etc') }}" autocomplete="off">
                     </div>
                   </div>
                   <div class="row g-2 mb-2">
                     <div class="col-12">
-                      <label class="form-label">Search Sources</label>
+                      <label class="form-label">{{ __('Search Sources') }}</label>
                       <div class="btn-group w-100" role="group">
                         <button type="button" class="btn btn-outline-primary" data-source="audible" id="search-audible-btn">
                           <i class="fas fa-headphones me-1"></i> Audible
@@ -308,7 +308,7 @@
                         <button type="button" class="btn btn-outline-primary" data-source="hardcover" id="search-hardcover-btn">
                           <i class="fas fa-book-open me-1"></i> Hardcover
                         </button>
-                        <button type="button" class="btn btn-outline-success" id="search-all-btn" title="Search all sources">
+                        <button type="button" class="btn btn-outline-success" id="search-all-btn" title="{{ __('Search all sources') }}">
                           <i class="fas fa-search"></i>
                         </button>
                       </div>
@@ -324,15 +324,15 @@
                   <table class="table table-bordered table-hover align-middle mb-0" id="autofill-results-table">
                     <thead class="table-light">
                       <tr>
-                        <th scope="col">Select</th>
-                        <th scope="col">Cover</th>
-                        <th scope="col">Title</th>
-                        <th scope="col">Author</th>
-                        <th scope="col">Narrator</th>
-                        <th scope="col">Series</th>
-                        <th scope="col">Genre</th>
-                        <th scope="col">Year</th>
-                        <th scope="col">Source</th>
+                        <th scope="col">{{ __('Select') }}</th>
+                        <th scope="col">{{ __('Cover') }}</th>
+                        <th scope="col">{{ __('Title') }}</th>
+                        <th scope="col">{{ __('Author') }}</th>
+                        <th scope="col">{{ __('Narrator') }}</th>
+                        <th scope="col">{{ __('Series') }}</th>
+                        <th scope="col">{{ __('Genre') }}</th>
+                        <th scope="col">{{ __('Year') }}</th>
+                        <th scope="col">{{ __('Source') }}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -342,8 +342,8 @@
                 </div>
               </div>
               <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="autofill-apply-btn" disabled>Apply</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                <button type="button" class="btn btn-success" id="autofill-apply-btn" disabled>{{ __('Apply') }}</button>
               </div>
             </div>
           </div>
@@ -360,7 +360,7 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body text-center py-3">
-                        <audio id="audioPlayer" controls style="width:100%;" preload="metadata">Your browser does not support audio.</audio>
+                        <audio id="audioPlayer" controls style="width:100%;" preload="metadata">{{ __('Your browser does not support audio.') }}</audio>
                     </div>
                 </div>
             </div>

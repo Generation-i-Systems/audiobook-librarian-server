@@ -55,7 +55,7 @@ class TagController extends Controller
             return response()->json(array_merge($result, ['message' => 'Tags updated successfully!']));
         }
 
-        return back()->with('success', 'Tags updated successfully!');
+        return back()->with('success', __('Tags updated successfully!'));
     }
 
     /**

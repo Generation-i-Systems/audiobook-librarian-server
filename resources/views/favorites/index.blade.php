@@ -30,19 +30,19 @@
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 class="mb-0">Add Favorite Author</h5>
+                                    <h5 class="mb-0">{{ __('Add Favorite Author') }}</h5>
                                 </div>
                                 <div class="card-body">
                                     <form method="POST" action="{{ route('favorites.store') }}">
                                         @csrf
                                         <div class="form-group">
-                                            <label for="author_name">Author Name</label>
+                                            <label for="author_name">{{ __('Author Name') }}</label>
                                             <input type="text"
                                                    class="form-control @error('author_name') is-invalid @enderror"
                                                    id="author_name"
                                                    name="author_name"
                                                    list="authors-list"
-                                                   placeholder="Enter or select author name"
+                                                   placeholder="{{ __('Enter or select author name') }}"
                                                    required>
                                             <datalist id="authors-list">
                                                 @foreach($allAuthors as $author)
@@ -64,16 +64,16 @@
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 class="mb-0">About Favorite Authors</h5>
+                                    <h5 class="mb-0">{{ __('About Favorite Authors') }}</h5>
                                 </div>
                                 <div class="card-body">
-                                    <p>When you favorite an author, the system will:</p>
+                                    <p>{{ __('When you favorite an author, the system will:') }}</p>
                                     <ul>
-                                        <li>Scrape AudiobookBay daily for new releases</li>
-                                        <li>Send you email notifications for new books</li>
-                                        <li>Track discovered books in your dashboard</li>
+                                        <li>{{ __('Scrape AudiobookBay daily for new releases') }}</li>
+                                        <li>{{ __('Send you email notifications for new books') }}</li>
+                                        <li>{{ __('Track discovered books in your dashboard') }}</li>
                                     </ul>
-                                    <p class="mb-0"><strong>Categories monitored:</strong> Sci-Fi, Fantasy, LitRPG</p>
+                                    <p class="mb-0"><strong>{{ __('Categories monitored:') }}</strong> {{ __('Sci-Fi, Fantasy, LitRPG') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -89,17 +89,17 @@
                             @if($favorites->isEmpty())
                                 <div class="alert alert-info">
                                     <i class="fas fa-info-circle"></i>
-                                    You haven't added any favorite authors yet. Add one above to start receiving notifications!
+                                    {{ __('You haven\'t added any favorite authors yet. Add one above to start receiving notifications!') }}
                                 </div>
                             @else
                                 <div class="table-responsive">
                                     <table class="table table-hover">
                                         <thead>
                                             <tr>
-                                                <th>Author Name</th>
-                                                <th>Email Notifications</th>
-                                                <th>Added On</th>
-                                                <th style="width: 200px;">Actions</th>
+                                                <th>{{ __('Author Name') }}</th>
+                                                <th>{{ __('Email Notifications') }}</th>
+                                                <th>{{ __('Added On') }}</th>
+                                                <th style="width: 200px;">{{ __('Actions') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -136,10 +136,10 @@
                                                         <form method="POST"
                                                               action="{{ route('favorites.destroy', $favorite) }}"
                                                               style="display: inline;"
-                                                              onsubmit="return confirm('Remove {{ $favorite->author_name }} from favorites?');">
+                                                              onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Remove :name from favorites?', ['name' => $favorite->author_name])) }});">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" class="btn btn-sm btn-danger" title="Remove from favorites">
+                                                            <button type="submit" class="btn btn-sm btn-danger" title="{{ __('Remove from favorites') }}">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         </form>

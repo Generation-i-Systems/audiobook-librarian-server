@@ -3,8 +3,8 @@
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>Search LibriVox</h1>
-        <a href="{{ route('admin.librivox.index') }}" class="btn btn-outline-secondary">Browse Imported</a>
+        <h1>{{ __('Search LibriVox') }}</h1>
+        <a href="{{ route('admin.librivox.index') }}" class="btn btn-outline-secondary">{{ __('Browse Imported') }}</a>
     </div>
 
     @if($error)
@@ -14,11 +14,11 @@
     <form action="{{ route('admin.librivox.search') }}" method="GET" class="mb-4">
         <div class="input-group">
             <select name="field" class="form-select" style="max-width: 130px;">
-                <option value="title" @selected(request('field', 'title') === 'title')>Title</option>
-                <option value="author" @selected(request('field') === 'author')>Author</option>
+                <option value="title" @selected(request('field', 'title') === 'title')>{{ __('Title') }}</option>
+                <option value="author" @selected(request('field') === 'author')>{{ __('Author') }}</option>
             </select>
-            <input type="text" class="form-control" name="q" value="{{ $query }}" placeholder="Search LibriVox catalog..." autofocus>
-            <button class="btn btn-primary" type="submit">Search</button>
+            <input type="text" class="form-control" name="q" value="{{ $query }}" placeholder="{{ __('Search LibriVox catalog...') }}" autofocus>
+            <button class="btn btn-primary" type="submit">{{ __('Search') }}</button>
         </div>
     </form>
 
@@ -66,10 +66,10 @@
                             <span class="small text-muted">ID: {{ $book['id'] }}</span>
                             <div class="d-flex gap-2 align-items-center">
                                 @if(!empty($book['url_librivox']))
-                                    <a href="{{ $book['url_librivox'] }}" target="_blank" class="small">LibriVox ↗</a>
+                                    <a href="{{ $book['url_librivox'] }}" target="_blank" class="small">{{ __('LibriVox ↗') }}</a>
                                 @endif
                                 @if(!empty($book['_local_id']))
-                                    <a href="{{ route('admin.books.show', $book['_local_id']) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                                    <a href="{{ route('admin.books.show', $book['_local_id']) }}" class="btn btn-sm btn-outline-secondary">{{ __('View') }}</a>
                                 @endif
                             </div>
                         </div>

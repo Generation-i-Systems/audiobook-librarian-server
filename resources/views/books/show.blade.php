@@ -24,7 +24,7 @@
                 </div>
             @endif
         </div>
-        <p><strong>Path:</strong>
+        <p><strong>{{ __('Path:') }}</strong>
             {{ isset($book['directoryPath']) ? $book['directoryPath'] : (isset($book['path']) ? $book['path'] : 'N/A') }}
         </p>
 
@@ -38,7 +38,7 @@
                 <img src="{{ $cover }}" alt="{{ $book['title'] }}" class="img-fluid rounded shadow-sm">
             </div>
             <div class="col-md-8">
-                <p><strong>Author:</strong>
+                <p><strong>{{ __('Author:') }}</strong>
                     @if(isset($book['authors']) && is_array($book['authors']) && !empty($book['authors']))
                         {{ implode(', ', $book['authors']) }}
                     @else
@@ -46,13 +46,13 @@
                     @endif
                 </p>
                 @if(!empty($book['series']))
-                    <p><strong>Series:</strong>
+                    <p><strong>{{ __('Series:') }}</strong>
                         @foreach($book['series'] as $series)
                             {{ $series['seriesName'] }}@if(isset($series['number'])) (Book {{ $series['number'] }})@endif
                         @endforeach
                     </p>
                 @endif
-                <p><strong>Genre:</strong>
+                <p><strong>{{ __('Genre:') }}</strong>
                     @if(isset($book['genres']) && is_array($book['genres']) && !empty($book['genres']))
                         {{ implode(', ', $book['genres']) }}
                     @else
@@ -63,7 +63,7 @@
 
                 @auth
                     <div class="mb-3" id="book-tags">
-                        <strong>Tags:</strong>
+                        <strong>{{ __('Tags:') }}</strong>
                         <div class="mt-1">
                             @forelse(($tags['system'] ?? []) as $tag)
                                 <span class="badge bg-primary me-1">{{ $tag }}</span>
@@ -78,13 +78,13 @@
                                 <span class="badge bg-secondary me-1">{{ $tag }}</span>
                             @endforeach
                             @if(empty($tags['system'] ?? []) && empty($tags['groups'] ?? []) && empty($tags['user'] ?? []))
-                                <span class="text-muted">No tags yet.</span>
+                                <span class="text-muted">{{ __('No tags yet.') }}</span>
                             @endif
                         </div>
 
                         @if(!empty($popularTags))
                             <div class="mt-2">
-                                <small class="text-muted">Popular tags:</small><br>
+                                <small class="text-muted">{{ __('Popular tags:') }}</small><br>
                                 @foreach($popularTags as $popularTag)
                                     <span class="badge bg-light text-dark border tag-suggestion" style="cursor:pointer" data-tag="{{ $popularTag }}">
                                         {{ $popularTag }}
@@ -108,11 +108,11 @@
                                 <div class="col-md-4">
                                     <form action="{{ route('books.tags.update', $book['id']) }}" method="POST" class="border rounded p-2">
                                         @csrf
-                                        <label class="form-label small fw-bold">System Tags</label>
+                                        <label class="form-label small fw-bold">{{ __('System Tags') }}</label>
                                         <input type="hidden" name="scope" value="system">
                                         <input type="text" name="tags" class="form-control form-control-sm tag-input"
                                             value="{{ implode(', ', $tags['system'] ?? []) }}" placeholder="comma separated">
-                                        <button type="submit" class="btn btn-sm btn-outline-primary mt-1">Save</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary mt-1">{{ __('Save') }}</button>
                                     </form>
                                 </div>
                             @endcan
@@ -129,7 +129,7 @@
                                         <input type="hidden" name="group_id" value="{{ $group->id }}">
                                         <input type="text" name="tags" class="form-control form-control-sm tag-input"
                                             value="{{ implode(', ', $existingGroupTags) }}" placeholder="comma separated">
-                                        <button type="submit" class="btn btn-sm btn-outline-info mt-1">Save</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-info mt-1">{{ __('Save') }}</button>
                                     </form>
                                 </div>
                             @endforeach
@@ -137,11 +137,11 @@
                             <div class="col-md-4">
                                 <form action="{{ route('books.tags.update', $book['id']) }}" method="POST" class="border rounded p-2">
                                     @csrf
-                                    <label class="form-label small fw-bold">My Tags</label>
+                                    <label class="form-label small fw-bold">{{ __('My Tags') }}</label>
                                     <input type="hidden" name="scope" value="user">
                                     <input type="text" name="tags" class="form-control form-control-sm tag-input"
                                         value="{{ implode(', ', $tags['user'] ?? []) }}" placeholder="comma separated">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary mt-1">Save</button>
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary mt-1">{{ __('Save') }}</button>
                                 </form>
                             </div>
                         </div>
@@ -165,7 +165,7 @@
                 <hr>
 
                 @if(!empty($relatedBooks))
-                    <h2>Related Books</h2>
+                    <h2>{{ __('Related Books') }}</h2>
                     <div class="row">
                         @foreach($relatedBooks as $relatedBook)
                             <div class="col-md-4 mb-3">
@@ -183,7 +183,7 @@
                                         <h6 class="card-title text-truncate" title="{{ $relatedBook['title'] }}">{{ $relatedBook['title'] }}</h6>
                                         <div class="d-flex justify-content-between align-items-center mt-2">
                                             <a href="{{ route($showRoute, $relatedBook['id']) }}"
-                                                class="btn btn-sm btn-outline-primary">View</a>
+                                                class="btn btn-sm btn-outline-primary">{{ __('View') }}</a>
                                             @can('manage-books')
                                                 <a href="{{ route('admin.books.edit', $relatedBook['id']) }}"
                                                     class="btn btn-sm btn-outline-warning">
@@ -199,31 +199,31 @@
                     <hr>
                 @endif
 
-                <h2>Reviews</h2>
+                <h2>{{ __('Reviews') }}</h2>
                 @if(isset($book['reviews']) && is_array($book['reviews']))
                     @foreach($book['reviews'] as $review)
                         <div class="card mb-3">
                             <div class="card-body">
                                 <p>{{ isset($review['comment']) ? $review['comment'] : '' }}</p>
-                                <p><strong>Age Rating:</strong> {{ isset($review['age_rating']) ? $review['age_rating'] : 'N/A' }}
+                                <p><strong>{{ __('Age Rating:') }}</strong> {{ isset($review['age_rating']) ? $review['age_rating'] : 'N/A' }}
                                 </p>
-                                <p><strong>Content Rating:</strong>
+                                <p><strong>{{ __('Content Rating:') }}</strong>
                                     {{ isset($review['content_rating']) ? $review['content_rating'] : 'N/A' }}</p>
                             </div>
                         </div>
                     @endforeach
                 @else
-                    <p>No reviews available.</p>
+                    <p>{{ __('No reviews available.') }}</p>
                 @endif
 
                 <form action="{{ route('reviews.store', $book['id']) }}" method="POST">
                     @csrf
                     <div class="form-group">
-                        <label for="comment">Add a Review:</label>
+                        <label for="comment">{{ __('Add a Review:') }}</label>
                         <textarea class="form-control" id="comment" name="comment" rows="3" required></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="age_rating">Age Rating:</label>
+                        <label for="age_rating">{{ __('Age Rating:') }}</label>
                         <select class="form-control" id="age_rating" name="age_rating">
                             <option value="1">1 (Very Young)</option>
                             <option value="2">2</option>
@@ -233,15 +233,15 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="content_rating">Content Rating:</label>
+                        <label for="content_rating">{{ __('Content Rating:') }}</label>
                         <select class="form-control" id="content_rating" name="content_rating">
                             <option value="G">G</option>
-                            <option value="PG">PG</option>
-                            <option value="PG-13">PG-13</option>
+                            <option value="PG">{{ __('PG') }}</option>
+                            <option value="PG-13">{{ __('PG-13') }}</option>
                             <option value="R">R</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Submit Review</button>
+                    <button type="submit" class="btn btn-primary">{{ __('Submit Review') }}</button>
                 </form>
 
             </div>

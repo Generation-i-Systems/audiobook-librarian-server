@@ -10,7 +10,7 @@
             @endphp
             @if(!empty($user['photo_url']))
                 <img src="{{ $user['photo_url'] }}"
-                     alt="Profile Photo"
+                     alt="{{ __('Profile Photo') }}"
                      class="rounded-circle me-3"
                      style="width: 64px; height: 64px; object-fit: cover;"
                      onerror="this.onerror=null; this.src='{{ $fallbackSvg }}';">
@@ -22,9 +22,9 @@
             <div>
                 <h1 class="h3 mb-0">{{ $user['name'] ?? 'Unknown User' }}
                     @if(($user['role'] ?? '') === 'unverified')
-                        <span class="badge bg-warning text-dark">Unverified</span>
+                        <span class="badge bg-warning text-dark">{{ __('Unverified') }}</span>
                     @else
-                        <span class="badge bg-success">Verified</span>
+                        <span class="badge bg-success">{{ __('Verified') }}</span>
                     @endif
 
                     @if(!empty($user['google_id']))
@@ -56,18 +56,18 @@
         <div class="col-md-3 mb-4">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">Profile Info</h5>
+                    <h5 class="mb-0">{{ __('Profile Info') }}</h5>
                 </div>
                 <div class="card-body">
-                    <p><strong>Role:</strong> {{ ucfirst($user['role'] ?? 'User') }}</p>
-                    <p><strong>Joined:</strong> {{ !empty($user['created_at']) ? \Carbon\Carbon::parse($user['created_at'])->format('M j, Y') : 'N/A' }}</p>
-                    <p><strong>Last Active:</strong> {{ !empty($user['last_active_at']) ? \Carbon\Carbon::parse($user['last_active_at'])->diffForHumans() : 'N/A' }}</p>
+                    <p><strong>{{ __('Role:') }}</strong> {{ ucfirst($user['role'] ?? 'User') }}</p>
+                    <p><strong>{{ __('Joined:') }}</strong> {{ !empty($user['created_at']) ? \Carbon\Carbon::parse($user['created_at'])->format('M j, Y') : 'N/A' }}</p>
+                    <p><strong>{{ __('Last Active:') }}</strong> {{ !empty($user['last_active_at']) ? \Carbon\Carbon::parse($user['last_active_at'])->diffForHumans() : 'N/A' }}</p>
                     <div class="d-grid gap-2 mt-3">
                         <a href="{{ route('admin.events.timeline', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
-                            Event Timeline
+                            {{ __('Event Timeline') }}
                         </a>
                         <a href="{{ route('admin.books.positions', $user['id']) }}" class="btn btn-outline-secondary btn-sm">
-                            Books in Progress
+                            {{ __('Books in Progress') }}
                         </a>
                     </div>
                 </div>

@@ -4,7 +4,7 @@
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-md-12">
-            <h2><i class="fas fa-trash me-2"></i>Trash Management</h2>
+            <h2><i class="fas fa-trash me-2"></i>{{ __('Trash Management') }}</h2>
         </div>
     </div>
 
@@ -26,7 +26,7 @@
         <div class="col-md-4">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Total Items</h5>
+                    <h5 class="card-title">{{ __('Total Items') }}</h5>
                     <p class="card-text display-6">{{ $stats['total_count'] }}</p>
                 </div>
             </div>
@@ -34,7 +34,7 @@
         <div class="col-md-4">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Total Size</h5>
+                    <h5 class="card-title">{{ __('Total Size') }}</h5>
                     <p class="card-text display-6">{{ \Illuminate\Support\Number::fileSize($stats['total_size']) }}</p>
                 </div>
             </div>
@@ -42,7 +42,7 @@
         <div class="col-md-4">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Actions</h5>
+                    <h5 class="card-title">{{ __('Actions') }}</h5>
                     <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteAllModal">
                         <i class="fas fa-trash-alt me-2"></i>Delete All
                     </button>
@@ -54,12 +54,12 @@
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header">Auto-Cleanup Settings</div>
+                <div class="card-header">{{ __('Auto-Cleanup Settings') }}</div>
                 <div class="card-body">
                     <form action="{{ route('admin.trash.cleanup') }}" method="POST" class="row g-3">
                         @csrf
                         <div class="col-auto">
-                            <label for="cleanupDays" class="col-form-label">Remove items older than:</label>
+                            <label for="cleanupDays" class="col-form-label">{{ __('Remove items older than:') }}</label>
                         </div>
                         <div class="col-auto">
                             <input type="number" class="form-control" id="cleanupDays" name="days" value="90" min="1" max="365">
@@ -68,7 +68,7 @@
                             <span class="col-form-label">days</span>
                         </div>
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-primary">Apply Cleanup</button>
+                            <button type="submit" class="btn btn-primary">{{ __('Apply Cleanup') }}</button>
                         </div>
                     </form>
                 </div>
@@ -84,17 +84,17 @@
                 </div>
                 <div class="card-body">
                     @if(empty($items))
-                        <p class="text-muted">No items in trash.</p>
+                        <p class="text-muted">{{ __('No items in trash.') }}</p>
                     @else
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Book Title</th>
-                                        <th>Deleted Date</th>
-                                        <th>Files</th>
-                                        <th>Size</th>
-                                        <th>Actions</th>
+                                        <th>{{ __('Book Title') }}</th>
+                                        <th>{{ __('Deleted Date') }}</th>
+                                        <th>{{ __('Files') }}</th>
+                                        <th>{{ __('Size') }}</th>
+                                        <th>{{ __('Actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -107,14 +107,14 @@
                                             <td>
                                                 <form action="{{ route('admin.trash.restore', $item['id']) }}" method="POST" style="display:inline;">
                                                     @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Restore">
+                                                    <button type="submit" class="btn btn-sm btn-success" title="{{ __('Restore') }}">
                                                         <i class="fas fa-undo"></i> Restore
                                                     </button>
                                                 </form>
-                                                <form action="{{ route('admin.trash.destroy', $item['id']) }}" method="POST" style="display:inline;" onsubmit="return confirm('Permanently delete this book? This cannot be undone.');">
+                                                <form action="{{ route('admin.trash.destroy', $item['id']) }}" method="POST" style="display:inline;" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Permanently delete this book? This cannot be undone.')) }});">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Permanently Delete">
+                                                    <button type="submit" class="btn btn-sm btn-danger" title="{{ __('Permanently Delete') }}">
                                                         <i class="fas fa-times"></i> Delete
                                                     </button>
                                                 </form>
@@ -147,19 +147,19 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">Permanently Delete All?</h5>
+                <h5 class="modal-title">{{ __('Permanently Delete All?') }}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>This will permanently delete <strong>all {{ $stats['total_count'] }} item(s)</strong> from trash.</p>
-                <p class="text-danger"><strong>This action cannot be undone!</strong></p>
+                <p>{{ __('This will permanently delete') }} <strong>all {{ $stats['total_count'] }} item(s)</strong> from trash.</p>
+                <p class="text-danger"><strong>{{ __('This action cannot be undone!') }}</strong></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                 <form action="{{ route('admin.trash.destroyAll') }}" method="POST" style="display:inline;">
                     @csrf
                     @method('DELETE')
-                    <button type="submit" class="btn btn-danger">Yes, Delete All</button>
+                    <button type="submit" class="btn btn-danger">{{ __('Yes, Delete All') }}</button>
                 </form>
             </div>
         </div>

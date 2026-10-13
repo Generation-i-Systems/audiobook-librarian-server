@@ -42,7 +42,7 @@ class SeriesController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to load series for editing: ' . $e->getMessage());
-            return redirect()->route('series.manage')->with('error', 'Failed to load series for editing.');
+            return redirect()->route('series.manage')->with('error', __('Failed to load series for editing.'));
         }
     }
 
@@ -59,10 +59,10 @@ class SeriesController extends Controller
             }
 
             $this->documentStoreService->updateSeries($id, ['name' => $validated['name']]);
-            return redirect()->route('series.edit', $id)->with('success', 'Series updated successfully!');
+            return redirect()->route('series.edit', $id)->with('success', __('Series updated successfully!'));
         } catch (\Exception $e) {
             Log::error('Failed to update series: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to update series. Please try again.')->withInput();
+            return redirect()->back()->with('error', __('Failed to update series. Please try again.'))->withInput();
         }
     }
 
@@ -75,10 +75,10 @@ class SeriesController extends Controller
             }
 
             $this->documentStoreService->deleteSeries($id);
-            return redirect()->route('series.manage')->with('success', 'Series deleted successfully!');
+            return redirect()->route('series.manage')->with('success', __('Series deleted successfully!'));
         } catch (\Exception $e) {
             Log::error('Failed to delete series: ' . $e->getMessage());
-            return redirect()->route('series.manage')->with('error', 'Failed to delete series. Please try again.');
+            return redirect()->route('series.manage')->with('error', __('Failed to delete series. Please try again.'));
         }
     }
 }

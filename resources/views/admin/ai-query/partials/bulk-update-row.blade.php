@@ -65,7 +65,7 @@
                         <div class="col-md-9">
                             @if($type === 'cover_update')
                                 <div class="d-flex align-items-center">
-                                    <span class="badge bg-secondary me-2">Current Cover</span>
+                                    <span class="badge bg-secondary me-2">{{ __('Current Cover') }}</span>
                                     <i class="fas fa-arrow-right mx-2 text-muted"></i>
                                     <a href="{{ $to }}" target="_blank" class="badge bg-success text-decoration-none">
                                         <i class="fas fa-image"></i> New Image URL

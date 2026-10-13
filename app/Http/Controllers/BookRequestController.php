@@ -30,13 +30,13 @@ class BookRequestController extends Controller
         $adminId = $admins[0]['id'] ?? null;
 
         if (! is_int($adminId)) {
-            return back()->with('error', 'No admin user available');
+            return back()->with('error', __('No admin user available'));
         }
 
         $senderId = Auth::id();
 
         if (! is_int($senderId)) {
-            return back()->with('error', 'Unauthenticated');
+            return back()->with('error', __('Unauthenticated'));
         }
 
         $payload = [
@@ -54,9 +54,9 @@ class BookRequestController extends Controller
         ]);
 
         if (! is_string($messageId) || $messageId === '') {
-            return back()->with('error', 'Failed to submit book request');
+            return back()->with('error', __('Failed to submit book request'));
         }
 
-        return back()->with('success', 'Book request submitted!');
+        return back()->with('success', __('Book request submitted!'));
     }
 }

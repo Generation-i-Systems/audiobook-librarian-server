@@ -1,12 +1,12 @@
 <div class="import-file-browser">
     <div class="mb-3">
-        <label for="import-root-select" class="form-label">Root Directory</label>
+        <label for="import-root-select" class="form-label">{{ __('Root Directory') }}</label>
         <select id="import-root-select" class="form-select">
             <!-- JS will populate options -->
         </select>
     </div>
     <div class="mb-3">
-        <label for="import-path-input" class="form-label">Current Path</label>
+        <label for="import-path-input" class="form-label">{{ __('Current Path') }}</label>
         <input type="text" id="import-path-input" class="form-control" readonly>
     </div>
     <div id="import-directory-list" class="border rounded p-2 bg-light mb-3" style="min-height: 200px;">
@@ -19,13 +19,13 @@
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="enable-ai-processing" checked>
                         <label class="form-check-label" for="enable-ai-processing">
-                            <strong>🤖 AI Enhancement</strong> <span class="badge bg-primary">New</span>
-                            <br><small class="text-muted">Improve metadata extraction using AI</small>
+                            <strong>{{ __('🤖 AI Enhancement') }}</strong> <span class="badge bg-primary">{{ __('New') }}</span>
+                            <br><small class="text-muted">{{ __('Improve metadata extraction using AI') }}</small>
                         </label>
                     </div>
                 </div>
                 <div class="col-md-6" id="ai-model-selection" style="display: block;">
-                    <label for="ai-model-select" class="form-label"><strong>AI Model</strong></label>
+                    <label for="ai-model-select" class="form-label"><strong>{{ __('AI Model') }}</strong></label>
                     <select id="ai-model-select" class="form-select form-select-sm">
                         <option value="gemini-2.5-flash-lite">🆓 Gemini 2.5 Flash Lite (Free - Recommended)</option>
                         <option value="gpt-4o-mini">⭐ GPT-4o Mini (Best Value - ~$0.22/1000 books)</option>
@@ -42,7 +42,7 @@
     <div class="d-flex justify-content-between">
         <div>
             <small class="text-muted">
-                <span id="ai-cost-info">💰 Cost estimate will be shown based on selection</span>
+                <span id="ai-cost-info">{{ __('💰 Cost estimate will be shown based on selection') }}</span>
             </small>
         </div>
         <div>

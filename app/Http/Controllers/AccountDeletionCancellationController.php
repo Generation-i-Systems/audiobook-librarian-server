@@ -18,9 +18,9 @@ class AccountDeletionCancellationController extends Controller
     public function cancel(string $token, AccountDeletionService $accountDeletionService): RedirectResponse
     {
         if (!$accountDeletionService->cancel($token)) {
-            return redirect('/account-deletion/cancelled')->with('error', 'This cancellation link is invalid or has expired.');
+            return redirect('/account-deletion/cancelled')->with('error', __('This cancellation link is invalid or has expired.'));
         }
 
-        return redirect('/account-deletion/cancelled')->with('status', 'Your account deletion has been cancelled.');
+        return redirect('/account-deletion/cancelled')->with('status', __('Your account deletion has been cancelled.'));
     }
 }

@@ -5,18 +5,18 @@
 <div id="ai-loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
     <div class="text-center">
         <div class="spinner-border text-light" role="status" style="width: 4rem; height: 4rem; border-width: 0.4rem;">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden">{{ __('Loading...') }}</span>
         </div>
         <div class="mt-3 text-white">
-            <h4><i class="fas fa-robot"></i> AI is thinking...</h4>
-            <p class="text-muted">This may take a few seconds</p>
+            <h4><i class="fas fa-robot"></i> {{ __('AI is thinking...') }}</h4>
+            <p class="text-muted">{{ __('This may take a few seconds') }}</p>
         </div>
     </div>
 </div>
 
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1><i class="fas fa-robot"></i> AI Library Assistant - Conversation</h1>
+        <h1><i class="fas fa-robot"></i> {{ __('AI Library Assistant - Conversation') }}</h1>
         <div>
             <a href="{{ route('admin.books.index') }}" class="btn btn-success me-2">
                 <i class="fas fa-plus"></i> New Conversation
@@ -30,13 +30,13 @@
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
         </div>
     @endif
     @if(session('error'))
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             {{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
         </div>
     @endif
 
@@ -67,7 +67,7 @@
                             </div>
                             <div>
                                 @if($loop->last)
-                                    <button type="button" class="btn btn-sm btn-link text-muted p-0" onclick="editPrompt({{ $index }})" title="Edit this prompt">
+                                    <button type="button" class="btn btn-sm btn-link text-muted p-0" onclick="editPrompt({{ $index }})" title="{{ __('Edit this prompt') }}">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <form action="{{ route('admin.ai-query.process') }}" method="POST" class="d-inline">
@@ -76,7 +76,7 @@
                                         @if($index > 0)
                                             <input type="hidden" name="context_query_id" value="{{ $conversationId }}">
                                         @endif
-                                        <button type="submit" class="btn btn-sm btn-link text-muted p-0" title="Rerun this query">
+                                        <button type="submit" class="btn btn-sm btn-link text-muted p-0" title="{{ __('Rerun this query') }}">
                                             <i class="fas fa-redo"></i>
                                         </button>
                                     </form>
@@ -148,22 +148,22 @@
                         name="prompt"
                         rows="2"
                         required
-                        placeholder="Ask a follow-up question or refine your request..."
+                        placeholder="{{ __('Ask a follow-up question or refine your request...') }}"
                         autofocus></textarea>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <small class="text-muted me-3">Press Ctrl+Enter to submit</small>
-                        <label class="text-muted small me-2">Context items:</label>
+                        <small class="text-muted me-3">{{ __('Press Ctrl+Enter to submit') }}</small>
+                        <label class="text-muted small me-2">{{ __('Context items:') }}</label>
                         <select name="context_limit" class="form-select form-select-sm d-inline-block" style="width: auto;">
-                            <option value="10">10 items</option>
-                            <option value="25">25 items</option>
-                            <option value="50" selected>50 items</option>
-                            <option value="100">100 items</option>
-                            <option value="200">200 items</option>
-                            <option value="0">All items</option>
+                            <option value="10">{{ __('10 items') }}</option>
+                            <option value="25">{{ __('25 items') }}</option>
+                            <option value="50" selected>{{ __('50 items') }}</option>
+                            <option value="100">{{ __('100 items') }}</option>
+                            <option value="200">{{ __('200 items') }}</option>
+                            <option value="0">{{ __('All items') }}</option>
                         </select>
-                        <small class="text-muted ms-2" title="Number of results sent to AI for context">
+                        <small class="text-muted ms-2" title="{{ __('Number of results sent to AI for context') }}">
                             <i class="fas fa-info-circle"></i>
                         </small>
                     </div>
@@ -234,7 +234,7 @@
     <div class="card mt-4 border-secondary">
         <div class="card-header bg-light text-muted py-2">
             <h6 class="mb-0 d-flex align-items-center justify-content-between">
-                <span><i class="fas fa-code me-2"></i>Generated SQL Queries</span>
+                <span><i class="fas fa-code me-2"></i>{{ __('Generated SQL Queries') }}</span>
                 <div>
                     <button class="btn btn-sm btn-outline-primary me-2" onclick="toggleEditMode()">
                         <i class="fas fa-edit"></i> Edit & Rerun

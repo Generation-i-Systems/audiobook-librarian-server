@@ -75,11 +75,11 @@ class DirectoryValidationController extends Controller
         $newPath = $storageRoot . '/' . ltrim($book->directory_path, '/');
 
         if (!File::exists($oldPath)) {
-            return back()->with('error', 'Orphaned directory not found');
+            return back()->with('error', __('Orphaned directory not found'));
         }
 
         if (File::exists($newPath)) {
-            return back()->with('error', 'Target directory already exists');
+            return back()->with('error', __('Target directory already exists'));
         }
 
         // Create parent directory if needed
@@ -95,10 +95,10 @@ class DirectoryValidationController extends Controller
             $book->directory_last_checked = now();
             $book->save();
 
-            return back()->with('success', 'Directory renamed successfully');
+            return back()->with('success', __('Directory renamed successfully'));
         }
 
-        return back()->with('error', 'Failed to rename directory');
+        return back()->with('error', __('Failed to rename directory'));
     }
 
     public function deleteBook(Request $request)
@@ -110,7 +110,7 @@ class DirectoryValidationController extends Controller
         $result = $this->bookDeletionService->moveToTrash($request->book_id, true);
 
         if ($result['success']) {
-            return back()->with('success', 'Book moved to trash successfully');
+            return back()->with('success', __('Book moved to trash successfully'));
         }
 
         return back()->with('error', $result['error'] ?? 'Failed to move book to trash');
@@ -139,7 +139,7 @@ class DirectoryValidationController extends Controller
         $fullPath = $request->orphaned_path;
 
         if (!File::exists($fullPath)) {
-            return back()->with('error', 'Directory not found');
+            return back()->with('error', __('Directory not found'));
         }
 
         // Move directory to trash instead of deleting
@@ -164,10 +164,10 @@ class DirectoryValidationController extends Controller
                 Cache::put('book_validation_results', $validationResults, now()->addDay());
             }
 
-            return back()->with('success', 'Directory moved to trash successfully');
+            return back()->with('success', __('Directory moved to trash successfully'));
         }
 
-        return back()->with('error', 'Failed to move directory to trash');
+        return back()->with('error', __('Failed to move directory to trash'));
     }
 
     public function renameOrphanedDirectory(Request $request)
@@ -182,11 +182,11 @@ class DirectoryValidationController extends Controller
         $newFullPath = $storageRoot . '/' . ltrim($request->new_path, '/');
 
         if (!File::exists($oldFullPath)) {
-            return back()->with('error', 'Source directory not found');
+            return back()->with('error', __('Source directory not found'));
         }
 
         if (File::exists($newFullPath)) {
-            return back()->with('error', 'Target directory already exists');
+            return back()->with('error', __('Target directory already exists'));
         }
 
         // Create parent directory if needed
@@ -208,10 +208,10 @@ class DirectoryValidationController extends Controller
             }
             Cache::put('orphaned_directories', $orphanedDirs, now()->addDay());
 
-            return back()->with('success', 'Directory renamed successfully');
+            return back()->with('success', __('Directory renamed successfully'));
         }
 
-        return back()->with('error', 'Failed to rename directory');
+        return back()->with('error', __('Failed to rename directory'));
     }
 
     public function rescan()
@@ -219,6 +219,6 @@ class DirectoryValidationController extends Controller
         // Dispatch validation job to run in background
         ValidateBookDirectoriesJob::dispatch();
 
-        return back()->with('success', 'Directory validation started in background. Refresh the page in a few minutes to see results.');
+        return back()->with('success', __('Directory validation started in background. Refresh the page in a few minutes to see results.'));
     }
 }

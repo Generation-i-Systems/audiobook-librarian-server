@@ -3,10 +3,10 @@
 @section('content')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Manage Series</h1>
+        <h1>{{ __('Manage Series') }}</h1>
         <form method="GET" action="{{ route('series.manage') }}" class="d-flex">
-            <input type="text" name="search" class="form-control me-2" placeholder="Search series..." value="{{ $search }}">
-            <button type="submit" class="btn btn-primary">Search</button>
+            <input type="text" name="search" class="form-control me-2" placeholder="{{ __('Search series...') }}" value="{{ $search }}">
+            <button type="submit" class="btn btn-primary">{{ __('Search') }}</button>
         </form>
     </div>
 
@@ -30,7 +30,7 @@
                 <button type="submit" class="btn btn-warning">
                     <i class="fas fa-compress-alt me-2"></i>Yes, Merge Series
                 </button>
-                <a href="{{ route('series.manage') }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ route('series.manage') }}" class="btn btn-secondary">{{ __('Cancel') }}</a>
             </form>
         </div>
     @endif
@@ -39,10 +39,10 @@
     @if(count($potentialMerges) > 0)
     <div class="card mb-4">
         <div class="card-header bg-warning">
-            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Potential Merges Detected</h5>
+            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>{{ __('Potential Merges Detected') }}</h5>
         </div>
         <div class="card-body">
-            <p>These books appear to be split across multiple subdirectories and may need to be merged:</p>
+            <p>{{ __('These books appear to be split across multiple subdirectories and may need to be merged:') }}</p>
             @foreach($potentialMerges as $merge)
             <div class="card mb-3">
                 <div class="card-header">
@@ -55,11 +55,11 @@
                             <table class="table table-sm">
                                 <thead>
                                     <tr>
-                                        <th>Select</th>
-                                        <th>Primary</th>
-                                        <th>Title</th>
-                                        <th>Directory</th>
-                                        <th>Files</th>
+                                        <th>{{ __('Select') }}</th>
+                                        <th>{{ __('Primary') }}</th>
+                                        <th>{{ __('Title') }}</th>
+                                        <th>{{ __('Directory') }}</th>
+                                        <th>{{ __('Files') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -82,7 +82,7 @@
                         <div class="form-check mb-2">
                             <input type="checkbox" name="flatten_directories" value="1" class="form-check-input" id="flatten-{{ $loop->index }}">
                             <label class="form-check-label" for="flatten-{{ $loop->index }}">
-                                Flatten directories (move all audio files to primary directory)
+                                {{ __('Flatten directories (move all audio files to primary directory)') }}
                             </label>
                         </div>
                         <button type="submit" class="btn btn-warning">
@@ -105,7 +105,7 @@
         <div class="card-body">
             {{ $paginator->onEachSide(2)->links('pagination.admin-books') }}
             @if(count($seriesGroups) === 0)
-                <p class="text-muted">No series found.</p>
+                <p class="text-muted">{{ __('No series found.') }}</p>
             @else
                 <div class="accordion" id="seriesAccordion">
                     @foreach($seriesGroups as $seriesName => $books)
@@ -134,11 +134,11 @@
                                             @csrf
                                             <input type="hidden" name="old_name" value="{{ $seriesName }}">
                                             <div class="col-auto">
-                                                <input type="text" name="new_name" class="form-control" placeholder="New series name" required>
+                                                <input type="text" name="new_name" class="form-control" placeholder="{{ __('New series name') }}" required>
                                             </div>
                                             <div class="col-auto">
-                                                <button type="submit" class="btn btn-primary">Save</button>
-                                                <button type="button" class="btn btn-secondary" onclick="hideRenameForm({{ $loop->index }})">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">{{ __('Save') }}</button>
+                                                <button type="button" class="btn btn-secondary" onclick="hideRenameForm({{ $loop->index }})">{{ __('Cancel') }}</button>
                                             </div>
                                         </form>
                                     </div>
@@ -146,11 +146,11 @@
                                 <table class="table table-sm">
                                     <thead>
                                         <tr>
-                                            <th>Title</th>
-                                            <th>Author</th>
-                                            <th>Directory</th>
-                                            <th>Files</th>
-                                            <th>Actions</th>
+                                            <th>{{ __('Title') }}</th>
+                                            <th>{{ __('Author') }}</th>
+                                            <th>{{ __('Directory') }}</th>
+                                            <th>{{ __('Files') }}</th>
+                                            <th>{{ __('Actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>

@@ -45,11 +45,11 @@ class TrashController extends Controller
 
         if ($result) {
             return redirect()->route('admin.trash.index')
-                ->with('success', 'Book restored successfully.');
+                ->with('success', __('Book restored successfully.'));
         }
 
         return redirect()->route('admin.trash.index')
-            ->with('error', 'Failed to restore book.');
+            ->with('error', __('Failed to restore book.'));
     }
 
     public function destroy(string $id)
@@ -58,11 +58,11 @@ class TrashController extends Controller
 
         if ($result) {
             return redirect()->route('admin.trash.index')
-                ->with('success', 'Book permanently deleted.');
+                ->with('success', __('Book permanently deleted.'));
         }
 
         return redirect()->route('admin.trash.index')
-            ->with('error', 'Failed to delete book.');
+            ->with('error', __('Failed to delete book.'));
     }
 
     public function destroyAll()

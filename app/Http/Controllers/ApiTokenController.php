@@ -51,6 +51,6 @@ class ApiTokenController extends Controller
 
         $token->delete();
 
-        return back()->with('success', 'Token revoked.');
+        return back()->with('success', __('Token revoked.'));
     }
 }

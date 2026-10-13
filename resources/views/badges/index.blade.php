@@ -3,7 +3,7 @@
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>All Badges</h1>
+        <h1>{{ __('All Badges') }}</h1>
         <div>
             @can('manage-badges')
                 <a href="{{ route('badges.create') }}" class="btn btn-primary">
@@ -33,13 +33,13 @@
                     <table class="table table-hover align-middle">
                         <thead>
                             <tr>
-                                <th style="width: 80px;">Icon</th>
-                                <th style="width: 20%;">Name</th>
-                                <th style="width: 15%;">Tier</th>
+                                <th style="width: 80px;">{{ __('Icon') }}</th>
+                                <th style="width: 20%;">{{ __('Name') }}</th>
+                                <th style="width: 15%;">{{ __('Tier') }}</th>
                                 <th>Description & Criteria</th>
-                                <th style="width: 10%;">Points</th>
-                                <th style="width: 15%;">Status</th>
-                                <th style="width: 15%;">Actions</th>
+                                <th style="width: 10%;">{{ __('Points') }}</th>
+                                <th style="width: 15%;">{{ __('Status') }}</th>
+                                <th style="width: 15%;">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -66,7 +66,7 @@
                                         <p class="mb-1">{{ $badge->description }}</p>
                                         <small class="text-muted">
                                         <small class="text-muted">
-                                            <strong>Criteria:</strong>
+                                            <strong>{{ __('Criteria:') }}</strong>
                                             @if(is_array($badge->criteria))
                                                 <ul class="mb-0 ps-3 list-unstyled">
                                                     @foreach($badge->criteria as $key => $value)
@@ -86,31 +86,31 @@
                                     </td>
                                     <td>
                                         @if($badge->is_active)
-                                            <span class="badge bg-success">Active</span>
+                                            <span class="badge bg-success">{{ __('Active') }}</span>
                                         @else
-                                            <span class="badge bg-secondary">Inactive</span>
+                                            <span class="badge bg-secondary">{{ __('Inactive') }}</span>
                                         @endif
                                     </td>
                                     <td>
                                         @can('manage-badges')
                                             <div class="d-flex flex-column gap-1">
-                                                <a href="{{ route('badges.edit', $badge) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                                <a href="{{ route('badges.edit', $badge) }}" class="btn btn-sm btn-outline-primary">{{ __('Edit') }}</a>
                                                 @if($badge->is_active)
-                                                    <form action="{{ route('badges.destroy', $badge) }}" method="POST" onsubmit="return confirm('Deactivate this badge? It will stop being awarded, but earned history is kept.');">
+                                                    <form action="{{ route('badges.destroy', $badge) }}" method="POST" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Deactivate this badge? It will stop being awarded, but earned history is kept.')) }});">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button type="submit" class="btn btn-sm btn-outline-warning w-100">Deactivate</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-warning w-100">{{ __('Deactivate') }}</button>
                                                     </form>
                                                 @else
                                                     <form action="{{ route('badges.activate', $badge) }}" method="POST">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-outline-success w-100">Activate</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-success w-100">{{ __('Activate') }}</button>
                                                     </form>
                                                     @if($badge->can_force_delete)
-                                                        <form action="{{ route('badges.forceDestroy', $badge) }}" method="POST" onsubmit="return confirm('Permanently delete this badge? This cannot be undone.');">
+                                                        <form action="{{ route('badges.forceDestroy', $badge) }}" method="POST" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Permanently delete this badge? This cannot be undone.')) }});">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" class="btn btn-sm btn-outline-danger w-100">Delete forever</button>
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger w-100">{{ __('Delete forever') }}</button>
                                                         </form>
                                                     @endif
                                                 @endif

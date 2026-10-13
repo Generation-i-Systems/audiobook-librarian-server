@@ -47,7 +47,7 @@ class AIReviewController extends Controller
     {
         if (!$book->ai_suggestions) {
             return redirect()->route('admin.ai-review.index')
-                           ->with('error', 'No AI suggestions found for this book.');
+                           ->with('error', __('No AI suggestions found for this book.'));
         }
 
         $aiSuggestions = json_decode($book->ai_suggestions, true);

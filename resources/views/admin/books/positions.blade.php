@@ -7,10 +7,10 @@
         <h1 class="h3">Books in Progress: {{ $user->name }}</h1>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.events.timeline', $user) }}" class="btn btn-outline-secondary btn-sm">
-                Event Timeline
+                {{ __('Event Timeline') }}
             </a>
             <a href="{{ route('admin.users.show', $user) }}" class="btn btn-outline-secondary btn-sm">
-                Back to User
+                {{ __('Back to User') }}
             </a>
         </div>
     </div>
@@ -18,7 +18,7 @@
     <form method="GET" class="row g-2 mb-4">
         <div class="col-auto">
             <select name="device_id" class="form-select form-select-sm">
-                <option value="">All Devices</option>
+                <option value="">{{ __('All Devices') }}</option>
                 @foreach($devices as $device)
                     <option value="{{ $device->device_id }}"
                         {{ request('device_id') === $device->device_id ? 'selected' : '' }}>
@@ -29,14 +29,14 @@
         </div>
         <div class="col-auto">
             <select name="completed" class="form-select form-select-sm">
-                <option value="">All Status</option>
-                <option value="0" {{ request('completed') === '0' ? 'selected' : '' }}>In Progress</option>
-                <option value="1" {{ request('completed') === '1' ? 'selected' : '' }}>Completed</option>
+                <option value="">{{ __('All Status') }}</option>
+                <option value="0" {{ request('completed') === '0' ? 'selected' : '' }}>{{ __('In Progress') }}</option>
+                <option value="1" {{ request('completed') === '1' ? 'selected' : '' }}>{{ __('Completed') }}</option>
             </select>
         </div>
         <div class="col-auto">
-            <button type="submit" class="btn btn-primary btn-sm">Filter</button>
-            <a href="{{ route('admin.books.positions', $user) }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+            <button type="submit" class="btn btn-primary btn-sm">{{ __('Filter') }}</button>
+            <a href="{{ route('admin.books.positions', $user) }}" class="btn btn-outline-secondary btn-sm">{{ __('Clear') }}</a>
         </div>
     </form>
 
@@ -44,14 +44,14 @@
         <table class="table table-sm table-striped">
             <thead>
                 <tr>
-                    <th>Book</th>
-                    <th>Device</th>
-                    <th>Position</th>
-                    <th>Progress</th>
-                    <th>Chapter</th>
-                    <th>Status</th>
-                    <th>Last Updated</th>
-                    <th>Last Event</th>
+                    <th>{{ __('Book') }}</th>
+                    <th>{{ __('Device') }}</th>
+                    <th>{{ __('Position') }}</th>
+                    <th>{{ __('Progress') }}</th>
+                    <th>{{ __('Chapter') }}</th>
+                    <th>{{ __('Status') }}</th>
+                    <th>{{ __('Last Updated') }}</th>
+                    <th>{{ __('Last Event') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -77,7 +77,7 @@
                                     }
                                 @endphp
                                 @if($display)
-                                    <small class="text-secondary" title="Book not on server">{{ Str::limit($display, 40) }}</small>
+                                    <small class="text-secondary" title="{{ __('Book not on server') }}">{{ Str::limit($display, 40) }}</small>
                                 @else
                                     <small class="text-muted">Book #{{ $position->book_id }}</small>
                                 @endif
@@ -121,9 +121,9 @@
                         </td>
                         <td>
                             @if($position->completed)
-                                <span class="badge bg-success">Completed</span>
+                                <span class="badge bg-success">{{ __('Completed') }}</span>
                             @else
-                                <span class="badge bg-primary">In Progress</span>
+                                <span class="badge bg-primary">{{ __('In Progress') }}</span>
                             @endif
                         </td>
                         <td>
@@ -136,13 +136,13 @@
                         <td>
                             <a href="{{ route('admin.events.timeline', ['user' => $user, 'book_id' => $position->book_id, 'device_id' => $position->device_id]) }}"
                                class="btn btn-outline-secondary btn-sm py-0 px-1">
-                                <small>Events</small>
+                                <small>{{ __('Events') }}</small>
                             </a>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">No book positions found.</td>
+                        <td colspan="8" class="text-center text-muted py-4">{{ __('No book positions found.') }}</td>
                     </tr>
                 @endforelse
             </tbody>

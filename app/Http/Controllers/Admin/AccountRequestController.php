@@ -32,7 +32,7 @@ class AccountRequestController extends Controller
         $success = $this->documentStoreService->approveAccountRequest($id);
 
         if ($success) {
-            return back()->with('success', 'Account request approved!');
+            return back()->with('success', __('Account request approved!'));
         } else {
             return back()->withErrors(['error' => 'Failed to approve account request.']);
         }
@@ -43,7 +43,7 @@ class AccountRequestController extends Controller
         $success = $this->documentStoreService->rejectAccountRequest($id);
 
         if ($success) {
-            return back()->with('success', 'Account request rejected!');
+            return back()->with('success', __('Account request rejected!'));
         } else {
             return back()->withErrors(['error' => 'Failed to reject account request.']);
         }

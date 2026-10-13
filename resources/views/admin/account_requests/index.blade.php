@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="container">
-        <h1>Account Requests</h1>
+        <h1>{{ __('Account Requests') }}</h1>
 
         @if(session('success'))
             <div class="alert alert-success">
@@ -13,10 +13,10 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>{{ __('Name') }}</th>
+                    <th>{{ __('Email') }}</th>
+                    <th>{{ __('Status') }}</th>
+                    <th>{{ __('Actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -30,14 +30,14 @@
                                 method="POST" style="display:inline;">
                                 @csrf
                                 @method('PUT')
-                                <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                                <button type="submit" class="btn btn-success btn-sm">{{ __('Approve') }}</button>
                             </form>
                             <form action="{{ route('admin.account_requests.destroy', ['account_request' => $request['id']]) }}"
                                 method="POST" style="display:inline;"
-                                onsubmit="return confirm('Are you sure you want to reject the request from &quot;{{ $request['name'] }}&quot;?')">
+                                onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to reject the request from ":name"?', ['name' => $request['name']])) }})">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                                <button type="submit" class="btn btn-danger btn-sm">{{ __('Reject') }}</button>
                             </form>
                         </td>
                     </tr>

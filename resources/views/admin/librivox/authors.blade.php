@@ -3,19 +3,19 @@
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>Browse by Author</h1>
+        <h1>{{ __('Browse by Author') }}</h1>
         <div class="d-flex gap-2">
-            <a href="{{ route('admin.librivox.genres') }}" class="btn btn-outline-secondary">Browse Genres</a>
-            <a href="{{ route('admin.librivox.search') }}" class="btn btn-outline-secondary">Search</a>
-            <a href="{{ route('admin.librivox.index') }}" class="btn btn-outline-secondary">Imported Books</a>
+            <a href="{{ route('admin.librivox.genres') }}" class="btn btn-outline-secondary">{{ __('Browse Genres') }}</a>
+            <a href="{{ route('admin.librivox.search') }}" class="btn btn-outline-secondary">{{ __('Search') }}</a>
+            <a href="{{ route('admin.librivox.index') }}" class="btn btn-outline-secondary">{{ __('Imported Books') }}</a>
         </div>
     </div>
 
     <form action="{{ route('admin.librivox.authors') }}" method="GET" class="mb-4">
         <div class="input-group">
             <input type="text" class="form-control" name="q" value="{{ $query }}"
-                placeholder="Search by last name (e.g. Twain, Dickens)..." autofocus>
-            <button class="btn btn-primary" type="submit">Search</button>
+                placeholder="{{ __('Search by last name (e.g. Twain, Dickens)...') }}" autofocus>
+            <button class="btn btn-primary" type="submit">{{ __('Search') }}</button>
         </div>
     </form>
 

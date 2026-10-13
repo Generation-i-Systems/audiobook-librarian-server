@@ -4,28 +4,28 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title" id="deleteBookModalLabel">Delete Book?</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="deleteBookModalLabel">{{ __('Delete Book?') }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <p class="mb-2"><strong>{{ $book['title'] }}</strong></p>
                         @if(!empty($book['directoryPath']))
-                            <p class="text-muted small mb-3">Directory: <code>{{ $book['directoryPath'] }}</code></p>
+                            <p class="text-muted small mb-3">{{ __('Directory:') }} <code>{{ $book['directoryPath'] }}</code></p>
                         @endif
 
                         <div class="form-check mt-3">
                             <input class="form-check-input" type="checkbox" id="deleteFilesCheckbox" checked>
                             <label class="form-check-label" for="deleteFilesCheckbox">
-                                Also delete files from disk (moved to trash)
+                                {{ __('Also delete files from disk (moved to trash)') }}
                             </label>
                         </div>
 
                         <div class="alert alert-info mt-3 mb-0">
-                            <small><i class="fas fa-info-circle me-2"></i>Files will be moved to trash and can be restored from the admin trash page.</small>
+                            <small><i class="fas fa-info-circle me-2"></i>{{ __('Files will be moved to trash and can be restored from the admin trash page.') }}</small>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                         <form id="deleteBookForm" action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" style="display:inline;">
                             @csrf
                             @method('DELETE')
@@ -35,7 +35,7 @@
                             @else
                                 <input type="hidden" name="return_url" value="{{ route('admin.books.index') }}">
                             @endif
-                            <button type="submit" class="btn btn-danger">Delete Book</button>
+                            <button type="submit" class="btn btn-danger">{{ __('Delete Book') }}</button>
                     </div>
                 </div>
             </div>
@@ -78,21 +78,21 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-warning text-dark">
-                        <h5 class="modal-title" id="sharedDirectoryModalLabel">Shared Directory Warning</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="sharedDirectoryModalLabel">{{ __('Shared Directory Warning') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>This book shares a directory with other books!</strong>
+                            <strong>{{ __('This book shares a directory with other books!') }}</strong>
                         </div>
-                        <p class="mb-2"><strong>Book:</strong> {{ session('book_title') }}</p>
-                        <p class="text-muted small mb-3"><strong>Shared directory:</strong> <code>{{ session('shared_directory') }}</code></p>
-                        <p><strong>You can only delete the database record. The files will remain on disk for the other books.</strong></p>
-                        <p class="mb-0">Do you want to proceed with deleting only the database record?</p>
+                        <p class="mb-2"><strong>{{ __('Book:') }}</strong> {{ session('book_title') }}</p>
+                        <p class="text-muted small mb-3"><strong>{{ __('Shared directory:') }}</strong> <code>{{ session('shared_directory') }}</code></p>
+                        <p><strong>{{ __('You can only delete the database record. The files will remain on disk for the other books.') }}</strong></p>
+                        <p class="mb-0">{{ __('Do you want to proceed with deleting only the database record?') }}</p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                         <form action="{{ route('admin.books.destroy', session('book_id')) }}" method="POST" style="display:inline;">
                             @csrf
                             @method('DELETE')
@@ -105,7 +105,7 @@
                             @else
                                 <input type="hidden" name="return_url" value="{{ route('admin.books.index') }}">
                             @endif
-                            <button type="submit" class="btn btn-danger">Delete Database Record Only</button>
+                            <button type="submit" class="btn btn-danger">{{ __('Delete Database Record Only') }}</button>
                         </form>
                     </div>
                 </div>
@@ -131,27 +131,27 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title" id="moveFailureModalLabel">Directory Move Failed</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title" id="moveFailureModalLabel">{{ __('Directory Move Failed') }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Failed to move files to new directory</strong>
+                            <strong>{{ __('Failed to move files to new directory') }}</strong>
                         </div>
-                        <p class="mb-2"><strong>Error:</strong></p>
+                        <p class="mb-2"><strong>{{ __('Error:') }}</strong></p>
                         <p class="text-muted small mb-3">{{ session('move_error') }}</p>
-                        <p class="mb-2"><strong>Old directory:</strong> <code>{{ session('old_directory_path') }}</code></p>
-                        <p class="mb-3"><strong>New directory:</strong> <code>{{ session('new_directory_path') }}</code></p>
+                        <p class="mb-2"><strong>{{ __('Old directory:') }}</strong> <code>{{ session('old_directory_path') }}</code></p>
+                        <p class="mb-3"><strong>{{ __('New directory:') }}</strong> <code>{{ session('new_directory_path') }}</code></p>
 
-                        <p class="mb-2"><strong>What would you like to do?</strong></p>
+                        <p class="mb-2"><strong>{{ __('What would you like to do?') }}</strong></p>
                         <ul>
-                            <li><strong>Continue Anyway:</strong> Update the database with the new directory path without moving files. Files will remain in the old location.</li>
-                            <li><strong>Revert:</strong> Cancel the update and return to editing the book.</li>
+                            <li><strong>{{ __('Continue Anyway:') }}</strong> {{ __('Update the database with the new directory path without moving files. Files will remain in the old location.') }}</li>
+                            <li><strong>{{ __('Revert:') }}</strong> {{ __('Cancel the update and return to editing the book.') }}</li>
                         </ul>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Revert</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Revert') }}</button>
                         <form action="{{ route('admin.books.update', $book['id']) }}" method="POST" style="display:inline;">
                             @csrf
                             @method('PUT')

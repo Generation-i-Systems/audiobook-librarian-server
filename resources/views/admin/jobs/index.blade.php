@@ -6,23 +6,23 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Job Queue</h5>
+                    <h5 class="mb-0">{{ __('Job Queue') }}</h5>
                     <div class="btn-group">
                         <a href="{{ route('admin.jobs.index', ['type' => 'directory_import']) }}" 
                            class="btn btn-outline-primary btn-sm {{ request('type') == 'directory_import' ? 'active' : '' }}">
-                            Directory Imports
+                            {{ __('Directory Imports') }}
                         </a>
                         <a href="{{ route('admin.jobs.index', ['type' => 'book_import']) }}" 
                            class="btn btn-outline-primary btn-sm {{ request('type') == 'book_import' ? 'active' : '' }}">
-                            Book Imports
+                            {{ __('Book Imports') }}
                         </a>
                         <a href="{{ route('admin.jobs.index', ['status' => 'failed']) }}" 
                            class="btn btn-outline-danger btn-sm {{ request('status') == 'failed' ? 'active' : '' }}">
-                            Failed Jobs
+                            {{ __('Failed Jobs') }}
                         </a>
                         <a href="{{ route('admin.jobs.index') }}" 
                            class="btn btn-outline-secondary btn-sm {{ !request('type') && !request('status') ? 'active' : '' }}">
-                            All Jobs
+                            {{ __('All Jobs') }}
                         </a>
                     </div>
                 </div>
@@ -36,19 +36,19 @@
 
                     @if(!isset($jobs) || $jobs->isEmpty())
                         <div class="alert alert-info">
-                            No jobs found.
+                            {{ __('No jobs found.') }}
                         </div>
                     @else
                         <div class="table-responsive">
                             <table class="table table-striped table-hover">
                                 <thead>
                                     <tr>
-                                        <th>ID</th>
-                                        <th>Type</th>
-                                        <th>Status</th>
-                                        <th>Message</th>
-                                        <th>Created</th>
-                                        <th>Actions</th>
+                                        <th>{{ __('ID') }}</th>
+                                        <th>{{ __('Type') }}</th>
+                                        <th>{{ __('Status') }}</th>
+                                        <th>{{ __('Message') }}</th>
+                                        <th>{{ __('Created') }}</th>
+                                        <th>{{ __('Actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -108,7 +108,7 @@
                                                 @if(!empty($job['id']))
                                                     <a href="{{ route('admin.jobs.show', $job['id']) }}" 
                                                        class="btn btn-sm btn-outline-primary"
-                                                       title="View job details">
+                                                       title="{{ __('View job details') }}">
                                                         <i class="fas fa-eye"></i> View
                                                     </a>
                                                 @else

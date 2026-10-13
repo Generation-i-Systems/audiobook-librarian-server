@@ -6,7 +6,7 @@
 <div class="container-fluid py-4">
     <div class="row">
         <div class="col-12">
-            <h1 class="mb-4">AI Book Management Assistant</h1>
+            <h1 class="mb-4">{{ __('AI Book Management Assistant') }}</h1>
 
             @if (session('success'))
                 <div class="alert alert-success alert-dismissible fade show">
@@ -33,7 +33,7 @@
                     <form action="{{ route('admin.ai-assistant.process') }}" method="POST">
                         @csrf
                         <div class="mb-3">
-                            <label for="message" class="form-label">What would you like to do?</label>
+                            <label for="message" class="form-label">{{ __('What would you like to do?') }}</label>
                             <textarea
                                 class="form-control"
                                 id="message"
@@ -48,7 +48,7 @@
 - Update the author of 'The Stand' to 'Stephen King'"
                             ></textarea>
                             <div class="form-text">
-                                Describe what you want to search for or change. The AI will show you a preview before making any changes.
+                                {{ __('Describe what you want to search for or change. The AI will show you a preview before making any changes.') }}
                             </div>
                         </div>
                         <button type="submit" class="btn btn-primary">
@@ -71,10 +71,10 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Intent</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th>{{ __('Date') }}</th>
+                                    <th>{{ __('Intent') }}</th>
+                                    <th>{{ __('Status') }}</th>
+                                    <th>{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -86,13 +86,13 @@
                                     </td>
                                     <td>
                                         @if($session->status === 'pending_approval')
-                                            <span class="badge bg-warning">Pending Approval</span>
+                                            <span class="badge bg-warning">{{ __('Pending Approval') }}</span>
                                         @elseif($session->status === 'completed')
-                                            <span class="badge bg-success">Completed</span>
+                                            <span class="badge bg-success">{{ __('Completed') }}</span>
                                         @elseif($session->status === 'partially_completed')
-                                            <span class="badge bg-warning">Partially Completed</span>
+                                            <span class="badge bg-warning">{{ __('Partially Completed') }}</span>
                                         @elseif($session->status === 'cancelled')
-                                            <span class="badge bg-secondary">Cancelled</span>
+                                            <span class="badge bg-secondary">{{ __('Cancelled') }}</span>
                                         @endif
                                     </td>
                                     <td>
@@ -119,18 +119,18 @@
                 </div>
                 <div class="card-body">
                     <ol>
-                        <li><strong>Describe what you want:</strong> Use natural language to describe what you want to search for or change</li>
-                        <li><strong>Preview the changes:</strong> The AI will show you exactly what will be changed before any action is taken</li>
-                        <li><strong>Refine if needed:</strong> You can ask follow-up questions or request modifications</li>
-                        <li><strong>Approve and execute:</strong> When you're happy with the preview, approve the changes to execute them</li>
+                        <li><strong>{{ __('Describe what you want:') }}</strong> {{ __('Use natural language to describe what you want to search for or change') }}</li>
+                        <li><strong>{{ __('Preview the changes:') }}</strong> {{ __('The AI will show you exactly what will be changed before any action is taken') }}</li>
+                        <li><strong>{{ __('Refine if needed:') }}</strong> {{ __('You can ask follow-up questions or request modifications') }}</li>
+                        <li><strong>{{ __('Approve and execute:') }}</strong> {{ __('When you\'re happy with the preview, approve the changes to execute them') }}</li>
                     </ol>
 
                     <h6 class="mt-3">Example Requests:</h6>
                     <ul>
-                        <li><strong>Search:</strong> "Show me all fantasy books published after 2020"</li>
-                        <li><strong>Update:</strong> "Change the genre of all Brandon Sanderson books to Fantasy"</li>
-                        <li><strong>Tag:</strong> "Mark all Terry Pratchett books as Comedy"</li>
-                        <li><strong>Find issues:</strong> "Show me books with missing authors"</li>
+                        <li><strong>{{ __('Search:') }}</strong> {{ __('"Show me all fantasy books published after 2020"') }}</li>
+                        <li><strong>{{ __('Update:') }}</strong> {{ __('"Change the genre of all Brandon Sanderson books to Fantasy"') }}</li>
+                        <li><strong>{{ __('Tag:') }}</strong> {{ __('"Mark all Terry Pratchett books as Comedy"') }}</li>
+                        <li><strong>{{ __('Find issues:') }}</strong> {{ __('"Show me books with missing authors"') }}</li>
                     </ul>
                 </div>
             </div>

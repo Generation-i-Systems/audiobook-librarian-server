@@ -11,10 +11,10 @@
         </div>
     </div>
 
-    <nav aria-label="Pagination Navigation" class="px-2 overflow-auto">
+    <nav aria-label="{{ __('Pagination Navigation') }}" class="px-2 overflow-auto">
         <ul class="pagination justify-content-center mb-0 flex-nowrap">
             @if ($paginator->onFirstPage())
-                <li class="page-item disabled" aria-disabled="true" aria-label="First">
+                <li class="page-item disabled" aria-disabled="true" aria-label="{{ __('First') }}">
                     <span class="page-link text-nowrap" aria-hidden="true">
                         &laquo;
                         <span class="d-none d-sm-inline">&nbsp;First</span>
@@ -22,7 +22,7 @@
                 </li>
             @else
                 <li class="page-item">
-                    <a class="page-link text-nowrap" href="{{ $paginator->url(1) }}" rel="first" aria-label="First">
+                    <a class="page-link text-nowrap" href="{{ $paginator->url(1) }}" rel="first" aria-label="{{ __('First') }}">
                         &laquo;
                         <span class="d-none d-sm-inline">&nbsp;First</span>
                     </a>
@@ -30,7 +30,7 @@
             @endif
 
             @if ($paginator->onFirstPage())
-                <li class="page-item disabled" aria-disabled="true" aria-label="Previous">
+                <li class="page-item disabled" aria-disabled="true" aria-label="{{ __('Previous') }}">
                     <span class="page-link text-nowrap" aria-hidden="true">
                         &lsaquo;
                         <span class="d-none d-sm-inline">&nbsp;Previous</span>
@@ -39,7 +39,7 @@
             @else
                 <li class="page-item">
                     <a class="page-link text-nowrap" href="{{ $paginator->previousPageUrl() }}" rel="prev"
-                        aria-label="Previous">
+                        aria-label="{{ __('Previous') }}">
                         &lsaquo;
                         <span class="d-none d-sm-inline">&nbsp;Previous</span>
                     </a>
@@ -70,13 +70,13 @@
 
             @if ($paginator->hasMorePages())
                 <li class="page-item">
-                    <a class="page-link text-nowrap" href="{{ $paginator->nextPageUrl() }}" rel="next" aria-label="Next">
+                    <a class="page-link text-nowrap" href="{{ $paginator->nextPageUrl() }}" rel="next" aria-label="{{ __('Next') }}">
                         <span class="d-none d-sm-inline">Next&nbsp;</span>
                         &rsaquo;
                     </a>
                 </li>
             @else
-                <li class="page-item disabled" aria-disabled="true" aria-label="Next">
+                <li class="page-item disabled" aria-disabled="true" aria-label="{{ __('Next') }}">
                     <span class="page-link text-nowrap" aria-hidden="true">
                         <span class="d-none d-sm-inline">Next&nbsp;</span>
                         &rsaquo;
@@ -85,7 +85,7 @@
             @endif
 
             @if ($paginator->currentPage() == $paginator->lastPage())
-                <li class="page-item disabled" aria-disabled="true" aria-label="Last">
+                <li class="page-item disabled" aria-disabled="true" aria-label="{{ __('Last') }}">
                     <span class="page-link text-nowrap" aria-hidden="true">
                         <span class="d-none d-sm-inline">Last&nbsp;</span>
                         &raquo;
@@ -94,7 +94,7 @@
             @else
                 <li class="page-item">
                     <a class="page-link text-nowrap" href="{{ $paginator->url($paginator->lastPage()) }}" rel="last"
-                        aria-label="Last">
+                        aria-label="{{ __('Last') }}">
                         <span class="d-none d-sm-inline">Last&nbsp;</span>
                         &raquo;
                     </a>

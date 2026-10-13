@@ -28,4 +28,10 @@ Only codes listed in `config/locales.php` are ever applied or accepted (`POST /l
 
 ## Status
 
-Converted so far: the shared layout (navbar, app-connect modal and QR component), the login/magic-link/password-reset pages, the storage-unavailable page and its message. Most other Blade views, emails, JavaScript and controller flash messages still contain hard-coded English; wrap them in `__()` / `t()` as you touch them. Library content (genres, tags, titles, descriptions) is data and is not translated by these files.
+Spanish (`es`) is enabled: `lang/es.json` (app strings) and `lang/es/*.php` (framework: auth, pagination, passwords, validation). The navbar shows a language selector when more than one locale is supported.
+
+Converted: the layout, QR component and every Blade view except those listed below, plus controller flash messages (`->with('success'|'error'|..., __(...))`) and static `confirm()`/`alert()` strings in view scripts (via `window.__`).
+
+Still English: API docs pages (`resources/views/docs`), emails (`resources/views/emails` — need `Mail::to()->locale()`), the Privacy Policy and Terms (legal text needs a human/legal translation), sentences assembled from fragments around `{{ }}` expressions, JavaScript under `resources/js`, API JSON messages, and validation `attributes` beyond a few common fields. Library content (genres, tags, titles, descriptions) is data and is not translated.
+
+`tests/Unit/Localization/SpanishCatalogTest` fails when a literal `__('...')` in a view has no `lang/es.json` entry or a placeholder differs; add the Spanish text when you add a string.

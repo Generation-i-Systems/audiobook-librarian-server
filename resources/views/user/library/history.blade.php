@@ -2,11 +2,11 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-6">Reading History</h1>
+    <h1 class="text-3xl font-bold mb-6">{{ __('Reading History') }}</h1>
 
     @if ($history->isEmpty())
         <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4" role="alert">
-            <p>You haven't finished any books yet. Keep listening!</p>
+            <p>{{ __('You haven\'t finished any books yet. Keep listening!') }}</p>
         </div>
     @else
         <div class="overflow-x-auto bg-white rounded-lg shadow">
@@ -17,10 +17,10 @@
                             Book
                         </th>
                         <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Finished At
+                            {{ __('Finished At') }}
                         </th>
                         <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Read Count
+                            {{ __('Read Count') }}
                         </th>
                         <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Actions
@@ -64,7 +64,7 @@
                             </td>
                             <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
                                 <a href="{{ route('books.show', $status->book->id) }}" class="text-blue-600 hover:text-blue-900">
-                                    View Details
+                                    {{ __('View Details') }}
                                 </a>
                             </td>
                         </tr>

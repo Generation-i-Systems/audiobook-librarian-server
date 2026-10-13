@@ -37,13 +37,13 @@ class SystemTagController extends Controller
 
         $this->bookTagService->renameSystemTag($tag, trim($validated['name']));
 
-        return redirect()->route('tags.index')->with('success', 'Tag renamed successfully!');
+        return redirect()->route('tags.index')->with('success', __('Tag renamed successfully!'));
     }
 
     public function destroy(string $tag): RedirectResponse
     {
         $this->bookTagService->deleteSystemTag($tag);
 
-        return redirect()->route('tags.index')->with('success', 'Tag deleted successfully!');
+        return redirect()->route('tags.index')->with('success', __('Tag deleted successfully!'));
     }
 }

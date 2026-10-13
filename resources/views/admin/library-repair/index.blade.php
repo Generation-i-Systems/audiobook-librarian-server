@@ -11,17 +11,17 @@
     <div class="container">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
             <div>
-                <h1 class="h3 mb-1">Library Repair</h1>
+                <h1 class="h3 mb-1">{{ __('Library Repair') }}</h1>
                 <p class="text-muted mb-0">
-                    Monitor and resolve directory issues detected by the library repair scanner.
+                    {{ __('Monitor and resolve directory issues detected by the library repair scanner.') }}
                 </p>
             </div>
             <div class="d-flex gap-2">
                 <a href="{{ route('admin.needs_review.index') }}" class="btn btn-outline-secondary">
-                    Needs Review
+                    {{ __('Needs Review') }}
                 </a>
                 <a href="{{ route('admin.books.index') }}" class="btn btn-secondary">
-                    Admin Books
+                    {{ __('Admin Books') }}
                 </a>
             </div>
         </div>
@@ -30,23 +30,23 @@
             <div class="card-body">
                 <form method="GET" action="{{ route('admin.library-repair.index') }}" class="row g-3 align-items-end">
                     <div class="col-md-3">
-                        <label for="issue_type" class="form-label">Issue type</label>
+                        <label for="issue_type" class="form-label">{{ __('Issue type') }}</label>
                         <select id="issue_type" name="issue_type" class="form-select">
-                            <option value="">All types</option>
+                            <option value="">{{ __('All types') }}</option>
                             @foreach($issueTypes as $value => $label)
                                 <option value="{{ $value }}" @selected($filters['issue_type'] === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label for="search" class="form-label">Search</label>
+                        <label for="search" class="form-label">{{ __('Search') }}</label>
                         <input type="search" id="search" name="search" class="form-control" value="{{ $filters['search'] }}"
-                            placeholder="Title or directory" />
+                            placeholder="{{ __('Title or directory') }}" />
                     </div>
                     <div class="col-md-3">
-                        <label for="needs_review_reason" class="form-label">Needs Review tag</label>
+                        <label for="needs_review_reason" class="form-label">{{ __('Needs Review tag') }}</label>
                         <select id="needs_review_reason" name="needs_review_reason" class="form-select">
-                            <option value="">All tags</option>
+                            <option value="">{{ __('All tags') }}</option>
                             @foreach($needsReviewReasons as $reason)
                                 <option value="{{ $reason }}" @selected($filters['needs_review_reason'] === $reason)>
                                     {{ $reason }}
@@ -55,7 +55,7 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <label for="limit" class="form-label">Per page</label>
+                        <label for="limit" class="form-label">{{ __('Per page') }}</label>
                         <select id="limit" name="limit" class="form-select">
                             @foreach([10, 25, 50, 100] as $limitOption)
                                 <option value="{{ $limitOption }}" @selected($filters['limit'] == $limitOption)>{{ $limitOption }}
@@ -67,12 +67,12 @@
                         <input class="form-check-input" type="checkbox" value="1" id="show_resolved" name="show_resolved"
                             @checked($filters['show_resolved'])>
                         <label class="form-check-label" for="show_resolved">
-                            Show resolved
+                            {{ __('Show resolved') }}
                         </label>
                     </div>
                     <div class="col-md-auto">
                         <button type="submit" class="btn btn-primary">
-                            Apply filters
+                            {{ __('Apply filters') }}
                         </button>
                         <a href="{{ route('admin.library-repair.index') }}" class="btn btn-link">
                             Reset
@@ -84,18 +84,18 @@
 
         @if($issuesCount === 0)
             <div class="alert alert-success">
-                <strong>No issues found.</strong> Run the library repair scan to generate new findings.
+                <strong>{{ __('No issues found.') }}</strong> Run the library repair scan to generate new findings.
             </div>
         @else
             <div class="table-responsive">
                 <table class="table align-middle table-striped">
                     <thead>
                         <tr>
-                            <th scope="col">Issue</th>
-                            <th scope="col">Directory / Book</th>
-                            <th scope="col">Details</th>
-                            <th scope="col">Status</th>
-                            <th scope="col" class="text-end">Actions</th>
+                            <th scope="col">{{ __('Issue') }}</th>
+                            <th scope="col">{{ __('Directory / Book') }}</th>
+                            <th scope="col">{{ __('Details') }}</th>
+                            <th scope="col">{{ __('Status') }}</th>
+                            <th scope="col" class="text-end">{{ __('Actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -107,7 +107,7 @@
                                             {{ $issue['issueLabel'] ?? str($issue['issueType'])->replace('_', ' ')->headline() }}
                                         </span>
                                         @if($issue['autoResolved'])
-                                            <span class="badge text-bg-success">Auto resolved</span>
+                                            <span class="badge text-bg-success">{{ __('Auto resolved') }}</span>
                                         @endif
                                     </div>
                                 </td>
@@ -133,7 +133,7 @@
                                             </div>
                                         @else
                                             <div class="text-muted mt-1">
-                                                Unlinked directory
+                                                {{ __('Unlinked directory') }}
                                             </div>
                                         @endif
                                     </div>
@@ -145,11 +145,11 @@
                                     @endphp
                                     <div class="small d-flex flex-column gap-2">
                                         <div>
-                                            <strong>Directory:</strong> {{ $issue['directoryPath'] ?? '—' }}
+                                            <strong>{{ __('Directory:') }}</strong> {{ $issue['directoryPath'] ?? '—' }}
                                         </div>
                                         @if(!empty($issue['book']))
                                             <div>
-                                                <strong>Book:</strong>
+                                                <strong>{{ __('Book:') }}</strong>
                                                 <a href="{{ route('admin.books.edit', $issue['book']['id']) }}"
                                                     class="text-decoration-none">
                                                     {{ $issue['book']['title'] }}
@@ -159,50 +159,50 @@
                                         @endif
                                         @if($issueType === \App\Enums\LibraryRepairIssueType::MISSING_DIRECTORY->value)
                                             <div class="text-muted">
-                                                Directory expected on disk but not found.
+                                                {{ __('Directory expected on disk but not found.') }}
                                             </div>
                                             @if(!empty($issue['audiobookBayUrl']))
                                                 <div>
                                                     <a href="{{ $issue['audiobookBayUrl'] }}" target="_blank" rel="noopener noreferrer"
                                                         class="link-primary">
-                                                        Search on AudiobookBay
+                                                        {{ __('Search on AudiobookBay') }}
                                                     </a>
                                                 </div>
                                             @endif
                                         @elseif($issueType === \App\Enums\LibraryRepairIssueType::DUPLICATE_DIRECTORY->value)
                                             <div>
-                                                <strong>Conflicting book IDs:</strong>
+                                                <strong>{{ __('Conflicting book IDs:') }}</strong>
                                                 {{ implode(', ', $metadata['book_ids'] ?? []) ?: 'Unknown' }}
                                             </div>
                                         @elseif($issueType === \App\Enums\LibraryRepairIssueType::ORPHAN_DIRECTORY->value)
                                             <div>
-                                                <strong>Filesystem path:</strong> {{ $metadata['full_path'] ?? 'Unknown' }}
+                                                <strong>{{ __('Filesystem path:') }}</strong> {{ $metadata['full_path'] ?? 'Unknown' }}
                                             </div>
                                             <div class="text-muted">
-                                                Contains audio files but no book references this path.
+                                                {{ __('Contains audio files but no book references this path.') }}
                                             </div>
                                         @elseif($issueType === \App\Enums\LibraryRepairIssueType::NESTED_AUDIO->value)
                                             <div class="text-muted">
-                                                Audio files detected only inside a nested folder. Consider updating the book directory.
+                                                {{ __('Audio files detected only inside a nested folder. Consider updating the book directory.') }}
                                             </div>
                                         @elseif($issueType === \App\Enums\LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY->value)
                                             <div class="text-muted">
-                                                Directory ends with a numeric suffix but no base directory exists.
+                                                {{ __('Directory ends with a numeric suffix but no base directory exists.') }}
                                             </div>
                                         @elseif($issueType === \App\Enums\LibraryRepairIssueType::PATH_GENRE_MISMATCH->value)
                                             <div>
-                                                <strong>Path genre:</strong> {{ $metadata['path_genre'] ?? 'Unknown' }}
+                                                <strong>{{ __('Path genre:') }}</strong> {{ $metadata['path_genre'] ?? 'Unknown' }}
                                             </div>
                                             <div>
-                                                <strong>Assigned genres:</strong>
+                                                <strong>{{ __('Assigned genres:') }}</strong>
                                                 {{ implode(', ', $metadata['assigned_genres'] ?? []) ?: 'None' }}
                                             </div>
                                         @elseif($issueType === \App\Enums\LibraryRepairIssueType::TITLE_DIRECTORY_MISMATCH->value)
                                             <div>
-                                                <strong>Book title:</strong> {{ $metadata['book_title'] ?? 'Unknown' }}
+                                                <strong>{{ __('Book title:') }}</strong> {{ $metadata['book_title'] ?? 'Unknown' }}
                                             </div>
                                             <div>
-                                                <strong>Directory title:</strong> {{ $metadata['directory_title'] ?? 'Unknown' }}
+                                                <strong>{{ __('Directory title:') }}</strong> {{ $metadata['directory_title'] ?? 'Unknown' }}
                                             </div>
                                         @endif
                                     </div>
@@ -221,7 +221,7 @@
                                         @endif
                                         @if(!empty($issue['resolutionNotes']))
                                             <div class="mt-2">
-                                                <strong>Notes:</strong>
+                                                <strong>{{ __('Notes:') }}</strong>
                                                 <div>{{ $issue['resolutionNotes'] }}</div>
                                             </div>
                                         @endif
@@ -236,13 +236,13 @@
                                             )
                                                 <a href="{{ route('admin.books.edit', $issue['book']['id']) }}"
                                                     class="btn btn-sm btn-outline-secondary w-100">
-                                                    Edit book
+                                                    {{ __('Edit book') }}
                                                 </a>
                                             @endif
                                             <form method="POST" action="{{ route('admin.library-repair.rescan', $issue['id']) }}">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-primary">
-                                                    Rescan issue
+                                                    {{ __('Rescan issue') }}
                                                 </button>
                                             </form>
 
@@ -253,7 +253,7 @@
                                                     @csrf
                                                     <div class="input-group input-group-sm">
                                                         <input type="text" name="import_path" class="form-control"
-                                                            placeholder="Filesystem path" required>
+                                                            placeholder="{{ __('Filesystem path') }}" required>
                                                         <button type="submit" class="btn btn-success">
                                                             Import
                                                         </button>
@@ -271,13 +271,13 @@
                                                     <input type="text" name="resolution_notes" class="form-control form-control-sm mb-2"
                                                         placeholder="Resolution notes (optional)" maxlength="500" />
                                                     <button type="submit" class="btn btn-sm btn-success w-100">
-                                                        Mark resolved
+                                                        {{ __('Mark resolved') }}
                                                     </button>
                                                 </form>
                                             @endif
                                         </div>
                                     @else
-                                        <span class="text-muted small">No actions available</span>
+                                        <span class="text-muted small">{{ __('No actions available') }}</span>
                                     @endif
                                 </td>
                             </tr>

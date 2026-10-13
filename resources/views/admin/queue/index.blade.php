@@ -5,7 +5,7 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h1 class="h3 mb-1">Queue & Worker Management</h1>
-                <p class="text-muted mb-0">Control background workers, queue states, and job processing in real-time.</p>
+                <p class="text-muted mb-0">{{ __('Control background workers, queue states, and job processing in real-time.') }}</p>
             </div>
             <div>
                 <a href="/horizon" target="_blank" class="btn btn-outline-primary">
@@ -20,11 +20,11 @@
                 <div class="row align-items-center">
                     <div class="col-md-6 mb-3 mb-md-0">
                         <div class="d-flex align-items-center">
-                            <span class="fw-bold me-2">Worker Status:</span>
-                            <span id="worker-status-badge" class="badge bg-secondary px-3 py-2 fs-6">Checking...</span>
+                            <span class="fw-bold me-2">{{ __('Worker Status:') }}</span>
+                            <span id="worker-status-badge" class="badge bg-secondary px-3 py-2 fs-6">{{ __('Checking...') }}</span>
                         </div>
                         <div class="mt-2 text-muted small" id="queue-depths-summary">
-                            Loading queue metrics...
+                            {{ __('Loading queue metrics...') }}
                         </div>
                     </div>
                     <div class="col-md-6 text-md-end">
@@ -62,7 +62,7 @@
         <div class="card shadow-sm">
             <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
                 <div class="d-flex align-items-center">
-                    <label for="job-type-filter" class="form-label mb-0 me-2 fw-semibold">Job Type:</label>
+                    <label for="job-type-filter" class="form-label mb-0 me-2 fw-semibold">{{ __('Job Type:') }}</label>
                     <select id="job-type-filter" class="form-select form-select-sm" style="width:auto; display:inline-block;"></select>
                 </div>
                 <span id="job-type-counts" class="text-muted small"></span>
@@ -72,13 +72,13 @@
                     <table class="table table-hover align-middle mb-0" id="import-queue-table">
                         <thead class="table-light">
                             <tr>
-                                <th>ID</th>
-                                <th>Type</th>
-                                <th>Directory / Payload</th>
-                                <th>Attempts</th>
-                                <th>Available At</th>
-                                <th>Created At</th>
-                                <th class="text-end">Action</th>
+                                <th>{{ __('ID') }}</th>
+                                <th>{{ __('Type') }}</th>
+                                <th>{{ __('Directory / Payload') }}</th>
+                                <th>{{ __('Attempts') }}</th>
+                                <th>{{ __('Available At') }}</th>
+                                <th>{{ __('Created At') }}</th>
+                                <th class="text-end">{{ __('Action') }}</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -134,11 +134,11 @@
             $.getJSON('{{ route("admin.queue.status") }}', function(data) {
                 let $badge = $('#worker-status-badge');
                 if (data.status === 'running' || data.worker_running) {
-                    $badge.removeClass('bg-secondary bg-warning bg-danger').addClass('bg-success').text('Running');
+                    $badge.removeClass('bg-secondary bg-warning bg-danger').addClass('bg-success').text(window.__('Running'));
                 } else if (data.status === 'paused') {
-                    $badge.removeClass('bg-secondary bg-success bg-danger').addClass('bg-warning text-dark').text('Paused');
+                    $badge.removeClass('bg-secondary bg-success bg-danger').addClass('bg-warning text-dark').text(window.__('Paused'));
                 } else {
-                    $badge.removeClass('bg-secondary bg-success bg-warning').addClass('bg-danger').text('Inactive / Stopped');
+                    $badge.removeClass('bg-secondary bg-success bg-warning').addClass('bg-danger').text(window.__('Inactive / Stopped'));
                 }
 
                 let q = data.queues || {};
@@ -164,7 +164,7 @@
             });
 
             $('#stop-worker').click(function() {
-                if (confirm('Stop the master queue worker?')) {
+                if (confirm(window.__('Stop the master queue worker?'))) {
                     $.post('{{ route("admin.queue.stop") }}', {_token: '{{ csrf_token() }}'}, function(data) {
                         loadWorkerStatus();
                     });
@@ -192,7 +192,7 @@
             });
 
             $(document).on('click', '.remove-job', function() {
-                if (confirm('Remove this job from the queue?')) {
+                if (confirm(window.__('Remove this job from the queue?'))) {
                     $.post(`/admin/queue/remove/${$(this).data('id')}`, {_token: '{{ csrf_token() }}'}, function(data) {
                         loadQueue(currentType);
                         loadWorkerStatus();
@@ -205,7 +205,7 @@
             });
 
             $('#clear-queue-btn').on('click', function () {
-                if (confirm('Are you sure you want to clear the queue? This cannot be undone.')) {
+                if (confirm(window.__('Are you sure you want to clear the queue? This cannot be undone.'))) {
                     $.post('{{ route("admin.queue.clear") }}', {confirm: true, _token: '{{ csrf_token() }}'}, function (data) {
                         loadQueue(currentType);
                         loadWorkerStatus();

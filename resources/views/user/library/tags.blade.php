@@ -2,11 +2,11 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-6">My Tags</h1>
+    <h1 class="text-3xl font-bold mb-6">{{ __('My Tags') }}</h1>
 
-    <h2 class="text-xl font-bold mb-3">My Tags</h2>
+    <h2 class="text-xl font-bold mb-3">{{ __('My Tags') }}</h2>
     @if (empty($tags['user']))
-        <p class="text-gray-500 mb-6">You haven't tagged any books yet. Add a tag from a book's page.</p>
+        <p class="text-gray-500 mb-6">{{ __('You haven\'t tagged any books yet. Add a tag from a book\'s page.') }}</p>
     @else
         <ul class="mb-6">
             @foreach ($tags['user'] as $entry)
@@ -23,7 +23,7 @@
     @foreach ($tags['groups'] as $group)
         <h2 class="text-xl font-bold mb-3">{{ $group['groupName'] }} Tags</h2>
         @if (empty($group['tags']))
-            <p class="text-gray-500 mb-6">No group tags yet.</p>
+            <p class="text-gray-500 mb-6">{{ __('No group tags yet.') }}</p>
         @else
             <ul class="mb-6">
                 @foreach ($group['tags'] as $entry)

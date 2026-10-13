@@ -27,7 +27,7 @@ class AdminController extends Controller
         $role = $request->input('role');
         $this->documentStoreService->updateUser($userId, ['role' => $role]);
 
-        return back()->with('success', 'User role updated successfully!');
+        return back()->with('success', __('User role updated successfully!'));
     }
 
 

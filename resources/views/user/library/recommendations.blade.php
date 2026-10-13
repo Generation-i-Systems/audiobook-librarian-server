@@ -1,9 +1,9 @@
 @extends('layouts.app')
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-6">Recommendations Inbox</h1>
+    <h1 class="text-3xl font-bold mb-6">{{ __('Recommendations Inbox') }}</h1>
     @if ($recommendations->isEmpty())
-        <p>Your recommendations inbox is empty. Nobody has recommended a book to you yet.</p>
+        <p>{{ __('Your recommendations inbox is empty. Nobody has recommended a book to you yet.') }}</p>
     @else
         <div class="space-y-4">
             @foreach ($recommendations as $recommendation)
@@ -17,9 +17,9 @@
                         @endif
                         <p class="mt-2 text-xs text-gray-500">Received: {{ $recommendation->created_at->diffForHumans() }}</p>
                         @if ($recommendation->acknowledged_at)
-                            <span class="text-green-500 text-sm font-medium">Acknowledged</span>
+                            <span class="text-green-500 text-sm font-medium">{{ __('Acknowledged') }}</span>
                         @else
-                            <button class="mt-2 text-sm text-blue-600 hover:underline">Acknowledge</button>
+                            <button class="mt-2 text-sm text-blue-600 hover:underline">{{ __('Acknowledge') }}</button>
                         @endif
                     </div>
                 </div>

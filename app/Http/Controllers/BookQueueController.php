@@ -34,12 +34,12 @@ class BookQueueController extends Controller
         $queue = $documentStore->getBookQueue((string) $user->id);
         foreach ($queue as $item) {
             if ($item['book_id'] == $bookId) {
-                return back()->with('error', 'Book already in queue.');
+                return back()->with('error', __('Book already in queue.'));
             }
         }
         $documentStore->addBookToQueue((string) $user->id, $bookId);
 
-        return back()->with('success', 'Book added to queue!');
+        return back()->with('success', __('Book added to queue!'));
     }
 
 
@@ -51,7 +51,7 @@ class BookQueueController extends Controller
         // @phpstan-ignore-next-line
         $this->reorderQueue($user->id);
 
-        return back()->with('success', 'Book removed from queue.');
+        return back()->with('success', __('Book removed from queue.'));
     }
 
 

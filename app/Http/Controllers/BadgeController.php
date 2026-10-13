@@ -88,12 +88,12 @@ class BadgeController extends Controller
 
             Badge::create($data);
 
-            return redirect()->route('badges.index')->with('success', 'Badge created successfully!');
+            return redirect()->route('badges.index')->with('success', __('Badge created successfully!'));
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to create badge: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to create badge. Please try again.')->withInput();
+            return redirect()->back()->with('error', __('Failed to create badge. Please try again.'))->withInput();
         }
     }
 
@@ -134,12 +134,12 @@ class BadgeController extends Controller
 
             $badge->update($data);
 
-            return redirect()->route('badges.index')->with('success', 'Badge updated successfully!');
+            return redirect()->route('badges.index')->with('success', __('Badge updated successfully!'));
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {
             Log::error('Failed to update badge: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to update badge. Please try again.')->withInput();
+            return redirect()->back()->with('error', __('Failed to update badge. Please try again.'))->withInput();
         }
     }
 
@@ -151,14 +151,14 @@ class BadgeController extends Controller
     {
         $badge->update(['is_active' => false]);
 
-        return redirect()->route('badges.index')->with('success', 'Badge deactivated.');
+        return redirect()->route('badges.index')->with('success', __('Badge deactivated.'));
     }
 
     public function activate(Badge $badge)
     {
         $badge->update(['is_active' => true]);
 
-        return redirect()->route('badges.index')->with('success', 'Badge activated.');
+        return redirect()->route('badges.index')->with('success', __('Badge activated.'));
     }
 
     /**
@@ -176,7 +176,7 @@ class BadgeController extends Controller
 
         $badge->delete();
 
-        return redirect()->route('badges.index')->with('success', 'Badge permanently deleted.');
+        return redirect()->route('badges.index')->with('success', __('Badge permanently deleted.'));
     }
 
     protected function resolveAdminIdentifier(Request $request): string

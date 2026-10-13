@@ -497,13 +497,13 @@ class BookController extends Controller
         $book = $this->documentStoreService->getBook($id);
 
         if (!$book) {
-            return redirect()->route('books.index')->with('error', 'Book not found');
+            return redirect()->route('books.index')->with('error', __('Book not found'));
         }
 
         // Ensure all required fields are present
         if (!is_array($book)) {
             Log::error('Expected array from getBook but got: ' . gettype($book), ['id' => $id]);
-            return redirect()->route('books.index')->with('error', 'Invalid book data');
+            return redirect()->route('books.index')->with('error', __('Invalid book data'));
         }
 
         $book = $this->ensureBookFields($book);
@@ -573,7 +573,7 @@ class BookController extends Controller
         $book = $documentStoreService->getBook($id);
 
         if (!$book || !isset($book['file_path'])) {
-            return redirect()->route('books.index')->with('error', 'Book file not found');
+            return redirect()->route('books.index')->with('error', __('Book file not found'));
         }
 
         $filePath = $book['file_path'];
@@ -581,7 +581,7 @@ class BookController extends Controller
 
         // Check if file exists in storage
         if (!Storage::exists($filePath)) {
-            return redirect()->route('books.show', $id)->with('error', 'Book file not found on server');
+            return redirect()->route('books.show', $id)->with('error', __('Book file not found on server'));
         }
 
         // Log download

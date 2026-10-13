@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Success</title>
+    <title>{{ __('Success') }}</title>
     <script>
         function tryClose() {
             try {

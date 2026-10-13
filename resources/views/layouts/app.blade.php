@@ -40,7 +40,9 @@
     <!-- Bootstrap dropdown fix: ensure dropdown-menu is above navbar and other elements -->
     <link rel="stylesheet" href="/css/bootstrap-dropdown-zfix.css">
 
-    <script>window.APP_I18N = @json(\App\Support\JsTranslations::forCurrentLocale());</script>
+    <script>window.APP_I18N = @json(\App\Support\JsTranslations::forCurrentLocale());
+    // Synchronous fallback so inline scripts can translate before the app bundle (which replaces it) has run.
+    window.__ = function (key) { return Object.prototype.hasOwnProperty.call(window.APP_I18N, key) ? window.APP_I18N[key] : key; };</script>
 
     <!-- Scripts -->
     @if (!app()->environment('testing'))
@@ -159,6 +161,19 @@
 
                     <!-- Right Side Of Navbar -->
                     <ul class="navbar-nav ms-auto">
+                        @if (count(config('locales.supported', [])) > 1)
+                            <li class="nav-item d-flex align-items-center me-2">
+                                <form method="POST" action="{{ route('locale.update') }}" class="m-0">
+                                    @csrf
+                                    <select name="locale" class="form-select form-select-sm" aria-label="{{ __('Language') }}"
+                                        onchange="this.form.submit()">
+                                        @foreach (config('locales.supported') as $code => $label)
+                                            <option value="{{ $code }}" @selected(app()->getLocale() === $code)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </form>
+                            </li>
+                        @endif
                         <!-- Authentication Links -->
                         @guest
                             @if (\Illuminate\Support\Facades\Route::has('login'))

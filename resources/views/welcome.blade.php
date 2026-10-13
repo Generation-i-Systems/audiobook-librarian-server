@@ -1,5 +1,6 @@
 <?php
 use Illuminate\Support\Facades\Route;
+
 ?>
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -8,7 +9,7 @@ use Illuminate\Support\Facades\Route;
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Audiobook Librarian</title>
+    <title>{{ __('Audiobook Librarian') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -110,19 +111,19 @@ use Illuminate\Support\Facades\Route;
 
 <body>
     <div class="container">
-        <img src="{{ asset('images/audiobook_icon.png') }}" alt="Audiobook Icon" class="animated-image">
-        <h1>Audiobook Librarian</h1>
-        <p>Your personalized archive for all your audiobooks and ebooks!</p>
+        <img src="{{ asset('images/audiobook_icon.png') }}" alt="{{ __('Audiobook Icon') }}" class="animated-image">
+        <h1>{{ __('Audiobook Librarian') }}</h1>
+        <p>{{ __('Your personalized archive for all your audiobooks and ebooks!') }}</p>
 
         @if (Route::has('login'))
             <div class="links">
                 @auth
-                    <a href="{{ url('/home') }}">Home</a>
+                    <a href="{{ url('/home') }}">{{ __('Home') }}</a>
                 @else
-                    <a href="{{ route('login') }}">Log in</a>
+                    <a href="{{ route('login') }}">{{ __('Log in') }}</a>
 
                     @if (Route::has('register'))
-                        <a href="{{ route('register') }}">Register</a>
+                        <a href="{{ route('register') }}">{{ __('Register') }}</a>
                     @endif
                 @endauth
             </div>

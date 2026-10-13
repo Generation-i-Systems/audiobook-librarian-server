@@ -2,16 +2,16 @@
 
 @section('content')
     <div class="container">
-        <h1>Create New Book</h1>
+        <h1>{{ __('Create New Book') }}</h1>
 
         <ul class="nav nav-tabs" id="bookCreateTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="regular-tab" data-bs-toggle="tab" data-bs-target="#regular"
-                    type="button" role="tab" aria-controls="regular" aria-selected="true">Regular Form</button>
+                    type="button" role="tab" aria-controls="regular" aria-selected="true">{{ __('Regular Form') }}</button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="import-tab" data-bs-toggle="tab" data-bs-target="#import" type="button"
-                    role="tab" aria-controls="import" aria-selected="false">Import from Directory</button>
+                    role="tab" aria-controls="import" aria-selected="false">{{ __('Import from Directory') }}</button>
             </li>
         </ul>
 
@@ -35,7 +35,7 @@
                 @endif
 
                 <div id="directory-browser" class="mt-3">
-                    <p>Loading directory...</p>
+                    <p>{{ __('Loading directory...') }}</p>
                 </div>
 
                 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

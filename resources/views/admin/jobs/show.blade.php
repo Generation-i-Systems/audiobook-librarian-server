@@ -10,14 +10,14 @@
                             <a href="{{ route('admin.jobs.index') }}" class="text-decoration-none">
                                 <i class="fas fa-arrow-left me-2"></i>
                             </a>
-                            Job Details
+                            {{ __('Job Details') }}
                         </h5>
                         <div>
                             @if(in_array($job['status'], ['queued', 'failed']))
                                 <form action="{{ route('admin.jobs.retry', $job['id']) }}" method="POST" class="d-inline">
                                     @csrf
                                     <button type="submit" class="btn btn-warning btn-sm"
-                                        onclick="return confirm('Are you sure you want to retry this job?')">
+                                        onclick="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to retry this job?')) }})">
                                         <i class="fas fa-redo me-1"></i> Retry
                                     </button>
                                 </form>
@@ -28,7 +28,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm"
-                                        onclick="return confirm('Are you sure you want to cancel job #{{ $job['id'] }}?')">
+                                        onclick="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to cancel job #:name?', ['name' => $job['id']])) }})">
                                         <i class="fas fa-times me-1"></i> Cancel
                                     </button>
                                 </form>
@@ -39,10 +39,10 @@
                     <div class="card-body">
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <h6 class="text-muted">Job ID</h6>
+                                <h6 class="text-muted">{{ __('Job ID') }}</h6>
                                 <p class="mb-3">{{ $job['id'] }}</p>
 
-                                <h6 class="text-muted">Type</h6>
+                                <h6 class="text-muted">{{ __('Type') }}</h6>
                                 @php
                                     $typeClass = [
                                         'directory_import' => 'primary',
@@ -56,7 +56,7 @@
                                     </span>
                                 </p>
 
-                                <h6 class="text-muted">Status</h6>
+                                <h6 class="text-muted">{{ __('Status') }}</h6>
                                 @php
                                     $statusClass = [
                                         'queued' => 'warning',
@@ -72,20 +72,20 @@
                                 </p>
                             </div>
                             <div class="col-md-6">
-                                <h6 class="text-muted">Created At</h6>
+                                <h6 class="text-muted">{{ __('Created At') }}</h6>
                                 <p>{{ \Carbon\Carbon::parse($job['created_at'])->format('Y-m-d H:i:s') }}</p>
 
                                 @if(isset($job['started_at']))
-                                    <h6 class="text-muted">Started At</h6>
+                                    <h6 class="text-muted">{{ __('Started At') }}</h6>
                                     <p>{{ \Carbon\Carbon::parse($job['started_at'])->format('Y-m-d H:i:s') }}</p>
                                 @endif
 
                                 @if(isset($job['completed_at']))
-                                    <h6 class="text-muted">Completed At</h6>
+                                    <h6 class="text-muted">{{ __('Completed At') }}</h6>
                                     <p>{{ \Carbon\Carbon::parse($job['completed_at'])->format('Y-m-d H:i:s') }}</p>
 
                                     @if(isset($job['started_at']))
-                                        <h6 class="text-muted">Duration</h6>
+                                        <h6 class="text-muted">{{ __('Duration') }}</h6>
                                         @php
                                             $start = \Carbon\Carbon::parse($job['started_at']);
                                             $end = \Carbon\Carbon::parse($job['completed_at']);
@@ -99,7 +99,7 @@
 
                         @if(isset($job['message']))
                             <div class="alert alert-info">
-                                <h6 class="alert-heading">Message</h6>
+                                <h6 class="alert-heading">{{ __('Message') }}</h6>
                                 <p class="mb-0">{{ $job['message'] }}</p>
                             </div>
                         @endif
@@ -107,7 +107,7 @@
                         @if(isset($job['details']) && count($job['details']) > 0)
                             <div class="card mb-4">
                                 <div class="card-header">
-                                    <h6 class="mb-0">Details</h6>
+                                    <h6 class="mb-0">{{ __('Details') }}</h6>
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
@@ -137,23 +137,23 @@
                         @if(isset($job['error']) && $job['error'])
                             <div class="card border-danger mb-4">
                                 <div class="card-header bg-danger text-white">
-                                    <h6 class="mb-0">Error Details</h6>
+                                    <h6 class="mb-0">{{ __('Error Details') }}</h6>
                                 </div>
                                 <div class="card-body">
                                     @if(isset($job['error']['message']))
-                                        <h6>Message</h6>
+                                        <h6>{{ __('Message') }}</h6>
                                         <pre class="bg-light p-3 rounded">{{ $job['error']['message'] }}</pre>
                                     @endif
 
                                     @if(isset($job['error']['trace']))
-                                        <h6>Stack Trace</h6>
+                                        <h6>{{ __('Stack Trace') }}</h6>
                                         <pre class="bg-light p-3 rounded"
                                             style="max-height: 300px; overflow: auto;">{{ $job['error']['trace'] }}</pre>
                                     @endif
 
                                     @if(isset($job['error']['file']) && isset($job['error']['line']))
                                         <div class="mt-3">
-                                            <span class="text-muted">In file:</span>
+                                            <span class="text-muted">{{ __('In file:') }}</span>
                                             {{ $job['error']['file'] }}:{{ $job['error']['line'] }}
                                         </div>
                                     @endif
@@ -164,16 +164,16 @@
                         @if(isset($job['logs']) && count($job['logs']) > 0)
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0">Logs</h6>
+                                    <h6 class="mb-0">{{ __('Logs') }}</h6>
                                 </div>
                                 <div class="card-body p-0">
                                     <div class="table-responsive">
                                         <table class="table table-sm table-striped mb-0">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th style="width: 150px;">Time</th>
-                                                    <th style="width: 100px;">Level</th>
-                                                    <th>Message</th>
+                                                    <th style="width: 150px;">{{ __('Time') }}</th>
+                                                    <th style="width: 100px;">{{ __('Level') }}</th>
+                                                    <th>{{ __('Message') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>

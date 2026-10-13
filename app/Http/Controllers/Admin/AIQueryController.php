@@ -276,7 +276,7 @@ class AIQueryController extends Controller
         }
 
         return redirect()->route('admin.ai-query.results', ['queryId' => $conversationId])
-            ->with('success', 'Custom query executed successfully.');
+            ->with('success', __('Custom query executed successfully.'));
     }
 
     public function editPrompt(Request $request)
@@ -337,7 +337,7 @@ class AIQueryController extends Controller
         }
 
         return redirect()->route('admin.ai-query.results', ['queryId' => $conversationId])
-            ->with('success', 'Prompt updated and conversation reset to this point.');
+            ->with('success', __('Prompt updated and conversation reset to this point.'));
     }
 
     public function processWithTools(Request $request)

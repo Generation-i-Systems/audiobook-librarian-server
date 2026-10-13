@@ -3,11 +3,11 @@
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>LibriVox Library</h1>
+        <h1>{{ __('LibriVox Library') }}</h1>
         <div class="d-flex gap-2">
-            <a href="{{ route('admin.librivox.genres') }}" class="btn btn-outline-secondary">Browse Genres</a>
-            <a href="{{ route('admin.librivox.authors') }}" class="btn btn-outline-secondary">Browse Authors</a>
-            <a href="{{ route('admin.librivox.search') }}" class="btn btn-primary">Search</a>
+            <a href="{{ route('admin.librivox.genres') }}" class="btn btn-outline-secondary">{{ __('Browse Genres') }}</a>
+            <a href="{{ route('admin.librivox.authors') }}" class="btn btn-outline-secondary">{{ __('Browse Authors') }}</a>
+            <a href="{{ route('admin.librivox.search') }}" class="btn btn-primary">{{ __('Search') }}</a>
         </div>
     </div>
 
@@ -25,17 +25,17 @@
 
     <form action="{{ route('admin.librivox.index') }}" method="GET" class="mb-3">
         <div class="input-group">
-            <input type="text" class="form-control" name="search" placeholder="Search title or author"
+            <input type="text" class="form-control" name="search" placeholder="{{ __('Search title or author') }}"
                 value="{{ request('search') }}">
             <select name="sort" class="form-select" style="max-width: 180px;">
-                <option value="recent_desc" @selected($sort === 'recent_desc')>Recently Added</option>
-                <option value="recent_asc" @selected($sort === 'recent_asc')>Oldest First</option>
-                <option value="title_asc" @selected($sort === 'title_asc')>Title A-Z</option>
-                <option value="title_desc" @selected($sort === 'title_desc')>Title Z-A</option>
-                <option value="year_asc" @selected($sort === 'year_asc')>Year Asc</option>
-                <option value="year_desc" @selected($sort === 'year_desc')>Year Desc</option>
+                <option value="recent_desc" @selected($sort === 'recent_desc')>{{ __('Recently Added') }}</option>
+                <option value="recent_asc" @selected($sort === 'recent_asc')>{{ __('Oldest First') }}</option>
+                <option value="title_asc" @selected($sort === 'title_asc')>{{ __('Title A-Z') }}</option>
+                <option value="title_desc" @selected($sort === 'title_desc')>{{ __('Title Z-A') }}</option>
+                <option value="year_asc" @selected($sort === 'year_asc')>{{ __('Year Asc') }}</option>
+                <option value="year_desc" @selected($sort === 'year_desc')>{{ __('Year Desc') }}</option>
             </select>
-            <button class="btn btn-outline-secondary" type="submit">Filter</button>
+            <button class="btn btn-outline-secondary" type="submit">{{ __('Filter') }}</button>
         </div>
     </form>
 
@@ -43,12 +43,12 @@
         <thead>
             <tr>
                 <th style="width:56px;"></th>
-                <th>Title</th>
-                <th>Authors</th>
-                <th>Language</th>
-                <th>Chapters</th>
-                <th>Year</th>
-                <th>Actions</th>
+                <th>{{ __('Title') }}</th>
+                <th>{{ __('Authors') }}</th>
+                <th>{{ __('Language') }}</th>
+                <th>{{ __('Chapters') }}</th>
+                <th>{{ __('Year') }}</th>
+                <th>{{ __('Actions') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -64,7 +64,7 @@
                     <td class="align-middle">
                         <a href="{{ route('admin.books.show', $book->id) }}">{{ $book->title }}</a>
                         @if($book->librivox_info['url_librivox'] ?? null)
-                            <a href="{{ $book->librivox_info['url_librivox'] }}" target="_blank" class="ms-1 text-muted small" title="View on LibriVox">↗</a>
+                            <a href="{{ $book->librivox_info['url_librivox'] }}" target="_blank" class="ms-1 text-muted small" title="{{ __('View on LibriVox') }}">↗</a>
                         @endif
                     </td>
                     <td class="align-middle small">
@@ -74,7 +74,7 @@
                     <td class="align-middle">{{ $book->audio_file_count ?? '—' }}</td>
                     <td class="align-middle">{{ $book->year ?? '—' }}</td>
                     <td class="align-middle">
-                        <a href="{{ route('admin.books.show', $book->id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                        <a href="{{ route('admin.books.show', $book->id) }}" class="btn btn-sm btn-outline-secondary">{{ __('View') }}</a>
                     </td>
                 </tr>
             @empty

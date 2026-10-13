@@ -112,6 +112,6 @@ class LibriVoxController extends Controller
 
         $this->syncService->trigger($language, $full);
 
-        return back()->with('success', 'Sync started in the background. Counts will update once it completes.');
+        return back()->with('success', __('Sync started in the background. Counts will update once it completes.'));
     }
 }

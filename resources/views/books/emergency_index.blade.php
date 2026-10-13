@@ -3,10 +3,10 @@
 @section('content')
 <div class="container">
     <div class="alert alert-warning mb-4">
-        <strong>Emergency Mode Active</strong> - Using optimized book loading to prevent memory issues.
+        <strong>{{ __('Emergency Mode Active') }}</strong> - Using optimized book loading to prevent memory issues.
     </div>
 
-    <h1>Books</h1>
+    <h1>{{ __('Books') }}</h1>
 
     <!-- Search Form -->
     <form action="{{ route('emergency.books.index') }}" method="GET" class="mb-4">
@@ -14,13 +14,13 @@
             <div class="col-md-6">
                 <input type="text" 
                        class="form-control" 
-                       placeholder="Search books..." 
+                       placeholder="{{ __('Search books...') }}" 
                        name="search" 
                        value="{{ request('search') }}">
             </div>
             <div class="col-md-3">
                 <select name="author" class="form-control">
-                    <option value="">All Authors</option>
+                    <option value="">{{ __('All Authors') }}</option>
                     @foreach($authors as $author)
                         <option value="{{ $author }}" {{ request('author') == $author ? 'selected' : '' }}>
                             {{ $author }}
@@ -29,8 +29,8 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <button type="submit" class="btn btn-primary">Search</button>
-                <a href="{{ route('emergency.books.index') }}" class="btn btn-secondary">Clear</a>
+                <button type="submit" class="btn btn-primary">{{ __('Search') }}</button>
+                <a href="{{ route('emergency.books.index') }}" class="btn btn-secondary">{{ __('Clear') }}</a>
             </div>
         </div>
     </form>
@@ -51,7 +51,7 @@
                         <div class="col-4">
                             <img src="{{ $book['coverImage'] }}" 
                                  class="img-fluid rounded-start h-100" 
-                                 alt="Cover" 
+                                 alt="{{ __('Cover') }}" 
                                  style="object-fit: cover; max-height: 200px;">
                         </div>
                         <div class="col-8">
@@ -59,14 +59,14 @@
                                 <h6 class="card-title">{{ $book['title'] }}</h6>
                                 <p class="card-text text-muted small mb-2">
                                     @if(!empty($book['author']))
-                                        <strong>Author:</strong> {{ implode(', ', array_slice($book['author'], 0, 2)) }}
+                                        <strong>{{ __('Author:') }}</strong> {{ implode(', ', array_slice($book['author'], 0, 2)) }}
                                         @if(count($book['author']) > 2)
                                             <span class="text-muted">+{{ count($book['author']) - 2 }} more</span>
                                         @endif
                                         <br>
                                     @endif
                                     @if(!empty($book['genre']))
-                                        <strong>Genre:</strong> {{ implode(', ', $book['genre']) }}
+                                        <strong>{{ __('Genre:') }}</strong> {{ implode(', ', $book['genre']) }}
                                     @endif
                                 </p>
                                 <p class="card-text small flex-grow-1">
@@ -74,7 +74,7 @@
                                 </p>
                                 <div class="mt-auto">
                                     <a href="{{ route('books.show', $book['id']) }}" 
-                                       class="btn btn-sm btn-outline-primary">View Details</a>
+                                       class="btn btn-sm btn-outline-primary">{{ __('View Details') }}</a>
                                 </div>
                             </div>
                         </div>
@@ -84,7 +84,7 @@
         @empty
             <div class="col-12">
                 <div class="alert alert-info">
-                    No books found. Try adjusting your search criteria.
+                    {{ __('No books found. Try adjusting your search criteria.') }}
                 </div>
             </div>
         @endforelse
@@ -98,7 +98,7 @@
     <!-- Recent Books Sidebar -->
     @if(!empty($recentBooks))
         <div class="mt-5">
-            <h4>Recently Added</h4>
+            <h4>{{ __('Recently Added') }}</h4>
             <div class="row">
                 @foreach($recentBooks as $book)
                     <div class="col-md-4 mb-3">
@@ -109,7 +109,7 @@
                                     {{ implode(', ', $book['author']) }}
                                 </p>
                                 <a href="{{ route('books.show', $book['id']) }}" 
-                                   class="btn btn-sm btn-outline-secondary">View</a>
+                                   class="btn btn-sm btn-outline-secondary">{{ __('View') }}</a>
                             </div>
                         </div>
                     </div>

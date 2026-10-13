@@ -2,7 +2,7 @@
 
 @section('content')
     <div class="container">
-        <h1>Messages</h1>
+        <h1>{{ __('Messages') }}</h1>
 
         @if(session('success'))
             <div class="alert alert-success">
@@ -28,11 +28,11 @@
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Status</th>
-                                <th>Content</th>
-                                <th>From</th>
-                                <th>Date</th>
-                                <th>Actions</th>
+                                <th>{{ __('Status') }}</th>
+                                <th>{{ __('Content') }}</th>
+                                <th>{{ __('From') }}</th>
+                                <th>{{ __('Date') }}</th>
+                                <th>{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -40,9 +40,9 @@
                                 <tr class="{{ $message['is_read'] ?? false ? '' : 'table-info' }}">
                                     <td>
                                         @if(!($message['is_read'] ?? false))
-                                            <span class="badge bg-warning text-dark">New</span>
+                                            <span class="badge bg-warning text-dark">{{ __('New') }}</span>
                                         @else
-                                            <span class="badge bg-light text-secondary">Read</span>
+                                            <span class="badge bg-light text-secondary">{{ __('Read') }}</span>
                                         @endif
                                     </td>
                                     <td>
@@ -61,12 +61,12 @@
                                         @if(!($message['acknowledged_at'] ?? false))
                                             <form action="{{ route('admin.messages.acknowledge', $message['id']) }}" method="POST" class="d-inline">
                                                 @csrf
-                                                <button type="submit" class="btn btn-sm btn-success" title="Acknowledge">
+                                                <button type="submit" class="btn btn-sm btn-success" title="{{ __('Acknowledge') }}">
                                                     <i class="fas fa-check"></i>
                                                 </button>
                                             </form>
                                         @else
-                                            <span class="badge bg-success">Acknowledged</span>
+                                            <span class="badge bg-success">{{ __('Acknowledged') }}</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -76,21 +76,21 @@
                                     <div class="modal-dialog">
                                         <div class="modal-content">
                                             <div class="modal-header">
-                                                <h5 class="modal-title">Message Details</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                <h5 class="modal-title">{{ __('Message Details') }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                                             </div>
                                             <div class="modal-body">
-                                                <p><strong>From:</strong> {{ $sender ? ($sender['name'] ?? $sender['email'] ?? 'Unknown') : 'System' }}</p>
-                                                <p><strong>Date:</strong> {{ \Carbon\Carbon::parse($message['created_at'] ?? now())->format('M j, Y g:i A') }}</p>
+                                                <p><strong>{{ __('From:') }}</strong> {{ $sender ? ($sender['name'] ?? $sender['email'] ?? 'Unknown') : 'System' }}</p>
+                                                <p><strong>{{ __('Date:') }}</strong> {{ \Carbon\Carbon::parse($message['created_at'] ?? now())->format('M j, Y g:i A') }}</p>
                                                 <hr>
                                                 <p>{{ $message['content'] ?? '' }}</p>
                                             </div>
                                             <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                                                 @if(!($message['acknowledged_at'] ?? false))
                                                     <form action="{{ route('admin.messages.acknowledge', ['messageId' => $message['id']]) }}" method="POST" class="d-inline">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-success">Acknowledge</button>
+                                                        <button type="submit" class="btn btn-success">{{ __('Acknowledge') }}</button>
                                                     </form>
                                                 @endif
                                             </div>
@@ -99,7 +99,7 @@
                                 </div>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center">No messages found.</td>
+                                    <td colspan="5" class="text-center">{{ __('No messages found.') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -114,16 +114,16 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">New Message</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title">{{ __('New Message') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                 </div>
                 <form action="{{ route('admin.messages.store') }}" method="POST">
                     @csrf
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="to_user_id" class="form-label">Recipient</label>
+                            <label for="to_user_id" class="form-label">{{ __('Recipient') }}</label>
                             <select class="form-select" id="to_user_id" name="to_user_id" required>
-                                <option value="">Select a user</option>
+                                <option value="">{{ __('Select a user') }}</option>
                                 @foreach($users as $user)
                                     <option value="{{ $user['id'] }}">
                                         {{ $user['name'] ?? $user['email'] }}
@@ -132,13 +132,13 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label for="content" class="form-label">Message</label>
+                            <label for="content" class="form-label">{{ __('Message') }}</label>
                             <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Send Message</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('Send Message') }}</button>
                     </div>
                 </form>
             </div>

@@ -70,7 +70,7 @@ class GenreController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to list genres: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to load genres. Please try again.');
+            return redirect()->back()->with('error', __('Failed to load genres. Please try again.'));
         }
     }
 
@@ -103,10 +103,10 @@ class GenreController extends Controller
                 'emoji' => !empty($validated['emoji']) ? $validated['emoji'] : null,
                 'icon_path' => !empty($validated['icon_path']) ? $validated['icon_path'] : null,
             ]);
-            return redirect()->route('genres.index')->with('success', 'Genre created successfully!');
+            return redirect()->route('genres.index')->with('success', __('Genre created successfully!'));
         } catch (\Exception $e) {
             Log::error('Failed to create genre: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to create genre. Please try again.')->withInput();
+            return redirect()->back()->with('error', __('Failed to create genre. Please try again.'))->withInput();
         }
     }
 
@@ -145,7 +145,7 @@ class GenreController extends Controller
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to load genre for editing: ' . $e->getMessage());
-            return redirect()->route('genres.index')->with('error', 'Failed to load genre for editing.');
+            return redirect()->route('genres.index')->with('error', __('Failed to load genre for editing.'));
         }
     }
 
@@ -178,10 +178,10 @@ class GenreController extends Controller
                 'emoji' => !empty($validated['emoji']) ? $validated['emoji'] : null,
                 'icon_path' => !empty($validated['icon_path']) ? $validated['icon_path'] : null,
             ]);
-            return redirect()->route('genres.index')->with('success', 'Genre updated successfully!');
+            return redirect()->route('genres.index')->with('success', __('Genre updated successfully!'));
         } catch (\Exception $e) {
             Log::error('Failed to update genre: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to update genre. Please try again.')->withInput();
+            return redirect()->back()->with('error', __('Failed to update genre. Please try again.'))->withInput();
         }
     }
 
@@ -197,10 +197,10 @@ class GenreController extends Controller
 
             $this->documentStoreService->deleteGenre($id);
             $returnUrl = $request->input('return_url', route('genres.index'));
-            return redirect()->to($returnUrl)->with('success', 'Genre deleted successfully!');
+            return redirect()->to($returnUrl)->with('success', __('Genre deleted successfully!'));
         } catch (\Exception $e) {
             Log::error('Failed to delete genre: ' . $e->getMessage());
-            return redirect()->route('genres.index')->with('error', 'Failed to delete genre. Please try again.');
+            return redirect()->route('genres.index')->with('error', __('Failed to delete genre. Please try again.'));
         }
     }
 

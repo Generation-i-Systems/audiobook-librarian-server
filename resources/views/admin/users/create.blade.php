@@ -2,23 +2,23 @@
 
 @section('content')
 <div class="container">
-    <h1>Add User</h1>
+    <h1>{{ __('Add User') }}</h1>
     <form action="{{ route('admin.users.store') }}" method="POST">
         @csrf
         <div class="mb-3">
-            <label for="name" class="form-label">Name</label>
+            <label for="name" class="form-label">{{ __('Name') }}</label>
             <input type="text" name="name" id="name" class="form-control" required value="{{ old('name') }}">
         </div>
         <div class="mb-3">
-            <label for="username" class="form-label">Username</label>
+            <label for="username" class="form-label">{{ __('Username') }}</label>
             <input type="text" name="username" id="username" class="form-control" required value="{{ old('username') }}">
         </div>
         <div class="mb-3">
-            <label for="email" class="form-label">Email</label>
+            <label for="email" class="form-label">{{ __('Email') }}</label>
             <input type="email" name="email" id="email" class="form-control" required value="{{ old('email') }}">
         </div>
         <div class="mb-3">
-            <label for="role" class="form-label">Role</label>
+            <label for="role" class="form-label">{{ __('Role') }}</label>
             <select name="role" id="role" class="form-control" required>
                 @foreach($assignableRoles as $roleKey => $roleLabel)
                     <option value="{{ $roleKey }}" @selected(old('role', 'library-user') === $roleKey)>{{ $roleLabel }}</option>
@@ -30,21 +30,21 @@
             <input type="checkbox" name="send_otp_email" id="send_otp_email" class="form-check-input" value="1"
                 {{ old('send_otp_email', '1') ? 'checked' : '' }}>
             <label for="send_otp_email" class="form-check-label">
-                Send a sign-in email instead of setting a password
+                {{ __('Send a sign-in email instead of setting a password') }}
             </label>
         </div>
         <div id="password-fields">
             <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
+                <label for="password" class="form-label">{{ __('Password') }}</label>
                 <input type="password" name="password" id="password" class="form-control">
             </div>
             <div class="mb-3">
-                <label for="password_confirmation" class="form-label">Confirm Password</label>
+                <label for="password_confirmation" class="form-label">{{ __('Confirm Password') }}</label>
                 <input type="password" name="password_confirmation" id="password_confirmation" class="form-control">
             </div>
         </div>
-        <button type="submit" class="btn btn-primary">Add User</button>
-        <a href="{{ route('admin.users.index') }}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">{{ __('Add User') }}</button>
+        <a href="{{ route('admin.users.index') }}" class="btn btn-secondary">{{ __('Cancel') }}</a>
     </form>
 </div>
 <script>

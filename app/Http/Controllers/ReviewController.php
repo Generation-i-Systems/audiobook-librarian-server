@@ -31,7 +31,7 @@ class ReviewController extends Controller
             'content_rating' => $request->content_rating,
         ]);
 
-        return back()->with('success', 'Review added successfully!');
+        return back()->with('success', __('Review added successfully!'));
     }
 
     public function destroy(Review $review)
@@ -42,6 +42,6 @@ class ReviewController extends Controller
 
         $review->delete();
 
-        return back()->with('success', 'Review deleted successfully!');
+        return back()->with('success', __('Review deleted successfully!'));
     }
 }

@@ -62,7 +62,7 @@
     <div class="container-fluid">
         <div class="row mb-4">
             <div class="col-md-12">
-                <h1>Directory Validation Report</h1>
+                <h1>{{ __('Directory Validation Report') }}</h1>
 
                 @if(session('success'))
                     <div class="alert alert-success">{{ session('success') }}</div>
@@ -83,9 +83,9 @@
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Missing Directories</h5>
+                        <h5 class="card-title">{{ __('Missing Directories') }}</h5>
                         <h2 class="text-danger">{{ number_format($validationResults['missing_directories']) }}</h2>
-                        <small class="text-muted">Books without physical directories</small>
+                        <small class="text-muted">{{ __('Books without physical directories') }}</small>
                     </div>
                 </div>
             </div>
@@ -93,9 +93,9 @@
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Orphaned Directories</h5>
+                        <h5 class="card-title">{{ __('Orphaned Directories') }}</h5>
                         <h2 class="text-warning">{{ number_format($validationResults['orphaned_directories']) }}</h2>
-                        <small class="text-muted">Directories without database entries</small>
+                        <small class="text-muted">{{ __('Directories without database entries') }}</small>
                     </div>
                 </div>
             </div>
@@ -103,11 +103,11 @@
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Last Scan</h5>
+                        <h5 class="card-title">{{ __('Last Scan') }}</h5>
                         <p class="mb-0">{{ $validationResults['last_scan'] }}</p>
                         <form action="{{ route('admin.directory-validation.rescan') }}" method="POST" class="mt-2">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-primary">Rescan Now</button>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('Rescan Now') }}</button>
                         </form>
                     </div>
                 </div>
@@ -116,14 +116,14 @@
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">AI Matching</h5>
+                        <h5 class="card-title">{{ __('AI Matching') }}</h5>
                         <form action="{{ route('admin.directory-validation') }}" method="GET">
                             <input type="hidden" name="run_matching" value="1">
                             <button type="submit" class="btn btn-sm btn-success">
                                 {{ !empty($matches) ? 'Refresh Matches' : 'Run AI Matching' }}
                             </button>
                         </form>
-                        <small class="text-muted mt-2 d-block">Find potential matches</small>
+                        <small class="text-muted mt-2 d-block">{{ __('Find potential matches') }}</small>
                     </div>
                 </div>
             </div>
@@ -135,18 +135,18 @@
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-header">
-                            <h3>AI Suggested Matches</h3>
+                            <h3>{{ __('AI Suggested Matches') }}</h3>
                         </div>
                         <div class="card-body">
                             @foreach($matches as $match)
                                 <div class="border-bottom pb-3 mb-3">
-                                    <h5 class="text-dark">Orphaned: <code
+                                    <h5 class="text-dark">{{ __('Orphaned:') }} <code
                                             class="bg-light text-dark">{{ $match['orphaned_path'] }}</code></h5>
                                     <small class="text-dark">Size: {{ number_format($match['orphaned_size'] / 1024 / 1024, 2) }}
                                         MB</small>
 
                                     <div class="mt-2">
-                                        <strong class="text-dark">Suggested Matches:</strong>
+                                        <strong class="text-dark">{{ __('Suggested Matches:') }}</strong>
                                         @foreach($match['matches'] as $suggestion)
                                             <div class="card mt-2 bg-white">
                                                 <div class="card-body">
@@ -157,7 +157,7 @@
                                                                     {{ implode(', ', $suggestion['authors']) }}</small></p>
                                                             <p class="mb-1 text-dark"><small>Series:
                                                                     {{ implode(', ', $suggestion['series']) }}</small></p>
-                                                            <p class="mb-1 text-dark"><small>Expected Path: <code
+                                                            <p class="mb-1 text-dark"><small>{{ __('Expected Path:') }} <code
                                                                         class="bg-light text-dark">{{ $suggestion['book_path'] }}</code></small>
                                                             </p>
                                                             <div class="mt-2">
@@ -180,7 +180,7 @@
 
                                                             @if(!$hasPermission)
                                                                 <div class="alert alert-warning p-2 mb-2">
-                                                                    <small>⚠️ No write permission</small>
+                                                                    <small>{{ __('⚠️ No write permission') }}</small>
                                                                 </div>
                                                             @endif
 
@@ -194,21 +194,21 @@
                                                                         <input type="hidden" name="orphaned_path"
                                                                             value="{{ $match['orphaned_path'] }}">
                                                                         <button type="submit" class="btn btn-sm btn-primary w-100 mb-2"
-                                                                            onclick="return confirm('Rename orphaned directory to match this book?')">
-                                                                            Rename to Match
+                                                                            onclick="return confirm({{ \Illuminate\Support\Js::from(__('Rename orphaned directory to match this book?')) }})">
+                                                                            {{ __('Rename to Match') }}
                                                                         </button>
                                                                     </form>
                                                                 @else
                                                                     <button type="button" class="btn btn-sm btn-primary w-100 mb-2" disabled
-                                                                        title="No write permission">
-                                                                        Rename to Match
+                                                                        title="{{ __('No write permission') }}">
+                                                                        {{ __('Rename to Match') }}
                                                                     </button>
                                                                 @endif
 
                                                                 @if($orphanData)
                                                                     <a href="{{ route('admin.books.create') }}?path={{ urlencode($orphanData['path']) }}&return_url={{ urlencode(route('admin.directory-validation')) }}"
                                                                         class="btn btn-sm btn-success w-100 mb-2">
-                                                                        Import as New
+                                                                        {{ __('Import as New') }}
                                                                     </a>
 
                                                                     @if($hasPermission)
@@ -219,14 +219,14 @@
                                                                             <input type="hidden" name="orphaned_path"
                                                                                 value="{{ $orphanData['full_path'] }}">
                                                                             <button type="submit" class="btn btn-sm btn-danger w-100"
-                                                                                onclick="return confirm('Delete directory &quot;{{ addslashes($orphanData['path']) }}&quot; and all its contents? This cannot be undone!')">
-                                                                                Delete Directory
+                                                                                onclick="return confirm({{ \Illuminate\Support\Js::from(__('Delete directory ":name" and all its contents? This cannot be undone!', ['name' => $orphanData['path']])) }})">
+                                                                                {{ __('Delete Directory') }}
                                                                             </button>
                                                                         </form>
                                                                     @else
                                                                         <button type="button" class="btn btn-sm btn-danger w-100" disabled
-                                                                            title="No write permission">
-                                                                            Delete Directory
+                                                                            title="{{ __('No write permission') }}">
+                                                                            {{ __('Delete Directory') }}
                                                                         </button>
                                                                     @endif
                                                                 @endif
@@ -257,12 +257,12 @@
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
-                                        <th>ID</th>
-                                        <th>Title</th>
-                                        <th>Authors</th>
-                                        <th>Series</th>
-                                        <th>Expected Path</th>
-                                        <th>Actions</th>
+                                        <th>{{ __('ID') }}</th>
+                                        <th>{{ __('Title') }}</th>
+                                        <th>{{ __('Authors') }}</th>
+                                        <th>{{ __('Series') }}</th>
+                                        <th>{{ __('Expected Path') }}</th>
+                                        <th>{{ __('Actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -274,6 +274,20 @@
                                             <td>{{ $book->series->pluck('name')->implode(', ') }}</td>
                                             <td><code>{{ $book->directory_path }}</code></td>
                                             <td>
+                                                <form action="{{ route('admin.directory-validation.delete-book') }}"
+                                                    method="POST" class="d-inline">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <input type="hidden" name="book_id" value="{{ $book->id }}">
+                                                    <button type="submit" class="btn btn-sm btn-danger"
+                                                        onclick="return confirm({{ \Illuminate\Support\Js::from(__(':name', ['name' => __('Delete this book entry?')])) }})">
+                                                        {{ __('Delete') }}
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
                             </table>
                         </div>
 
@@ -301,9 +315,9 @@
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
-                                        <th>Path</th>
-                                        <th>Size</th>
-                                        <th>Actions</th>
+                                        <th>{{ __('Path') }}</th>
+                                        <th>{{ __('Size') }}</th>
+                                        <th>{{ __('Actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -330,7 +344,7 @@
                                                     </button>
                                                 @else
                                                     <button type="button" class="btn btn-sm btn-warning" disabled
-                                                        title="No write permission">
+                                                        title="{{ __('No write permission') }}">
                                                         Rename
                                                     </button>
                                                 @endif
@@ -343,13 +357,13 @@
                                                         <input type="hidden" name="orphaned_path"
                                                             value="{{ $orphan['full_path'] }}">
                                                         <button type="submit" class="btn btn-sm btn-danger"
-                                                            onclick="return confirm('Delete directory &quot;{{ addslashes($orphan['path']) }}&quot; and all its contents? This cannot be undone!')">
+                                                            onclick="return confirm({{ \Illuminate\Support\Js::from(__('Delete directory ":name" and all its contents? This cannot be undone!', ['name' => $orphan['path']])) }})">
                                                             Delete
                                                         </button>
                                                     </form>
                                                 @else
                                                     <button type="button" class="btn btn-sm btn-danger" disabled
-                                                        title="No write permission">
+                                                        title="{{ __('No write permission') }}">
                                                         Delete
                                                     </button>
                                                 @endif
@@ -372,27 +386,27 @@
                 <form action="{{ route('admin.directory-validation.rename-orphan') }}" method="POST">
                     @csrf
                     <div class="modal-header">
-                        <h5 class="modal-title">Rename Directory</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <h5 class="modal-title">{{ __('Rename Directory') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="old_path" id="rename_old_path">
 
                         <div class="mb-3">
-                            <label class="form-label">Current Full Path:</label>
+                            <label class="form-label">{{ __('Current Full Path:') }}</label>
                             <p><code id="rename_current_full_path"></code></p>
                         </div>
 
                         <div class="mb-3">
-                            <label for="rename_new_path" class="form-label">New Full Path:</label>
+                            <label for="rename_new_path" class="form-label">{{ __('New Full Path:') }}</label>
                             <input type="text" class="form-control" name="new_path" id="rename_new_path" required>
                             <div class="form-text">Edit the full path as needed. Path is relative to book storage root.
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Rename</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('Rename') }}</button>
                     </div>
                 </form>
             </div>
@@ -421,7 +435,7 @@
                     $('#renameModal').modal('show');
                 } else {
                     console.error('No modal library found');
-                    alert('Modal library not loaded. Please refresh the page.');
+                    alert(window.__('Modal library not loaded. Please refresh the page.'));
                 }
             } catch (e) {
                 console.error('Error showing modal:', e);

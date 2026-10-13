@@ -7,7 +7,7 @@
     <div class="card-header bg-info text-white">
         <h5 class="mb-0">
             <i class="fas fa-search"></i>
-            Parse & Update Preview
+            {{ __('Parse & Update Preview') }}
             @if(isset($results['preview']))
                 ({{ count($results['preview']) }} items found)
             @endif
@@ -16,7 +16,7 @@
     <div class="card-body">
         @if(isset($results['preview']) && count($results['preview']) > 0)
             <div class="alert alert-info mb-3">
-                <strong><i class="fas fa-info-circle"></i> Parsing Pattern:</strong>
+                <strong><i class="fas fa-info-circle"></i> {{ __('Parsing Pattern:') }}</strong>
                 @if(isset($parseConfig['source_field']))
                     Extracting from <strong>{{ $parseConfig['source_field'] }}</strong> field
                 @endif
@@ -110,14 +110,14 @@
                 function confirmParseUpdate() {
                     const selected = document.querySelectorAll('.bulk-checkbox:checked').length;
                     if (selected === 0) {
-                        alert('Please select at least one item to update.');
+                        alert(window.__('Please select at least one item to update.'));
                         return false;
                     }
                     return confirm(`Are you sure you want to apply parsed updates to ${selected} item(s)?`);
                 }
             </script>
         @else
-            <p class="text-muted">No items matched the parsing pattern.</p>
+            <p class="text-muted">{{ __('No items matched the parsing pattern.') }}</p>
         @endif
     </div>
 </div>

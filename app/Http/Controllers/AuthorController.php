@@ -82,7 +82,7 @@ class AuthorController extends Controller
     public function clearMerge()
     {
         session()->forget('selected_merge_author_ids');
-        return redirect()->route('authors.index')->with('success', 'Merge selection cleared.');
+        return redirect()->route('authors.index')->with('success', __('Merge selection cleared.'));
     }
 
 
@@ -103,7 +103,7 @@ class AuthorController extends Controller
         }
         $this->documentStoreService->createAuthor(['name' => $request->name]);
 
-        return redirect()->route('authors.index')->with('success', 'Author created!');
+        return redirect()->route('authors.index')->with('success', __('Author created!'));
     }
 
 
@@ -157,7 +157,7 @@ class AuthorController extends Controller
         }
         $this->documentStoreService->updateAuthor($id, ['name' => $request->name]);
 
-        return redirect()->route('authors.index')->with('success', 'Author updated!');
+        return redirect()->route('authors.index')->with('success', __('Author updated!'));
     }
 
 
@@ -179,7 +179,7 @@ class AuthorController extends Controller
         $this->documentStoreService->deleteAuthor($id);
 
         $returnUrl = $request->input('return_url', route('authors.index'));
-        return redirect()->to($returnUrl)->with('success', 'Author deleted!');
+        return redirect()->to($returnUrl)->with('success', __('Author deleted!'));
     }
 
 

@@ -31,23 +31,23 @@
                     <div>
                         <h1 style="margin-bottom: 30px;">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
                         <div class="mb-3">
-                            <button type="button" class="btn btn-info" id="autofill-modal-btn" aria-label="Autofill Book Metadata"><i
-                                    class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
+                            <button type="button" class="btn btn-info" id="autofill-modal-btn" aria-label="{{ __('Autofill Book Metadata') }}"><i
+                                    class="fas fa-magic me-2"></i>{{ __('Autofill Book Metadata') }}</button>
                              <button type="button" class="btn btn-success ms-2" id="magic-autofill-btn"
-                                  title="Auto-search and apply first result from Audible" aria-label="Magic Autofill"><i class="fas fa-magic"></i></button>
+                                  title="{{ __('Auto-search and apply first result from Audible') }}" aria-label="{{ __('Magic Autofill') }}"><i class="fas fa-magic"></i></button>
                             @if(!empty($initial['sourcePath']) || !empty($initial['sourceRelPath']))
                                 <button type="button" class="btn btn-primary ms-2" id="ai-extract-btn"
-                                    title="Extract and enrich metadata using AI" aria-label="AI Extraction"><i class="fas fa-robot me-2"></i>AI Extract</button>
+                                    title="{{ __('Extract and enrich metadata using AI') }}" aria-label="{{ __('AI Extraction') }}"><i class="fas fa-robot me-2"></i>{{ __('AI Extract') }}</button>
                             @endif
                             @if(isset($book))
                                 <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i
-                                        class="fas fa-code me-2"></i>Raw JSON Edit</button>
+                                        class="fas fa-code me-2"></i>{{ __('Raw JSON Edit') }}</button>
                             @endif
                         </div>
                     </div>
                     <div id="cover-preview-container">
                         <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
-                            <img src="{{ $coverUrl ?? asset('images/placeholder.png') }}" alt="Book Cover"
+                            <img src="{{ $coverUrl ?? asset('images/placeholder.png') }}" alt="{{ __('Book Cover') }}"
                                 id="current-cover-image"
                                 style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px; {{ !$coverUrl ? 'opacity: 0.5;' : '' }}">
                             <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle"
@@ -151,10 +151,10 @@
                             <i class="fas fa-exclamation-triangle me-2"></i>Review Status
                         </div>
                         <div class="card-body">
-                            <p class="mb-2"><strong>This book has been flagged for review.</strong></p>
+                            <p class="mb-2"><strong>{{ __('This book has been flagged for review.') }}</strong></p>
 
                             @if(!empty($book['needsReviewReasons']) && is_array($book['needsReviewReasons']))
-                                <p class="text-muted small mb-3">Check the boxes below to <strong>KEEP</strong> those reasons. Unchecked reasons will be removed when you save. If all are unchecked, the needs review flag will be cleared.</p>
+                                <p class="text-muted small mb-3">{{ __('Check the boxes below to') }} <strong>{{ __('KEEP') }}</strong> those reasons. Unchecked reasons will be removed when you save. If all are unchecked, the needs review flag will be cleared.</p>
 
                                 @foreach($book['needsReviewReasons'] as $index => $reason)
                                     <div class="form-check mb-2">
@@ -168,17 +168,17 @@
                                 @endforeach
                             @else
                                 <p class="text-muted small mb-3">
-                                    <em>No specific reasons were recorded for this review flag.</em>
+                                    <em>{{ __('No specific reasons were recorded for this review flag.') }}</em>
                                 </p>
                                 <p class="text-muted small mb-3">
-                                    To clear the review flag, check the box below and save.
+                                    {{ __('To clear the review flag, check the box below and save.') }}
                                 </p>
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox"
                                            name="clearNeedsReview" value="1"
                                            id="clearNeedsReview">
                                     <label class="form-check-label" for="clearNeedsReview">
-                                        <strong>Clear review flag</strong>
+                                        <strong>{{ __('Clear review flag') }}</strong>
                                     </label>
                                 </div>
                             @endif
@@ -191,22 +191,22 @@
                 {{-- Basic Information Card --}}
                 <div class="book-form-card">
                     <h5 class="book-form-section-title" data-card="basic-info">
-                        <span><i class="fas fa-book me-2"></i>Basic Information</span>
+                        <span><i class="fas fa-book me-2"></i>{{ __('Basic Information') }}</span>
                         <i class="fas fa-chevron-down toggle-icon"></i>
                     </h5>
                     <div class="card-content">
                         <div class="row">
                             <div class="col-md-6">
-                                <label for="title" class="form-label">Title</label>
+                                <label for="title" class="form-label">{{ __('Title') }}</label>
                                 <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
                                     value="{{ old('title', isset($book) ? ($book['title'] ?? null) : (request()->get('title') ?? ($initial['title'] ?? ''))) }}"
-                                    placeholder="Enter book title" required>
+                                    placeholder="{{ __('Enter book title') }}" required>
                                 @error('title')
                                     <span class="invalid-feedback d-block">{{ $message }}</span>
                                 @enderror
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Series</label>
+                                <label class="form-label">{{ __('Series') }}</label>
                                 <div id="series-group">
                                     {{-- Only use canonical format: array of objects with seriesName and number --}}
                                     @php
@@ -243,39 +243,39 @@
                                                 value="{{ $series['number'] ?? '' }}" step="any">
                                             <input type="text" name="series[{{ $idx }}][seriesName]"
                                                 class="form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
-                                                placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                                                placeholder="{{ __('Series Name') }}" value="{{ $series['seriesName'] ?? '' }}">
                                             <div class="form-check ms-2 d-flex align-items-center form-control-height-32"
                                                 title="Collection (not a primary series)">
                                                 <input type="checkbox" name="series[{{ $idx }}][isCollection]"
                                                     class="form-check-input" value="1" {{ ($series['isCollection'] ?? false) ? 'checked' : '' }} style="margin-top:0;">
-                                                <label class="form-check-label ms-1 small">Collection</label>
+                                                <label class="form-check-label ms-1 small">{{ __('Collection') }}</label>
                                             </div>
                                             <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             @if($seriesId)
                                                 <a href="{{ route('admin.books.index', ['search' => 'seriesId:' . $seriesId]) }}"
                                                     target="_blank" rel="noopener"
                                                     class="btn btn-sm btn-outline-secondary ms-2 btn-size-32 flex-shrink-0 d-flex align-items-center justify-content-center"
-                                                    title="View series in book list" aria-label="View series in book list">
+                                                    title="{{ __('View series in book list') }}" aria-label="{{ __('View series in book list') }}">
                                                     <i class="fas fa-external-link-alt"></i>
                                                 </a>
                                                 <button type="button" class="btn btn-sm btn-outline-secondary ms-2 view-related-books-btn btn-size-32 flex-shrink-0"
                                                     data-type="series" data-id="{{ $seriesId }}" data-name="{{ $series['seriesName'] }}"
-                                                    title="Show other books in this series" aria-label="Show other books in this series">
+                                                    title="{{ __('Show other books in this series') }}" aria-label="{{ __('Show other books in this series') }}">
                                                     <i class="fas fa-book-open"></i>
                                                 </button>
                                             @endif
                                             @if(!empty($series['seriesName']))
                                                 <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn btn-size-32 flex-shrink-0"
                                                     data-series-name="{{ $series['seriesName'] }}"
-                                                    title="Rename this series" aria-label="Rename series">
+                                                    title="{{ __('Rename this series') }}" aria-label="{{ __('Rename series') }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                              @else
                                                 <div class="btn-size-32 ms-2 flex-shrink-0" role="presentation" aria-hidden="true"></div>
                                             @endif
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
-                                                <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="{{ __('Remove series') }}">&times;</button>
+                                                <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="{{ __('Add series') }}">+</button>
                                             </div>
                                         </div>
                                     @endforeach
@@ -285,7 +285,7 @@
 
                         <div class="row">
                             <div class="col-md-6">
-                                <label class="form-label">Authors</label>
+                                <label class="form-label">{{ __('Authors') }}</label>
                                 <div id="authors-group">
                                     @php
     $authors = old('author');
@@ -333,27 +333,27 @@
         $authorId = $authorsDataByName[$author]['id'] ?? null;
     @endphp
     <div class="d-flex align-items-start mb-2 author-row">
-        <input type="text" name="author[]" class="form-control author-autocomplete form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="Author Name" required>
+        <input type="text" name="author[]" class="form-control author-autocomplete form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="{{ __('Author Name') }}" required>
         <datalist id="author-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
         @if($authorId)
             <a href="{{ route('admin.books.index', ['search' => 'authorId:' . $authorId]) }}"
                 target="_blank" rel="noopener"
                 class="btn btn-sm btn-outline-secondary ms-2 btn-size-32 flex-shrink-0 d-flex align-items-center justify-content-center"
-                title="View author's books in book list" aria-label="View author's books in book list">
+                title="{{ __('View author\'s books in book list') }}" aria-label="{{ __('View author\'s books in book list') }}">
                 <i class="fas fa-external-link-alt"></i>
             </a>
             <button type="button" class="btn btn-sm btn-outline-secondary ms-2 view-related-books-btn btn-size-32 flex-shrink-0"
                 data-type="author" data-id="{{ $authorId }}" data-name="{{ $author }}"
-                title="Show other books by this author" aria-label="Show other books by this author">
+                title="{{ __('Show other books by this author') }}" aria-label="{{ __('Show other books by this author') }}">
                 <i class="fas fa-book-open"></i>
             </button>
         @endif
         <div class="d-flex flex-column ms-2" style="gap:2px;">
             <button type="button" class="btn btn-outline-danger btn-sm remove-author"
-                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
+                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="{{ __('Remove author') }}">&times;</button>
             @if($idx === $authorsCount - 1)
                 <button type="button" class="btn btn-primary btn-sm add-author-row"
-                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
+                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="{{ __('Add author') }}">+</button>
             @endif
         </div>
     </div>
@@ -361,7 +361,7 @@
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Narrators</label>
+                                <label class="form-label">{{ __('Narrators') }}</label>
                                 <div id="narrators-group">
                                     @php
     $narrators = old('narrator');
@@ -380,13 +380,13 @@
                                     @php $narratorsCount = count($narrators); @endphp
                                      @foreach($narrators as $idx => $narrator)
                                         <div class="d-flex align-items-start mb-2 narrator-row">
-                                            <input type="text" name="narrator[]" class="form-control narrator-autocomplete form-control-height-32 form-control-flex-1" value="{{ $narrator }}" placeholder="Narrator Name">
+                                            <input type="text" name="narrator[]" class="form-control narrator-autocomplete form-control-height-32 form-control-flex-1" value="{{ $narrator }}" placeholder="{{ __('Narrator Name') }}">
                                             <datalist id="narrator-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-narrator btn-size-32" aria-label="Remove narrator">&times;</button>
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-narrator btn-size-32" aria-label="{{ __('Remove narrator') }}">&times;</button>
                                                 @if($idx === $narratorsCount - 1)
                                                     <button type="button" class="btn btn-primary btn-sm add-narrator-row"
-                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add narrator">+</button>
+                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="{{ __('Add narrator') }}">+</button>
                                                 @endif
                                             </div>
                                         </div>
@@ -396,7 +396,7 @@
                         </div>
                         <div class="row mt-3">
                             <div class="col-md-6">
-                                <label class="form-label">Genres</label>
+                                <label class="form-label">{{ __('Genres') }}</label>
                                 <div id="genres-group">
                                     @php
     $genres = old('genre');
@@ -418,7 +418,7 @@
                                     @foreach($genres as $idx => $genre)
                                         <div class="d-flex align-items-start mb-2 genre-row" data-original-genre="{{ $genre }}">
                                             <select name="genre[]" class="form-select form-control-height-32 form-control-flex-1" required>
-                                                <option value="">Select a genre</option>
+                                                <option value="">{{ __('Select a genre') }}</option>
                                                 @foreach($genreList as $g)
                                                     <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
                                                 @endforeach
@@ -426,16 +426,16 @@
                                             @if($idx === 0)
                                                 <button type="button" class="btn btn-outline-info btn-sm ms-2 update-path-from-genre"
                                                     style="width:auto; height:32px; padding:0 8px; display:none; align-items:center; justify-content:center; white-space:nowrap;"
-                                                    title="Update directory path to move book to this genre">
+                                                    title="{{ __('Update directory path to move book to this genre') }}">
                                                     <i class="fas fa-folder-open me-1"></i>Update Path
                                                 </button>
                                             @endif
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
                                                 <button type="button" class="btn btn-outline-danger btn-sm remove-genre"
-                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove genre">&times;</button>
+                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="{{ __('Remove genre') }}">&times;</button>
                                                 @if($idx === $genresCount - 1)
                                                     <button type="button" class="btn btn-primary btn-sm add-genre-row"
-                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add genre">+</button>
+                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="{{ __('Add genre') }}">+</button>
                                                 @endif
                                             </div>
                                         </div>
@@ -454,28 +454,28 @@
                     </h5>
                     <div class="card-content">
                         <div class="mb-3">
-                            <label for="directoryPath" class="form-label">Directory Path</label>
+                            <label for="directoryPath" class="form-label">{{ __('Directory Path') }}</label>
                             <div class="d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
                                 <div class="position-relative" style="flex: 1; min-width: 300px;">
                                     <input type="text" class="form-control @error('directoryPath') is-invalid @enderror"
                                         id="directoryPath" name="directoryPath"
                                         value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}"
-                                        style="padding-right: 35px;" placeholder="Path to book directory">
+                                        style="padding-right: 35px;" placeholder="{{ __('Path to book directory') }}">
                                 <button type="button" class="btn btn-link text-danger position-absolute"
                                         id="directory-not-found-btn"
                                         style="display: none; right: 5px; top: 50%; transform: translateY(-50%); padding: 0; width: 25px; height: 25px;"
-                                        title="Directory not found - Click to browse"
-                                        aria-label="Directory not found - Click to browse">
+                                        title="{{ __('Directory not found - Click to browse') }}"
+                                        aria-label="{{ __('Directory not found - Click to browse') }}">
                                         <i class="fas fa-times-circle"></i>
                                     </button>
                                 <button type="button" class="btn btn-outline-secondary" id="update-path-from-fields-btn"
-                                    title="Update directory path based on current genre, author, title, and series fields"
-                                    aria-label="Update directory path based on current genre, author, title, and series fields">
+                                    title="{{ __('Update directory path based on current genre, author, title, and series fields') }}"
+                                    aria-label="{{ __('Update directory path based on current genre, author, title, and series fields') }}">
                                     <i class="fas fa-folder-plus me-1"></i>Update Path from Fields
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary" id="resync-path-btn"
-                                    title="Parse directory path to populate title, author, and series fields"
-                                    aria-label="Parse directory path to populate title, author, and series fields">
+                                    title="{{ __('Parse directory path to populate title, author, and series fields') }}"
+                                    aria-label="{{ __('Parse directory path to populate title, author, and series fields') }}">
                                     <i class="fas fa-sync-alt me-1"></i>Parse Path to Fields
                                 </button>
                                 </div>
@@ -493,7 +493,7 @@
                             </a>
                             <div id="directory-files-list-content" class="w-100 mt-2"
                                 style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
-                                <span class="text-muted">No files loaded yet.</span>
+                                <span class="text-muted">{{ __('No files loaded yet.') }}</span>
                             </div>
                         </div>
                     </div>
@@ -502,13 +502,13 @@
                 @if(isset($book))
                     <div class="book-form-card mt-3" id="book-tags-editor">
                         <h5 class="book-form-section-title">
-                            <span><i class="fas fa-tags me-2"></i>Tags</span>
+                            <span><i class="fas fa-tags me-2"></i>{{ __('Tags') }}</span>
                         </h5>
                         <div class="card-content">
                             <div class="row g-3">
                                 @if($canManageSystemTags ?? false)
                                     <div class="col-md-6">
-                                        <label class="form-label" for="system-tags">System Tags</label>
+                                        <label class="form-label" for="system-tags">{{ __('System Tags') }}</label>
                                         <input type="hidden" form="system-tags-form" name="scope" value="system">
                                         <div class="tag-editor" data-tags-input="system-tags" data-suggestions="{{ json_encode($tagSuggestions['system'] ?? []) }}">
                                             <input type="text" class="form-control" form="system-tags-form" id="system-tags" name="tags"
@@ -519,12 +519,12 @@
                                                 @endforeach
                                             </datalist>
                                         </div>
-                                        <button type="submit" form="system-tags-form" class="btn btn-outline-primary btn-sm mt-2">Save System Tags</button>
+                                        <button type="submit" form="system-tags-form" class="btn btn-outline-primary btn-sm mt-2">{{ __('Save System Tags') }}</button>
                                         <div class="tag-save-status small mt-2" id="system-tags-save-status" role="status"></div>
                                     </div>
                                 @endif
                                 <div class="col-md-6">
-                                    <label class="form-label" for="my-tags">My Tags</label>
+                                    <label class="form-label" for="my-tags">{{ __('My Tags') }}</label>
                                     <input type="hidden" form="my-tags-form" name="scope" value="user">
                                     <div class="tag-editor" data-tags-input="my-tags" data-suggestions="{{ json_encode($tagSuggestions['user'] ?? []) }}">
                                         <input type="text" class="form-control" form="my-tags-form" id="my-tags" name="tags"
@@ -535,7 +535,7 @@
                                             @endforeach
                                         </datalist>
                                     </div>
-                                    <button type="submit" form="my-tags-form" class="btn btn-outline-secondary btn-sm mt-2">Save My Tags</button>
+                                    <button type="submit" form="my-tags-form" class="btn btn-outline-secondary btn-sm mt-2">{{ __('Save My Tags') }}</button>
                                     <div class="tag-save-status small mt-2" id="my-tags-save-status" role="status"></div>
                                 </div>
                             </div>
@@ -546,23 +546,23 @@
                 {{-- Additional Information Card --}}
                 <div class="book-form-card">
                     <h5 class="book-form-section-title" data-card="additional-info">
-                        <span><i class="fas fa-info-circle me-2"></i>Additional Information</span>
+                        <span><i class="fas fa-info-circle me-2"></i>{{ __('Additional Information') }}</span>
                         <i class="fas fa-chevron-down toggle-icon"></i>
                     </h5>
                     <div class="card-content">
                         <div class="row">
                             <div class="col-md-9">
-                                <label for="description" class="form-label">Description <span
+                                <label for="description" class="form-label">{{ __('Description') }} <span
                                         class="text-muted">(Optional)</span></label>
                                 <textarea class="form-control @error('description') is-invalid @enderror" id="description"
                                     name="description" rows="3"
-                                    placeholder="Enter book description">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
+                                    placeholder="{{ __('Enter book description') }}">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
                                 @error('description')
                                     <span class="invalid-feedback d-block">{{ $message }}</span>
                                 @enderror
                             </div>
                             <div class="col-md-3">
-                                <label for="release_date" class="form-label">Release Date <span
+                                <label for="release_date" class="form-label">{{ __('Release Date') }} <span
                                         class="text-muted">(Optional)</span></label>
                                 @php
     // Check both snake_case and camelCase versions
@@ -574,7 +574,7 @@
     }
                                 @endphp
                                 <input type="text" class="form-control @error('release_date') is-invalid @enderror"
-                                    id="release_date" name="release_date" placeholder="YYYY or YYYY-MM-DD"
+                                    id="release_date" name="release_date" placeholder="{{ __('YYYY or YYYY-MM-DD') }}"
                                     value="{{ $releaseDisplayValue }}">
                                 @error('release_date')
                                     <span class="invalid-feedback d-block">{{ $message }}</span>
@@ -706,7 +706,7 @@
                                 <h5 class="modal-title" id="coverImageModalLabel">
                                     <i class="fas fa-images me-2"></i>Select Cover Image
                                 </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                             </div>
                             <div class="modal-body">
                                 @php
@@ -746,7 +746,7 @@
                                         @empty
                                             <div class="alert alert-info w-100 mb-0">
                                                 <i class="fas fa-info-circle me-2"></i>No cover images found.
-                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="extract-cover-no-covers-btn" aria-label="Extract cover from audio files">
+                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="extract-cover-no-covers-btn" aria-label="{{ __('Extract cover from audio files') }}">
                                                     <i class="fas fa-music me-1"></i>Extract from Audio Files
                                                 </button>
                                             </div>
@@ -758,15 +758,15 @@
                                 <div id="embedded-cover-options" class="mt-3" style="display:none; min-height: 50px;"></div>
 
                                 <div id="google-books-matches-table-wrapper" style="display:none;" class="mt-4">
-                                    <label class="form-label">Google Books: Select a Match</label>
+                                    <label class="form-label">{{ __('Google Books: Select a Match') }}</label>
                                     <table class="table table-bordered table-sm mb-0" id="google-books-matches-table">
                                         <thead>
                                             <tr>
                                                 <th></th>
-                                                <th>Title</th>
-                                                <th>Authors</th>
-                                                <th>Year</th>
-                                                <th>Cover</th>
+                                                <th>{{ __('Title') }}</th>
+                                                <th>{{ __('Authors') }}</th>
+                                                <th>{{ __('Year') }}</th>
+                                                <th>{{ __('Cover') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody></tbody>
@@ -799,13 +799,13 @@
 
                                 <div class="mt-4" id="extract-embedded-cover-section">
                                     <button type="button" class="btn btn-outline-primary" id="extract-embedded-cover-btn"
-                                aria-label="Extract cover from audio files">
+                                aria-label="{{ __('Extract cover from audio files') }}">
                                         <i class="fas fa-music me-2"></i>Extract Cover from Audio Files
                                     </button>
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close modal">Close</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="{{ __('Close modal') }}">{{ __('Close') }}</button>
                             </div>
                         </div>
                     </div>
@@ -980,7 +980,7 @@
                         const directoryPath = document.getElementById('directoryPath')?.value;
 
                         if (!directoryPath) {
-                            alert('Please select a directory path first');
+                            alert(window.__('Please select a directory path first'));
                             return;
                         }
 
@@ -1115,7 +1115,7 @@
                 resyncBtn.addEventListener('click', function() {
                     const path = document.getElementById('directoryPath').value;
                     if (!path) {
-                        alert('Please enter a directory path first.');
+                        alert(window.__('Please enter a directory path first.'));
                         return;
                     }
                     resyncBtn.disabled = true;
@@ -1159,7 +1159,7 @@
                         .catch(err => {
                             resyncBtn.disabled = false;
                             resyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Resync Title/Author/Series';
-                            alert('Resync failed.');
+                            alert(window.__('Resync failed.'));
                         });
                 });
                 });
@@ -1167,11 +1167,11 @@
                 @if(isset($book))
                     <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                         <div>
-                            <button type="submit" class="btn btn-primary" id="modal-update-btn">Save Changes</button>
+                            <button type="submit" class="btn btn-primary" id="modal-update-btn">{{ __('Save Changes') }}</button>
                             @if(!empty($isModal))
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">{{ __('Cancel') }}</button>
                             @else
-                                <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
+                                <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">{{ __('Cancel') }}</a>
                             @endif
                         </div>
                         <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteBookModal">
@@ -1179,11 +1179,11 @@
                         </button>
                     </div>
                 @else
-                    <button type="submit" class="btn btn-primary" id="modal-create-btn">Create</button>
+                    <button type="submit" class="btn btn-primary" id="modal-create-btn">{{ __('Create') }}</button>
                     @if(!empty($isModal))
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">{{ __('Cancel') }}</button>
                     @else
-                        <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
+                        <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">{{ __('Cancel') }}</a>
                     @endif
                 @endif
             </form>

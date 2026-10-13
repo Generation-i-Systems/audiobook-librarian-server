@@ -6,7 +6,7 @@
             {{ $item['name'] }}
         </a>
     </td>
-    <td>Directory</td>
+    <td>{{ __('Directory') }}</td>
     <td>-</td>
     <td>-</td>
     <td></td>

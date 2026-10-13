@@ -268,7 +268,7 @@ rendering or real user interactions.
 
 ---
 
-- **Localization rendering** (`resources/views/layouts/app.blade.php` `window.APP_I18N`, `resources/js/i18n.js`) — tests prove locale selection, the stored preference and the `t()` helper, but not that a real browser receives the inline `APP_I18N` script on every page, that translated text fits its buttons/layouts, or that right-to-left languages render correctly.
+- **Localization rendering** (`resources/views/layouts/app.blade.php` `window.APP_I18N`, `resources/js/i18n.js`) — tests prove locale selection, the stored preference and the `t()` helper, but not that a real browser receives the inline `APP_I18N` script on every page, that translated text fits its buttons/layouts, or that right-to-left languages render correctly. Also unverified: the Spanish text is machine-written and needs a native-speaker review; longer Spanish labels may overflow buttons, table headers and the navbar; auto-wrapped strings inside inline `<script>` blocks (`window.__(...)`) and `confirm()` attributes (`Js::from`) are only compile-checked, not exercised in a browser; fragments split around `{{ }}` expressions read awkwardly when translated.
 
 ## 7. File Download / Streaming
 

@@ -101,11 +101,11 @@ class ManageSeriesController extends Controller
         $flattenDirectories = $request->input('flatten_directories', false);
 
         if (count($bookIds) < 2) {
-            return back()->with('error', 'Please select at least 2 books to merge');
+            return back()->with('error', __('Please select at least 2 books to merge'));
         }
 
         if (!$primaryBookId || !in_array($primaryBookId, $bookIds)) {
-            return back()->with('error', 'Please select a primary book');
+            return back()->with('error', __('Please select a primary book'));
         }
 
         try {
@@ -119,7 +119,7 @@ class ManageSeriesController extends Controller
             }
 
             if (count($books) < 2) {
-                return back()->with('error', 'Could not find all selected books');
+                return back()->with('error', __('Could not find all selected books'));
             }
 
             // Find the primary book
@@ -134,7 +134,7 @@ class ManageSeriesController extends Controller
             }
 
             if (!$primaryBook) {
-                return back()->with('error', 'Primary book not found');
+                return back()->with('error', __('Primary book not found'));
             }
 
             // If flatten directories is enabled, move files
@@ -215,11 +215,11 @@ class ManageSeriesController extends Controller
         $merge = $request->input('merge', false);
 
         if (empty($oldName) || empty($newName)) {
-            return back()->with('error', 'Both old and new series names are required');
+            return back()->with('error', __('Both old and new series names are required'));
         }
 
         if ($oldName === $newName) {
-            return back()->with('error', 'New name must be different from old name');
+            return back()->with('error', __('New name must be different from old name'));
         }
 
         try {

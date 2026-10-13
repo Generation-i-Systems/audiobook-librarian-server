@@ -4,17 +4,17 @@
     <div class="container">
         <h1>Manage Books (Emergency Mode)</h1>
         
-        <p>Memory usage debugging mode enabled.</p>
+        <p>{{ __('Memory usage debugging mode enabled.') }}</p>
         <p>Total books: {{ $books->total() }}</p>
         <p>Showing: {{ $books->count() }}</p>
 
         <table class="table">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Author</th>
-                    <th>Actions</th>
+                    <th>{{ __('ID') }}</th>
+                    <th>{{ __('Title') }}</th>
+                    <th>{{ __('Author') }}</th>
+                    <th>{{ __('Actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -30,7 +30,7 @@
                             @endif
                         </td>
                         <td>
-                            <a href="{{ route('admin.books.edit', $book['id'] ?? '1') }}" class="btn btn-sm btn-primary">Edit</a>
+                            <a href="{{ route('admin.books.edit', $book['id'] ?? '1') }}" class="btn btn-sm btn-primary">{{ __('Edit') }}</a>
                         </td>
                     </tr>
                 @endforeach

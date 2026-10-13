@@ -7,10 +7,10 @@
         <h1 class="h3">Event Timeline: {{ $user->name }}</h1>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.books.positions', $user) }}" class="btn btn-outline-secondary btn-sm">
-                Books in Progress
+                {{ __('Books in Progress') }}
             </a>
             <a href="{{ route('admin.users.show', $user) }}" class="btn btn-outline-secondary btn-sm">
-                Back to User
+                {{ __('Back to User') }}
             </a>
         </div>
     </div>
@@ -18,7 +18,7 @@
     <form method="GET" class="row g-2 mb-4">
         <div class="col-auto">
             <select name="device_id" class="form-select form-select-sm">
-                <option value="">All Devices</option>
+                <option value="">{{ __('All Devices') }}</option>
                 @foreach($devices as $device)
                     <option value="{{ $device->device_id }}"
                         {{ request('device_id') === $device->device_id ? 'selected' : '' }}>
@@ -29,7 +29,7 @@
         </div>
         <div class="col-auto">
             <select name="event_type" class="form-select form-select-sm">
-                <option value="">All Event Types</option>
+                <option value="">{{ __('All Event Types') }}</option>
                 @foreach($eventTypes as $type)
                     <option value="{{ $type }}"
                         {{ request('event_type') === $type ? 'selected' : '' }}>
@@ -40,7 +40,7 @@
         </div>
         <div class="col-auto">
             <select name="book_id" class="form-select form-select-sm">
-                <option value="">All Books</option>
+                <option value="">{{ __('All Books') }}</option>
                 @foreach($books as $book)
                     <option value="{{ $book->id }}"
                         {{ request('book_id') == $book->id ? 'selected' : '' }}>
@@ -50,7 +50,7 @@
             </select>
         </div>
         <div class="col-auto">
-            <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+            <button type="submit" class="btn btn-primary btn-sm">{{ __('Filter') }}</button>
             <a href="{{ route('admin.events.timeline', $user) }}" class="btn btn-outline-secondary btn-sm">
                 Clear
             </a>
@@ -61,13 +61,13 @@
         <table class="table table-sm table-striped">
             <thead>
                 <tr>
-                    <th>Timestamp</th>
-                    <th>Event Type</th>
-                    <th>Book</th>
-                    <th>Position</th>
-                    <th>Device</th>
-                    <th>Metadata</th>
-                    <th>Sync</th>
+                    <th>{{ __('Timestamp') }}</th>
+                    <th>{{ __('Event Type') }}</th>
+                    <th>{{ __('Book') }}</th>
+                    <th>{{ __('Position') }}</th>
+                    <th>{{ __('Device') }}</th>
+                    <th>{{ __('Metadata') }}</th>
+                    <th>{{ __('Sync') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -115,7 +115,7 @@
                                     }
                                 @endphp
                                 @if($display)
-                                    <small class="text-secondary" title="Book not on server">{{ Str::limit($display, 40) }}</small>
+                                    <small class="text-secondary" title="{{ __('Book not on server') }}">{{ Str::limit($display, 40) }}</small>
                                 @else
                                     <small class="text-muted">Book #{{ $event->book_id }}</small>
                                 @endif
@@ -174,7 +174,7 @@
                 @empty
                     <tr>
                         <td colspan="7" class="text-center text-muted py-4">
-                            No events found.
+                            {{ __('No events found.') }}
                         </td>
                     </tr>
                 @endforelse

@@ -36,7 +36,7 @@ class FavoriteAuthorWebController extends Controller
             ->exists();
 
         if ($existing) {
-            return redirect()->back()->with('error', 'Author already in favorites');
+            return redirect()->back()->with('error', __('Author already in favorites'));
         }
 
         FavoriteAuthor::create([
@@ -45,7 +45,7 @@ class FavoriteAuthorWebController extends Controller
             'notify_email' => true,
         ]);
 
-        return redirect()->back()->with('success', 'Author added to favorites');
+        return redirect()->back()->with('success', __('Author added to favorites'));
     }
 
     public function destroy(FavoriteAuthor $favorite)
@@ -62,7 +62,7 @@ class FavoriteAuthorWebController extends Controller
 
         $favorite->delete();
 
-        return redirect()->back()->with('success', 'Author removed from favorites');
+        return redirect()->back()->with('success', __('Author removed from favorites'));
     }
 
     public function toggleNotifications(FavoriteAuthor $favorite)
@@ -77,6 +77,6 @@ class FavoriteAuthorWebController extends Controller
             'notify_email' => !$favorite->notify_email,
         ]);
 
-        return redirect()->back()->with('success', 'Notification settings updated');
+        return redirect()->back()->with('success', __('Notification settings updated'));
     }
 }
