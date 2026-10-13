@@ -42,8 +42,8 @@
 <body>
     <div class="card">
         <div class="icon">✓</div>
-        <h1>Password Reset</h1>
-        <p>Your password has been reset successfully. You can now sign in to the app with your new password.</p>
+        <h1>{{ __('Password Reset') }}</h1>
+        <p>{{ __('Your password has been reset successfully. You can now sign in to the app with your new password.') }}</p>
     </div>
 </body>
 </html>

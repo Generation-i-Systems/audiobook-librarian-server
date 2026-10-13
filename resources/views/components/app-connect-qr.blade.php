@@ -1,6 +1,6 @@
 @props([
-    'title' => 'Connect the mobile app',
-    'description' => 'Scan this QR code from the Audiobook Librarian app to connect it to this server.',
+    'title' => __('Connect the mobile app'),
+    'description' => __('Scan this QR code from the Audiobook Librarian app to connect it to this server.'),
     'connectUrl',
     'apiUrl',
 ])
@@ -12,16 +12,16 @@
         <div
             class="app-connect-qr d-flex align-items-center justify-content-center border rounded bg-white mx-auto"
             data-connect-url="{{ $connectUrl }}"
-            aria-label="Server connection QR code"
+            aria-label="{{ __('Server connection QR code') }}"
         >
-            <span class="text-muted small">Generating QR code...</span>
+            <span class="text-muted small">{{ __('Generating QR code...') }}</span>
         </div>
         <div class="mt-3">
-            <div class="small text-muted">Server API URL</div>
+            <div class="small text-muted">{{ __('Server API URL') }}</div>
             <code class="d-block small app-connect-value">{{ $apiUrl }}</code>
         </div>
         <div class="mt-2">
-            <div class="small text-muted">QR link</div>
+            <div class="small text-muted">{{ __('QR link') }}</div>
             <code class="d-block small app-connect-value">{{ $connectUrl }}</code>
         </div>
     </div>

@@ -1,43 +1,43 @@
 @extends('layouts.app')
 
-@section('title', 'Sign in')
+@section('title', __('Sign in'))
 
 @section('content')
 <div class="container" style="max-width: 480px; margin: 64px auto; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-    <h1 style="font-size: 22px; margin-bottom: 12px;">Sign in</h1>
+    <h1 style="font-size: 22px; margin-bottom: 12px;">{{ __('Sign in') }}</h1>
 
     @if(!$valid)
-        <p style="color:#c0392b;">This sign-in link is no longer valid. It may have expired or already been used.</p>
-        <p style="margin-top: 16px;"><a href="/login">Go to login</a></p>
+        <p style="color:#c0392b;">{{ __('This sign-in link is no longer valid. It may have expired or already been used.') }}</p>
+        <p style="margin-top: 16px;"><a href="/login">{{ __('Go to login') }}</a></p>
     @else
-        <p style="color:#444;">Opening the app&hellip;</p>
+        <p style="color:#444;">{{ __('Opening the app…') }}</p>
 
         <noscript>
-            <p>Click below to continue.</p>
+            <p>{{ __('Click below to continue.') }}</p>
         </noscript>
 
         <p style="margin: 24px 0;">
             <a href="{{ $playerDeepLink }}"
                id="open-in-app"
                data-deeplink="{{ $playerDeepLink }}"
-               style="display:inline-block; background:#3955ff; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:600; font-size:14px;">Open in app</a>
+               style="display:inline-block; background:#3955ff; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:600; font-size:14px;">{{ __('Open in app') }}</a>
         </p>
 
         <p style="margin: 12px 0; font-size: 13px;">
-            <a href="{{ $libraryDeepLink }}" style="color:#3955ff; text-decoration:none;">Open Library app</a>
+            <a href="{{ $libraryDeepLink }}" style="color:#3955ff; text-decoration:none;">{{ __('Open Library app') }}</a>
             &nbsp;&middot;&nbsp;
-            <a href="{{ $androidLibraryIntent }}" style="color:#3955ff; text-decoration:none;">Open on Android</a>
+            <a href="{{ $androidLibraryIntent }}" style="color:#3955ff; text-decoration:none;">{{ __('Open on Android') }}</a>
         </p>
 
         <form method="POST" action="{{ $continueUrl }}" style="margin-top: 16px;">
             @csrf
             <button type="submit"
                     style="background:transparent; color:#3955ff; border:1px solid #3955ff; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer;">
-                Continue in browser
+                {{ __('Continue in browser') }}
             </button>
         </form>
 
-        <p style="margin-top: 32px; font-size: 12px; color:#888;">If nothing happens, the app may not be installed on this device.</p>
+        <p style="margin-top: 32px; font-size: 12px; color:#888;">{{ __('If nothing happens, the app may not be installed on this device.') }}</p>
 
         <script>
             // Try the deep link automatically. If the app handles it, the

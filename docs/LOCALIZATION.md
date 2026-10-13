@@ -28,4 +28,4 @@ Only codes listed in `config/locales.php` are ever applied or accepted (`POST /l
 
 ## Status
 
-Most Blade views, emails, JavaScript and controller flash messages still contain hard-coded English; wrap them in `__()` / `t()` as you touch them. Library content (genres, tags, titles, descriptions) is data and is not translated by these files.
+Converted so far: the shared layout (navbar, app-connect modal and QR component), the login/magic-link/password-reset pages, the storage-unavailable page and its message. Most other Blade views, emails, JavaScript and controller flash messages still contain hard-coded English; wrap them in `__()` / `t()` as you touch them. Library content (genres, tags, titles, descriptions) is data and is not translated by these files.

@@ -78,7 +78,7 @@
         <nav class="navbar navbar-expand-md navbar-dark bg-primary shadow-sm">
             <div class="container">
                 <a class="navbar-brand" href="{{ url('/') }}">
-                    <img src="{{ asset('images/ablibrarian_logo_horizontal_white.svg') }}" alt="Audiobook Librarian"
+                    <img src="{{ asset('images/ablibrarian_logo_horizontal_white.svg') }}" alt="{{ __('Audiobook Librarian') }}"
                         height="30">
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -97,19 +97,19 @@
                                     href="{{ route('books.index') }}">{{ __('Books') }}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="{{ route('authors.index') }}">Authors</a>
+                                <a class="nav-link" style="color:white" href="{{ route('authors.index') }}">{{ __('Authors') }}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="{{ route('genres.index') }}">Genres</a>
+                                <a class="nav-link" style="color:white" href="{{ route('genres.index') }}">{{ __('Genres') }}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="{{ route('tags.index') }}">Tags</a>
+                                <a class="nav-link" style="color:white" href="{{ route('tags.index') }}">{{ __('Tags') }}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="{{ route('badges.index') }}">Badges</a>
+                                <a class="nav-link" style="color:white" href="{{ route('badges.index') }}">{{ __('Badges') }}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="{{ route('series.manage') }}">Series</a>
+                                <a class="nav-link" style="color:white" href="{{ route('series.manage') }}">{{ __('Series') }}</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/skins">{{ __('Skins') }}</a>
@@ -120,21 +120,20 @@
                             @if(Auth::user()->is_admin)
                                 <!-- Not yet permission-gated (Phase 4): still full-admin-only tooling -->
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.library-repair.index') }}">Library Repair</a>
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.library-repair.index') }}">{{ __('Library Repair') }}</a>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white"
-                                        href="{{ route('admin.messages.index') }}">Messages</a>
+                                        href="{{ route('admin.messages.index') }}">{{ __('Messages') }}</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.queue.index') }}">Queue</a>
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.queue.index') }}">{{ __('Queue') }}</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.users.index') }}">User
-                                        Management</a>
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.users.index') }}">{{ __('User Management') }}</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.database') }}">Database Admin</a>
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.database') }}">{{ __('Database Admin') }}</a>
                                 </li>
                             @endif
                             @unless(request()->is('admin/*'))
@@ -142,16 +141,16 @@
                                     <a id="libraryDropdown" class="nav-link dropdown-toggle" href="#" role="button"
                                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre
                                         style="color:white">
-                                        My Library
+                                        {{ __('My Library') }}
                                     </a>
                                     <div class="dropdown-menu" aria-labelledby="libraryDropdown">
-                                        <a class="dropdown-item" href="{{ route('my-library.queue') }}">Queue</a>
-                                        <a class="dropdown-item" href="{{ route('my-library.wishlist') }}">Wishlist</a>
-                                        <a class="dropdown-item" href="{{ route('my-library.recommendations') }}">Recommendations</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.queue') }}">{{ __('Queue') }}</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.wishlist') }}">{{ __('Wishlist') }}</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.recommendations') }}">{{ __('Recommendations') }}</a>
                                         <div class="dropdown-divider"></div>
-                                        <a class="dropdown-item" href="{{ route('my-library.history') }}">Reading History</a>
-                                        <a class="dropdown-item" href="{{ route('my-library.goals') }}">Reading Goals</a>
-                                        <a class="dropdown-item" href="{{ route('my-library.tags') }}">My Tags</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.history') }}">{{ __('Reading History') }}</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.goals') }}">{{ __('Reading Goals') }}</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.tags') }}">{{ __('My Tags') }}</a>
                                     </div>
                                 </li>
                             @endif
@@ -213,7 +212,7 @@
                 @if (session('status'))
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
                         {{ session('status') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
                     </div>
                 @endif
             </div>
@@ -234,8 +233,8 @@
                         </div>
                         <div class="modal-body">
                             <x-app-connect-qr
-                                title="This server"
-                                description="Scan this QR code from the app to connect it to this self-hosted server."
+                                title="{{ __('This server') }}"
+                                description="{{ __('Scan this QR code from the app to connect it to this self-hosted server.') }}"
                                 :connect-url="$appConnectUrl"
                                 :api-url="$appConnectApiUrl"
                             />

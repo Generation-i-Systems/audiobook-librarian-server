@@ -58,15 +58,15 @@
 </head>
 <body>
     <div class="card">
-        <h1>Reset Password</h1>
-        <p class="subtitle">Choose a new password for your account.</p>
+        <h1>{{ __('Reset Password') }}</h1>
+        <p class="subtitle">{{ __('Choose a new password for your account.') }}</p>
 
         <form method="POST" action="{{ route('password.update') }}">
             @csrf
             <input type="hidden" name="token" value="{{ $token }}">
 
             <div class="field">
-                <label for="email">Email Address</label>
+                <label for="email">{{ __('Email Address') }}</label>
                 <input id="email" type="email" name="email"
                        value="{{ $email ?? old('email') }}"
                        required autocomplete="email" autofocus>
@@ -76,7 +76,7 @@
             </div>
 
             <div class="field">
-                <label for="password">New Password</label>
+                <label for="password">{{ __('New Password') }}</label>
                 <input id="password" type="password" name="password"
                        required autocomplete="new-password" minlength="8">
                 @error('password')
@@ -85,12 +85,12 @@
             </div>
 
             <div class="field">
-                <label for="password-confirm">Confirm New Password</label>
+                <label for="password-confirm">{{ __('Confirm New Password') }}</label>
                 <input id="password-confirm" type="password" name="password_confirmation"
                        required autocomplete="new-password">
             </div>
 
-            <button type="submit">Reset Password</button>
+            <button type="submit">{{ __('Reset Password') }}</button>
         </form>
     </div>
 </body>

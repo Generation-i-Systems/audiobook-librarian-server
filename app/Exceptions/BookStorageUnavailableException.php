@@ -18,7 +18,7 @@ class BookStorageUnavailableException extends HttpException
 
     public function __construct(public readonly string $root, ?\Throwable $previous = null)
     {
-        parent::__construct(503, self::MESSAGE, $previous);
+        parent::__construct(503, __(self::MESSAGE), $previous);
     }
 
     public static function forRoot(?string $root, ?\Throwable $previous = null): self
@@ -38,6 +38,6 @@ class BookStorageUnavailableException extends HttpException
             return null;
         }
 
-        return response()->view('errors.storage-unavailable', ['message' => self::MESSAGE], 503);
+        return response()->view('errors.storage-unavailable', ['message' => __(self::MESSAGE)], 503);
     }
 }

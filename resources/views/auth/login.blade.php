@@ -78,16 +78,16 @@
                 <div class="text-center mt-4">
                     <a href="{{ route('login.google') }}" class="btn btn-outline-primary"
                         style="background: #fff; color: #444; border-color: #ddd;">
-                        <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google Logo"
+                        <img src="https://developers.google.com/identity/images/g-logo.png" alt="{{ __('Google Logo') }}"
                             style="width:20px; margin-right:8px; vertical-align:middle;">
-                        Sign in with Google
+                        {{ __('Sign in with Google') }}
                     </a>
                 </div>
 
                 <div class="mt-4">
                     <x-app-connect-qr
-                        title="Connect the mobile app"
-                        description="Scan this QR code from the app to connect it to this self-hosted server before signing in."
+                        title="{{ __('Connect the mobile app') }}"
+                        description="{{ __('Scan this QR code from the app to connect it to this self-hosted server before signing in.') }}"
                         :connect-url="$appConnectUrl"
                         :api-url="$appConnectApiUrl"
                     />
@@ -96,7 +96,7 @@
                 @if ($otpEnabled)
                     <div class="mt-4 mb-3">
                         <div class="text-center mb-3" style="color: #888;">
-                            <span style="background: #fff; padding: 0 12px; font-size: 13px;">or sign in with a code</span>
+                            <span style="background: #fff; padding: 0 12px; font-size: 13px;">{{ __('or sign in with a code') }}</span>
                         </div>
                         <div class="card">
                             <div class="card-body">
@@ -111,7 +111,7 @@
                                 <div class="row mb-0">
                                     <div class="col-md-8 offset-md-4">
                                         <button type="button" id="send-otp-btn" class="btn btn-outline-primary">
-                                            Send sign-in code
+                                            {{ __(window.__('Send sign-in code')) }}
                                         </button>
                                         <span id="otp-status" class="ms-2" style="display:none;"></span>
                                     </div>
@@ -128,7 +128,7 @@
                                 <div class="row mb-0 mt-2" id="otp-verify-row" style="display:none;">
                                     <div class="col-md-8 offset-md-4">
                                         <button type="button" id="verify-otp-btn" class="btn btn-primary">
-                                            Verify code
+                                            {{ __(window.__('Verify code')) }}
                                         </button>
                                         <span id="otp-verify-status" class="ms-2" style="display:none;"></span>
                                     </div>
@@ -154,11 +154,11 @@
                                     $btn.on('click', function () {
                                         var email = $email.val().trim();
                                         if (!email) {
-                                            $status.text('Please enter your email.').removeClass('text-success').addClass('text-danger').show();
+                                            $status.text(window.__('Please enter your email.')).removeClass('text-success').addClass('text-danger').show();
                                             return;
                                         }
 
-                                        $btn.prop('disabled', true).text('Sending...');
+                                        $btn.prop('disabled', true).text(window.__('Sending...'));
                                         $status.hide();
 
                                         $.ajax({
@@ -169,20 +169,20 @@
                                                 _token: '{{ csrf_token() }}'
                                             },
                                             success: function () {
-                                                $status.text('Check your email for the sign-in code, or enter it below.').removeClass('text-danger').addClass('text-success').show();
+                                                $status.text(window.__('Check your email for the sign-in code, or enter it below.')).removeClass('text-danger').addClass('text-success').show();
                                                 $codeRow.show();
                                                 $verifyRow.show();
                                                 $code.trigger('focus');
                                             },
                                             error: function (xhr) {
-                                                var msg = 'Failed to send. Please try again.';
+                                                var msg = window.__('Failed to send. Please try again.');
                                                 if (xhr.responseJSON && xhr.responseJSON.message) {
                                                     msg = xhr.responseJSON.message;
                                                 }
                                                 $status.text(msg).removeClass('text-success').addClass('text-danger').show();
                                             },
                                             complete: function () {
-                                                $btn.prop('disabled', false).text('Send sign-in code');
+                                                $btn.prop('disabled', false).text(window.__('Send sign-in code'));
                                             }
                                         });
                                     });
@@ -191,11 +191,11 @@
                                         var email = $email.val().trim();
                                         var code = $code.val().trim();
                                         if (!code) {
-                                            $verifyStatus.text('Please enter the sign-in code.').removeClass('text-success').addClass('text-danger').show();
+                                            $verifyStatus.text(window.__('Please enter the sign-in code.')).removeClass('text-success').addClass('text-danger').show();
                                             return;
                                         }
 
-                                        $verifyBtn.prop('disabled', true).text('Verifying...');
+                                        $verifyBtn.prop('disabled', true).text(window.__('Verifying...'));
                                         $verifyStatus.hide();
 
                                         $.ajax({
@@ -210,14 +210,14 @@
                                                 window.location.href = (data && data.redirect) || '/';
                                             },
                                             error: function (xhr) {
-                                                var msg = 'Invalid code. Please try again.';
+                                                var msg = window.__('Invalid code. Please try again.');
                                                 if (xhr.responseJSON && xhr.responseJSON.message) {
                                                     msg = xhr.responseJSON.message;
                                                 }
                                                 $verifyStatus.text(msg).removeClass('text-success').addClass('text-danger').show();
                                             },
                                             complete: function () {
-                                                $verifyBtn.prop('disabled', false).text('Verify code');
+                                                $verifyBtn.prop('disabled', false).text(window.__('Verify code'));
                                             }
                                         });
                                     });
