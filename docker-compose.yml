@@ -54,7 +54,21 @@ services:
       - app
     restart: unless-stopped
 
+  # Optional speech-to-text for the apps' text sync (see docs/TRANSCRIPTION.md).
+  # Enable with `--profile transcription` and set
+  # TRANSCRIPTION_WHISPER_URL=http://whisper:8000 in .env.docker.
+  # Not published on the host: only the app container talks to it.
+  whisper:
+    image: ${TRANSCRIPTION_WHISPER_IMAGE:-ghcr.io/speaches-ai/speaches:latest-cpu}
+    profiles: ["transcription"]
+    environment:
+      PRELOAD_MODELS: '["${TRANSCRIPTION_WHISPER_MODEL_ID:-Systran/faster-whisper-base.en}"]'
+    volumes:
+      - whisper-models:/home/ubuntu/.cache/huggingface/hub
+    restart: unless-stopped
+
 volumes:
+  whisper-models:
   app-storage:
   app-database:
   caddy-data:

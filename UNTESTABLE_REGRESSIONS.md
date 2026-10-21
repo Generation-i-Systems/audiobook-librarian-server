@@ -437,6 +437,11 @@ about whether the image actually builds, boots, serves traffic, or persists data
   tested, but a broken selector or payload key fails silently (the page still works, it just stops remembering).
   The `users.book_list_preferences` migration must also be applied on live before saves succeed.
 
+- **`transcription` compose profile** (`docker-compose.yml` `whisper` service, `ffmpeg` in the `Dockerfile`) —
+  `docker compose config` validates the file, but nothing here pulls the `speaches` image, checks that the model
+  cache volume path (`/home/ubuntu/.cache/huggingface/hub`) matches the image, that the app container reaches
+  `http://whisper:8000`, or that the default `latest-cpu` tag stays compatible; pin `TRANSCRIPTION_WHISPER_IMAGE`.
+
 - **Audit archive** (`AuditArchiveService`, `audits:archive`, `audits:restore`) — tests run on SQLite with
   small fixtures. Not provable there: how the live MySQL `audits` `old_values`/`new_values` columns (utf8mb4_bin
   text/JSON) round-trip through export and `audits:restore` for odd real payloads; runtime and memory for the first

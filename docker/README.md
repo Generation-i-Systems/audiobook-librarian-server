@@ -85,6 +85,13 @@ The app supports host-based library profiles (`LIBRARY_PROFILE_*` env vars,
 see `.env.example`). These work the same way inside the container — set them
 in `.env.docker` if you need multiple libraries served from one instance.
 
+## Optional speech-to-text (text sync)
+
+The `transcription` profile adds a Whisper sidecar (`whisper` service). Set
+`TRANSCRIPTION_WHISPER_URL=http://whisper:8000` in `.env.docker` and start with
+`docker compose --env-file .env.docker --profile transcription up -d`. See
+[docs/TRANSCRIPTION.md](../docs/TRANSCRIPTION.md).
+
 ## What the entrypoint does on every start
 
 `docker/entrypoint.sh` (see that file for the exact logic):
