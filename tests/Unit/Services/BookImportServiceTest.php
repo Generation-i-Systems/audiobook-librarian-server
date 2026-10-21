@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit\Services;
 
 use App\Models\Author;
@@ -329,6 +331,60 @@ class BookImportServiceTest extends TestCase
         $this->assertSame('Existing/Book', $metadata['custom_directory_path']);
 
         File::deleteDirectory($bookRoot);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function reviewAndApproveAcceptsInPlaceDirectoryThroughSymlinkedBookRoot(): void
+    {
+        $realRoot = $this->createTempDirectory('real_book_root');
+        $linkedRoot = $realRoot . '_link';
+        symlink($realRoot, $linkedRoot);
+        config(['app.book_root' => $linkedRoot, 'filesystems.disks.books.root' => $linkedRoot]);
+        File::makeDirectory($realRoot . '/Fantasy/Author/Book', 0775, true);
+        File::put($realRoot . '/Fantasy/Author/Book/track.mp3', 'audio');
+        Genre::create(['name' => 'Fantasy']);
+
+        $metadata = ['title' => 'Book', 'author' => ['Author'], 'genre' => 'Fantasy', 'confidence' => 100];
+        $audiobook = [
+            'path' => $realRoot . '/Fantasy/Author/Book',
+            'files' => [$realRoot . '/Fantasy/Author/Book/track.mp3'],
+        ];
+        $prompts = [];
+        $inputInterrupted = false;
+
+        try {
+            $result = $this->service->reviewAndApprove(
+                $metadata,
+                $audiobook,
+                fn ($data) => $data,
+                function (): void {
+                },
+                function ($question) use (&$prompts) {
+                    $prompts[] = $question;
+                    return '1';
+                },
+                fn ($question, $default = '') => $default,
+                fn () => [],
+                fn ($data) => $data,
+                fn ($data) => $data,
+                fn () => null,
+                fn () => $this->service->getValidGenres(),
+                fn () => true,
+                fn () => 'Fantasy/Author/Book',
+                $inputInterrupted
+            );
+
+            $this->assertTrue($result);
+            $this->assertSame(['Choose an option'], $prompts);
+            $this->assertSame('Fantasy/Author/Book', $metadata['custom_directory_path']);
+            $this->assertTrue($this->service->directoryPathHasRealConflict(
+                'Fantasy/Author/Book',
+                $realRoot . '/Fantasy/Author/Another Book'
+            ));
+        } finally {
+            unlink($linkedRoot);
+            File::deleteDirectory($realRoot);
+        }
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

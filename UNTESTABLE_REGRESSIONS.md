@@ -139,7 +139,9 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
   `attemptAcceptFromReview()` are unit-tested (`BookImportServiceReviewDirectoryConflictTest`),
   but actually reaching and driving this menu from a live `book:import` run cannot be — verify
   manually: get Accept blocked by a directory conflict, confirm all the listed options work,
-  and confirm the narrator option only appears when a narrator is set.
+  and confirm the narrator option only appears when a narrator is set. Also verify a real
+  library path reached through a symlink to the book root accepts as an in-place import
+  without showing this menu or moving audio files.
 - **`ReviewProgressionFantasyDuplicates` command** (`app/Console/Commands/ReviewProgressionFantasyDuplicates.php`)
   — interactive menu driven by `$this->ask()`, and shells out to the external `mplayer` binary
   via `passthru()` to play audio for manual A/B comparison. Neither the TTY menu loop nor the

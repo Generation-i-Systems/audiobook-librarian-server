@@ -629,6 +629,10 @@ OH, I SEE IT YOU JUST DIDN'T CREATE THE ACTUAL COLUMN (follow-up: restore Series
 That makes sense. this is an architectural failure. It should NOT be searching without QUERY_STRING. This is a fundamental problem in how this page works
 (context: "after editing a book it no longer returns to the search page as it was left. the search is losing the previous data.")
 
+## 2026-10-21: in-place import directory conflict
+
+The importer needs to handle the special case where the import is already in place and we are just creating a db record, because the source and destination paths are the same.
+
 ## 2026-10-21
 
 Implement phase 3 of the text-sync plan on the server: optional Whisper speech-to-text endpoints. A faster-whisper sidecar behind a `transcription` docker-compose profile (default model `base.en`); `POST /api/v1/books/{book}/files/{file}/transcriptions` (JSON `startMs`, `durationMs`, `language?`, `expectedSize`, `expectedChunkHash?`; ffmpeg cut to 16 kHz mono WAV, 404/409/422 checks) and `POST /api/v1/transcriptions` (multipart WAV/FLAC up to 30 s and 1 MB), both returning `{words[{text,startMs,endMs,confidence}], language, model, durationMs, source}`; 503/504 for an unavailable or slow sidecar; one shared per-user rate limit; store nothing; `TRANSCRIPTION` and `TRANSCRIPTION_SERVER_FILES` capability tokens; tests, Bruno requests, OpenAPI and docs.

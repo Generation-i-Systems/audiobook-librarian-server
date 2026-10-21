@@ -52,7 +52,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - Repair AI context supplies the full library path, and prompt sanitization retains author/series/title context while stripping unrelated leading filesystem segments.
 - Repair files move only after the user confirms a directory different from the original; unchanged paths are in-place metadata updates, and move failure restores the old database path for retry.
 - Cover updates in import review aggregate enrichment, embedded-tag, and all directory-image sources for a user-selected preview; an explicit selection may replace the current cover.
-- Import confirmation treats a source directory already located at the selected library path as metadata-only, avoiding a false destination-file conflict without weakening protection against distinct source/destination collisions.
+- Import confirmation treats a source directory already located at the selected library path as metadata-only, including when the book root is a symlink to the source's physical path. Distinct source/destination collisions still require review.
 - Book form metadata search/autofill supports Audible, Google Books, AudiobookBay, and Hardcover.
   Metadata autofill must preserve any existing selected genre, including genres inferred from the directory path, and may only apply provider genres that match configured genre options when no genre is selected.
 - Authors/series autocomplete via jQuery UI, server-side filtering

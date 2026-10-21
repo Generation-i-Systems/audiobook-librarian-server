@@ -10560,13 +10560,16 @@ class BookImportService
         // If so, lock the directory to its current relative path — no rename will occur.
         $bookStorageRoot = rtrim(config('filesystems.disks.books.root') ?? config('app.book_root', ''), '/');
         $sourcePath = rtrim($audiobook['path'], '/');
-        $isInBookRoot = $bookStorageRoot !== '' && str_starts_with($sourcePath, $bookStorageRoot . '/');
+        $realBookStorageRoot = $bookStorageRoot !== '' ? realpath($bookStorageRoot) : false;
+        $realSourcePath = realpath($sourcePath);
+        $isInBookRoot = $realBookStorageRoot !== false && $realSourcePath !== false
+            && str_starts_with($realSourcePath, $realBookStorageRoot . '/');
 
         $aiMetadata = $processWithAICallback($audiobook);
         $aiMetadata = $this->applyParentDirectoryManualOverrides($audiobook, $aiMetadata, $infoCallback);
 
         if ($isInBookRoot) {
-            $relativeDir = substr($sourcePath, strlen($bookStorageRoot) + 1);
+            $relativeDir = substr($realSourcePath, strlen($realBookStorageRoot) + 1);
             $aiMetadata['custom_directory_path'] = $relativeDir;
             $infoCallback("📍 Path is inside book root — directory locked: {$relativeDir}");
         }
@@ -11216,6 +11219,13 @@ class BookImportService
             return false;
         }
 
+        $fullPath = rtrim((string) $bookStoragePath, '/') . '/' . $relativePath;
+        $realSourcePath = realpath($ownCurrentPath);
+        $realTargetPath = realpath($fullPath);
+        if ($realSourcePath !== false && $realTargetPath !== false && $realSourcePath === $realTargetPath) {
+            return false;
+        }
+
         $ownCurrentPath = str_replace('\\', '/', trim($ownCurrentPath, '/'));
         $normalizedRoot = str_replace('\\', '/', trim((string) $bookStoragePath, '/'));
         if (str_starts_with($ownCurrentPath, $normalizedRoot . '/')) {
@@ -11226,7 +11236,6 @@ class BookImportService
             return false;
         }
 
-        $fullPath = rtrim((string) $bookStoragePath, '/') . '/' . $relativePath;
         if (!File::isDirectory($fullPath)) {
             return false;
         }
