@@ -21,6 +21,7 @@ cannot be verified by the test suite — only by live calls.
 | **AI tool filesystem prompt** | `app/Services/AI/AIToolService.php` | Tests confirm the configured book path appears in the prompt, but only a real model response can show whether the model uses that path correctly for tool calls. |
 | **AI-generated SQL dialect** | `app/Services/AIQueryService.php` | Tests inspect SQLite, PostgreSQL, and SQL Server example syntax, but only real model responses and database executions can show whether generated queries follow the configured SQL driver. |
 | **OpenAI Whisper (transcription)** | `app/Services/AI/Providers/OpenAIProvider.php` `transcribe()` | Requires real audio; mock cannot verify transcription accuracy |
+| **Whisper sidecar (text-sync transcription)** | `app/Services/Transcription/WhisperTranscriptionService.php`, `docker-compose.yml` `whisper` service (`--profile transcription`) | Tests fake `Http` only. Not proven against a real faster-whisper/speaches server: that `POST /v1/audio/transcriptions` accepts `timestamp_granularities[]=word` with `verbose_json` and returns `words[].word/start/end/probability` (a server without `probability` gives `confidence: null`), that `GET /health` is the right liveness probe (it drives the `TRANSCRIPTION`/`TRANSCRIPTION_SERVER_FILES` capability tokens, cached 60 s), that the default model id `Systran/faster-whisper-base.en` is accepted and preloaded by `PRELOAD_MODELS` (newer speaches may need `POST /v1/models/{id}` first), how a reported language name like `english` is mapped (falls back to the request or `.en` model), timeout detection by the `cURL error 28` message, real latency of a 30 s clip on CPU against the 30 s timeout, and word-time accuracy for audiobook narration. Manually verify: start the profile, confirm both capability tokens appear, transcribe a known 30 s range and compare word times with the audio. |
 | **OpenAI Chat / GPT** | `app/Services/AI/Providers/OpenAIProvider.php` | Structured JSON schema responses. `describeImage()`/`callAPIWithImage()` sends a Chat Completions vision request (`image_url` with a `data:` URI) whose real-API acceptance can't be proven by mocks. |
 | **Google Gemini** | `app/Services/AI/Providers/GeminiProvider.php` | Any model-response format changes. `describeImage()`/`callAPIWithImage()` sends `inline_data` with a real cover image's bytes; only a mocked HTTP response is exercised by tests, not the real Gemini vision endpoint's actual acceptance/limits (e.g. max image size). |
 | **AIBookProcessor prompt (import metadata extraction)** | `app/Services/AIBookProcessor.php` `buildPrompt()`/`extractMetadataFromTranscription()` (separate, older Gemini/Claude/OpenAI caller from the `AI/Providers/*` classes above) | Whether the model actually returns a `tags` field, and whether it reliably infers the "spicy" tag only when warranted (vs. over/under-tagging), can only be judged against real AI responses on real book directories — unit tests only cover `normalizeMetadata()`'s parsing of an already-returned `tags` array, not the model's judgment in producing one. |
@@ -67,6 +68,16 @@ metadata or shell-invokes `ffprobe`.
   prove chapter availability across container formats and encoders.
 - **OpenAI Whisper transcription** — real audio bytes required; mock responses cannot
   validate accuracy or API contract.
+- **Server-file transcription clips** (`app/Services/Transcription/AudioClipExtractor.php`) — tests fake
+  `Process`, so the real `ffmpeg -ss <start> -t <dur> -i <file> -ac 1 -ar 16000 -f wav` cut is never run.
+  Unverified: input-seek accuracy on real M4B/M4A (AAC priming, edit lists, a `moov` at the end) and on VBR MP3
+  without a Xing/LAME header, where `-ss` can land hundreds of ms off and every returned word time shifts by that
+  much relative to the client's player; `ffprobe` durations used for the 422 range check and the end-of-file clamp
+  on the same files; and how long a cut takes deep into a large non-fast-start M4B on slow storage (counted against
+  `TRANSCRIPTION_TIMEOUT_SECONDS`). Manually verify with a real multi-hour M4B and a VBR MP3: transcribe a range
+  near the end and compare the first word's time with the client's playback position.
+- **Uploaded clip header parsing** (`AudioClipInspector`) — unit-tested with synthetic WAV/FLAC headers; real
+  client encoders (Android `MediaCodec` FLAC, iOS `AVAudioFile` WAV with `FLLR`/`LIST` chunks) are unverified.
 
 ---
 

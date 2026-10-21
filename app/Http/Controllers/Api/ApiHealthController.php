@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Services\Transcription\AudioClipExtractor;
+use App\Services\Transcription\WhisperTranscriptionService;
 use App\Support\CommunityStatus;
 use App\Support\MailConfiguration;
 use Illuminate\Http\JsonResponse;
@@ -19,8 +21,11 @@ class ApiHealthController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        private readonly WhisperTranscriptionService $whisper,
+        private readonly AudioClipExtractor $clipExtractor
+    ) {
         $this->documentStoreService = $documentStoreService;
     }
 
@@ -164,6 +169,9 @@ class ApiHealthController extends Controller
      * Feature tokens clients use to decide what to show. MESSAGING means history, read state and
      * the sync summary are served; DIRECT_MESSAGING adds user-to-user sending, which follows the
      * community rules and so is only advertised while community features are available.
+     * TRANSCRIPTION means the Whisper sidecar answers its health check (cached briefly), so
+     * POST /transcriptions works; TRANSCRIPTION_SERVER_FILES adds ffmpeg, so book files on
+     * this server can be transcribed by range.
      *
      * @return list<string>
      */
@@ -185,6 +193,13 @@ class ApiHealthController extends Controller
 
         if (CommunityStatus::mode() === CommunityStatus::MODE_FULL) {
             $tokens[] = 'DIRECT_MESSAGING';
+        }
+
+        if ($this->whisper->isHealthy()) {
+            $tokens[] = 'TRANSCRIPTION';
+            if ($this->clipExtractor->isAvailable()) {
+                $tokens[] = 'TRANSCRIPTION_SERVER_FILES';
+            }
         }
 
         return $tokens;

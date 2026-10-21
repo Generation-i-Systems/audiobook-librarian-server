@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\PlaylistController;
 use App\Http\Controllers\Api\UserListController;
 use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
+use App\Http\Controllers\Api\TranscriptionController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\UserStatusController;
 use App\Http\Controllers\Api\FeedbackController;
@@ -213,6 +214,18 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/{book}/download/{file}', [BookDownloadController::class, 'downloadFile'])
             ->where('file', '.*')
             ->name('api.books.downloadFile');
+
+        // Speech-to-text for text sync (optional Whisper sidecar); one shared per-user limit.
+        Route::middleware('throttle:transcriptions')->group(function () {
+            Route::post('/books/{book}/files/{file}/transcriptions', [
+                TranscriptionController::class,
+                'transcribeBookFile',
+            ])
+                ->where('file', '.*')
+                ->name('api.books.files.transcriptions');
+            Route::post('/transcriptions', [TranscriptionController::class, 'transcribeUpload'])
+                ->name('api.transcriptions.upload');
+        });
         Route::get('/books/{book}/download-url', [BookDownloadController::class, 'downloadUrl']);
         Route::get('/download/remote', [BookDownloadController::class, 'remoteDownload'])->name('api.download.remote');
 
