@@ -19,6 +19,7 @@
 ### Fixed
 
 - Security: updated Vite to 6.4.5, follow-redirects to 1.16.1, and the shell-quote override to 1.12.0, resolving the high and critical npm advisories that failed the CI security job.
+- Admin Messages page: it listed every user's messages without saying who they were for, so one badge earned by several users looked like the same badge earned repeatedly. It now shows the current user's messages by default, with a Recipient selector (any user, or All users) and a To column.
 - Admin AI query: follow-up questions on a results page no longer fail with a 500 `TypeError`. Form IDs (`context_query_id`, `context_limit`, `query_id`, `limit`) are now cast to integers before they reach `AIQueryService`.
 - Import: books already in the library can be accepted as in-place imports when the configured book root is a symlink to the source path; review no longer shows a false directory conflict.
 - Import: books split out of a flat folder no longer get another book's cover or OpenAudible data. Each book uses its own embedded cover (and OpenAudible record for publisher, description, ASIN, genre, chapters, narrator, series). Data priority is now OpenAudible, then the book's own tags, then AI; AI only confirms or fills gaps and never replaces OpenAudible or tag narrator, series or author data (single-book and split imports).

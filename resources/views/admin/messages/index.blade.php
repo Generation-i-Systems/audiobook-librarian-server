@@ -16,10 +16,22 @@
             </div>
         @endif
 
-        <div class="mb-4">
+        <div class="mb-4 d-flex flex-wrap gap-2 align-items-center">
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newMessageModal">
                 <i class="fas fa-plus"></i> New Message
             </button>
+            <form method="GET" action="{{ route('admin.messages.index') }}" class="d-flex gap-2 align-items-center ms-auto">
+                <label for="recipient" class="form-label mb-0">{{ __('Recipient') }}</label>
+                <select class="form-select" id="recipient" name="recipient">
+                    <option value="all" @selected(($selectedRecipient ?? null) === 'all')>{{ __('All users') }}</option>
+                    @foreach($users as $user)
+                        <option value="{{ $user['id'] }}" @selected(($selectedRecipient ?? null) === (string) $user['id'])>
+                            {{ $user['name'] ?? $user['email'] }}
+                        </option>
+                    @endforeach
+                </select>
+                <button type="submit" class="btn btn-outline-secondary">{{ __('Show') }}</button>
+            </form>
         </div>
 
         <div class="card">
@@ -31,6 +43,7 @@
                                 <th>{{ __('Status') }}</th>
                                 <th>{{ __('Content') }}</th>
                                 <th>{{ __('From') }}</th>
+                                <th>{{ __('To') }}</th>
                                 <th>{{ __('Date') }}</th>
                                 <th>{{ __('Actions') }}</th>
                             </tr>
@@ -43,6 +56,8 @@
                                     $createdAt = \Carbon\Carbon::parse($message['createdAt'] ?? now());
                                     $sender = collect($users)->firstWhere('id', $message['senderId'] ?? null);
                                     $senderName = $sender ? ($sender['name'] ?? $sender['email'] ?? __('Unknown')) : __('System');
+                                    $recipient = collect($users)->firstWhere('id', $message['recipientId'] ?? null);
+                                    $recipientName = $recipient ? ($recipient['name'] ?? $recipient['email'] ?? __('Unknown')) : __('Unknown');
                                 @endphp
                                 <tr class="{{ $isAcknowledged ? '' : 'table-info' }}">
                                     <td>
@@ -60,6 +75,7 @@
                                     <td>
                                         {{ $senderName }}
                                     </td>
+                                    <td>{{ $recipientName }}</td>
                                     <td>{{ $createdAt->diffForHumans() }}</td>
                                     <td>
                                         @if(!$isAcknowledged)
@@ -85,6 +101,7 @@
                                             </div>
                                             <div class="modal-body">
                                                 <p><strong>{{ __('From:') }}</strong> {{ $senderName }}</p>
+                                                <p><strong>{{ __('To:') }}</strong> {{ $recipientName }}</p>
                                                 <p><strong>{{ __('Date:') }}</strong> {{ $createdAt->format('M j, Y g:i A') }}</p>
                                                 <hr>
                                                 <p>{{ $message['content'] ?? '' }}</p>
@@ -103,7 +120,7 @@
                                 </div>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center">{{ __('No messages found.') }}</td>
+                                    <td colspan="6" class="text-center">{{ __('No messages found.') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>

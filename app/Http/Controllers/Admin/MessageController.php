@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
@@ -18,20 +20,25 @@ class MessageController extends Controller
 
 
     /**
-     * Display a listing of messages
+     * Display a listing of messages for one recipient (the current user by default) or, with
+     * ?recipient=all, for every user
      *
      * @return \Illuminate\View\View|\Illuminate\Http\RedirectResponse
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            // Get all messages, including acknowledged ones
-            $messages = $this->documentStoreService->getMessages(null, true, 100);
+            $selectedRecipient = (string) $request->query('recipient', (string) Auth::id());
+            $recipientId = $selectedRecipient === 'all' ? null : $selectedRecipient;
+
+            // Include acknowledged messages too
+            $messages = $this->documentStoreService->getMessages($recipientId, true, 100);
             $users = $this->documentStoreService->getUsersForMessaging();
 
             return view('admin.messages.index', [
                 'messages' => $messages,
                 'users' => $users,
+                'selectedRecipient' => $selectedRecipient,
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to fetch messages: ' . $e->getMessage());

@@ -647,6 +647,12 @@ The importer needs to handle the special case where the import is already in pla
 
 TypeError on POST /admin/ai-query/process: AIQueryService::processQuery(): Argument #3 ($contextQueryId) must be of type ?int, string given (AIQueryController.php line 47), from the follow-up form on /admin/ai-query/results/71.
 
+## 2026-10-21: messages page recipient
+
+(admin Messages page listing many "You earned the ... badge!" rows) the same badge is "earned" many times
+
+the issue seems to be the messages page not showing the recipent. it should default to the current user but allow other users for admins
+
 ## 2026-10-21
 
 Implement phase 3 of the text-sync plan on the server: optional Whisper speech-to-text endpoints. A faster-whisper sidecar behind a `transcription` docker-compose profile (default model `base.en`); `POST /api/v1/books/{book}/files/{file}/transcriptions` (JSON `startMs`, `durationMs`, `language?`, `expectedSize`, `expectedChunkHash?`; ffmpeg cut to 16 kHz mono WAV, 404/409/422 checks) and `POST /api/v1/transcriptions` (multipart WAV/FLAC up to 30 s and 1 MB), both returning `{words[{text,startMs,endMs,confidence}], language, model, durationMs, source}`; 503/504 for an unavailable or slow sidecar; one shared per-user rate limit; store nothing; `TRANSCRIPTION` and `TRANSCRIPTION_SERVER_FILES` capability tokens; tests, Bruno requests, OpenAPI and docs.
