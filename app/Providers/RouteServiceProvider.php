@@ -38,6 +38,13 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(1200)->by($this->importLimiterKey($request));
         });
 
+        // Both transcription routes share one per-user budget: each request can hold a
+        // Whisper worker for up to TRANSCRIPTION_TIMEOUT_SECONDS.
+        RateLimiter::for('transcriptions', function (Request $request) {
+            return Limit::perMinute(max(1, (int) config('transcription.rate_limit_per_minute', 30)))
+                ->by($this->importLimiterKey($request));
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

@@ -76,6 +76,76 @@
             }
         },
         "schemas": {
+            "TranscriptionWord": {
+                "type": "object",
+                "required": [
+                    "text",
+                    "startMs",
+                    "endMs",
+                    "confidence"
+                ],
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "example": "Hello"
+                    },
+                    "startMs": {
+                        "type": "integer",
+                        "description": "Relative to the clip start",
+                        "example": 0
+                    },
+                    "endMs": {
+                        "type": "integer",
+                        "description": "Relative to the clip start",
+                        "example": 420
+                    },
+                    "confidence": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "Whisper word probability (0-1); null when the sidecar does not report one",
+                        "example": 0.93
+                    }
+                }
+            },
+            "TranscriptionResponse": {
+                "type": "object",
+                "required": [
+                    "words",
+                    "language",
+                    "model",
+                    "durationMs",
+                    "source"
+                ],
+                "properties": {
+                    "words": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TranscriptionWord"
+                        }
+                    },
+                    "language": {
+                        "type": "string",
+                        "nullable": true,
+                        "example": "en"
+                    },
+                    "model": {
+                        "type": "string",
+                        "example": "base.en"
+                    },
+                    "durationMs": {
+                        "type": "integer",
+                        "description": "Length of the clip actually transcribed",
+                        "example": 30000
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "server_file",
+                            "upload"
+                        ]
+                    }
+                }
+            },
             "User": {
                 "type": "object",
                 "properties": {
@@ -8183,6 +8253,263 @@
                 }
             }
         },
+        "/books/{book}/files/{file}/transcriptions": {
+            "post": {
+                "tags": [
+                    "Books"
+                ],
+                "summary": "Transcribe a range of a book file on the server",
+                "description": "Cuts startMs..startMs+durationMs out of the book file with ffmpeg (16 kHz mono WAV) and transcribes it with the Whisper sidecar. durationMs is clamped to TRANSCRIPTION_MAX_CLIP_SECONDS (default 30 s) and to the end of the file. Word times are relative to startMs. The client names the copy it holds with expectedSize and, optionally, expectedChunkHash (the sha256 of the first chunk, i.e. chunks[0].sha256 of the download manifest); a different server file is refused with 409. Same access rule as GET /books/{book}/download/{file}. Advertised by the TRANSCRIPTION_SERVER_FILES capability.",
+                "operationId": "transcribeBookFile",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "book",
+                        "in": "path",
+                        "required": true,
+                        "description": "Book ID",
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "file",
+                        "in": "path",
+                        "required": true,
+                        "description": "The server filename relative to the book directory, encoded exactly as for GET /books/{book}/download/{file} (may contain /)",
+                        "schema": {
+                            "type": "string",
+                            "example": "01%20-%20Chapter%201.mp3"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "startMs",
+                                    "durationMs",
+                                    "expectedSize"
+                                ],
+                                "properties": {
+                                    "startMs": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "example": 60000
+                                    },
+                                    "durationMs": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 30000
+                                    },
+                                    "language": {
+                                        "type": "string",
+                                        "pattern": "^[a-z]{2,3}$",
+                                        "nullable": true,
+                                        "description": "ISO 639-1 language hint passed to Whisper; detected when omitted",
+                                        "example": "en"
+                                    },
+                                    "expectedSize": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "description": "Size in bytes of the client's copy of the file",
+                                        "example": 52428800
+                                    },
+                                    "expectedChunkHash": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Hex sha256 of the first 8 MiB chunk (an optional sha256: prefix is accepted)",
+                                        "example": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Word-timed transcript of the clip. Nothing is stored on the server.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TranscriptionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "description": "The account has no library access"
+                    },
+                    "404": {
+                        "description": "FILE_NOT_FOUND: the book or file does not exist on this server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "FILE_MISMATCH: the server file's size or first-chunk hash differs from the client's",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation failed, or CLIP_OUT_OF_RANGE (startMs is at or past the end of the file)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many transcription requests (one per-user limit, TRANSCRIPTION_RATE_LIMIT_PER_MINUTE, shared by both transcription routes)"
+                    },
+                    "500": {
+                        "description": "CLIP_EXTRACTION_FAILED: ffmpeg could not decode the requested range",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "TRANSCRIPTION_UNAVAILABLE: the Whisper sidecar is not configured or cannot be reached (server-file mode also needs ffmpeg)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "504": {
+                        "description": "TRANSCRIPTION_TIMEOUT: Whisper (or ffmpeg) did not finish within TRANSCRIPTION_TIMEOUT_SECONDS",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/transcriptions": {
+            "post": {
+                "tags": [
+                    "Books"
+                ],
+                "summary": "Transcribe an uploaded clip",
+                "description": "Transcribes a short clip the client cut from its own copy of the audio. Word times are relative to the start of the clip. Advertised by the TRANSCRIPTION capability. Requires a signed-in account with library access.",
+                "operationId": "transcribeUpload",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "audio"
+                                ],
+                                "properties": {
+                                    "audio": {
+                                        "type": "string",
+                                        "format": "binary",
+                                        "description": "16 kHz mono WAV or FLAC, at most TRANSCRIPTION_MAX_CLIP_SECONDS (30 s) and 1 MB"
+                                    },
+                                    "language": {
+                                        "type": "string",
+                                        "pattern": "^[a-z]{2,3}$",
+                                        "nullable": true,
+                                        "description": "ISO 639-1 language hint passed to Whisper; detected when omitted",
+                                        "example": "en"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Word-timed transcript of the clip. Nothing is stored on the server.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TranscriptionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "description": "The account has no library access"
+                    },
+                    "422": {
+                        "description": "Validation failed, or AUDIO_TOO_LARGE, UNSUPPORTED_AUDIO (not WAV/FLAC or no stated length), CLIP_TOO_LONG",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many transcription requests (one per-user limit, TRANSCRIPTION_RATE_LIMIT_PER_MINUTE, shared by both transcription routes)"
+                    },
+                    "503": {
+                        "description": "TRANSCRIPTION_UNAVAILABLE: the Whisper sidecar is not configured or cannot be reached (server-file mode also needs ffmpeg)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "504": {
+                        "description": "TRANSCRIPTION_TIMEOUT: Whisper (or ffmpeg) did not finish within TRANSCRIPTION_TIMEOUT_SECONDS",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/health/capabilities": {
             "get": {
                 "tags": [
@@ -8214,7 +8541,7 @@
                                         },
                                         "capabilities": {
                                             "type": "array",
-                                            "description": "Feature tokens. MESSAGING: GET /messages/history, POST /messages/{id}/acknowledge and the messages summary in /sync/events are served. DIRECT_MESSAGING: users can also send messages to each other with POST /messages recipient_id (only while community features are available). A server without these tokens does not support the message history API, so clients should not poll it.",
+                                            "description": "Feature tokens. MESSAGING: GET /messages/history, POST /messages/{id}/acknowledge and the messages summary in /sync/events are served. DIRECT_MESSAGING: users can also send messages to each other with POST /messages recipient_id (only while community features are available). A server without these tokens does not support the message history API, so clients should not poll it. TRANSCRIPTION: POST /transcriptions works (the Whisper sidecar answered its health check, cached for TRANSCRIPTION_HEALTH_CACHE_SECONDS). TRANSCRIPTION_SERVER_FILES: POST /books/{book}/files/{file}/transcriptions also works (Whisper healthy and ffmpeg/ffprobe available). Each is present only while its condition holds.",
                                             "items": {
                                                 "type": "string"
                                             },
@@ -8230,7 +8557,9 @@
                                                 "PLAYLISTS",
                                                 "BADGES",
                                                 "MESSAGING",
-                                                "DIRECT_MESSAGING"
+                                                "DIRECT_MESSAGING",
+                                                "TRANSCRIPTION",
+                                                "TRANSCRIPTION_SERVER_FILES"
                                             ]
                                         },
                                         "requiresAuth": {

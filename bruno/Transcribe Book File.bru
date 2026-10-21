@@ -1,0 +1,31 @@
+meta {
+  name: Transcribe Book File
+  type: http
+  seq: 6
+}
+
+post {
+  url: https://books.thelin.org/api/v1/books/234/files/01%20-%20Chapter%201.mp3/transcriptions
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Accept: application/json
+}
+
+body:json {
+  {
+    "startMs": 60000,
+    "durationMs": 30000,
+    "language": "en",
+    "expectedSize": 52428800,
+    "expectedChunkHash": "replace-with-chunks[0].sha256-from-the-download-manifest"
+  }
+}
+
+docs {
+  Needs the TRANSCRIPTION_SERVER_FILES capability. Get expectedSize and expectedChunkHash from
+  GET /books/{book}/download?include_chunks=1 (files[].size and files[].chunks[0].sha256).
+}

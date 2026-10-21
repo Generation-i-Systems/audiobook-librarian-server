@@ -2,6 +2,7 @@
 
 ### Added
 
+- Transcription (text sync): optional Whisper speech-to-text. `POST /api/v1/books/{book}/files/{file}/transcriptions` cuts a range (up to `TRANSCRIPTION_MAX_CLIP_SECONDS`, default 30 s) of a book file with ffmpeg after checking the client's `expectedSize`/`expectedChunkHash`; `POST /api/v1/transcriptions` takes an uploaded 16 kHz mono WAV or FLAC clip. Both return word times relative to the clip, share one per-user rate limit, and store nothing. `/health/capabilities` lists `TRANSCRIPTION` while the sidecar is healthy and `TRANSCRIPTION_SERVER_FILES` when ffmpeg is also available. The sidecar runs under `docker compose --profile transcription` (`TRANSCRIPTION_WHISPER_URL`, `TRANSCRIPTION_MODEL`, default `base.en`); see `docs/TRANSCRIPTION.md`.
 - Tag filters: `DEFAULT_TAG_FILTERS` (e.g. `-spicy`) gives every newly created user those personal filters (`-` bans a tag, otherwise required). Users can still remove them; existing users are unchanged.
 - Audits: `audits:archive` moves audit rows older than 30 days (`--days`, `AUDIT_ARCHIVE_AFTER_DAYS`) out of the database. It exports batches to gzip NDJSON files with a `.sha256` in `AUDIT_ARCHIVE_PATH`, re-reads each file to verify it, and only then deletes exactly those rows; it asks for confirmation (`--force` to skip), refuses without a database backup from the last 24 hours, and supports `--dry-run`. `audits:restore <file>` loads an archive back. Optional weekly schedule via `AUDIT_ARCHIVE_SCHEDULED=true`. The `audits` table was about half of every database backup.
 - Discovery: a little randomness. On each recompute every book is nudged up to `recommendations.jitter` places (default 5, `RECOMMENDATIONS_JITTER`, 0 disables) on its shelf, so the same recommendations are not always shown in the same order and books near the preview cut-off rotate in. "Continue Your Series" shuffles which in-progress series come first (and which make the cut of 20), still offering each series' next book.
@@ -13,6 +14,7 @@
 
 ### Fixed
 
+- Security: updated Vite to 6.4.5, follow-redirects to 1.16.1, and the shell-quote override to 1.12.0, resolving the high and critical npm advisories that failed the CI security job.
 - Admin user creation and pending-account approval now default to `library-user`. The legacy `user` role is no longer offered or accepted for new assignments; existing accounts retain it until explicitly changed.
 - Security: upgraded Jest and its jsdom environment to 30.5.2, removing the vulnerable `braces` dependency path reported by `npm audit`. Updated the book-form tests for jsdom's read-only location object.
 - Import book discovery: documented and tested that `mode: scan` works from an audio-files-only listing (what the Kotlin apps send for a base directory) and from several requests that each hold whole subtrees, giving the same books as `scanForAudiobooks`. No server code changed.

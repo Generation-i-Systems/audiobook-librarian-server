@@ -27,6 +27,7 @@ your audiobook collection.
 - **AI-powered book import & metadata processing**, with multi-provider support (Google Gemini, Anthropic Claude, OpenAI ChatGPT), cost estimation, and confidence-based manual review ([setup guide](docs/AI_PROCESSING_SETUP.md))
 - Import-from-file: import books directly from audio files via a browser file picker, with cover and metadata extraction ([details](docs/import-from-file.md))
 - Modal-based metadata autofill (Google Books, Audible) with AJAX search and selection
+- Optional Whisper speech-to-text for the apps' ebook/audiobook text sync, as a docker-compose profile ([details](docs/TRANSCRIPTION.md))
 - Optional vector-embedding recommendation engine ("Similar to Recent Books", "New For You") ([details](docs/RECOMMENDATIONS.md))
 
 ## Setup
@@ -106,6 +107,7 @@ integration tests.
 - [Mobile App Connection](docs/MOBILE_APP_CONNECTION.md)
 - [Host-Based Library Profiles](docs/HOST_PROFILES.md)
 - [Vector Database & Recommendations](docs/RECOMMENDATIONS.md)
+- [Speech-to-text for text sync](docs/TRANSCRIPTION.md)
 - [Worker Management & Queue Monitoring](docs/QUEUES.md)
 - [Backup System](docs/BACKUP_SYSTEM.md)
 - [Testing](docs/TESTING.md)

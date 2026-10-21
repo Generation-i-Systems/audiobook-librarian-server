@@ -1,0 +1,26 @@
+meta {
+  name: Transcribe Upload
+  type: http
+  seq: 7
+}
+
+post {
+  url: https://books.thelin.org/api/v1/transcriptions
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+  Accept: application/json
+}
+
+body:multipart-form {
+  audio: @file(clip.wav)
+  language: en
+}
+
+docs {
+  Needs the TRANSCRIPTION capability. audio is a 16 kHz mono WAV or FLAC clip of at most 30 s and 1 MB,
+  for example: ffmpeg -ss 60 -t 30 -i book.m4b -ac 1 -ar 16000 clip.wav
+}
