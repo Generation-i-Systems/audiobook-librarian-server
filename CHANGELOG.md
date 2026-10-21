@@ -14,6 +14,7 @@
 
 ### Fixed
 
+- Security: updated Vite to 6.4.5, follow-redirects to 1.16.1, and the shell-quote override to 1.12.0, resolving the high and critical npm advisories that failed the CI security job.
 - Admin user creation and pending-account approval now default to `library-user`. The legacy `user` role is no longer offered or accepted for new assignments; existing accounts retain it until explicitly changed.
 - Security: upgraded Jest and its jsdom environment to 30.5.2, removing the vulnerable `braces` dependency path reported by `npm audit`. Updated the book-form tests for jsdom's read-only location object.
 - Import book discovery: documented and tested that `mode: scan` works from an audio-files-only listing (what the Kotlin apps send for a base directory) and from several requests that each hold whole subtrees, giving the same books as `scanForAudiobooks`. No server code changed.
