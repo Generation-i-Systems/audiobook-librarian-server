@@ -24,7 +24,7 @@ class AIQueryController extends Controller
 
         $model = config('services.ai.default_model', 'claude-3-5-sonnet');
         $paidTier = config('services.ai.paid_tier', true);
-        $this->aiQueryService = new AIQueryService($model, $paidTier);
+        $this->aiQueryService = app()->make(AIQueryService::class, ['model' => $model, 'paidTier' => $paidTier]);
         $this->aiToolService = new AIToolService('gemini-2.5-flash');
     }
 
@@ -41,8 +41,9 @@ class AIQueryController extends Controller
         // Basic sanitization: trim and remove excessive whitespace
         $prompt = trim(preg_replace('/\s+/', ' ', $prompt));
 
-        $contextQueryId = $request->input('context_query_id');
-        $contextLimit = $request->input('context_limit', 50);
+        // Form fields arrive as strings; the service requires ints under strict_types
+        $contextQueryId = $request->filled('context_query_id') ? $request->integer('context_query_id') : null;
+        $contextLimit = $request->integer('context_limit', 50);
 
         $result = $this->aiQueryService->processQuery(
             $prompt,
@@ -136,7 +137,7 @@ class AIQueryController extends Controller
             'query_id' => 'required|integer',
         ]);
 
-        $queryId = $request->input('query_id');
+        $queryId = $request->integer('query_id');
 
         $result = $this->aiQueryService->executeQuery($queryId);
 
@@ -161,7 +162,7 @@ class AIQueryController extends Controller
             'selected_ids.*' => 'integer',
         ]);
 
-        $queryId = $request->input('query_id');
+        $queryId = $request->integer('query_id');
         $selectedIds = $request->input('selected_ids');
 
         Log::info('Applying bulk update', [
@@ -230,7 +231,7 @@ class AIQueryController extends Controller
 
     public function history(Request $request)
     {
-        $limit = $request->input('limit', 10);
+        $limit = $request->integer('limit', 10);
         $history = $this->aiQueryService->getQueryHistory(Auth::id(), $limit);
 
         return response()->json([
@@ -250,7 +251,7 @@ class AIQueryController extends Controller
             'queries.*.purpose' => 'required|string',
         ]);
 
-        $queryId = $request->input('query_id');
+        $queryId = $request->integer('query_id');
         $conversationId = $request->input('conversation_id');
         $customQueries = $request->input('queries');
 
