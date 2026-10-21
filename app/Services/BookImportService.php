@@ -5175,6 +5175,12 @@ class BookImportService
                 if (!empty($tagMetadata['year'])) {
                     $aiResult['year'] = $tagMetadata['year'];
                 }
+                // Same for narrator and series: AI confirms or fills gaps, it never replaces tag data
+                foreach (['narrator', 'series', 'series_number'] as $tagField) {
+                    if (!empty($tagMetadata[$tagField])) {
+                        $aiResult[$tagField] = $tagMetadata[$tagField];
+                    }
+                }
 
                 Log::debug('[AUTHOR-TRACE] processWithAI: final aiResult after tag-authoritative override', [
                     'path' => $audiobook['path'] ?? null,
@@ -5643,6 +5649,16 @@ class BookImportService
 
         return $tempFile;
     }
+
+    /**
+     * Whole-batch fields that come from the first sampled file's OpenAudible record and so
+     * must not leak into the other books of a split.
+     */
+    private const OPENAUDIBLE_BATCH_LEAK_KEYS = [
+        'description', 'summary', 'asin', 'product_id', 'chapters', 'rating_average', 'rating_count',
+        'publisher', 'release_date', 'language', 'duration', 'genre', 'mapped_genre', 'original_genre',
+        'narrated_by', 'skip_enrichment', 'source',
+    ];
 
     /**
      * Names of generic/basic download-staging directories that should never be treated
@@ -6863,9 +6879,13 @@ class BookImportService
         }
 
         // Look up genre from existing books in the same series by the same author
+        // A generic container folder (e.g. OpenAudible's flat "books" directory) is not a series:
+        // each book in it gets its own series from its own OpenAudible record / file tags.
+        $splitSeriesIsContainer = $this->isGenericContainerDirectory((string) $multiBookInfo['series_name']);
+
         $lookupMetadata = $aiMetadata;
-        $lookupMetadata['series'] = $multiBookInfo['series_name'];
-        $seriesGenre = $this->lookupGenreFromExistingSeries($lookupMetadata);
+        $lookupMetadata['series'] = $splitSeriesIsContainer ? null : $multiBookInfo['series_name'];
+        $seriesGenre = $splitSeriesIsContainer ? null : $this->lookupGenreFromExistingSeries($lookupMetadata);
         if ($seriesGenre) {
             $aiMetadata['genre'] = $seriesGenre;
             if ($infoCallback) {
@@ -6965,21 +6985,32 @@ class BookImportService
             if (empty($sharedOverrideNarrator)) {
                 unset($bookMetadata['narrator']);
             }
-            $bookMetadata['series'] = $multiBookInfo['series_name'];
-            $bookMetadata['series_number'] = $bookNumber;
+            if ($splitSeriesIsContainer) {
+                unset($bookMetadata['series'], $bookMetadata['series_number']);
+            } else {
+                $bookMetadata['series'] = $multiBookInfo['series_name'];
+                $bookMetadata['series_number'] = $bookNumber;
+            }
             unset($bookMetadata['series_original']);
 
-            // The per-book AI result (this book's own file only) takes priority over
-            // raw filename/tag parsing below, same as it would for a normal single-book
-            // import — but still yields to an explicit multiBookSharedOverrides edit.
-            if ($partAiMetadata !== null) {
-                if (empty($sharedOverrideAuthor) && !empty($partAiMetadata['author'])) {
-                    $bookMetadata['author'] = $partAiMetadata['author'];
-                }
-                if (empty($sharedOverrideNarrator) && !empty($partAiMetadata['narrator'])) {
-                    $bookMetadata['narrator'] = $partAiMetadata['narrator'];
+            // Cover and OpenAudible-derived fields in the whole-batch metadata describe the
+            // sampled first files, not this book — drop them; this book's own file and
+            // OpenAudible record supply them below.
+            $isBatchOpenAudible = ($aiMetadata['source'] ?? null) === 'openaudible';
+            if ($isBatchOpenAudible) {
+                foreach (self::OPENAUDIBLE_BATCH_LEAK_KEYS as $leakKey) {
+                    if (!array_key_exists($leakKey, $sharedOverrides)) {
+                        unset($bookMetadata[$leakKey]);
+                    }
                 }
             }
+            unset(
+                $bookMetadata['cover_data'],
+                $bookMetadata['cover_path'],
+                $bookMetadata['cover_url'],
+                $bookMetadata['cover_source'],
+                $bookMetadata['cover_sources']
+            );
 
             // Merge filename-parsed metadata (fills in missing fields)
             if (!empty($filenameMetadata)) {
@@ -6998,6 +7029,48 @@ class BookImportService
                 if (!empty($fileTagMetadata['title']) && $fileTagMetadata['title'] !== $bookTitle) {
                     $bookMetadata['title'] = $fileTagMetadata['title'];
                     $bookTitle = $fileTagMetadata['title'];
+                }
+            }
+
+            // Data priority: OpenAudible record for THIS book's file, then this book's own tags,
+            // and only then AI — AI confirms existing data or fills gaps, it never replaces
+            // OpenAudible or tag data. A field the user edited on a sibling (shared override)
+            // is never replaced.
+            $partOpenAudible = $this->lookupOpenAudibleMetadata([
+                'path' => $audiobook['path'],
+                'files' => [$firstFilePath],
+            ]);
+            if ($partOpenAudible !== null) {
+                $openAudibleFields = $this->mergeWithOpenAudibleMetadata([], $partOpenAudible);
+                foreach ($openAudibleFields as $field => $value) {
+                    if (
+                        in_array($field, ['title', 'source', 'skip_enrichment', 'series_name', 'series_sequence'], true)
+                        || array_key_exists($field, $sharedOverrides)
+                        || ($field === 'series' && !$splitSeriesIsContainer)
+                        || ($field === 'series_number' && !$splitSeriesIsContainer)
+                    ) {
+                        continue;
+                    }
+                    if (in_array($field, ['author', 'narrator'], true) && is_string($value)) {
+                        $value = $this->splitMultiValueNameTag($value);
+                    }
+                    if ($value === null || $value === '' || $value === []) {
+                        continue;
+                    }
+                    $bookMetadata[$field] = $value;
+                }
+                $bookMetadata['source'] = 'openaudible';
+                $bookMetadata['skip_enrichment'] = true;
+            }
+
+            if ($partAiMetadata !== null) {
+                foreach (['author', 'narrator'] as $aiField) {
+                    if (
+                        empty($bookMetadata[$aiField]) && !empty($partAiMetadata[$aiField])
+                        && empty($this->getMultiBookSharedOverride($aiField))
+                    ) {
+                        $bookMetadata[$aiField] = $partAiMetadata[$aiField];
+                    }
                 }
             }
 
@@ -7022,6 +7095,31 @@ class BookImportService
                 if (!empty($partMetadataJson['title'])) {
                     $bookTitle = $partMetadataJson['title'];
                 }
+            }
+
+            // Cover: this book's OWN embedded picture first (never another file's), plus
+            // local cover files only when the book lives in its own folder.
+            $coverSources = [];
+            $ownPicture = $this->extractEmbeddedPicture($firstFilePath);
+            if ($ownPicture !== null) {
+                $coverSources[] = [
+                    'type' => 'embedded',
+                    'data' => $ownPicture,
+                    'label' => 'Embedded (audio file tags)',
+                ];
+            }
+            if (!$splitSeriesIsContainer && !isset($multiBookInfo['is_flat_archive'])) {
+                foreach ($this->findAllCoversInSourceDirectory(dirname($firstFilePath)) as $sourceCover) {
+                    $coverSources[] = [
+                        'type' => 'file',
+                        'path' => $sourceCover,
+                        'label' => 'Local file: ' . basename($sourceCover),
+                    ];
+                }
+            }
+            if ($coverSources !== []) {
+                $bookMetadata['cover_sources'] = $coverSources;
+                $this->applyDefaultCoverSource($bookMetadata, $coverSources);
             }
 
             // Deliberately NO fallback to the whole-batch AI/tag guess here: that guess
@@ -7079,7 +7177,7 @@ class BookImportService
             // Process each book if callback provided
             if ($processSingleBookCallback) {
                 if ($infoCallback) {
-                    $infoCallback("📖 Processing Book {$bookMetadata['series_number']} with " . count($virtualAudiobook['files']) . " files");
+                    $infoCallback("📖 Processing Book {$bookNumber} with " . count($virtualAudiobook['files']) . " files");
                     $infoCallback("📁 File: {$firstFilename}");
                 }
 
@@ -7321,6 +7419,26 @@ class BookImportService
         }
 
         return $this->extractMetadataFromFileTags($fileTags);
+    }
+
+    /**
+     * Raw bytes of the embedded cover picture in an audio file, or null when it has none.
+     */
+    protected function extractEmbeddedPicture(string $filePath): ?string
+    {
+        if (!class_exists('getID3') || !is_file($filePath)) {
+            return null;
+        }
+
+        try {
+            $fileInfo = (new \getID3())->analyze($filePath);
+        } catch (\Exception $e) {
+            return null;
+        }
+
+        $data = $fileInfo['comments']['picture'][0]['data'] ?? $fileInfo['id3v2']['APIC'][0]['data'] ?? null;
+
+        return is_string($data) && $data !== '' ? $data : null;
     }
 
     /**
@@ -7710,6 +7828,7 @@ class BookImportService
         // as-is for the book title (it typically holds the series/product title).
         if ($titleTag && $albumTag) {
             $seriesPatterns = [
+                '/\(\s*([^()]+?),\s*Book\s+([\d.]+)\s*\)\s*$/i',
                 '/^(.+?),\s*Book\s+([\d.]+)$/i',
                 '/^(.+?)\s*#([\d.]+)$/i',
                 '/^(.+?)\s+Book\s+([\d.]+)$/i',
@@ -7770,6 +7889,12 @@ class BookImportService
             if (preg_match('/(?:Read|Narrated)\s+by\s+([^.]+)/i', $firstTags['comment'], $matches)) {
                 $metadata['narrator'] = $this->splitMultiValueNameTag(trim($matches[1]));
             }
+        }
+
+        // Audible-sourced m4b files store the narrator(s) in the composer tag; use it only when
+        // no explicit narrator, writer or "Narrated by" comment was found.
+        if (empty($metadata['narrator']) && !empty($firstTags['composer']) && is_string($firstTags['composer'])) {
+            $metadata['narrator'] = $this->splitMultiValueNameTag($firstTags['composer']);
         }
 
         return $metadata;
@@ -8867,6 +8992,11 @@ class BookImportService
         // Discard purely numeric series names (e.g. "11") — not valid series
         if (!empty($aiResult['series']) && is_numeric($aiResult['series'])) {
             unset($aiResult['series']);
+        }
+
+        // Discard generic container folder names (e.g. "books") — never a real series
+        if (!empty($aiResult['series']) && $this->isGenericContainerDirectory((string) $aiResult['series'])) {
+            unset($aiResult['series'], $aiResult['series_number']);
         }
 
         return $aiResult;

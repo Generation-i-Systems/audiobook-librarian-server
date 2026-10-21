@@ -629,6 +629,16 @@ OH, I SEE IT YOU JUST DIDN'T CREATE THE ACTUAL COLUMN (follow-up: restore Series
 That makes sense. this is an architectural failure. It should NOT be searching without QUERY_STRING. This is a fundamental problem in how this page works
 (context: "after editing a book it no longer returns to the search page as it was left. the search is losing the previous data.")
 
+## 2026-10-14: books is not a series
+`books` is not a series. but there IS a series in both the metadata AND in the OpenAudible data (import review showed Series: books #1 for All Fired Up)
+
+1/1????  (progress bar during a 36-book split)
+
+narrator data is in the OpenBooks data AND the tags yet not being set
+"per-book split code deliberately drops the narrator" this is WRONG
+
+AI is to be used for CONFIRMATION of existing data or in cases where we don't have valid data it should NOT be used in place of openaudible OR tag data
+images are being used from the WRONG book; this book DOES have a cover in the m4b file but it is not being used
 ## 2026-10-21: in-place import directory conflict
 
 The importer needs to handle the special case where the import is already in place and we are just creating a db record, because the source and destination paths are the same.

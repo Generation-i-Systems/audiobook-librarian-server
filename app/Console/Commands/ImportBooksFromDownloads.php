@@ -117,6 +117,14 @@ class ImportBooksFromDownloads extends Command
     protected int $fixHistoryIndex = 0;
     protected int $totalFound = 0;
 
+    /** Books beyond one-per-source-folder added to the progress total by multi-book splits. */
+    protected int $progressSplitExtra = 0;
+
+    /** Source folders (1-based) reached so far in the main import loop. */
+    protected int $progressSourceNumber = 0;
+
+    protected int $progressSourceTotal = 0;
+
     protected function getFileOperation(): string
     {
         return $this->getImportService()->getFileOperation(fn () => $this->option('copy-files'));
@@ -587,7 +595,12 @@ class ImportBooksFromDownloads extends Command
 
             // Process each audiobook
             foreach ($audiobooks as $index => $audiobook) {
-                $this->uiService->updateProgress($index + 1, count($audiobooks));
+                $this->progressSourceNumber = $index + 1;
+                $this->progressSourceTotal = count($audiobooks);
+                $this->uiService->updateProgress(
+                    $this->progressSourceNumber + $this->progressSplitExtra,
+                    $this->progressSourceTotal + $this->progressSplitExtra
+                );
                 $this->uiService->logMessage('Processing: ' . $audiobook['name']);
                 try {
                     // Start background processing for upcoming books
@@ -1498,7 +1511,7 @@ class ImportBooksFromDownloads extends Command
                 $splitGroups,
                 $aiMetadata,
                 fn ($message) => $this->info($message),
-                fn ($virtualAudiobook, $bookMetadata) => $this->processSingleBook($virtualAudiobook, $bookMetadata),
+                $this->splitProgressCallback(count($splitGroups)),
                 $this->aiProcessor
             ),
             fn ($audiobook, $aiMetadata) => $this->handleLowConfidenceMetadata($audiobook, $aiMetadata),
@@ -1982,6 +1995,26 @@ class ImportBooksFromDownloads extends Command
 
 
     /**
+     * Wrap the per-part callback so a split folder counts as N books in the progress bar
+     * instead of 1: the total grows by N-1 and the bar advances as each part is handled.
+     */
+    protected function splitProgressCallback(int $partCount): callable
+    {
+        $this->progressSplitExtra += max(0, $partCount - 1);
+        $partsDone = 0;
+        $before = $this->progressSplitExtra - max(0, $partCount - 1);
+
+        return function ($virtualAudiobook, $bookMetadata) use (&$partsDone, $before) {
+            $partsDone++;
+            $this->uiService?->updateProgress(
+                max(0, $this->progressSourceNumber - 1) + $before + $partsDone,
+                $this->progressSourceTotal + $this->progressSplitExtra
+            );
+            $this->processSingleBook($virtualAudiobook, $bookMetadata);
+        };
+    }
+
+    /**
      * Process multi-book directory by splitting into individual books
      */
     protected function processMultiBookSplit(
@@ -1996,7 +2029,7 @@ class ImportBooksFromDownloads extends Command
             $splitGroups,
             $aiMetadata,
             fn ($message) => $this->info($message),
-            fn ($virtualAudiobook, $bookMetadata) => $this->processSingleBook($virtualAudiobook, $bookMetadata),
+            $this->splitProgressCallback(count($splitGroups)),
             $this->aiProcessor
         );
     }

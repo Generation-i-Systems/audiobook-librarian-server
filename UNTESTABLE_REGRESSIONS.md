@@ -90,6 +90,11 @@ These features require real directory trees and file contents on disk.
 - **`BookDirectoryParser`** — Symfony Finder scanning real directories for audio files.
 - **`BookImportService::lookupOpenAudibleMetadata()`** — expects `books.json` in the real
   OpenAudible directory layout.
+  Per-book series for a flat `OpenAudible/books` split (`processMultiBookSplit()`) is unit-tested with a mocked
+  parser and synthetic tags only; real `books.json` series fields and real m4b title tags (`(Series, Book N)`)
+  can only be verified by importing from a real OpenAudible folder.
+  Likewise the per-book embedded cover (`extractEmbeddedPicture()`, real getID3 on real m4b files) and the
+  `composer`-tag narrator fallback are only tested with mocked/synthetic data.
 - **`CoverImageAnalysisService::isTextOnWhiteCover()`** — reads real image pixels via
   Intervention\Image; cannot determine cover quality from a mock.
 - **`ValidateAudioFilesCommand`, `ValidateBookDirectoriesCommand`** — walk real filesystem. The directory validator now aborts before changing records when the storage root is absent, but tests cannot prove that the production mount stays available during a long scan or that every stored relative path matches a real directory.
