@@ -558,11 +558,6 @@ $canManageBooks = $canManageBooks ?? false;
                                     @can('manage-books')
                                         <div class="d-flex gap-1 mt-1">
                                             <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
-                                            <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Autofill metadata from path-based best match (prefers Audible)"><i class="fas fa-magic"></i></button>
-                                            </form>
                                             <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
                                                 @csrf
                                                 @method('DELETE')
@@ -643,11 +638,6 @@ $canManageBooks = $canManageBooks ?? false;
                                     @can('manage-books')
                                         <div class="d-flex gap-1 mt-1">
                                             <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
-                                            <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" title="{{ __('Autofill') }}"><i class="fas fa-magic"></i></button>
-                                            </form>
                                             <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
                                                 @csrf
                                                 @method('DELETE')
@@ -733,11 +723,6 @@ $canManageBooks = $canManageBooks ?? false;
                                         <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary" title="{{ __('Download') }}"><i class="fas fa-download"></i></a>
                                         @can('manage-books')
                                             <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
-                                            <form action="{{ route('admin.books.autofillFromPath', $book['id']) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-success" title="{{ __('Autofill') }}"><i class="fas fa-magic"></i></button>
-                                            </form>
                                             <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
                                                 @csrf
                                                 @method('DELETE')
@@ -825,7 +810,6 @@ $canManageBooks = $canManageBooks ?? false;
             const bookDownloadRoute = '{{ route("books.download", ":id") }}';
             const bookIndexRoute = '{{ route("books.index") }}';
             const bookEditRoute = '{{ route("admin.books.edit", ":id") }}';
-            const bookAutofillRoute = '{{ route("admin.books.autofillFromPath", ":id") }}';
             const bookDestroyRoute = '{{ route("admin.books.destroy", ":id") }}';
             function hasCoverImage(book) {
                 return book.hasCoverImage === true || (typeof book.coverImage === 'string' && book.coverImage.trim() !== '');

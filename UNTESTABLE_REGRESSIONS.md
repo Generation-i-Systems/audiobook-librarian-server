@@ -471,6 +471,12 @@ about whether the image actually builds, boots, serves traffic, or persists data
   mount (a path left inside the backed-up storage defeats the purpose); and that InnoDB actually shrinks
   `mysqldump` output after the deletes. The command deletes live rows — after the first real run, spot-check one
   archive file and run `audits:restore` against a copy before trusting it.
+- **Book edit history** (`BookHistoryService`, edit page "Edit history" / "Other data") — tests build audits
+  through the `Auditable` trait on SQLite. Not provable there: every shape of the ~150k live `audits` rows (written
+  double-encoded, `created` rows with camelCase keys from `toArray()`, older rows from earlier versions of the trait)
+  renders sensibly. Once `audits:archive` runs, a book's first import and older edits leave the database and the
+  timeline falls back to "Added to library" from `books.created_at`; archived history is not read back. Author,
+  narrator, series and genre links are pivot tables with no audit, so those changes never appear.
 
 ---
 

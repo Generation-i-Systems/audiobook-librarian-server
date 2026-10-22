@@ -251,7 +251,7 @@ class BookControllerTest extends TestCase
     }
 
     #[Test]
-    public function indexIncludesAutofillFromPathAction(): void
+    public function indexOmitsAutofillFromPathActionButKeepsEdit(): void
     {
         $books = [
             ['id' => '1', 'title' => 'Test Book 1', 'directoryPath' => 'Author/Test Book 1'],
@@ -265,7 +265,8 @@ class BookControllerTest extends TestCase
         $response = $this->get(route('books.index'));
 
         $response->assertStatus(200)
-            ->assertSee(route('admin.books.autofillFromPath', '1'), false);
+            ->assertSee(route('admin.books.edit', '1'), false)
+            ->assertDontSee(route('admin.books.autofillFromPath', '1'), false);
     }
 
     #[Test]

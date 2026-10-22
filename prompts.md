@@ -666,3 +666,8 @@ messages should also be noted as "new" only until actually delivered to a client
 ## 2026-10-22: book search autocomplete and Enter
 
 the autocomplete on the book search doesn't work. it just shows blank lines [screenshot: Author "vi" with empty suggestion rows] also pressing enter on any of the fields in that search should perform the search
+
+## 2026-10-22: edit history timeline, remove autofill button
+
+update the edit page to show a timeline of edits including the first import and to view all not shown data.
+remove the autofill button from the books list (/books)

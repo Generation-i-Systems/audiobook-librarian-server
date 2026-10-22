@@ -13,6 +13,7 @@ use App\Services\AudibleService;
 use App\Services\AudiobookBayService;
 use App\Services\BookDirectoryMoveService;
 use App\Services\BookDirectoryParser;
+use App\Services\BookHistoryService;
 use App\Services\BookTagService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
@@ -206,6 +207,15 @@ class BookController extends Controller
             }
         }
 
+        $history = null;
+        $otherData = [];
+        $historyBook = Book::find($book['id']);
+        if ($historyBook) {
+            $bookHistoryService = app(BookHistoryService::class);
+            $history = $bookHistoryService->timeline($historyBook);
+            $otherData = $bookHistoryService->otherData($historyBook);
+        }
+
         return view('admin.books.edit', [
             'book' => $book,
             'genreList' => $genreList,
@@ -218,6 +228,8 @@ class BookController extends Controller
             'tags' => $tags,
             'tagSuggestions' => $tagSuggestions,
             'canManageSystemTags' => $canManageSystemTags,
+            'history' => $history,
+            'otherData' => $otherData,
         ]);
     }
 
