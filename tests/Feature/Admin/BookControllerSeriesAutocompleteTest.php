@@ -22,9 +22,9 @@ class BookControllerSeriesAutocompleteTest extends TestCase
             ->with('test')
             ->once()
             ->andReturn([
-                ['seriesName' => 'Test Series 1'],
-                ['seriesName' => 'Test Series 2'],
-                ['seriesName' => 'Another Test Series'],
+                ['name' => 'Test Series 1'],
+                ['name' => 'Test Series 2'],
+                ['name' => 'Another Test Series'],
             ]);
 
         // Create a controller instance with the mock
