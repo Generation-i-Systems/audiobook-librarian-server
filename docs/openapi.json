@@ -597,24 +597,34 @@
             },
             "MessageItem": {
                 "type": "object",
+                "description": "Returning a message here marks it delivered (deliveredAt is set on first delivery and then kept).",
                 "properties": {
                     "id": {
                         "type": "integer"
                     },
-                    "sender_id": {
+                    "senderId": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "recipientId": {
                         "type": "integer"
                     },
-                    "recipient_id": {
-                        "type": "integer"
+                    "type": {
+                        "type": "string"
                     },
                     "content": {
                         "type": "string"
                     },
-                    "created_at": {
+                    "createdAt": {
                         "type": "string",
                         "format": "date-time"
                     },
-                    "acknowledged_at": {
+                    "deliveredAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "acknowledgedAt": {
                         "type": "string",
                         "format": "date-time",
                         "nullable": true
@@ -680,6 +690,12 @@
                     },
                     "recipient": {
                         "$ref": "#/components/schemas/MessagePerson"
+                    },
+                    "deliveredAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "When the message first reached the recipient's client. Fetching the received box marks the returned page delivered."
                     },
                     "readAt": {
                         "type": "string",

@@ -32,4 +32,28 @@ class MessagesIndexViewTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    public function testStatusIsNewUntilDeliveredThenReadOnceAcknowledged(): void
+    {
+        $time = '2026-10-14T11:00:00.000000Z';
+        $messages = [
+            ['id' => 1, 'content' => 'undelivered', 'deliveredAt' => null, 'acknowledgedAt' => null, 'createdAt' => $time],
+            ['id' => 2, 'content' => 'delivered', 'deliveredAt' => $time, 'acknowledgedAt' => null, 'createdAt' => $time],
+            ['id' => 3, 'content' => 'read', 'deliveredAt' => $time, 'acknowledgedAt' => $time, 'createdAt' => $time],
+        ];
+        $users = [];
+
+        $html = view('admin.messages.index', compact('messages', 'users'))
+            ->withErrors([])
+            ->render();
+
+        $this->assertSame(
+            ['New' => 1, 'Delivered' => 1, 'Read' => 1],
+            [
+                'New' => substr_count($html, '>New</span>'),
+                'Delivered' => substr_count($html, '>Delivered</span>'),
+                'Read' => substr_count($html, '>Read</span>'),
+            ]
+        );
+    }
 }

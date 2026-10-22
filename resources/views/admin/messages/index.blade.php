@@ -53,18 +53,21 @@
                                 @php
                                     // Messages arrive from toArray() with camelCase keys.
                                     $isAcknowledged = !empty($message['acknowledgedAt']);
+                                    $isDelivered = !empty($message['deliveredAt']);
                                     $createdAt = \Carbon\Carbon::parse($message['createdAt'] ?? now());
                                     $sender = collect($users)->firstWhere('id', $message['senderId'] ?? null);
                                     $senderName = $sender ? ($sender['name'] ?? $sender['email'] ?? __('Unknown')) : __('System');
                                     $recipient = collect($users)->firstWhere('id', $message['recipientId'] ?? null);
                                     $recipientName = $recipient ? ($recipient['name'] ?? $recipient['email'] ?? __('Unknown')) : __('Unknown');
                                 @endphp
-                                <tr class="{{ $isAcknowledged ? '' : 'table-info' }}">
+                                <tr class="{{ $isAcknowledged || $isDelivered ? '' : 'table-info' }}">
                                     <td>
-                                        @if(!$isAcknowledged)
-                                            <span class="badge bg-warning text-dark">{{ __('New') }}</span>
-                                        @else
+                                        @if($isAcknowledged)
                                             <span class="badge bg-light text-secondary">{{ __('Read') }}</span>
+                                        @elseif($isDelivered)
+                                            <span class="badge bg-info text-dark">{{ __('Delivered') }}</span>
+                                        @else
+                                            <span class="badge bg-warning text-dark">{{ __('New') }}</span>
                                         @endif
                                     </td>
                                     <td>

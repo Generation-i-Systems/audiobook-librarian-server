@@ -14,6 +14,7 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property string $content
  * @property array|null $payload
  * @property \Illuminate\Support\Carbon|null $acknowledged_at
+ * @property \Illuminate\Support\Carbon|null $delivered_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
@@ -43,11 +44,13 @@ class Message extends Model
         'content',
         'payload',
         'acknowledged_at',
+        'delivered_at',
     ];
 
     protected $casts = [
         'payload' => 'array',
         'acknowledged_at' => 'datetime',
+        'delivered_at' => 'datetime',
     ];
 
     public function sender(): \Illuminate\Database\Eloquent\Relations\BelongsTo

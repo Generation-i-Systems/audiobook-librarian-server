@@ -60,6 +60,7 @@ class MessageApiController extends Controller
             ->whereNull('acknowledged_at')
             ->orderBy('created_at', 'desc')
             ->get();
+        $this->history->markDelivered($messages);
 
         return response()->json(['data' => $messages]);
     }

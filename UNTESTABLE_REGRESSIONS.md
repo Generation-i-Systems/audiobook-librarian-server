@@ -395,6 +395,12 @@ feature tests without running a real queue worker.
   notifications and reports a cursor; when a user actually sees one depends on the client's
   background sync schedule (Android background work, iOS background app refresh), which only
   real devices can show. Tests cover the cursor, unread count and preference handling.
+- **Message delivery status** (`messages.delivered_at`, `MessageHistoryService::markDelivered()`,
+  admin Messages "New/Delivered/Read") — a message counts as delivered once the server returns it
+  from `GET /messages` or the received box of `GET /messages/history`. Whether the client actually
+  received and stored that response (dropped connection, app killed mid-request, a client that
+  fetches but never shows the message) cannot be seen by the server or the tests. Messages sent and
+  never acknowledged before the column existed stay "New" until a client fetches them again.
 - **Community demo mode on the public demo server** — `CommunityStatus` reports `demo` only
   when that deployment sets `DEMO_MODE=true`; whether demo.ablibrarian.com (and not the
   private books.ablibrarian.com) actually has that setting is deployment configuration no

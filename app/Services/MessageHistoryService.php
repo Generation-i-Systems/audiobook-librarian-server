@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Message;
 use App\Models\User;
+use Illuminate\Support\Collection;
 
 /**
  * Message history for the apps: everything a user received or sent, read or not. Admin-written
@@ -39,6 +40,10 @@ class MessageHistoryService
             ->forPage($page, $perPage)
             ->get();
 
+        if ($box === self::BOX_RECEIVED) {
+            $this->markDelivered($messages);
+        }
+
         return [
             'data' => $messages->map(fn (Message $message) => $this->format($message))->values()->all(),
             'meta' => [
@@ -61,6 +66,27 @@ class MessageHistoryService
             'cursor' => (int) (Message::where('recipient_id', $userId)->max('id') ?? 0),
             'unread' => $this->unreadCount($userId),
         ];
+    }
+
+    /**
+     * Record that these messages reached their recipient's client. Only the first delivery counts, so
+     * messages already delivered keep their original time.
+     *
+     * @param Collection<int, Message> $messages
+     */
+    public function markDelivered(Collection $messages): void
+    {
+        $undelivered = $messages->filter(fn (Message $message) => $message->delivered_at === null);
+        if ($undelivered->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        Message::query()->whereIn('id', $undelivered->pluck('id'))->whereNull('delivered_at')
+            ->update(['delivered_at' => $now]);
+        $undelivered->each(function (Message $message) use ($now): void {
+            $message->delivered_at = $now;
+        });
     }
 
     public function send(User $sender, User $recipient, ?string $subject, string $content): ?string
@@ -88,6 +114,7 @@ class MessageHistoryService
             'body' => $body,
             'sender' => $message->sender ? $this->person($message->sender) : null,
             'recipient' => $this->person($message->recipient),
+            'deliveredAt' => $message->delivered_at?->toISOString(),
             'readAt' => $message->acknowledged_at?->toISOString(),
             'createdAt' => $message->created_at?->toISOString(),
         ];

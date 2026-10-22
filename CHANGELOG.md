@@ -18,6 +18,7 @@
 
 ### Fixed
 
+- Admin Messages page: a message now shows as New only until a client has fetched it, then Delivered, then Read once acknowledged (before, New just meant unacknowledged). Additive migration adds nullable `messages.delivered_at`, filled from `acknowledged_at` for messages already read (run `php artisan migrate`). `GET /messages` and the received box of `GET /messages/history` set it on first delivery; both now return `deliveredAt`. `docs/openapi.json` `MessageItem` now lists the camelCase fields the endpoint really returns.
 - Security: updated Vite to 6.4.5, follow-redirects to 1.16.1, and the shell-quote override to 1.12.0, resolving the high and critical npm advisories that failed the CI security job.
 - Admin Messages page: it listed every user's messages without saying who they were for, so one badge earned by several users looked like the same badge earned repeatedly. It now shows the current user's messages by default, with a Recipient selector (any user, or All users) and a To column.
 - Admin AI query: follow-up questions on a results page no longer fail with a 500 `TypeError`. Form IDs (`context_query_id`, `context_limit`, `query_id`, `limit`) are now cast to integers before they reach `AIQueryService`.
