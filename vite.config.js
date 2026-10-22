@@ -39,6 +39,7 @@ export default defineConfig({
                 "resources/js/admin/users/login-qr.js",
                 "resources/js/admin/badges/rule-builder.js",
                 "resources/js/ai-query.js",
+                "resources/js/books/search-form.js",
                 "resources/js/global-ajax-auth.js",
             ],
             publicDirectory: "public",

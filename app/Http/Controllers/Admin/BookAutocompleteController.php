@@ -57,8 +57,7 @@ class BookAutocompleteController extends Controller
         // Format response based on whether we're using the legacy or new format
         if ($request->has('query')) {
             // New format for book-autocomplete.js
-            // Use 'seriesName' field instead of 'name' for series documents
-            $seriesNames = collect($series)->pluck('seriesName')->unique()->values()->all();
+            $seriesNames = collect($series)->pluck('name')->filter()->unique()->values()->all();
             return response()->json(['data' => $seriesNames]);
         } else {
             // Legacy format

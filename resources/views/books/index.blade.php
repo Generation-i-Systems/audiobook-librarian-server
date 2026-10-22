@@ -380,7 +380,12 @@ $canManageBooks = $canManageBooks ?? false;
             <hr />
         @endif
 
-        <form action="{{ route('books.index') }}" method="GET" class="mb-4">
+        <form action="{{ route('books.index') }}" method="GET" class="mb-4" data-book-search
+            @can('manage-books')
+                data-authors-autocomplete-url="{{ route('admin.books.autocomplete.authors') }}"
+                data-series-autocomplete-url="{{ route('admin.books.autocomplete.series') }}"
+            @endcan
+        >
             <div class="row g-3 align-items-end">
                 <div class="col-md-3">
                     <label for="search" class="form-label">{{ __('Search:') }}</label>
@@ -766,6 +771,7 @@ $canManageBooks = $canManageBooks ?? false;
 @endpush
 
 @push('scripts')
+    @vite('resources/js/books/search-form.js')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const librivoxListOnly = @json($isLibrivoxMode);
@@ -900,47 +906,6 @@ $canManageBooks = $canManageBooks ?? false;
 
                 // Debug initial view type
                 console.log('Initial view type:', mainViewType);
-                
-                // Initialize autocomplete for authors
-                $('.autocomplete-author').autocomplete({
-                    source: function(request, response) {
-                        $.ajax({
-                            url: '{{ route("admin.books.autocomplete.authors") }}',
-                            type: 'GET',
-                            data: { term: request.term },
-                            success: function(data) {
-                                response(data);
-                            }
-                        });
-                    },
-                    minLength: 2,
-                    select: function(event, ui) {
-                        $(this).val(ui.item.value);
-                    }
-                });
-                
-                // Initialize autocomplete for series
-                $('#series').autocomplete({
-                    source: function(request, response) {
-                        $.ajax({
-                            url: '{{ route("admin.books.autocomplete.series") }}',
-                            type: 'GET',
-                            data: { query: request.term },
-                            success: function(data) {
-                                // Handle the series response format
-                                if (data.data) {
-                                    response(data.data);
-                                } else {
-                                    response(data);
-                                }
-                            }
-                        });
-                    },
-                    minLength: 2,
-                    select: function(event, ui) {
-                        $(this).val(ui.item.value);
-                    }
-                });
             });
 
             // Handle recent books view toggle

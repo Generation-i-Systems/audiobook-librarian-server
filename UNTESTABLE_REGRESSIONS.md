@@ -220,6 +220,13 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
 These features require a live browser with DOM and event-loop; Jest tests cover logic but not
 rendering or real user interactions.
 
+- **Book search form on /books** (`resources/js/books/search-form.js`) — Jest covers the response
+  mapping, keyboard-vs-click detection and Enter on selects/checkboxes, but not real jQuery UI:
+  that the suggestion menu shows names, that Enter on a highlighted suggestion fills the field and
+  submits (relies on jQuery UI passing the keydown as the select event's `originalEvent`), and that
+  a click only fills it. Suggestions only load for users with `manage-books` (the autocomplete
+  endpoints require it). Verify in a browser after jQuery UI upgrades.
+
 - **Adminer SQL driver login** (`app/Http/Controllers/Admin/AdminerController.php`,
   `resources/adminer/adminer-custom-class.php`) — connection defaults can be unit tested, but
   the embedded Adminer login and database browsing require a live browser and database for each
