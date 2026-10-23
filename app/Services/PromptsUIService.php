@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\ImportUIInterface;
+use App\Support\PromptSelection;
 use App\Support\TypeaheadFilter;
 
 use function Laravel\Prompts\confirm;
@@ -122,7 +123,7 @@ class PromptsUIService implements ImportUIInterface
             default: $defaultKey
         );
 
-        return (string) $response;
+        return PromptSelection::keyFor($formattedOptions, $response);
     }
 
     public function selectFiltered(string $question, array $options, string $default = ''): string
@@ -149,7 +150,7 @@ class PromptsUIService implements ImportUIInterface
             placeholder: 'Type to filter...',
         );
 
-        return (string) $selected;
+        return PromptSelection::keyFor($formattedOptions, $selected);
     }
 
     protected function selectPlain(string $question, array $options, string $default): string

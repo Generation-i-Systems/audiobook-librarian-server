@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PromptSelection;
 use App\Support\TypeaheadFilter;
 
 use function Laravel\Prompts\confirm;
@@ -204,7 +205,7 @@ class HybridUIService extends ImportUIService
 
         $this->renderFull();
 
-        return (string) $response;
+        return PromptSelection::keyFor($formattedOptions, $response);
     }
 
     public function selectFiltered(string $question, array $options, string $default = ''): string
@@ -252,7 +253,7 @@ class HybridUIService extends ImportUIService
             return '';
         }
 
-        return (string) $response;
+        return PromptSelection::keyFor($formattedOptions, $response);
     }
 
     /**
@@ -326,7 +327,7 @@ class HybridUIService extends ImportUIService
 
         $this->renderFull();
 
-        return (string) $response;
+        return PromptSelection::keyFor($formattedOptions, $response);
     }
 
     public function confirm(string $question, bool $default = false): bool

@@ -98,4 +98,65 @@ class BookImportServiceMultiBookSplitAuthorTest extends TestCase
             $this->assertNotSame(['Wrong Whole-Batch Author'], $book['metadata']['author']);
         }
     }
+
+    /**
+     * Regression test: a whole-batch ISBN (read from whichever file the upfront scan
+     * sampled) was copied onto every split book, so findExistingBook() matched each new
+     * book to the first one by ISBN and overwrote that single record four times. When a
+     * per-book AI result exists, the parent folder's AI result must not be used at all.
+     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function processMultiBookSplitIgnoresWholeBatchAiResultWhenPerBookAiRuns(): void
+    {
+        $book1Path = $this->parentDir . '/Charlie Higson - Young Bond Book 1 - Blood Fever.m4b';
+        $book2Path = $this->parentDir . '/Charlie Higson - Young Bond Book 2 - By Royal Command.m4b';
+        File::put($book1Path, 'fake audio');
+        File::put($book2Path, 'fake audio');
+
+        $audiobook = ['path' => $this->parentDir, 'files' => [$book1Path, $book2Path]];
+        $multiBookInfo = ['series_name' => 'Young Bond', 'numbers' => [1, 2]];
+        $splitGroups = $this->service->analyzeMultiBookFiles($audiobook, $multiBookInfo);
+
+        $wholeBatchAiMetadata = [
+            'title' => 'Young Bond',
+            'isbn' => '9781445892832',
+            'asin' => 'B007GE1XTU',
+            'description' => 'Whole-batch description of By Royal Command',
+            'year' => 2012,
+            'publisher' => 'Whole-Batch Publisher',
+        ];
+        $book2Publisher = 'Book Two Publisher';
+        $book1Isbn = '9781111111111';
+
+        $aiProcessor = \Mockery::mock(AIBookProcessor::class);
+        $aiProcessor->shouldReceive('processBookDirectory')
+            ->withArgs(fn ($directoryPath, $fileNames) => $fileNames === [basename($book1Path)])
+            ->andReturn(['author' => ['Charlie Higson'], 'isbn' => $book1Isbn]);
+        $aiProcessor->shouldReceive('processBookDirectory')
+            ->withArgs(fn ($directoryPath, $fileNames) => $fileNames === [basename($book2Path)])
+            ->andReturn(['author' => ['Charlie Higson'], 'publisher' => $book2Publisher]);
+
+        $books = $this->service->processMultiBookSplit(
+            $audiobook,
+            $multiBookInfo,
+            $splitGroups,
+            $wholeBatchAiMetadata,
+            null,
+            null,
+            $aiProcessor
+        );
+
+        $identity = array_map(static fn (array $book): array => [
+            'isbn' => $book['metadata']['isbn'] ?? null,
+            'asin' => $book['metadata']['asin'] ?? null,
+            'description' => $book['metadata']['description'] ?? null,
+            'year' => $book['metadata']['year'] ?? null,
+            'publisher' => $book['metadata']['publisher'] ?? null,
+        ], $books);
+
+        $this->assertSame([
+            ['isbn' => $book1Isbn, 'asin' => null, 'description' => null, 'year' => null, 'publisher' => null],
+            ['isbn' => null, 'asin' => null, 'description' => null, 'year' => null, 'publisher' => $book2Publisher],
+        ], $identity);
+    }
 }

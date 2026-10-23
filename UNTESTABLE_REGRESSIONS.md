@@ -177,6 +177,12 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
   falls back to the field's current/default value) without exiting the whole import, in both
   `--ui=ncurses` and the default `--ui=hybrid` mode — verify manually since raw ESC-key handling
   and `Laravel\Prompts\SearchPrompt`'s internal loop can't be driven by PHPUnit either.
+- **Menus whose option keys start at `'0'`** (e.g. "Use an existing series location instead?") —
+  Laravel Prompts returns the selected *label* for list-shaped options and the key otherwise;
+  `App\Support\PromptSelection::keyFor()` maps it back in `HybridUIService` and `PromptsUIService`.
+  Tests drive the prompts with `Prompt::fake()`, but `HybridUIService::select()` itself needs a
+  real terminal: verify in `book:import` that choosing option 2 of the series-location menu
+  changes the Directory shown.
 - **Text field editing (Title, Directory Path, etc.)** — `ImportUIService::readLineWithEditableDefault()`
   (raw-TTY line editor, `--ui=ncurses`) and `HybridUIService::ask()` / `App\Services\ScrollableTextPrompt`
   (Laravel Prompts `TextPrompt`-based, default `--ui=hybrid` mode) have the same

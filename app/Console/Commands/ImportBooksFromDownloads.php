@@ -1894,6 +1894,17 @@ class ImportBooksFromDownloads extends Command
         );
 
         if ($approved) {
+            // Move the folder first; never record a path the files are not at.
+            $moveError = $this->getImportService()->moveLibraryDirectoryForConfirmedPath(
+                $book,
+                (string) ($metadata['custom_directory_path'] ?? '')
+            );
+            if ($moveError !== null) {
+                $this->error("❌ Not saved — could not move folder: {$moveError}");
+                $this->fixHistoryIndex = 0;
+                return;
+            }
+
             $this->getImportService()->persistConfirmedBookUpdate(
                 $book,
                 ConfirmedBookMetadata::fromConfirmed($metadata),

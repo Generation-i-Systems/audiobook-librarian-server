@@ -671,3 +671,18 @@ the autocomplete on the book search doesn't work. it just shows blank lines [scr
 
 update the edit page to show a timeline of edits including the first import and to view all not shown data.
 remove the autofill button from the books list (/books)
+
+## 2026-10-23: import ignores filenames when AI fails
+
+something is wrong and the import is not even looking at filenames this is being ran from the download directory /media/download with `ibk C*` [screenshot: title "Cassius Lange", no author, 25% confidence]
+yes, it is failing it should be able to use the filename to get author series and title from the WITHOUT AI
+
+## 2026-10-23: split imports overwrite one record; fixed book not moved
+
+look at the import logs because the last few imports have failed. I am getting files copied but no db entry '/media/lyra_data1/audiobooks/books/Kids/Charlie Higson/Young Bond/02 By Royal Command' or db entries with the files copied somewhere else 'Action/Charlie Higson & Ian Fleming/James Bond/01 On His Majesty's Secret Service' (id 15073)
+if you are running a new ai request for the files in the split the ai result from the parent should be not be used at all
+do 1. 2 is not possible and the import needs to handle it better because we can't be expected to modify source files
+
+## 2026-10-23: series location choice ignored
+
+[screenshot: "Use an existing series location instead?" menu] making changes to this don't get applied. I selected 2 and the change didn't happen

@@ -1026,6 +1026,37 @@ class BookImportService
      * guarantee as persistConfirmedBook(): every value comes straight from the
      * confirmed snapshot, nothing is calculated, derived, corrected, or changed here.
      */
+    /**
+     * Move an already-imported book's folder to the directory path the user just confirmed
+     * (the "fix previous import" flow). Returns an error message, or null when the files
+     * are at the confirmed path. The confirmed path is used exactly; a conflict is an error.
+     */
+    public function moveLibraryDirectoryForConfirmedPath(Book $book, string $confirmedDirectoryPath): ?string
+    {
+        $oldDirectoryPath = trim((string) $book->directory_path, '/');
+        $newDirectoryPath = trim($confirmedDirectoryPath, '/');
+
+        if ($newDirectoryPath === '' || $oldDirectoryPath === $newDirectoryPath) {
+            return null;
+        }
+
+        $coverBasename = !empty($book->cover_image) ? basename((string) $book->cover_image) : null;
+        $result = app(BookDirectoryMoveService::class)
+            ->moveBookDirectoryContents($oldDirectoryPath, $newDirectoryPath, $coverBasename);
+
+        if (($result['moved'] ?? false) !== true) {
+            return $result['error'] ?? "Book folder not found: {$oldDirectoryPath}";
+        }
+
+        Log::channel('import')->info('Moved book folder to confirmed path', [
+            'book_id' => $book->id,
+            'old_directory_path' => $oldDirectoryPath,
+            'new_directory_path' => $newDirectoryPath,
+        ]);
+
+        return null;
+    }
+
     public function persistConfirmedBookUpdate(Book $book, ConfirmedBookMetadata $confirmed, array $audiobook, array $options = []): Book
     {
         $metadata = $confirmed->toArray();
@@ -4304,10 +4335,32 @@ class BookImportService
     {
         $sourceDirectoryName = $this->extractSourceDirectoryName($path);
 
+        // ISBNs are not unique in the library and can be wrong on a stored book (source
+        // files can't be fixed), so an ISBN match is only trusted when the titles agree.
         if (!empty($metadata['isbn'])) {
-            $existingBook = Book::where('isbn', $metadata['isbn'])->first();
-            if ($existingBook) {
-                return $existingBook;
+            $normalizeTitle = static fn (string $title): string => (string) preg_replace(
+                '/[^a-z0-9]+/',
+                '',
+                mb_strtolower($title)
+            );
+            $incomingTitle = $normalizeTitle((string) ($metadata['title'] ?? ''));
+
+            foreach (Book::where('isbn', $metadata['isbn'])->get() as $existingBook) {
+                $existingTitle = $normalizeTitle((string) $existingBook->title);
+                if (
+                    $incomingTitle === '' || $existingTitle === ''
+                    || str_contains($incomingTitle, $existingTitle) || str_contains($existingTitle, $incomingTitle)
+                ) {
+                    return $existingBook;
+                }
+
+                Log::channel('import')->warning('Ignoring ISBN match with a different title', [
+                    'isbn' => $metadata['isbn'],
+                    'incoming_path' => $path,
+                    'incoming_title' => $metadata['title'] ?? null,
+                    'existing_book_id' => $existingBook->id,
+                    'existing_title' => $existingBook->title,
+                ]);
             }
         }
 
@@ -5151,6 +5204,20 @@ class BookImportService
                 $this->getParentDirectoryPatternHints($audiobook),
                 ...($additionalText === [] ? [] : [$additionalText])
             );
+
+            // The AI call failed and AIBookProcessor fell back to the directory name alone.
+            // The filename usually carries author/series/title, so read it without AI.
+            if ($aiResult && ($aiResult['ai_processed'] ?? null) === false) {
+                $aiResult['_ai_failed'] = true;
+                $filenameMetadata = $fileNames !== [] ? $this->parseFilenameForMetadata($fileNames[0]) : [];
+                if (!empty($filenameMetadata['author']) || !empty($filenameMetadata['series'])) {
+                    $firstTags = $fileTags !== [] ? reset($fileTags) : [];
+                    if (!empty($firstTags['title'])) {
+                        unset($filenameMetadata['title']);
+                    }
+                    $aiResult = array_merge($aiResult, $filenameMetadata);
+                }
+            }
 
             if ($aiResult) {
                 Log::debug('[AUTHOR-TRACE] processWithAI: raw AI result', [
@@ -6978,7 +7045,14 @@ class BookImportService
             // from its own filename/tags/metadata.json below, with no fallback to the
             // whole-batch guess — a book with no source of its own is left without an
             // author/narrator rather than confidently attributed to the wrong person.
-            $bookMetadata = array_merge($aiMetadata, $sharedOverrides);
+            // When this book had its own AI call, the whole-batch result is not used at all.
+            if ($partAiMetadata !== null) {
+                $partAiMetadata = $this->postProcessAIResult($partAiMetadata, [
+                    'path' => $audiobook['path'],
+                    'files' => $files,
+                ]);
+            }
+            $bookMetadata = array_merge($partAiMetadata ?? $aiMetadata, $sharedOverrides);
             if (empty($sharedOverrideAuthor)) {
                 unset($bookMetadata['author']);
             }
@@ -6996,7 +7070,7 @@ class BookImportService
             // Cover and OpenAudible-derived fields in the whole-batch metadata describe the
             // sampled first files, not this book — drop them; this book's own file and
             // OpenAudible record supply them below.
-            $isBatchOpenAudible = ($aiMetadata['source'] ?? null) === 'openaudible';
+            $isBatchOpenAudible = $partAiMetadata === null && ($aiMetadata['source'] ?? null) === 'openaudible';
             if ($isBatchOpenAudible) {
                 foreach (self::OPENAUDIBLE_BATCH_LEAK_KEYS as $leakKey) {
                     if (!array_key_exists($leakKey, $sharedOverrides)) {
@@ -7011,6 +7085,19 @@ class BookImportService
                 $bookMetadata['cover_source'],
                 $bookMetadata['cover_sources']
             );
+
+            // Identity fields likewise describe the sampled file, not this book. A shared
+            // ISBN made findExistingBook() match every split book to the first one and
+            // overwrite that one record. Only this book's own AI result may supply them.
+            foreach (['isbn', 'asin', 'description', 'year'] as $identityKey) {
+                if (array_key_exists($identityKey, $sharedOverrides)) {
+                    continue;
+                }
+                unset($bookMetadata[$identityKey]);
+                if (!empty($partAiMetadata[$identityKey])) {
+                    $bookMetadata[$identityKey] = $partAiMetadata[$identityKey];
+                }
+            }
 
             // Merge filename-parsed metadata (fills in missing fields)
             if (!empty($filenameMetadata)) {
@@ -7265,7 +7352,7 @@ class BookImportService
 
         // Pattern 1: "Author - Series #N - Title" or "Author - Series, Book N - Title"
         if (preg_match('/^(.+?)\s*-\s*(.+?)\s*[#,]\s*([\d.]+)\s*-\s*(.+)$/i', $name, $matches)) {
-            $metadata['author'] = [trim($matches[1])];
+            $metadata['author'] = $this->splitFilenameAuthors($matches[1]);
             $metadata['series'] = trim($matches[2]);
             $raw = $matches[3];
             $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
@@ -7275,7 +7362,17 @@ class BookImportService
 
         // Pattern 2: "Author - Series Book N - Title"
         if (preg_match('/^(.+?)\s*-\s*(.+?)\s+Book\s+([\d.]+)\s*-\s*(.+)$/i', $name, $matches)) {
-            $metadata['author'] = [trim($matches[1])];
+            $metadata['author'] = $this->splitFilenameAuthors($matches[1]);
+            $metadata['series'] = trim($matches[2]);
+            $raw = $matches[3];
+            $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
+            $metadata['title'] = trim($matches[4]);
+            return $metadata;
+        }
+
+        // Pattern 2a: "Author - Series NN - Title" (bare number, e.g. "Space Academy 06")
+        if (preg_match('/^(.+?)\s+-\s+(.+?)\s+(\d{1,3}(?:\.\d+)?)\s+-\s+(.+)$/', $name, $matches)) {
+            $metadata['author'] = $this->splitFilenameAuthors($matches[1]);
             $metadata['series'] = trim($matches[2]);
             $raw = $matches[3];
             $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
@@ -7298,13 +7395,13 @@ class BookImportService
             $raw = $matches[2];
             $metadata['series_number'] = str_contains($raw, '.') ? (float) $raw : (int) $raw;
             $metadata['title'] = trim($matches[3]);
-            $metadata['author'] = [trim($matches[4])];
+            $metadata['author'] = $this->splitFilenameAuthors($matches[4]);
             return $metadata;
         }
 
         // Pattern 4: "Author - Series, The Series Name, Book N" (with nested series info)
         if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?)\s+Series,?\s*Book\s*([\d.]+)$/i', $name, $matches)) {
-            $metadata['author'] = [trim($matches[1])];
+            $metadata['author'] = $this->splitFilenameAuthors($matches[1]);
             $metadata['title'] = trim($matches[2]);
             $metadata['series'] = trim($matches[3]) . ' Series';
             $raw = $matches[4];
@@ -7314,7 +7411,7 @@ class BookImportService
 
         // Pattern 5: "Author - Title The Series, Book N"
         if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?),?\s*Book\s*([\d.]+)$/i', $name, $matches)) {
-            $metadata['author'] = [trim($matches[1])];
+            $metadata['author'] = $this->splitFilenameAuthors($matches[1]);
             $metadata['title'] = trim($matches[2]);
             $metadata['series'] = trim($matches[3]);
             $raw = $matches[4];
@@ -7343,6 +7440,26 @@ class BookImportService
     /**
      * Check if a string looks like an author name
      */
+    /**
+     * Split a filename author group into co-authors ("A B, C D", "A B & C D").
+     * Only splits when every part is a multi-word name, so "Sanderson, Brandon" stays whole.
+     *
+     * @return array<int, string>
+     */
+    private function splitFilenameAuthors(string $authors): array
+    {
+        $authors = trim($authors);
+        $parts = array_map('trim', preg_split('/\s*(?:,|&|\band\b)\s*/i', $authors) ?: []);
+
+        foreach ($parts as $part) {
+            if (count(preg_split('/\s+/', $part) ?: []) < 2) {
+                return [$authors];
+            }
+        }
+
+        return $parts;
+    }
+
     protected function looksLikeAuthorName(string $str): bool
     {
         // Author names typically:
@@ -10743,7 +10860,9 @@ class BookImportService
             return;
         }
 
-        $successMessage = "✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)";
+        $successMessage = !empty($aiMetadata['_ai_failed'])
+            ? "⚠️  AI call failed (see laravel.log) — using filename/tags only (confidence: {$aiMetadata['confidence']}%)"
+            : "✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)";
         if ($uiService) {
             $uiServiceLogCallback($successMessage);
         } else {
