@@ -108,16 +108,7 @@
                                 <a class="nav-link" style="color:white" href="{{ route('tags.index') }}">{{ __('Tags') }}</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="{{ route('badges.index') }}">{{ __('Badges') }}</a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link" style="color:white" href="{{ route('series.manage') }}">{{ __('Series') }}</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/skins">{{ __('Skins') }}</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" style="color:white" href="https://www.ablibrarian.com/gallery/themes">{{ __('Themes') }}</a>
                             </li>
                             @if(Auth::user()->is_admin)
                                 <!-- Not yet permission-gated (Phase 4): still full-admin-only tooling -->
@@ -128,16 +119,23 @@
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('admin.messages.index') }}">{{ __('Messages') }}</a>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.queue.index') }}">{{ __('Queue') }}</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.users.index') }}">{{ __('User Management') }}</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.database') }}">{{ __('Database Admin') }}</a>
-                                </li>
                             @endif
+                            <li class="nav-item dropdown">
+                                <a id="adminDropdown" class="nav-link dropdown-toggle" href="#" role="button"
+                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="color:white">
+                                    {{ __('Admin') }}
+                                </a>
+                                <div class="dropdown-menu" aria-labelledby="adminDropdown">
+                                    <a class="dropdown-item" href="https://www.ablibrarian.com/gallery/skins">{{ __('Skins') }}</a>
+                                    <a class="dropdown-item" href="https://www.ablibrarian.com/gallery/themes">{{ __('Themes') }}</a>
+                                    <a class="dropdown-item" href="{{ route('badges.index') }}">{{ __('Badges') }}</a>
+                                    @if(Auth::user()->is_admin)
+                                        <a class="dropdown-item" href="{{ route('admin.users.index') }}">{{ __('User Management') }}</a>
+                                        <a class="dropdown-item" href="{{ route('admin.database') }}">{{ __('Database Admin') }}</a>
+                                        <a class="dropdown-item" href="{{ route('admin.queue.index') }}">{{ __('Queue') }}</a>
+                                    @endif
+                                </div>
+                            </li>
                             @unless(request()->is('admin/*'))
                                 <li class="nav-item dropdown">
                                     <a id="libraryDropdown" class="nav-link dropdown-toggle" href="#" role="button"

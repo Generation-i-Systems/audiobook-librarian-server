@@ -2,6 +2,8 @@
 
 ### Added
 
+- Navigation: group skins, themes, badges, user management, database admin, and the admin queue under an Admin menu.
+
 - Book list: show a Needs Review badge on flagged books in grid, compact, and list views.
 
 - Book edit page: an "Edit history" timeline (newest first, ending with the first import) built from the audit trail, showing who changed what, from where (edit form, folder move, autofill, import/command line) and the before/after values; automatic directory checks are summarised in one line. An "Other data" section shows every stored field the form does not (ISBN, ASIN, language, duration, AI fields, file tags, Audible/Google/Hardcover/LibriVox info, ...). Both are read-only and collapsed by default. Author, narrator, series and genre changes are not audited, so they are not in the timeline.
