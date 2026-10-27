@@ -108,4 +108,43 @@ class SystemTagControllerTest extends TestCase
         $response->assertRedirect(route('tags.index'));
         $this->assertDatabaseHas('book_tags', ['book_id' => $book->id, 'tags' => json_encode(['award-winner'])]);
     }
+    public function testTagBrowseFiltersAndPaginatesBooks(): void
+    {
+        $user = User::factory()->create(['role' => 'admin']);
+        $book = Book::factory()->create(['title' => 'Unique Selected Title']);
+        $other = Book::factory()->create(['title' => 'Other Title']);
+        BookTag::create(['user_id' => $user->id, 'book_id' => $book->id, 'scope' => 'system', 'tags' => ['featured']]);
+        BookTag::create(['user_id' => $user->id, 'book_id' => $other->id, 'scope' => 'system', 'tags' => ['featured']]);
+
+        $this->actingAs($user)->get(route('tags.index', ['tag' => 'featured', 'search' => 'Unique Selected']))
+            ->assertOk()->assertSee('Unique Selected Title')->assertDontSee('Other Title');
+    }
+
+    public function testBulkChangesPreserveOtherTagsAndRejectUnauthorizedUsers(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $book = Book::factory()->create();
+        BookTag::create(['user_id' => $admin->id, 'book_id' => $book->id, 'scope' => 'system', 'tags' => ['Keep', 'Old']]);
+        $payload = ['book_ids' => [$book->id], 'tag' => 'old', 'action' => 'remove'];
+        $this->actingAs(User::factory()->create(['role' => 'unverified']))
+            ->post(route('tags.bulk'), $payload)->assertForbidden();
+        $this->actingAs($admin)->post(route('tags.bulk'), $payload)->assertRedirect();
+        $this->assertSame(['Keep'], BookTag::where('book_id', $book->id)->firstOrFail()->tags);
+        $this->post(route('tags.bulk'), ['book_ids' => [$book->id], 'tag' => 'New', 'action' => 'add'])->assertRedirect();
+        $this->assertSame(['Keep', 'New'], BookTag::where('book_id', $book->id)->firstOrFail()->tags);
+    }
+
+    public function testTagBrowseLimitsResultsToFiftyAndFiltersGenres(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $genre = \App\Models\Genre::factory()->create();
+        $books = Book::factory()->count(51)->create();
+        foreach ($books as $book) {
+            $book->genres()->attach($genre);
+            BookTag::create(['user_id' => $admin->id, 'book_id' => $book->id, 'scope' => 'system', 'tags' => ['large']]);
+        }
+        $response = $this->actingAs($admin)->get(route('tags.index', ['tag' => 'large', 'genre' => $genre->id]));
+        $response->assertOk()->assertViewHas('books', fn ($result): bool => $result->total() === 51 && $result->count() === 50);
+    }
 }

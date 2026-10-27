@@ -282,6 +282,38 @@ class BookTagService
         return Book::query()->whereIn('id', $bookIds)->get();
     }
 
+    public function browseSystemTags(string $tag, string $search, int $genre): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return Book::query()->with(['authors', 'genres', 'userTags' => fn ($query) => $query->where('scope', 'system')])
+            ->when($tag !== '', fn ($query) => $query->whereHas('userTags', fn ($tags) => $tags->where('scope', 'system')->whereJsonContains('tags', $tag)))
+            ->when($genre > 0, fn ($query) => $query->whereHas('genres', fn ($genres) => $genres->where('genres.id', $genre)))
+            ->when($search !== '', fn ($query) => $query->where(fn ($books) => $books
+                ->where('title', 'like', '%' . $search . '%')
+                ->orWhereHas('authors', fn ($authors) => $authors->where('name', 'like', '%' . $search . '%'))))
+            ->orderBy('title')->orderBy('id')->paginate(50)->withQueryString();
+    }
+
+    /** @param array<int, int> $bookIds */
+    public function bulkSystemTags(User $user, array $bookIds, string $tag, string $action): void
+    {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $bookIds, $tag, $action): void {
+            foreach ($bookIds as $bookId) {
+                $row = BookTag::query()->where('book_id', $bookId)->where('owner_key', 'system')->lockForUpdate()->first();
+                $tags = $row === null ? [] : $row->tags;
+                $tags = $action === 'add' ? $this->normalizeTags([...$tags, $tag]) : array_values(array_filter($tags, fn (string $existing): bool => mb_strtolower($existing) !== mb_strtolower($tag)));
+                if ($row === null && $action === 'remove') {
+                    continue;
+                }
+                BookTag::query()->updateOrCreate(['book_id' => $bookId, 'owner_key' => 'system'], [
+                    'user_id' => $user->id, 'scope' => 'system', 'group_id' => null, 'tags' => $tags,
+                ]);
+            }
+        });
+        foreach ($bookIds as $bookId) {
+            EmbedBookJob::dispatch($bookId);
+        }
+    }
+
     public function renameSystemTag(string $oldName, string $newName): int
     {
         $rows = BookTag::query()->where('scope', 'system')->whereJsonContains('tags', $oldName)->get();

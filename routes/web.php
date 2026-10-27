@@ -284,6 +284,7 @@ Route::middleware(['auth'])->group(function (): void {
     // App\Http\Controllers\TagController::update for that).
     Route::get('/tags', [\App\Http\Controllers\SystemTagController::class, 'index'])->name('tags.index');
     Route::middleware('permission:manage-tags')->group(function (): void {
+        Route::post('/tags/bulk', [\App\Http\Controllers\SystemTagController::class, 'bulk'])->name('tags.bulk');
         Route::get('/tags/{tag}/edit', [\App\Http\Controllers\SystemTagController::class, 'edit'])
             ->where('tag', '.+')->name('tags.edit');
         Route::put('/tags/{tag}', [\App\Http\Controllers\SystemTagController::class, 'update'])

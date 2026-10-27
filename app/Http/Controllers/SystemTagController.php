@@ -15,11 +15,30 @@ class SystemTagController extends Controller
     {
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $tags = $this->bookTagService->systemTagsOverview();
 
-        return view('tags.index', ['tags' => $tags]);
+        $tag = trim((string) $request->query('tag', ''));
+        $search = trim((string) $request->query('search', ''));
+        $genre = (int) $request->query('genre', 0);
+        $genres = \App\Models\Genre::query()->orderBy('name')->get(['id', 'name']);
+        $books = $this->bookTagService->browseSystemTags($tag, $search, $genre);
+
+        return view('tags.index', compact('tags', 'books', 'tag', 'search', 'genres', 'genre'));
+    }
+
+    public function bulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'book_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'book_ids.*' => ['required', 'integer', 'distinct', 'exists:books,id'],
+            'tag' => ['required', 'string', 'max:64', 'regex:/\S/'],
+            'action' => ['required', 'in:add,remove'],
+        ]);
+        $this->bookTagService->bulkSystemTags($request->user(), $validated['book_ids'], trim($validated['tag']), $validated['action']);
+
+        return back()->with('success', __('Tags updated successfully!'));
     }
 
     public function edit(string $tag): View
