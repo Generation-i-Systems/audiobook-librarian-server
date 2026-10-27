@@ -223,6 +223,8 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
 
 ## 6. Browser / JavaScript UI
 
+- **Book edit series numbers** (`resources/views/admin/books/partials/form_content.blade.php`) — rendering and editing non-numeric series labels needs a real-browser check, including save and reload.
+
 - **Admin navigation dropdown** (`resources/views/layouts/app.blade.php`) — rendered links and access visibility are tested, but dropdown interaction and responsive layout require a real browser check.
 
 - **Livewire / Pulse dashboard** (`resources/views/vendor/pulse/dashboard.blade.php`) — Livewire upgrades need a real-browser check of Pulse dashboard loading and interactions; automated tests do not exercise the real browser runtime.

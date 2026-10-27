@@ -25,6 +25,8 @@
 
 ### Fixed
 
+- Book edit: allow series numbers stored as text to remain visible and editable.
+
 - Security: update Livewire to 4.4.8 to address the authorization bypass advisory.
 
 - Book list: keep download, edit, and delete actions on one line.

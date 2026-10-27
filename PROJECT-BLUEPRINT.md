@@ -31,6 +31,8 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 ## 2. Core Features
 
+- Book editing accepts series numbers as text, preserving non-numeric series labels.
+
 - The Admin navigation menu groups skins, themes, and badges for signed-in users, plus user management, database admin, and queue for administrators.
 
 - The system tags page browses a paginated book list by tag, title/author and genre. Users with manage-tags permission can add or remove one system tag from selected books on the current page.

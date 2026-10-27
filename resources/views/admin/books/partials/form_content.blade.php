@@ -238,9 +238,9 @@
     $seriesId = $seriesDataByName[$series['seriesName'] ?? '']['id'] ?? null;
                                         @endphp
                                         <div class="d-flex align-items-start mb-2 series-row">
-                                            <input type="number" name="series[{{ $idx }}][number]" class="form-control width-80 form-control-height-32 flex-shrink-0"
-                                                placeholder="#"
-                                                value="{{ $series['number'] ?? '' }}" step="any">
+                                            <input type="text" name="series[{{ $idx }}][number]" class="form-control width-80 form-control-height-32 flex-shrink-0"
+                                                placeholder="#" autocomplete="off"
+                                                value="{{ $series['number'] ?? '' }}">
                                             <input type="text" name="series[{{ $idx }}][seriesName]"
                                                 class="form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
                                                 placeholder="{{ __('Series Name') }}" value="{{ $series['seriesName'] ?? '' }}">
