@@ -21,6 +21,8 @@
 
 ### Fixed
 
+- Security: update Livewire to 4.4.8 to address the authorization bypass advisory.
+
 - Book list: keep download, edit, and delete actions on one line.
 
 - Import: choosing an option in "Use an existing series location instead?" (and any other menu whose keys start at `0`) was ignored and kept the computed location. Laravel Prompts returns the label instead of the key for such menus; `PromptSelection::keyFor()` now maps it back in the hybrid and prompts UIs.

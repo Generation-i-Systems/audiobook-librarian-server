@@ -18,6 +18,8 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 ## 1. Tech Stack
 
+- Livewire 4.4.8 addresses the authorization bypass advisory affecting 4.3.0 through 4.4.7.
+
 - **Backend:** Laravel (PHP) — provides both web and REST API endpoints
 - **Frontend:** Blade, Bootstrap 5, jQuery, jQuery UI (Autocomplete)
 - **JavaScript checks:** Jest 30 with the matching jsdom environment covers browser logic; Vite builds the production assets. `npm audit` checks the locked dependency tree.
