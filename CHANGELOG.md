@@ -2,6 +2,8 @@
 
 ### Added
 
+- Book list: show a Needs Review badge on flagged books in grid, compact, and list views.
+
 - Book edit page: an "Edit history" timeline (newest first, ending with the first import) built from the audit trail, showing who changed what, from where (edit form, folder move, autofill, import/command line) and the before/after values; automatic directory checks are summarised in one line. An "Other data" section shows every stored field the form does not (ISBN, ASIN, language, duration, AI fields, file tags, Audible/Google/Hardcover/LibriVox info, ...). Both are read-only and collapsed by default. Author, narrator, series and genre changes are not audited, so they are not in the timeline.
 - Transcription (text sync): optional Whisper speech-to-text. `POST /api/v1/books/{book}/files/{file}/transcriptions` cuts a range (up to `TRANSCRIPTION_MAX_CLIP_SECONDS`, default 30 s) of a book file with ffmpeg after checking the client's `expectedSize`/`expectedChunkHash`; `POST /api/v1/transcriptions` takes an uploaded 16 kHz mono WAV or FLAC clip. Both return word times relative to the clip, share one per-user rate limit, and store nothing. `/health/capabilities` lists `TRANSCRIPTION` while the sidecar is healthy and `TRANSCRIPTION_SERVER_FILES` when ffmpeg is also available. The sidecar runs under `docker compose --profile transcription` (`TRANSCRIPTION_WHISPER_URL`, `TRANSCRIPTION_MODEL`, default `base.en`); see `docs/TRANSCRIPTION.md`.
 - Spanish (`es`) added as the first language: ~950 strings in `lang/es.json`, framework files in `lang/es/`, navbar language selector, and nearly every Blade view, controller flash message and view-script `confirm()`/`alert()` now goes through `__()`. English output is unchanged. Excluded for now: API docs pages, emails, Privacy/Terms, `resources/js`, API messages.
@@ -18,6 +20,8 @@
 - Import drafts: draft responses now include bounded source file and tag evidence for review. `POST /imports/drafts/{id}/recheck` lets an unapproved draft run the current server importer rules again from its saved observation without choosing the folder again.
 
 ### Fixed
+
+- Book list: keep download, edit, and delete actions on one line.
 
 - Import: choosing an option in "Use an existing series location instead?" (and any other menu whose keys start at `0`) was ignored and kept the computed location. Laravel Prompts returns the label instead of the key for such menus; `PromptSelection::keyFor()` now maps it back in the hybrid and prompts UIs.
 - Import: an ISBN match no longer reuses (and overwrites) an existing book whose title differs. ISBNs are not unique and can be wrong on a stored book, and source files can't be edited to fix them; the mismatch is logged to the import log instead.

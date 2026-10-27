@@ -788,6 +788,7 @@ class BookController extends Controller
             'series' => $series,
             'duration' => $book['duration'] ?? null,
             'source' => $book['source'] ?? null,
+            'needsReview' => (bool) ($book['needsReview'] ?? $book['needs_review'] ?? false),
         ];
     }
 

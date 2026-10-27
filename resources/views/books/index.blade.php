@@ -542,6 +542,9 @@ $canManageBooks = $canManageBooks ?? false;
                                         @if(!empty($book['duration']) && $book['duration'] !== '00:00:00')
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;"><i class="fas fa-clock"></i> {{ $book['duration'] }}</p>
                                         @endif
+                                        @if(!empty($book['needsReview']))
+                                            <span class="badge bg-warning text-dark book-needs-review">{{ __('Needs Review') }}</span>
+                                        @endif
                                         @if($directoryMissing)
                                             <span class="badge bg-danger mt-1">{{ __('⚠️ Missing Files') }}</span>
                                         @endif
@@ -622,6 +625,9 @@ $canManageBooks = $canManageBooks ?? false;
                                         @if(!empty($book['duration']) && $book['duration'] !== '00:00:00')
                                             <p class="card-text small text-muted mb-0" style="font-size: 0.7rem;"><i class="fas fa-clock"></i> {{ $book['duration'] }}</p>
                                         @endif
+                                        @if(!empty($book['needsReview']))
+                                            <span class="badge bg-warning text-dark book-needs-review">{{ __('Needs Review') }}</span>
+                                        @endif
                                         @if($directoryMissing)
                                             <span class="badge bg-danger mt-1">⚠️</span>
                                         @endif
@@ -690,6 +696,9 @@ $canManageBooks = $canManageBooks ?? false;
                                     </td>
                                     <td>
                                         <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none">{{ $title }}</a>
+                                        @if(!empty($book['needsReview']))
+                                            <span class="badge bg-warning text-dark book-needs-review">{{ __('Needs Review') }}</span>
+                                        @endif
                                         @if($directoryMissing)
                                             <span class="badge bg-danger ms-1" title="{{ __('Directory not found') }}">{{ __('⚠️ Missing Files') }}</span>
                                         @endif
@@ -720,16 +729,18 @@ $canManageBooks = $canManageBooks ?? false;
                                     </td>
                                     <td class="text-muted small">{{ (!empty($book['duration']) && $book['duration'] !== '00:00:00') ? $book['duration'] : '' }}</td>
                                     <td>
-                                        <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary" title="{{ __('Download') }}"><i class="fas fa-download"></i></a>
-                                        @can('manage-books')
-                                            <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
-                                            <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
-                                                @csrf
-                                                @method('DELETE')
-                                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}"><i class="fas fa-trash-alt"></i></button>
-                                            </form>
-                                        @endcan
+                                        <div class="d-flex flex-nowrap gap-1">
+                                            <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary" title="{{ __('Download') }}"><i class="fas fa-download"></i></a>
+                                            @can('manage-books')
+                                                <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>
+                                                <form action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" class="d-inline" onsubmit="return confirm({{ \Illuminate\Support\Js::from(__('Are you sure you want to delete :name?', ['name' => $title])) }})">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('Delete') }}"><i class="fas fa-trash-alt"></i></button>
+                                                </form>
+                                            @endcan
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach

@@ -34,6 +34,33 @@ class BookIndexQueryStringTest extends TestCase
     }
 
     #[Test]
+    public function markedBooksShowNeedsReviewInEveryView(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        Book::factory()->create(['title' => 'Marked book', 'needs_review' => true]);
+        Book::factory()->create(['title' => 'Unmarked book', 'needs_review' => false]);
+
+        $html = $this->get(route('books.index'))->assertOk()->getContent();
+        $this->assertIsString($html);
+        $this->assertSame(3, substr_count($html, 'class="badge bg-warning text-dark book-needs-review"'));
+    }
+
+    #[Test]
+    public function listActionsShareANonWrappingContainer(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        $book = Book::factory()->create();
+
+        $html = $this->get(route('books.index'))->assertOk()->getContent();
+        $this->assertIsString($html);
+        $this->assertMatchesRegularExpression(
+            '~<div class="d-flex flex-nowrap gap-1">\s*<a href="' . preg_quote(e(route('books.download', $book->id)), '~')
+                . '"[^>]*>.*?</a>\s*<a[^>]*>.*?</a>\s*<form.*?</form>\s*</div>~s',
+            $html
+        );
+    }
+
+    #[Test]
     public function paginationLinksKeepTheSearchQuery(): void
     {
         $series = Series::factory()->create(['name' => 'Warriors']);

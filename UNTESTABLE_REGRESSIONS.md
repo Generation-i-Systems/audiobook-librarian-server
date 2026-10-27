@@ -223,6 +223,8 @@ The import command uses raw TTY operations that cannot be driven by PHPUnit.
 
 ## 6. Browser / JavaScript UI
 
+- **Book list review badge** (`resources/views/books/index.blade.php`) — rendered output is tested, but badge visibility and layout in grid, compact, and list views, and the list action buttons remaining on one line, require a real browser check.
+
 These features require a live browser with DOM and event-loop; Jest tests cover logic but not
 rendering or real user interactions.
 
