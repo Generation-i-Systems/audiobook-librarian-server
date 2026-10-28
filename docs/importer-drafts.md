@@ -213,6 +213,12 @@ from the server. All are additive.
   the audio it holds (`file_count`, `bytes`, `formats`). When a candidate has narrators and none of them reads this import,
   a `with_narrator` target (`Title (Narrator)`, as book:import names it) is listed first and becomes the default target.
   Every target candidate has `existing_depth`: how many of its leading folder names already exist.
+- **Acting on a possible copy.** `PATCH` accepts `duplicate_book_id` (one of the `duplicate_candidates`, or `null`): the
+  duplicate decision (skip/replace/create_new, or merge when the copy has no audio), `related_book_id` and the
+  `existing_book` destination are then derived for that copy, so replace and merge apply to it. Candidates also carry
+  the copy's `series`, `series_number`, `year` and `genres` so a person can borrow its details through an ordinary edit.
+  `GET /imports/drafts/{draftId}/duplicates/{bookId}/files` lists a copy's audio by name and size (at most 500).
+  A `with_year` destination (`Title (2015)`) is offered when the year is known, next to `with_narrator`.
 - **Existing series locations.** When the book has a series that already lives in the library under
   another genre or author combination (the old "Use an existing series location instead?" question),
   each location is a target candidate `series_location_N` with `book_count`, never the default.

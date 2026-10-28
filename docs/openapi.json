@@ -4066,6 +4066,11 @@
                         "maxLength": 500,
                         "description": "A destination folder typed by the person, relative to the library's book root (for example Genre/Author/Title). It becomes the `custom` target candidate and the default destination. null clears it. A folder that is absolute, has a `..` or empty segment, a backslash, a control character or surrounding spaces is rejected with 422 validation_failed, never rewritten."
                     },
+                    "duplicate_book_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Which possible copy (a `duplicate_candidates` book_id) replace, merge and skip are about. The decisions and the `existing_book` destination are then derived for that book. null goes back to the closest match. Any other book is 422 validation_failed."
+                    },
                     "local_ai_artifacts": {
                         "type": "array",
                         "items": {
@@ -4480,6 +4485,24 @@
                                         "type": "string"
                                     },
                                     "description": "File extensions of the audio files, e.g. mp3, m4b."
+                                },
+                                "series": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "series_number": {
+                                    "type": "number",
+                                    "nullable": true
+                                },
+                                "year": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "genres": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
                                 }
                             }
                         }
@@ -10619,6 +10642,79 @@
                         "BearerAuth": []
                     }
                 ]
+            }
+        },
+        "/imports/drafts/{draftId}/duplicates/{bookId}/files": {
+            "get": {
+                "operationId": "listImportDraftDuplicateFiles",
+                "summary": "The audio files of one possible copy, by name and size",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Names and sizes (relative to the copy's folder, at most 500) of the audio a possible copy holds, so it can be compared with this import. 404 when the book is not one of the draft's possible copies.",
+                "parameters": [
+                    {
+                        "name": "draftId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^imp_[A-Za-z0-9]+$"
+                        }
+                    },
+                    {
+                        "name": "bookId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The files",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "book_id": {"type": "integer"},
+                                                "directory": {"type": "string", "nullable": true},
+                                                "files": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "path": {"type": "string"},
+                                                            "bytes": {"type": "integer"}
+                                                        }
+                                                    }
+                                                },
+                                                "truncated": {"type": "boolean"}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Draft or possible copy not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportsErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/imports/drafts/{draftId}/enrichment": {

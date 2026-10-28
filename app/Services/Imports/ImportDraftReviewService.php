@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Imports;
 
 use App\Enums\ImportDraftState;
+use App\Models\Book;
 use App\Models\Imports\ImportDraft;
 use App\Models\Imports\ImportPlan;
 use App\Models\User;
@@ -54,9 +55,9 @@ class ImportDraftReviewService
         if ($expectedRevision === null) {
             throw ImportApiException::revisionRequired();
         }
-        [$patch, $customDirectory] = $this->validateBody($body);
+        [$patch, $customDirectory, $chosenDuplicate] = $this->validateBody($body);
 
-        $updated = DB::transaction(function () use ($draft, $expectedRevision, $patch, $customDirectory): ImportDraft {
+        $updated = DB::transaction(function () use ($draft, $expectedRevision, $patch, $customDirectory, $chosenDuplicate): ImportDraft {
             /** @var ImportDraft $locked */
             $locked = ImportDraft::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
             $this->draftService->assertRevision($locked->load('files'), $expectedRevision);
@@ -83,6 +84,20 @@ class ImportDraftReviewService
                 }
                 $changed[] = 'custom_directory';
             }
+            if ($chosenDuplicate['present'] && ($recommendation['chosen_duplicate_book_id'] ?? null) !== $chosenDuplicate['value']) {
+                $possible = array_column((array) ($recommendation['duplicate_candidates'] ?? []), 'book_id');
+                if ($chosenDuplicate['value'] !== null && !in_array($chosenDuplicate['value'], $possible, true)) {
+                    throw ImportApiException::validation(
+                        'That book is not one of the possible copies.',
+                        ['fields' => ['duplicate_book_id' => 'Choose one of the possible copies.']]
+                    );
+                }
+                $recommendation['chosen_duplicate_book_id'] = $chosenDuplicate['value'];
+                if ($chosenDuplicate['value'] === null) {
+                    unset($recommendation['chosen_duplicate_book_id']);
+                }
+                $changed[] = 'duplicate_book_id';
+            }
             if ($changed === []) {
                 $this->refreshTargets($locked, self::TRIGGER_REVIEW_PATCH);
 
@@ -106,6 +121,23 @@ class ImportDraftReviewService
         }
 
         return $updated;
+    }
+
+    /**
+     * The audio files of one possible copy, by name and size only, so the person can compare it with this import.
+     *
+     * @return array{book_id: int, directory: string|null, files: array<int, array{path: string, bytes: int}>, truncated: bool}
+     */
+    public function duplicateFiles(User $user, string $publicId, int $bookId): array
+    {
+        $draft = $this->draftService->findForUser($user, $publicId);
+        $possible = array_column((array) (((array) $draft->recommendation)['duplicate_candidates'] ?? []), 'book_id');
+        $book = in_array($bookId, $possible, true) ? Book::query()->find($bookId) : null;
+        if ($book === null) {
+            throw ImportApiException::notFound();
+        }
+
+        return ['book_id' => $bookId] + $this->policy->copyFiles($book);
     }
 
     /**
@@ -168,7 +200,7 @@ class ImportDraftReviewService
 
     /**
      * @param array<string, mixed> $body
-     * @return array{0: array<string, mixed>, 1: array{present: bool, value: string|null}}
+     * @return array{0: array<string, mixed>, 1: array{present: bool, value: string|null}, 2: array{present: bool, value: int|null}}
      */
     private function validateBody(array $body): array
     {
@@ -178,7 +210,7 @@ class ImportDraftReviewService
                 'This server does not accept local AI results yet.'
             );
         }
-        $unknown = array_diff(array_keys($body), ['contract_version', 'metadata', 'custom_directory']);
+        $unknown = array_diff(array_keys($body), ['contract_version', 'metadata', 'custom_directory', 'duplicate_book_id']);
         if ($unknown !== []) {
             throw ImportApiException::validation(
                 'Only book details can be edited.',
@@ -190,12 +222,21 @@ class ImportDraftReviewService
             throw ImportApiException::validation('Unsupported contract version.');
         }
 
+        $chosen = $body['duplicate_book_id'] ?? null;
+        if ($chosen !== null && !is_int($chosen)) {
+            throw ImportApiException::validation(
+                'The duplicate_book_id must be a book number or null.',
+                ['fields' => ['duplicate_book_id' => 'Use the number of one of the possible copies.']]
+            );
+        }
+
         return [
             $this->metadataValidator->validatePatch($body['metadata'] ?? []),
             [
                 'present' => array_key_exists('custom_directory', $body),
                 'value' => array_key_exists('custom_directory', $body) ? $this->metadataValidator->validateCustomDirectory($body['custom_directory']) : null,
             ],
+            ['present' => array_key_exists('duplicate_book_id', $body), 'value' => $chosen],
         ];
     }
 
@@ -229,7 +270,7 @@ class ImportDraftReviewService
         array $changed
     ): array {
         $provenance = (array) ($recommendation['field_provenance'] ?? []);
-        foreach (array_diff($changed, ['custom_directory']) as $field) {
+        foreach (array_diff($changed, ['custom_directory', 'duplicate_book_id']) as $field) {
             $entries = array_values(array_filter(
                 (array) ($provenance[$field] ?? []),
                 static fn (array $entry): bool
@@ -272,7 +313,8 @@ class ImportDraftReviewService
             $metadata,
             (array) ($recommendation['identifiers'] ?? []),
             $keptWarnings,
-            isset($recommendation['custom_directory']) ? (string) $recommendation['custom_directory'] : null
+            isset($recommendation['custom_directory']) ? (string) $recommendation['custom_directory'] : null,
+            isset($recommendation['chosen_duplicate_book_id']) ? (int) $recommendation['chosen_duplicate_book_id'] : null
         );
 
         return array_merge($recommendation, $derived);

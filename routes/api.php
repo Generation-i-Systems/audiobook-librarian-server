@@ -485,6 +485,8 @@ Route::prefix('v1')->group(function () {
             // Stateless: decides what counts as a book from a names-and-sizes listing (no persistence).
             Route::post('/discoveries', [\App\Http\Controllers\Api\ImportDiscoveryController::class, 'store'])
                 ->middleware('throttle:60,1');
+            Route::get('/drafts/{draftId}/duplicates/{bookId}/files', [ImportDraftController::class, 'duplicateFiles'])
+                ->where(['draftId' => 'imp_[A-Za-z0-9]+', 'bookId' => '[0-9]+']);
             Route::post('/drafts/{draftId}/enrichment', [ImportDraftController::class, 'enrichment'])
                 ->where('draftId', 'imp_[A-Za-z0-9]+')
                 ->middleware('throttle:10,1');

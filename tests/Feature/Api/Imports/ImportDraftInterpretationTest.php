@@ -192,6 +192,10 @@ class ImportDraftInterpretationTest extends ApiTestCase
             'file_count' => 1,
             'bytes' => 1,
             'formats' => ['mp3'],
+            'series' => null,
+            'series_number' => null,
+            'year' => $book->year,
+            'genres' => [],
         ], $recommendation['duplicate_candidates'][0]);
         $this->assertSame(
             [['recommended', false], ['renamed', true], ['existing_book', true]],
@@ -255,6 +259,24 @@ class ImportDraftInterpretationTest extends ApiTestCase
         $this->assertSame('recommended', $candidates[1]['id']);
         $target = array_values(array_filter($recommendation['required_decisions'], static fn (array $d): bool => $d['id'] === 'target'))[0];
         $this->assertSame('with_narrator', $target['default']);
+    }
+
+    public function testAYearFolderIsOfferedAsAnotherWayToMakeTheNameUnique(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $recommendation = $this->createInterpretedDraft($this->observation('Dust Road', [
+            $this->audioFile('f_01', 'Dust Road.m4b', [
+                'album' => ['Dust Road'],
+                'artist' => ['Jane Author'],
+                'genre' => ['Fantasy'],
+                'year' => ['2015'],
+            ]),
+        ]))['recommendation'];
+
+        $this->assertSame(2015, $recommendation['metadata']['year']);
+        $years = array_values(array_filter($recommendation['target_candidates'], static fn (array $c): bool => $c['id'] === 'with_year'));
+        $this->assertSame('Fantasy/Jane Author/Dust Road (2015)', $years[0]['relative_directory']);
+        $this->assertSame('recommended', $recommendation['target_candidates'][0]['id']);
     }
 
     public function testTheSameNarratorDoesNotChangeTheDefaultTarget(): void

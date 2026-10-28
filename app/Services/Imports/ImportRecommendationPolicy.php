@@ -21,6 +21,7 @@ class ImportRecommendationPolicy
     public const TARGET_RECOMMENDED = 'recommended';
     public const TARGET_RENAMED = 'renamed';
     public const TARGET_WITH_NARRATOR = 'with_narrator';
+    public const TARGET_WITH_YEAR = 'with_year';
     public const TARGET_EXISTING_BOOK = 'existing_book';
     public const TARGET_CUSTOM = 'custom';
     public const TARGET_SERIES_LOCATION_PREFIX = 'series_location_';
@@ -63,7 +64,8 @@ class ImportRecommendationPolicy
         array $metadata,
         array $identifiers,
         array $otherWarnings,
-        ?string $customDirectory = null
+        ?string $customDirectory = null,
+        ?int $chosenDuplicateBookId = null
     ): array {
         $legacy = $this->toLegacyMetadata($metadata, $identifiers);
         $hasTitle = ($legacy['title'] ?? '') !== '';
@@ -83,9 +85,11 @@ class ImportRecommendationPolicy
             );
         }
 
-        $existingBook = $hasTitle && $hasAuthor ? $this->importService->findExistingBook('', $legacy) : null;
+        $foundBook = $hasTitle && $hasAuthor ? $this->importService->findExistingBook('', $legacy) : null;
+        // The person can pick which possible copy a replace or merge is about; otherwise the closest match is used.
+        $existingBook = ($chosenDuplicateBookId !== null ? Book::query()->find($chosenDuplicateBookId) : null) ?? $foundBook;
         $existingHasAudio = $existingBook !== null && $this->existingBookHasAudio($existingBook);
-        $duplicateCandidates = $hasTitle ? $this->duplicateCandidates($legacy, $existingBook) : [];
+        $duplicateCandidates = $hasTitle ? $this->duplicateCandidates($legacy, $foundBook) : [];
         if ($existingBook !== null) {
             $warnings[] = $this->warning(
                 'duplicate_found',
@@ -233,7 +237,17 @@ class ImportRecommendationPolicy
             'file_count' => 0,
             'bytes' => 0,
             'formats' => [],
+            'series' => null,
+            'series_number' => null,
+            'year' => $book->year !== null ? (int) $book->year : null,
+            'genres' => array_values($book->genres()->pluck('name')->all()),
         ];
+        $series = $book->series()->first();
+        if ($series !== null) {
+            $facts['series'] = (string) $series->name;
+            $number = $series->pivot->series_number ?? null;
+            $facts['series_number'] = $number !== null ? (float) $number : null;
+        }
         $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root');
         $directory = is_string($bookRoot) && $bookRoot !== ''
             ? $this->importService->resolveExistingBookDirectory($book, $bookRoot)
@@ -251,6 +265,37 @@ class ImportRecommendationPolicy
         sort($facts['formats']);
 
         return $facts;
+    }
+
+    /**
+     * A library copy's audio files, relative to its folder, by name and size only.
+     *
+     * @return array{directory: string|null, files: array<int, array{path: string, bytes: int}>, truncated: bool}
+     */
+    public function copyFiles(Book $book, int $limit = 500): array
+    {
+        $result = ['directory' => $this->relativeDirectory((string) $book->directory_path), 'files' => [], 'truncated' => false];
+        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root');
+        $directory = is_string($bookRoot) && $bookRoot !== ''
+            ? $this->importService->resolveExistingBookDirectory($book, $bookRoot)
+            : null;
+        if ($directory === null) {
+            return $result;
+        }
+        $files = $this->importService->findAudioFilesInDirectory($directory);
+        sort($files);
+        foreach ($files as $file) {
+            if (count($result['files']) >= $limit) {
+                $result['truncated'] = true;
+                break;
+            }
+            $result['files'][] = [
+                'path' => ltrim(substr($file, strlen(rtrim($directory, '/'))), '/'),
+                'bytes' => (int) @filesize($file),
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -355,6 +400,15 @@ class ImportRecommendationPolicy
                 // A copy read by someone else makes the narrator the first choice, so the two folders differ.
                 $narratorDiffers ? array_unshift($candidates, $candidate) : $candidates[] = $candidate;
             }
+            $withYear = $this->yearDirectory($recommended, $legacy);
+            if ($withYear !== null) {
+                $candidates[] = $this->targetCandidate(
+                    self::TARGET_WITH_YEAR,
+                    $withYear,
+                    !$this->isTargetOccupied($withYear),
+                    $newBookActions
+                );
+            }
 
             if (!$available) {
                 $renamed = $this->relativeDirectory($this->importService->generateDirectoryPath(
@@ -450,6 +504,22 @@ class ImportRecommendationPolicy
         $base = (string) preg_replace('/\s*\([^)]+\)$/', '', $recommended);
 
         return $this->relativeDirectory($base . ' (' . $narrator . ')');
+    }
+
+    /**
+     * The usual folder with the year on the end, "Title (2015)": another way to tell two editions apart.
+     *
+     * @param array<string, mixed> $legacy
+     */
+    private function yearDirectory(string $recommended, array $legacy): ?string
+    {
+        $year = (int) ($legacy['year'] ?? 0);
+        if ($year < 1000 || $year > 9999) {
+            return null;
+        }
+        $base = (string) preg_replace('/\s*\([^)]+\)$/', '', $recommended);
+
+        return $this->relativeDirectory($base . ' (' . $year . ')');
     }
 
     /**

@@ -50,6 +50,51 @@ class ImportDraftReviewTest extends ApiTestCase
         $this->assertSame(['fields' => ['title']], $draft->events()->reorder('id', 'desc')->first()?->payload);
     }
 
+    public function testChoosingASimilarCopyMakesReplaceAndMergeApplyToIt(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $book = $this->createLibraryBook('Dust Road', 'Someone Else', 'Fantasy/Someone Else/Dust Road');
+        $this->createLibraryDirectory('Fantasy/Someone Else/Dust Road', true);
+        $draft = $this->createInterpretedDraft($this->dustRoadObservation());
+        $draftId = (string) $draft['id'];
+        $this->assertSame(['create_new', 'skip'], $draft['recommendation']['required_decisions'][0]['options']);
+
+        $chosen = $this->patchDraft($draftId, ['duplicate_book_id' => $book->id], '"3"')->assertOk();
+
+        $decision = $chosen->json('draft.recommendation.required_decisions.0');
+        $this->assertSame(['skip', 'replace', 'create_new'], $decision['options']);
+        $this->assertSame($book->id, $decision['related_book_id']);
+        $this->assertContains('existing_book', array_column($chosen->json('draft.recommendation.target_candidates'), 'id'));
+        $this->assertSame($book->id, $chosen->json('draft.recommendation.chosen_duplicate_book_id'));
+
+        $cleared = $this->patchDraft($draftId, ['duplicate_book_id' => null], '"4"')->assertOk();
+        $this->assertSame(['create_new', 'skip'], $cleared->json('draft.recommendation.required_decisions.0.options'));
+    }
+
+    public function testChoosingABookThatIsNotAPossibleCopyIsRejected(): void
+    {
+        $draftId = (string) $this->createInterpretedDraft($this->dustRoadObservation())['id'];
+
+        $this->patchDraft($draftId, ['duplicate_book_id' => 987654], '"3"')
+            ->assertStatus(422)
+            ->assertJsonPath('error.code', 'validation_failed');
+    }
+
+    public function testAPossibleCopysFilesCanBeListedToCompareWithThisImport(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $book = $this->createLibraryBook('Dust Road', 'Someone Else', 'Fantasy/Someone Else/Dust Road');
+        $this->createLibraryDirectory('Fantasy/Someone Else/Dust Road', true);
+        $draftId = (string) $this->createInterpretedDraft($this->dustRoadObservation())['id'];
+
+        $listed = $this->withDraftHeaders([])->getJson(self::DRAFTS_URL . "/$draftId/duplicates/{$book->id}/files")->assertOk();
+
+        $this->assertSame(['01.mp3'], array_column($listed->json('data.files'), 'path'));
+        $this->assertSame('Fantasy/Someone Else/Dust Road', $listed->json('data.directory'));
+        $this->assertStringNotContainsString($this->booksRoot, (string) $listed->getContent());
+        $this->withDraftHeaders([])->getJson(self::DRAFTS_URL . "/$draftId/duplicates/987654/files")->assertStatus(404);
+    }
+
     public function testPatchRederivesDuplicatesForEditedAuthor(): void
     {
         $book = $this->createLibraryBook('Dust Road', 'Other Writer', 'Fantasy/Other Writer/Dust Road');

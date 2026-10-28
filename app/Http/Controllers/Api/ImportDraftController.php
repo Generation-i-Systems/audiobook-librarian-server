@@ -90,6 +90,11 @@ class ImportDraftController extends Controller
         return $this->draftResponse($draft, 200);
     }
 
+    public function duplicateFiles(Request $request, string $draftId, int $bookId): JsonResponse
+    {
+        return response()->json(['data' => $this->reviewService->duplicateFiles($this->user($request), $draftId, $bookId)]);
+    }
+
     public function enrichment(Request $request, string $draftId): JsonResponse
     {
         $result = $this->reviewService->enrichmentComparison($this->user($request), $draftId);
