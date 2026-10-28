@@ -334,6 +334,16 @@ class ImportDraftInterpretationTest extends ApiTestCase
         $this->assertSame('USS Hamilton', $draft['source_evidence']['files'][0]['raw_tags']['album'][0]);
     }
 
+    public function testAFileWithoutTagsIsSentAsAnEmptyObjectNotAnEmptyList(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $response = $this->postDraft($this->observation('Untagged Book', [
+            $this->audioFile('f_01', 'Untagged Book.mp3', []),
+        ]))->assertCreated();
+
+        $this->assertStringContainsString('"raw_tags":{}', $response->getContent());
+    }
+
     public function testColonTitleFromFileTagsSurvivesWithoutAi(): void
     {
         config(['import_drafts.ai_enabled' => false]);

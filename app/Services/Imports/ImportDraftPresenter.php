@@ -58,7 +58,8 @@ class ImportDraftPresenter
                     'relative_path' => $file->relative_path,
                     'role' => $file->role,
                     'bytes' => (int) $file->bytes,
-                    'raw_tags' => array_map(
+                    // An object, so a file without tags is {} and not [] (clients decode a map).
+                    'raw_tags' => (object) array_map(
                         static fn ($values): array => array_map(
                             static fn ($value): string => mb_substr((string) $value, 0, 500),
                             array_slice((array) $values, 0, 4)
