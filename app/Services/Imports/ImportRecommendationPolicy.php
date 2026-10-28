@@ -20,6 +20,7 @@ class ImportRecommendationPolicy
 {
     public const TARGET_RECOMMENDED = 'recommended';
     public const TARGET_RENAMED = 'renamed';
+    public const TARGET_WITH_NARRATOR = 'with_narrator';
     public const TARGET_EXISTING_BOOK = 'existing_book';
     public const TARGET_CUSTOM = 'custom';
     public const TARGET_SERIES_LOCATION_PREFIX = 'series_location_';
@@ -95,7 +96,12 @@ class ImportRecommendationPolicy
         $duplicateOptions = $this->duplicateOptions($existingBook, $existingHasAudio, $duplicateCandidates !== []);
         $targetCandidates = [];
         if ($hasTitle && $hasAuthor) {
-            $targetCandidates = $this->targetCandidates($legacy, $existingBook, $existingHasAudio);
+            $targetCandidates = $this->targetCandidates(
+                $legacy,
+                $existingBook,
+                $existingHasAudio,
+                $this->narratorDiffers($legacy, $duplicateCandidates)
+            );
         }
         if ($customDirectory !== null) {
             array_unshift($targetCandidates, $this->targetCandidate(
@@ -186,12 +192,13 @@ class ImportRecommendationPolicy
             if ($bookId === 0 || isset($candidates[$bookId])) {
                 continue;
             }
+            $book = Book::query()->find($bookId);
             $candidates[$bookId] = [
                 'book_id' => $bookId,
                 'title' => (string) ($similar['title'] ?? ''),
                 'match_reasons' => ['similar_title'],
                 'confidence' => 0.5,
-            ];
+            ] + ($book !== null ? $this->libraryFacts($book) : []);
         }
 
         return array_values($candidates);
@@ -208,7 +215,65 @@ class ImportRecommendationPolicy
             'title' => (string) $book->title,
             'match_reasons' => $reasons,
             'confidence' => in_array('isbn', $reasons, true) ? 0.99 : 0.95,
+        ] + $this->libraryFacts($book);
+    }
+
+    /**
+     * What a person needs to tell a library copy from this import: who wrote and read it, where it lives, and
+     * how much audio of what type it holds.
+     *
+     * @return array<string, mixed>
+     */
+    private function libraryFacts(Book $book): array
+    {
+        $facts = [
+            'authors' => array_values($book->authors()->pluck('name')->all()),
+            'narrators' => array_values($book->narrators()->pluck('name')->all()),
+            'directory' => $this->relativeDirectory((string) $book->directory_path),
+            'file_count' => 0,
+            'bytes' => 0,
+            'formats' => [],
         ];
+        $bookRoot = config('filesystems.disks.books.root') ?? config('app.book_root');
+        $directory = is_string($bookRoot) && $bookRoot !== ''
+            ? $this->importService->resolveExistingBookDirectory($book, $bookRoot)
+            : null;
+        if ($directory === null) {
+            return $facts;
+        }
+        $formats = [];
+        foreach ($this->importService->findAudioFilesInDirectory($directory) as $file) {
+            $facts['file_count']++;
+            $facts['bytes'] += (int) @filesize($file);
+            $formats[strtolower(pathinfo($file, PATHINFO_EXTENSION))] = true;
+        }
+        $facts['formats'] = array_keys($formats);
+        sort($facts['formats']);
+
+        return $facts;
+    }
+
+    /**
+     * True when a possible copy names a narrator and none of them reads this import: the folder name then needs
+     * the narrator to tell the two apart, as book:import's "Add narrator to directory name" does.
+     *
+     * @param array<string, mixed> $legacy
+     * @param array<int, array<string, mixed>> $duplicateCandidates
+     */
+    private function narratorDiffers(array $legacy, array $duplicateCandidates): bool
+    {
+        $incoming = array_map('mb_strtolower', array_values(array_filter(array_map('trim', (array) ($legacy['narrator'] ?? [])))));
+        if ($incoming === []) {
+            return false;
+        }
+        foreach ($duplicateCandidates as $candidate) {
+            $theirs = array_map('mb_strtolower', (array) ($candidate['narrators'] ?? []));
+            if ($theirs !== [] && array_intersect($incoming, $theirs) === []) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -270,7 +335,7 @@ class ImportRecommendationPolicy
      * @param array<string, mixed> $legacy
      * @return array<int, array<string, mixed>>
      */
-    private function targetCandidates(array $legacy, ?Book $existingBook, bool $existingHasAudio): array
+    private function targetCandidates(array $legacy, ?Book $existingBook, bool $existingHasAudio, bool $narratorDiffers = false): array
     {
         $candidates = [];
         $generated = $this->importService->generateDirectoryPath($legacy, ['include_title' => true]);
@@ -279,6 +344,17 @@ class ImportRecommendationPolicy
         if ($recommended !== null) {
             $available = !$this->isTargetOccupied($recommended);
             $candidates[] = $this->targetCandidate(self::TARGET_RECOMMENDED, $recommended, $available, $newBookActions);
+            $withNarrator = $this->narratorDirectory($recommended, $legacy);
+            if ($withNarrator !== null) {
+                $candidate = $this->targetCandidate(
+                    self::TARGET_WITH_NARRATOR,
+                    $withNarrator,
+                    !$this->isTargetOccupied($withNarrator),
+                    $newBookActions
+                );
+                // A copy read by someone else makes the narrator the first choice, so the two folders differ.
+                $narratorDiffers ? array_unshift($candidates, $candidate) : $candidates[] = $candidate;
+            }
 
             if (!$available) {
                 $renamed = $this->relativeDirectory($this->importService->generateDirectoryPath(
@@ -361,6 +437,45 @@ class ImportRecommendationPolicy
     }
 
     /**
+     * The usual folder with the narrator on the end, "Title (Narrator)", as book:import names it.
+     *
+     * @param array<string, mixed> $legacy
+     */
+    private function narratorDirectory(string $recommended, array $legacy): ?string
+    {
+        $narrator = trim(implode(', ', array_filter(array_map('trim', (array) ($legacy['narrator'] ?? [])))));
+        if ($narrator === '') {
+            return null;
+        }
+        $base = (string) preg_replace('/\s*\([^)]+\)$/', '', $recommended);
+
+        return $this->relativeDirectory($base . ' (' . $narrator . ')');
+    }
+
+    /**
+     * How many of a folder's leading names already exist in the library, so a client can show which part of
+     * the planned path is new.
+     */
+    private function existingDepth(string $relativeDirectory): int
+    {
+        $root = config('filesystems.disks.books.root') ?? config('app.book_root');
+        if (!is_string($root) || $root === '') {
+            return 0;
+        }
+        $depth = 0;
+        $path = rtrim($root, '/');
+        foreach (explode('/', $relativeDirectory) as $segment) {
+            $path .= '/' . $segment;
+            if (!is_dir($path)) {
+                break;
+            }
+            $depth++;
+        }
+
+        return $depth;
+    }
+
+    /**
      * @param array<int, string> $duplicateActions
      * @return array<string, mixed>
      */
@@ -375,6 +490,7 @@ class ImportRecommendationPolicy
             'relative_directory' => $relativeDirectory,
             'available' => $available,
             'duplicate_actions' => $duplicateActions,
+            'existing_depth' => $this->existingDepth($relativeDirectory),
         ];
     }
 

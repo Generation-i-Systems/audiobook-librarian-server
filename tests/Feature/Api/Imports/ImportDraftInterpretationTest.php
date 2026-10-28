@@ -160,6 +160,7 @@ class ImportDraftInterpretationTest extends ApiTestCase
             'relative_directory' => 'Fantasy/Jane Author/Dust Road',
             'available' => true,
             'duplicate_actions' => ['create_new', 'skip'],
+            'existing_depth' => 0,
         ]], $recommendation['target_candidates']);
         $this->assertSame([], $recommendation['duplicate_candidates']);
         $this->assertSame([
@@ -185,6 +186,12 @@ class ImportDraftInterpretationTest extends ApiTestCase
             'title' => 'Dust Road',
             'match_reasons' => ['title_author'],
             'confidence' => 0.95,
+            'authors' => ['Jane Author'],
+            'narrators' => [],
+            'directory' => 'Fantasy/Jane Author/Dust Road',
+            'file_count' => 1,
+            'bytes' => 1,
+            'formats' => ['mp3'],
         ], $recommendation['duplicate_candidates'][0]);
         $this->assertSame(
             [['recommended', false], ['renamed', true], ['existing_book', true]],
@@ -197,6 +204,85 @@ class ImportDraftInterpretationTest extends ApiTestCase
         $this->assertSame($book->id, $decision['related_book_id']);
         $this->assertContains('duplicate_found', array_column($recommendation['warnings'], 'code'));
         $this->assertContains('target_unavailable', array_column($recommendation['warnings'], 'code'));
+    }
+
+    public function testNarratorLabelsFromTagsAreDroppedFromTheName(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $draft = $this->createInterpretedDraft($this->observation('Dust Road', [
+            $this->audioFile('f_01', 'Dust Road.m4b', [
+                'album' => ['Dust Road'],
+                'artist' => ['Jane Author'],
+                'composer' => ['Read by: P. J. Ochlan'],
+            ]),
+        ]));
+
+        $this->assertSame(['P. J. Ochlan'], $draft['recommendation']['metadata']['narrators']);
+    }
+
+    public function testANarratorWhoseNameStartsWithALabelWordKeepsIt(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $draft = $this->createInterpretedDraft($this->observation('Dust Road', [
+            $this->audioFile('f_01', 'Dust Road.m4b', [
+                'album' => ['Dust Road'],
+                'artist' => ['Jane Author'],
+                'composer' => ['Reader Smith'],
+            ]),
+        ]));
+
+        $this->assertSame(['Reader Smith'], $draft['recommendation']['metadata']['narrators']);
+    }
+
+    public function testADifferentNarratorOnASimilarBookMakesTheNarratorFolderTheDefault(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $other = $this->createLibraryBook('Dust Road', 'Someone Else', 'Fantasy/Someone Else/Dust Road');
+        $other->narrators()->attach(\App\Models\Narrator::query()->firstOrCreate(['name' => 'Bob Reader'])->id);
+
+        $recommendation = $this->createInterpretedDraft($this->observation('Dust Road', [
+            $this->audioFile('f_01', 'Dust Road.m4b', [
+                'album' => ['Dust Road'],
+                'artist' => ['Jane Author'],
+                'genre' => ['Fantasy'],
+                'composer' => ['Alice Voice'],
+            ]),
+        ]))['recommendation'];
+
+        $candidates = $recommendation['target_candidates'];
+        $this->assertSame('with_narrator', $candidates[0]['id']);
+        $this->assertSame('Fantasy/Jane Author/Dust Road (Alice Voice)', $candidates[0]['relative_directory']);
+        $this->assertSame('recommended', $candidates[1]['id']);
+        $target = array_values(array_filter($recommendation['required_decisions'], static fn (array $d): bool => $d['id'] === 'target'))[0];
+        $this->assertSame('with_narrator', $target['default']);
+    }
+
+    public function testTheSameNarratorDoesNotChangeTheDefaultTarget(): void
+    {
+        config(['import_drafts.ai_enabled' => false]);
+        $other = $this->createLibraryBook('Dust Road', 'Someone Else', 'Fantasy/Someone Else/Dust Road');
+        $other->narrators()->attach(\App\Models\Narrator::query()->firstOrCreate(['name' => 'Alice Voice'])->id);
+
+        $recommendation = $this->createInterpretedDraft($this->observation('Dust Road', [
+            $this->audioFile('f_01', 'Dust Road.m4b', [
+                'album' => ['Dust Road'],
+                'artist' => ['Jane Author'],
+                'genre' => ['Fantasy'],
+                'composer' => ['Alice Voice'],
+            ]),
+        ]))['recommendation'];
+
+        $this->assertSame('recommended', $recommendation['target_candidates'][0]['id']);
+    }
+
+    public function testEachTargetSaysHowManyOfItsLeadingFoldersAlreadyExist(): void
+    {
+        $this->createLibraryDirectory('Fantasy/Jane Author', true);
+
+        $recommendation = $this->createInterpretedDraft($this->dustRoadObservation())['recommendation'];
+
+        $this->assertSame('Fantasy/Jane Author/Dust Road', $recommendation['target_candidates'][0]['relative_directory']);
+        $this->assertSame(2, $recommendation['target_candidates'][0]['existing_depth']);
     }
 
     public function testDuplicateWithoutAudioOffersMerge(): void

@@ -84,7 +84,8 @@ the draft.
                "genres": ["Fantasy"], "tags": [], "language": null, "description": null,
                "cover_artifact_id": null},
   "field_provenance": {"title": [{"source": "file tags", "source_id": "embedded_tag", "value": "Dust Road", "confidence": 1.0}]},
-  "duplicate_candidates": [{"book_id": 42, "title": "Dust Road", "match_reasons": ["title_author"], "confidence": 0.95}],
+  "duplicate_candidates": [{"book_id": 42, "title": "Dust Road", "match_reasons": ["title_author"], "confidence": 0.95,
+    "authors": ["Jane Author"], "narrators": ["Sam Voice"], "directory": "Fantasy/Jane Author/Dust Road", "file_count": 12, "bytes": 154327680, "formats": ["mp3"]}],
   "target_candidates": [
     {"id": "recommended", "relative_directory": "Fantasy/Jane Author/Dust Road", "available": false, "duplicate_actions": ["create_new", "skip"]},
     {"id": "renamed", "relative_directory": "Fantasy/Jane Author/Dust Road_01", "available": true, "duplicate_actions": ["create_new", "skip"]},
@@ -208,6 +209,10 @@ from the server. All are additive.
   more than 500 characters is `422 validation_failed` and is never rewritten, so the folder stored in
   the approved plan is exactly the one that was typed. Its `available` flag says whether the folder
   already has files; an occupied one is not approvable (`target_unavailable`).
+- **Telling copies apart.** Each duplicate candidate carries the library copy's `authors`, `narrators`, `directory`, and
+  the audio it holds (`file_count`, `bytes`, `formats`). When a candidate has narrators and none of them reads this import,
+  a `with_narrator` target (`Title (Narrator)`, as book:import names it) is listed first and becomes the default target.
+  Every target candidate has `existing_depth`: how many of its leading folder names already exist.
 - **Existing series locations.** When the book has a series that already lives in the library under
   another genre or author combination (the old "Use an existing series location instead?" question),
   each location is a target candidate `series_location_N` with `book_count`, never the default.

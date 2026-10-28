@@ -4448,6 +4448,38 @@
                                 },
                                 "confidence": {
                                     "type": "number"
+                                },
+                                "authors": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "narrators": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "directory": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "Where the library copy lives, relative to the book root."
+                                },
+                                "file_count": {
+                                    "type": "integer",
+                                    "description": "Audio files the library copy holds on disk."
+                                },
+                                "bytes": {
+                                    "type": "integer",
+                                    "description": "Total size of those audio files."
+                                },
+                                "formats": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "description": "File extensions of the audio files, e.g. mp3, m4b."
                                 }
                             }
                         }
@@ -4462,6 +4494,10 @@
                                 },
                                 "relative_directory": {
                                     "type": "string"
+                                },
+                                "existing_depth": {
+                                    "type": "integer",
+                                    "description": "How many leading names of relative_directory already exist in the library."
                                 },
                                 "available": {
                                     "type": "boolean"

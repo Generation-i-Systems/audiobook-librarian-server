@@ -251,7 +251,10 @@ class ImportObservationInterpreter
         return [
             'title' => $this->stringOrNull($legacy['title'] ?? null),
             'authors' => $this->nameList($legacy['author'] ?? []),
-            'narrators' => $this->nameList($legacy['narrator'] ?? []),
+            'narrators' => array_values(array_filter(array_map(
+                [$this, 'withoutNarratorLabel'],
+                $this->nameList($legacy['narrator'] ?? [])
+            ))),
             'series' => $seriesName === null ? null : [
                 'name' => $seriesName,
                 'number' => $this->seriesNumber($legacy['series_number'] ?? null),
@@ -745,6 +748,12 @@ class ImportObservationInterpreter
         }
 
         return $this->stringList($value);
+    }
+
+    /** "Read by: P. J. Ochlan" and "Narrated by P. J. Ochlan" are labels on the name, not part of it. */
+    private function withoutNarratorLabel(string $name): string
+    {
+        return trim((string) preg_replace('/^\s*(?:(?:read|narrated|performed)\s+by\b\s*[:\-]?|(?:narrator|reader|read|narrated|performed)\s*[:\-])\s*/i', '', $name));
     }
 
     /**
