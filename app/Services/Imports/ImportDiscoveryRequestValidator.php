@@ -33,9 +33,6 @@ class ImportDiscoveryRequestValidator
             'selections' => 'required|array|min:1|max:' . $maxSelections,
             'selections.*' => 'required|string|max:1024',
             'entries' => 'required|array|min:1|max:' . $maxEntries,
-            'entries.*.path' => 'required|string|max:1024',
-            'entries.*.kind' => 'required|string|in:file,dir',
-            'entries.*.bytes' => 'sometimes|integer|min:0',
             'overrides' => 'sometimes|array|max:' . $maxSelections,
             'overrides.*.path' => 'required|string|max:1024',
             'overrides.*.action' => 'required|string|in:single,split',
@@ -44,8 +41,12 @@ class ImportDiscoveryRequestValidator
             'tags.*.album' => 'sometimes|nullable|string|max:500',
             'tags.*.title' => 'sometimes|nullable|string|max:500',
         ]);
-        if ($validator->fails()) {
-            throw ImportApiException::validation('The folder listing was not valid.', $validator->errors()->toArray());
+        $errors = $validator->fails() ? $validator->errors()->toArray() : [];
+        if ($errors === []) {
+            $errors = $this->entryErrors((array) $payload['entries']);
+        }
+        if ($errors !== []) {
+            throw ImportApiException::validation('The folder listing was not valid.', $errors);
         }
 
         $data = $validator->validated();
@@ -60,5 +61,34 @@ class ImportDiscoveryRequestValidator
         }
 
         return $data;
+    }
+
+    /**
+     * Checks each listed entry with plain comparisons: Laravel's wildcard rules take seconds on the tens of
+     * thousands of entries a base directory sends.
+     *
+     * @param array<int|string, mixed> $entries
+     * @return array<string, array<int, string>>
+     */
+    private function entryErrors(array $entries): array
+    {
+        $errors = [];
+        foreach ($entries as $index => $entry) {
+            $entry = is_array($entry) ? $entry : [];
+            $path = $entry['path'] ?? null;
+            if (!is_string($path) || $path === '') {
+                $errors["entries.$index.path"] = ['The path is required.'];
+            } elseif (strlen($path) > 1024) {
+                $errors["entries.$index.path"] = ['The path may not be greater than 1024 characters.'];
+            }
+            if (!in_array($entry['kind'] ?? null, ['file', 'dir'], true)) {
+                $errors["entries.$index.kind"] = ['The kind must be file or dir.'];
+            }
+            if (array_key_exists('bytes', $entry) && (!is_int($entry['bytes']) || $entry['bytes'] < 0)) {
+                $errors["entries.$index.bytes"] = ['The bytes must be a whole number of zero or more.'];
+            }
+        }
+
+        return $errors;
     }
 }
