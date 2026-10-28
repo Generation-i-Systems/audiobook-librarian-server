@@ -23,6 +23,30 @@ class BookImportServiceEditMetadataFieldsTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function editingFieldsHighlightsTheNextMenuOption(): void
+    {
+        $defaults = [];
+        $choices = ['1', '3', '8', 't', '9'];
+        $this->service->editMetadataFields(
+            ['title' => 'Title', 'author' => ['Author']],
+            [],
+            fn (string $question, string $default): string => $default,
+            function (string $question, array $options, string $default) use (&$choices, &$defaults): string {
+                $defaults[] = $default;
+                return array_shift($choices);
+            },
+            fn (array $metadata, array $keys) => null,
+            function (array &$metadata): void {
+            },
+            fn () => ['Other'],
+            function (): void {
+            },
+            fn (array $metadata) => $metadata
+        );
+        $this->assertSame(['9', '2', '4', 't', 'a'], $defaults);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function editingSeriesAfterTitleDoesNotStripManuallyEditedTitleNumber(): void
     {
         $metadata = [

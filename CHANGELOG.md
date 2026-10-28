@@ -25,6 +25,8 @@
 
 ### Fixed
 
+- Import review: advance the edit-menu selection after editing, and use Left/Right to jump to the first/last option.
+
 - Book edit: allow series numbers stored as text to remain visible and editable.
 
 - Security: update Livewire to 4.4.8 to address the authorization bypass advisory.

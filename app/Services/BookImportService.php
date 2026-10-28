@@ -6084,6 +6084,7 @@ class BookImportService
         }
 
         $titleManuallyEdited = false;
+        $nextEditSelection = '9';
         while (true) {
             $currentTitle = $metadata['title'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']) ?? '';
             $currentAuthor = $metadata['author'] ?? $getFirstNonEmptyMetadataValueCallback($metadata, ['author', 'authors', 'authorName', 'author_name']) ?? '';
@@ -6138,7 +6139,7 @@ class BookImportService
             $options['9'] = "\e[1;32mDone\e[0m";
             $options['y'] = "\e[1;32mAccept and Import\e[0m";
 
-            $choice = $selectWithImmediateInterruptCallback('Select field to edit', $options, '9');
+            $choice = $selectWithImmediateInterruptCallback('Select field to edit', $options, $nextEditSelection);
 
             if ($choice === 'y' || $choice === 'accept') {
                 // Signal to reviewAndApprove() that the user wants to finish editing and
@@ -6150,6 +6151,12 @@ class BookImportService
 
             if ($choice === '9' || $choice === 'd' || $choice === 'done' || $choice === '') {
                 break;
+            }
+
+            $optionKeys = array_map('strval', array_keys($options));
+            $choiceIndex = array_search($choice, $optionKeys, true);
+            if ($choiceIndex !== false) {
+                $nextEditSelection = $optionKeys[min($choiceIndex + 1, count($optionKeys) - 1)];
             }
 
             switch ($choice) {

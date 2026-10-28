@@ -7,10 +7,9 @@ namespace App\Services;
 use Closure;
 use Illuminate\Support\Collection;
 use Laravel\Prompts\Key;
-use Laravel\Prompts\SelectPrompt;
 use Laravel\Prompts\Themes\Default\SelectPromptRenderer;
 
-class ScrollableSelectPrompt extends SelectPrompt
+class ScrollableSelectPrompt extends ImportEditSelectPrompt
 {
     private bool $initialRenderDone = false;
 
@@ -30,12 +29,14 @@ class ScrollableSelectPrompt extends SelectPrompt
         private readonly ?Closure $onScrollUp = null,
         private readonly ?Closure $onScrollDown = null,
         private readonly ?Closure $onHighlightChange = null,
+        bool $jumpToEnds = false,
     ) {
         parent::__construct(
             label: $label,
             options: $options,
             default: $default,
             scroll: $scroll,
+            jumpToEnds: $jumpToEnds,
         );
 
         $this->lastNotifiedHighlight = $this->highlightedValue();

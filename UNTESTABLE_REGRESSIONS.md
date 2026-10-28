@@ -124,6 +124,8 @@ These features require real directory trees and file contents on disk.
 
 ## 5. Interactive Terminal UI
 
+- **Import edit-menu navigation** (`BookImportService::editMetadataFields`, `ImportUIService`, `HybridUIService`, `PromptsUIService`) — tests exercise default selection and prompt key events, but raw terminal input and screen rendering need a real TTY check in each UI mode. Verify next-field highlighting after editing and Left/Right jumps to the first/last menu entries.
+
 The import command uses raw TTY operations that cannot be driven by PHPUnit.
 
 - **`ImportUIService`** (`app/Services/ImportUIService.php`) — `readLineWithPrompt()`,

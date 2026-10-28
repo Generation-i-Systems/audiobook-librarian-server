@@ -117,11 +117,9 @@ class PromptsUIService implements ImportUIInterface
 
         $defaultKey = $default !== '' && isset($formattedOptions[$default]) ? $default : (string) array_key_first($formattedOptions);
 
-        $response = select(
-            label: $question,
-            options: $formattedOptions,
-            default: $defaultKey
-        );
+        $response = $question === 'Select field to edit'
+            ? (new ImportEditSelectPrompt(label: $question, options: $formattedOptions, default: $defaultKey))->prompt()
+            : select(label: $question, options: $formattedOptions, default: $defaultKey);
 
         return PromptSelection::keyFor($formattedOptions, $response);
     }

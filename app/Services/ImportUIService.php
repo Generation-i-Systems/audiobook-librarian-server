@@ -969,6 +969,11 @@ class ImportUIService implements ImportUIInterface
                 $action = $this->parseTerminalKeySequence($char);
                 $actionType = (string) ($action[0] ?? '');
                 if ($actionType === 'up' || $actionType === 'down' || $actionType === 'left' || $actionType === 'right') {
+                    if ($question === 'Select field to edit' && ($actionType === 'left' || $actionType === 'right')) {
+                        $selectedIndex = $actionType === 'left' ? 0 : count($keys) - 1;
+                        $numericBuffer = '';
+                        continue;
+                    }
                     $selectedIndex = self::moveGridSelection(
                         $selectedIndex,
                         $actionType,

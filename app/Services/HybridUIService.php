@@ -193,6 +193,7 @@ class HybridUIService extends ImportUIService
             default: $defaultKey,
             scroll: $scroll,
             cursorRow: $cursorY,
+            jumpToEnds: $question === 'Select field to edit',
             onScrollUp: function (): void {
                 $this->scrollLog('up');
             },

@@ -31,6 +31,8 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 ## 2. Core Features
 
+- Import metadata editing highlights the next menu option after an edit; Left and Right jump to the first and last options.
+
 - Book editing accepts series numbers as text, preserving non-numeric series labels.
 
 - The Admin navigation menu groups skins, themes, and badges for signed-in users, plus user management, database admin, and queue for administrators.
