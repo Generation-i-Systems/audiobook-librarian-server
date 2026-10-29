@@ -36,6 +36,12 @@ streaming, email delivery, etc.).
 - **Build Tools**: When running fire-and-forget tasks (builds, tests, installs), use quiet/minimal output flags
     - **Gradle**: Use `--quiet` and `--console=plain`
 
+## Script Options
+
+- **MUST** support `-n` and `--dry-run` for a no-change preview in every script.
+- **MUST** support `-h` and `--help` for usage information in every script.
+- **MUST** support `-v` and `--verbose` for more detail in every script. Repeated `-v` flags (such as `-vv`) and a numeric `--verbose` level (such as `--verbose=2`) must increase the verbosity level.
+
 ## Implementation Best Practices
 
 ### Before Coding (Project-Specific Additions)
