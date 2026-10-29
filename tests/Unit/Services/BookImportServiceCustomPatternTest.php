@@ -51,6 +51,24 @@ class BookImportServiceCustomPatternTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function generateDirectoryPathPatternKeepsAuthorForGraphicAudio(): void
+    {
+        $metadata = [
+            'title' => 'Fourth Wing',
+            'author' => ['Rebecca Yarros'],
+            'genre' => 'Romance',
+            'publisher' => 'GraphicAudio',
+        ];
+
+        $path = $this->service->generateDirectoryPath($metadata, [
+            'directory_pattern' => '[genre]/[author]/[title]',
+            'include_title' => true,
+        ]);
+
+        $this->assertSame('Romance/Rebecca Yarros/Fourth Wing (GraphicAudio)', $path);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generateDirectoryPathHandlesMissingMetadataInPattern(): void
     {
         $metadata = [

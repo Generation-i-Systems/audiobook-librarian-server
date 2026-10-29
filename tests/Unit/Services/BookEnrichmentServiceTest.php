@@ -205,6 +205,56 @@ class BookEnrichmentServiceTest extends TestCase
         $this->assertSame(['Science Fiction', 'Fantasy'], $result['genre']);
     }
 
+    private function stubAudibleWithDramatizedEditionFirst(): void
+    {
+        $audibleMock = $this->createStub(AudibleService::class);
+        $audibleMock->method('searchBooksWithFiltering')->willReturn([
+            [
+                'title' => 'A Court of Splintered Harmony [Dramatized Adaptation]',
+                'publisher' => ['name' => 'GraphicAudio'],
+                'narratorsList' => ['Full Cast', 'Colleen Delany'],
+            ],
+            [
+                'title' => 'A Court of Splintered Harmony',
+                'publisher' => ['name' => 'Recorded Books'],
+                'narratorsList' => ['Stacey Glemboski'],
+            ],
+        ]);
+        $this->app->instance(AudibleService::class, $audibleMock);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function enrichWithExternalDataPrefersStandardAudibleEditionOverDramatizedAdaptation(): void
+    {
+        $this->stubAudibleWithDramatizedEditionFirst();
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'A Court of Splintered Harmony',
+            'author' => ['Sarah J. Maas'],
+        ], ['sources' => ['audible']]);
+
+        $this->assertSame(
+            ['publisher' => ['name' => 'Recorded Books'], 'narrator' => ['Stacey Glemboski']],
+            ['publisher' => $result['publisher'], 'narrator' => $result['narrator']]
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function enrichWithExternalDataKeepsDramatizedAudibleEditionWhenTitleAsksForIt(): void
+    {
+        $this->stubAudibleWithDramatizedEditionFirst();
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'A Court of Splintered Harmony (GraphicAudio)',
+            'author' => ['Sarah J. Maas'],
+        ], ['sources' => ['audible']]);
+
+        $this->assertSame(
+            ['publisher' => ['name' => 'GraphicAudio'], 'narrator' => ['Full Cast', 'Colleen Delany']],
+            ['publisher' => $result['publisher'], 'narrator' => $result['narrator']]
+        );
+    }
+
     #[\PHPUnit\Framework\Attributes\Test]
     public function normalizeAuthorForExternalLookupUsesPrimaryAuthorFromMultiAuthorString(): void
     {
@@ -623,7 +673,7 @@ class BookEnrichmentServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function addGraphicAudioMarkerAddsMarkerForFullCastNarrator(): void
+    public function addGraphicAudioMarkerDoesNotAddMarkerForFullCastNarrator(): void
     {
         $metadata = [
             'narrator' => 'Full Cast Audio Production',
@@ -632,7 +682,7 @@ class BookEnrichmentServiceTest extends TestCase
 
         $result = $this->service->addGraphicAudioMarker('Test Book', $metadata);
 
-        $this->assertEquals('Test Book (GraphicAudio)', $result);
+        $this->assertEquals('Test Book', $result);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

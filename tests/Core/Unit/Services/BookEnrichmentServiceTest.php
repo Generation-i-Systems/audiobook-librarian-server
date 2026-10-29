@@ -522,7 +522,7 @@ class BookEnrichmentServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function addGraphicAudioMarkerAddsMarkerForFullCastNarrator(): void
+    public function addGraphicAudioMarkerDoesNotAddMarkerForFullCastNarrator(): void
     {
         $metadata = [
             'narrator' => 'Full Cast Audio Production',
@@ -531,7 +531,7 @@ class BookEnrichmentServiceTest extends TestCase
 
         $result = $this->service->addGraphicAudioMarker('Test Book', $metadata);
 
-        $this->assertEquals('Test Book (GraphicAudio)', $result);
+        $this->assertEquals('Test Book', $result);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

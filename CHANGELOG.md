@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- Import: GraphicAudio books are no longer filed under a `Graphic Audio` author folder; they stay under their real author, with the `(GraphicAudio)` series/title marker telling them apart. A "Full Cast" narrator alone no longer marks a book as GraphicAudio. Audible enrichment now checks up to 5 results and skips GraphicAudio "[Dramatized Adaptation]" editions unless the book's own title says it is one, so a standard edition no longer gets the dramatized edition's publisher, cast and cover. Existing `Graphic Audio` folders in the library are not moved.
 - Import review: advance the edit-menu selection after editing, and use Left/Right to jump to the first/last option.
 
 - Book edit: allow series numbers stored as text to remain visible and editable.

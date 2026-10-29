@@ -686,3 +686,7 @@ do 1. 2 is not possible and the import needs to handle it better because we can'
 ## 2026-10-23: series location choice ignored
 
 [screenshot: "Use an existing series location instead?" menu] making changes to this don't get applied. I selected 2 and the change didn't happen
+
+## 2026-10-28: GraphicAudio author directory
+
+[screenshot: import details for A Court of Splintered Harmony, Directory `Romance/Graphic Audio/A Court of Splintered Harmony (GraphicAudio)/...`] This book is not graphic audio. And even if it were WHY would the the directory path use GraphicAudio instead of the author???

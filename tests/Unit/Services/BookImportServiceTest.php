@@ -116,6 +116,49 @@ class BookImportServiceTest extends TestCase
         $this->assertStringContainsString('01 Willful Child', $path);
     }
 
+    public static function graphicAudioIndicatorProvider(): array
+    {
+        return [
+            'publisher' => [['publisher' => 'GraphicAudio']],
+            'narrator' => [['narrator' => ['Graphic Audio', 'Colleen Delany']]],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\DataProvider('graphicAudioIndicatorProvider')]
+    public function generateDirectoryPathKeepsAuthorDirectoryForGraphicAudio(array $indicator): void
+    {
+        $metadata = array_merge([
+            'title' => 'Fourth Wing',
+            'author' => ['Rebecca Yarros'],
+            'genre' => 'Romance',
+            'series' => 'The Empyrean',
+            'series_number' => 1,
+        ], $indicator);
+
+        $path = $this->service->generateDirectoryPath($metadata, ['include_title' => true]);
+
+        $this->assertSame('Romance/Rebecca Yarros/The Empyrean (GraphicAudio)/01 Fourth Wing (GraphicAudio)', $path);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function generateDirectoryPathDoesNotTreatFullCastAsGraphicAudio(): void
+    {
+        $metadata = [
+            'title' => 'The Sandman',
+            'author' => ['Neil Gaiman'],
+            'genre' => 'Fantasy',
+            'series' => 'The Sandman',
+            'series_number' => 1,
+            'narrator' => ['Full Cast', 'Neil Gaiman'],
+            'publisher' => 'Audible Originals',
+        ];
+
+        $path = $this->service->generateDirectoryPath($metadata, ['include_title' => true]);
+
+        $this->assertSame('Fantasy/Neil Gaiman/The Sandman/01 The Sandman', $path);
+    }
+
     #[\PHPUnit\Framework\Attributes\Test]
     public function reviewAndApproveAllowsAcceptAfterGenreFix(): void
     {

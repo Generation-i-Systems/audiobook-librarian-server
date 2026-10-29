@@ -1293,15 +1293,9 @@ class BookImportService
 
         $existingAuthorDir = $this->findExistingAuthorDirectory($authors, $cleanedSeries);
 
-        if ($existingAuthorDir) {
-            $authorDir = $existingAuthorDir;
-        } else {
-            // Check for Graphic Audio in narrator field
-            $authorDir = $this->formatAuthorsForDirectory($authors);
-            if ($this->isGraphicAudio($metadata)) {
-                $authorDir = 'Graphic Audio';
-            }
-        }
+        // GraphicAudio editions stay under their author; the "(GraphicAudio)" series/title
+        // marker is what distinguishes them from the standard edition.
+        $authorDir = $existingAuthorDir ?: $this->formatAuthorsForDirectory($authors);
 
         $path = match ($structure) {
             'author/series' => $this->buildAuthorSeriesPath($authorDir, $metadata),
@@ -1345,9 +1339,6 @@ class BookImportService
         // Extract basic metadata values
         $authors = is_array($metadata['author'] ?? []) ? $metadata['author'] : (array) ($metadata['author'] ?? []);
         $author = $this->formatAuthorsForDirectory($authors);
-        if ($this->isGraphicAudio($metadata)) {
-            $author = 'Graphic Audio';
-        }
 
         $genreData = $metadata['genre'] ?? 'Unknown';
         $genre = is_array($genreData) ? ($genreData[0] ?? 'Unknown') : $genreData;
@@ -2361,42 +2352,6 @@ class BookImportService
         if ($this->isDirectoryEmpty($path)) {
             File::deleteDirectory($path);
         }
-    }
-
-    /**
-     * Check if this is a Graphic Audio audiobook
-     */
-    protected function isGraphicAudio(array $metadata): bool
-    {
-        // Check narrator field
-        if (!empty($metadata['narrator'])) {
-            $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
-            foreach ($narrators as $narrator) {
-                if (
-                    is_string($narrator) &&
-                    (stripos($narrator, 'Graphic Audio') !== false ||
-                        stripos($narrator, 'GraphicAudio') !== false)
-                ) {
-                    return true;
-                }
-            }
-        }
-
-        // Also check publisher field as fallback
-        if (!empty($metadata['publisher'])) {
-            $publishers = is_array($metadata['publisher']) ? $metadata['publisher'] : [$metadata['publisher']];
-            foreach ($publishers as $publisher) {
-                if (
-                    is_string($publisher) &&
-                    (stripos($publisher, 'Graphic Audio') !== false ||
-                        stripos($publisher, 'GraphicAudio') !== false)
-                ) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -8076,21 +8031,6 @@ class BookImportService
         // Check original title
         if (is_string($originalTitle) && preg_match('/\(Graphic\s*Audio\)/i', $originalTitle)) {
             $isGraphicAudio = true;
-        }
-
-        // Check if narrator contains typical GraphicAudio cast indicators
-        $graphicAudioNarratorPatterns = [
-            '/full\s*cast/i',
-            '/ensemble\s*cast/i',
-            '/multi\s*cast/i',
-            '/cast\s*of\s*voices/i',
-        ];
-
-        foreach ($graphicAudioNarratorPatterns as $pattern) {
-            if (preg_match($pattern, $narratorString)) {
-                $isGraphicAudio = true;
-                break;
-            }
         }
 
         // Add GraphicAudio marker if detected

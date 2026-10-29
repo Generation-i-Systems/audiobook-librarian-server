@@ -587,7 +587,7 @@ class BookEnrichmentService
             $results = [];
             foreach ($this->buildAudibleSearchQueryVariants($title, $author) as $queryVariant) {
                 $results = $this->audibleService->searchBooksWithFiltering($queryVariant, $author, [
-                    'limit' => 1,
+                    'limit' => 5,
                 ]);
                 if (!empty($results)) {
                     break;
@@ -595,7 +595,23 @@ class BookEnrichmentService
             }
 
             if (!empty($results) && isset($results[0])) {
+                // Audible often ranks a GraphicAudio "[Dramatized Adaptation]" first; taking its
+                // publisher/narrators/cover for a standard edition mislabels the whole import.
+                // Prefer the standard edition unless the book itself is the dramatized one.
                 $bookData = $results[0];
+                $dramatizedPattern = '/dramati[sz]ed|graphic\s*audio/i';
+                if (!preg_match($dramatizedPattern, $title)) {
+                    foreach ($results as $candidate) {
+                        $candidatePublisher = $candidate['publisher']['name'] ?? $candidate['publisher'] ?? '';
+                        if (
+                            !preg_match($dramatizedPattern, (string) ($candidate['title'] ?? ''))
+                            && !(is_string($candidatePublisher) && preg_match($dramatizedPattern, $candidatePublisher))
+                        ) {
+                            $bookData = $candidate;
+                            break;
+                        }
+                    }
+                }
 
                 $enrichedData = [];
 
@@ -927,10 +943,7 @@ class BookEnrichmentService
     {
         $sourcePath = $metadata['source_path'] ?? '';
 
-        if (
-            stripos($sourcePath, 'graphicaudio') !== false ||
-            (isset($metadata['narrator']) && stripos($metadata['narrator'], 'full cast') !== false)
-        ) {
+        if (stripos($sourcePath, 'graphicaudio') !== false) {
             if (stripos($title, 'GraphicAudio') === false) {
                 return $title . ' (GraphicAudio)';
             }
