@@ -20,6 +20,8 @@ class DatabaseBackupScheduleTest extends TestCase
             $events = app(Schedule::class)->events();
             $backupEvents = array_filter($events, static fn ($event): bool => str_contains($event->command, 'backup:database'));
             $this->assertCount(2, $backupEvents);
+            $dailyEvents = array_filter($backupEvents, static fn ($event): bool => $event->expression === '0 2 * * *');
+            $this->assertCount(1, $dailyEvents);
         } finally {
             config(['database.default' => $previous]);
             app()->forgetInstance(Schedule::class);

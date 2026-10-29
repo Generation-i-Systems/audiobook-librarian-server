@@ -690,3 +690,11 @@ do 1. 2 is not possible and the import needs to handle it better because we can'
 ## 2026-10-28: GraphicAudio author directory
 
 [screenshot: import details for A Court of Splintered Harmony, Directory `Romance/Graphic Audio/A Court of Splintered Harmony (GraphicAudio)/...`] This book is not graphic audio. And even if it were WHY would the the directory path use GraphicAudio instead of the author???
+
+## 2026-10-29: database backup retention
+
+create a script to clear old db backups keeping one per month, one per week for the last month, one per day for the last day
+
+The default should NOT be dry run. Add to AGENTS.md that all scripts should support -n and --dry-run; -h and --help; -v and --verbose, including numeric verbosity or repeated -v flags.
+
+The completed `import-books` and `pre-*` database backups should be covered by retention too. Make the cleanup run daily.

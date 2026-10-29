@@ -439,6 +439,11 @@ feature tests without running a real queue worker.
   isolated SQLite snapshot test and container smoke checks exercise SQLite, MySQL, and PostgreSQL
   backup creation. They cannot prove that a populated production database can be restored from
   the resulting file or that a host's custom backup directory has the right permissions.
+- **Database backup retention** (`DatabaseBackupPruner`, `scripts/prune-db-backups.php`) — tests
+  exercise temporary files, named backup selection, and retention boundaries, but cannot prove that every real backup is
+  restorable, that the configured production directory is the intended mount, or that files are
+  not changed by another process between planning and deletion. Preview the live plan and verify
+  a retained backup on the target host before applying manual cleanup.
 - **Nullable book-status key migration** (`database/migrations/2026_01_30_223000_support_non_library_books_and_enhanced_messages.php`)
   — fresh disposable PostgreSQL/MySQL installs verify the unique user/book constraint, but do
   not exercise an existing populated installation. Back up and review that schema before applying

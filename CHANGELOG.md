@@ -2,6 +2,8 @@
 
 ### Added
 
+- Database backups: added `scripts/prune-db-backups.php`, which prunes by default and supports `-n`/`--dry-run`, help, and increasing verbosity. Completed backups, including named operation snapshots, now keep one recent daily copy, one per week for the preceding month, and one per older month; incomplete partial files remain untouched.
+
 - Navigation: group skins, themes, badges, user management, database admin, and the admin queue under an Admin menu.
 
 - Book list: show a Needs Review badge on flagged books in grid, compact, and list views.

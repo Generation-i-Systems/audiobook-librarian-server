@@ -138,7 +138,7 @@ Required scheduled maintenance:
 
 | Command | Default cadence | Purpose |
 | --- | --- | --- |
-| `backup:database --verify` | Daily 02:00 and Sunday 03:00 for SQLite, MySQL/MariaDB, PostgreSQL | Creates verified database backups. Configure `DATABASE_BACKUP_PATH` and confirm backup storage permissions. Use a native backup scheduler for another SQL driver. |
+| `backup:database --verify` | Daily 02:00 and Sunday 03:00 for SQLite, MySQL/MariaDB, PostgreSQL | Creates verified database backups, then prunes completed backups using daily, weekly, and monthly retention. Configure `DATABASE_BACKUP_PATH` and confirm backup storage permissions. Use a native backup scheduler for another SQL driver. |
 | `accounts:purge-scheduled-deletions` | Daily | Permanently erases accounts whose cancellation window has expired. This is required for account deletion compliance. |
 | `sessions:close-orphaned` | Daily 03:30 | Closes listening sessions that were started by a client but never ended, preventing stale session state. |
 | `logs:compress`, `log:rotate`, `log:clear --keep-last=14` | Daily | Compresses, rotates, and prunes application logs. |

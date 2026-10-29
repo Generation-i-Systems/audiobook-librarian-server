@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Services\DatabaseBackupWriter;
+use App\Services\DatabaseBackupPruner;
+use DateTimeImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -132,7 +134,7 @@ class BackupDatabase extends Command
                 'connection' => $connection->getName(),
                 'driver' => $driver,
             ]);
-            $this->cleanupOldBackups($backupDir);
+            $this->cleanupOldBackups($backupDir, (string) $identifier);
             return self::SUCCESS;
         } catch (\Throwable $exception) {
             @unlink($dumpFile);
@@ -174,27 +176,24 @@ class BackupDatabase extends Command
     }
 
     /**
-     * Clean up backups older than 30 days
+     * Prune completed scheduled backups using daily, weekly, and monthly retention.
      */
-    private function cleanupOldBackups(string $backupDir): void
+    private function cleanupOldBackups(string $backupDir, string $identifier): void
     {
-        $this->line("Cleaning up old backups...");
-
-        $files = array_merge(glob($backupDir . '/backup_*.sql.gz') ?: [], glob($backupDir . '/backup_*.sqlite') ?: []);
-        $thirtyDaysAgo = now()->subDays(30)->timestamp;
+        $plan = (new DatabaseBackupPruner())->plan($backupDir, $identifier, new DateTimeImmutable('now'));
         $deletedCount = 0;
 
-        foreach ($files as $file) {
-            if (filemtime($file) < $thirtyDaysAgo) {
-                unlink($file);
+        foreach ($plan['delete'] as $file) {
+            if (is_file($file) && !is_link($file) && unlink($file)) {
                 $deletedCount++;
+                Log::info('Old database backup deleted', ['file' => basename($file)]);
+            } else {
+                $this->warn('Could not delete old backup: ' . basename($file));
             }
         }
 
         if ($deletedCount > 0) {
-            $this->info("✓ Deleted {$deletedCount} old backup(s)");
-        } else {
-            $this->line("No old backups to delete");
+            $this->info("Deleted {$deletedCount} old backup(s)");
         }
     }
 
