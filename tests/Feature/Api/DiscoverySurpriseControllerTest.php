@@ -89,4 +89,31 @@ class DiscoverySurpriseControllerTest extends TestCase
         $response->assertOk();
         $this->assertSame($unreadBook->id, $response->json('data.id'));
     }
+
+    public function testNeverPicksABookWhoseDirectoryIsMissing(): void
+    {
+        Book::factory()->count(5)->create(['directory_exists' => false]);
+
+        $response = $this->getJson('/api/v1/discovery/surprise');
+
+        $response->assertOk()->assertJson(['data' => null]);
+    }
+
+    public function testMissingBookDoesNotHideTheFirstAvailableBookInASeries(): void
+    {
+        $series = Series::factory()->create();
+        $missingBook1 = Book::factory()->create(['directory_exists' => false]);
+        $series->books()->attach($missingBook1->id, ['series_number' => '1']);
+
+        $availableBook2 = Book::factory()->create();
+        $series->books()->attach($availableBook2->id, ['series_number' => '2']);
+
+        $availableBook3 = Book::factory()->create();
+        $series->books()->attach($availableBook3->id, ['series_number' => '3']);
+
+        $response = $this->getJson('/api/v1/discovery/surprise');
+
+        $response->assertOk();
+        $this->assertSame($availableBook2->id, $response->json('data.id'));
+    }
 }

@@ -183,7 +183,7 @@ class DiscoveryController extends Controller
             $book = $this->pickFirstInSeriesCandidate($excluded, $favoredGenreIds, $userId);
         }
         $book ??= $this->pickFirstInSeriesCandidate($excluded, null, $userId);
-        $fallback = Book::query()->whereNotIn('id', $excluded ?: [0]);
+        $fallback = Book::query()->withExistingDirectories()->whereNotIn('id', $excluded ?: [0]);
         $this->blockFilter->applyToBookQuery($fallback, $userId);
         $book ??= $fallback->inRandomOrder()->first();
 
@@ -202,6 +202,7 @@ class DiscoveryController extends Controller
     {
         for ($attempt = 0; $attempt < self::SURPRISE_MAX_ATTEMPTS; $attempt++) {
             $candidatesQuery = Book::query()
+                ->withExistingDirectories()
                 ->whereNotIn('id', $excludedBookIds ?: [0])
                 ->when($genreIds !== null, fn (Builder $q) => $q->whereHas('genres', fn ($g) => $g->whereIn('genres.id', $genreIds)))
                 ->with('series');
@@ -244,7 +245,7 @@ class DiscoveryController extends Controller
 
     private function minSeriesNumber(Series $series): int
     {
-        return $series->books()->get()
+        return $series->books()->withExistingDirectories()->get()
             ->map(fn (Book $b) => (int) ($b->pivot->series_number ?? PHP_INT_MAX))
             ->min() ?? PHP_INT_MAX;
     }
