@@ -351,12 +351,10 @@ class BookApiController extends Controller
                 $validIds = \App\Models\Author::query()
                     ->whereHas('books', fn ($b) => $b->whereIn('books.id', $matchingBookIds))
                     ->pluck('id')->all();
-            } elseif ($type === 'series') {
+            } else {
                 $validIds = \App\Models\Series::query()
                     ->whereHas('books', fn ($b) => $b->whereIn('books.id', $matchingBookIds))
                     ->pluck('id')->all();
-            } else {
-                $validIds = [];
             }
 
             $items = array_filter($items, fn ($item) => in_array($item['id'] ?? null, $validIds));

@@ -73,7 +73,7 @@ class BadgeController extends Controller
             }
 
             $progress = 0;
-            if (!$hasEarned && $userStats !== null) {
+            if (!$hasEarned) {
                 $progressInfo = collect($userStats)->firstWhere('badge.id', $badge->id);
                 $progress = $progressInfo['progress'] ?? 0;
             }

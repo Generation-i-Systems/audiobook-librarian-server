@@ -125,6 +125,35 @@ class TagFilteringListSearchTest extends ApiTestCase
         $this->assertNotContains($series2->id, $seriesBanIds);
     }
 
+    public function testBrowseSeriesSupportsRequireAndBanTagFilters(): void
+    {
+        $magicSeries = Series::factory()->create(['name' => 'Fantasy Saga']);
+        $scarySeries = Series::factory()->create(['name' => 'Horror Chronicles']);
+
+        foreach ([[$magicSeries, 'magic'], [$scarySeries, 'scary']] as [$series, $tag]) {
+            $book = Book::factory()->create(['directory_exists' => true, 'needs_review' => false]);
+            $series->books()->attach($book->id);
+            BookTag::create([
+                'user_id' => $this->user->id,
+                'book_id' => $book->id,
+                'scope' => 'user',
+                'owner_key' => 'user:' . $this->user->id,
+                'tags' => [$tag],
+            ]);
+        }
+
+        $cases = ['magic' => $magicSeries->id, '-scary' => $magicSeries->id, 'scary' => $scarySeries->id];
+        foreach ($cases as $tagSpec => $expectedId) {
+            $response = $this->getJson('/api/v1/books/browse?type=series&tag=' . urlencode($tagSpec));
+            $response->assertStatus(200);
+            $this->assertEquals(
+                [$expectedId],
+                array_map('intval', array_column($response->json('data'), 'id')),
+                "tag={$tagSpec}"
+            );
+        }
+    }
+
     public function test_series_list_supports_repeated_tags_array_parameters(): void
     {
         $this->withoutExceptionHandling();

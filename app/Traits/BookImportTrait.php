@@ -269,7 +269,8 @@ trait BookImportTrait
      * @param  string  $directoryPath  The directory path to process
      * @return array{
      *      genre: array, author: array, series?: array, title: string, directoryPath: string, skipped?: bool,
-     *      error?: string
+     *      error?: string, authors?: array, seriesData?: array, series_number?: string|null,
+     *      seriesNumber?: string|null, edition?: string|null
      * }
      *
      * @throws InvalidArgumentException If the directory path is invalid

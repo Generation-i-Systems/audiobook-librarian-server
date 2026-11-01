@@ -27,6 +27,7 @@
 
 ### Fixed
 
+- Dependencies: npm `overrides` pin `glob` 14.0.3 and `minimatch` 11.0.3 (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249; Jest's coverage tooling only), so `npm audit --audit-level=moderate` passes again. `deepmerge` (GHSA-gcqx-w48m-w2h4, low, no patched release) remains via Jest. PHPStan 2.3 issues fixed without suppression: `processDirPath()` documents every key it returns, and two always-true checks in the badges and browse endpoints are gone (no behaviour change; new test covers browsing series by tag).
 - Import: GraphicAudio books are no longer filed under a `Graphic Audio` author folder; they stay under their real author, with the `(GraphicAudio)` series/title marker telling them apart. A "Full Cast" narrator alone no longer marks a book as GraphicAudio. Audible enrichment now checks up to 5 results and skips GraphicAudio "[Dramatized Adaptation]" editions unless the book's own title says it is one, so a standard edition no longer gets the dramatized edition's publisher, cast and cover. Existing `Graphic Audio` folders in the library are not moved.
 - Import review: advance the edit-menu selection after editing, and use Left/Right to jump to the first/last option.
 
