@@ -32,7 +32,9 @@
     },
     "overrides": {
         "brace-expansion": "5.0.12",
+        "glob": "14.0.3",
         "js-yaml": "4.3.2",
+        "minimatch": "11.0.3",
         "postcss": "8.5.23",
         "shell-quote": "1.12.0"
     }
