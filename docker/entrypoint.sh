@@ -13,8 +13,9 @@ if [ -z "${APP_KEY:-}" ]; then
     mkdir -p "$(dirname "$key_file")"
     if [ ! -s "$key_file" ]; then
         echo "[entrypoint] APP_KEY not set, generating one in persistent storage..."
-        umask 077
-        php artisan key:generate --show > "$key_file"
+        # In a subshell: a umask left in place here made config:cache below write
+        # root-only cache files that php-fpm (www-data) cannot read.
+        (umask 077 && php artisan key:generate --show > "$key_file")
     fi
     APP_KEY=$(cat "$key_file")
     export APP_KEY
@@ -58,9 +59,6 @@ elif [ "${DB_CONNECTION:-sqlite}" = "pgsql" ]; then
     done
 fi
 
-# Fix ownership in case a bind-mounted volume reset it.
-chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
-
 # ---------------------------------------------------------------------------
 # Non-destructive schema migration only. This never drops/truncates data —
 # see CLAUDE.md database safety rules. Fresh installs get their schema
@@ -80,5 +78,10 @@ if [ "${APP_ENV:-production}" = "production" ]; then
 else
     php artisan config:clear
 fi
+
+# Fix ownership in case a bind-mounted volume reset it. Last, because the artisan
+# commands above run as root and create files there (laravel.log, the config and
+# route caches) that php-fpm, running as www-data, must be able to write and read.
+chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
 
 exec "$@"
