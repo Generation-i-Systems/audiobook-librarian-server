@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Transcription\AudioClipExtractor;
 use App\Services\Transcription\WhisperTranscriptionService;
 use App\Support\CommunityStatus;
+use App\Support\LocalTransfer;
 use App\Support\MailConfiguration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -171,7 +172,8 @@ class ApiHealthController extends Controller
      * community rules and so is only advertised while community features are available.
      * TRANSCRIPTION means the Whisper sidecar answers its health check (cached briefly), so
      * POST /transcriptions works; TRANSCRIPTION_SERVER_FILES adds ffmpeg, so book files on
-     * this server can be transcribed by range.
+     * this server can be transcribed by range. LOCAL_TRANSFER means GET /local-transfer names a
+     * LAN listener (see docs/LOCAL_TRANSFER.md).
      *
      * @return list<string>
      */
@@ -193,6 +195,10 @@ class ApiHealthController extends Controller
 
         if (CommunityStatus::mode() === CommunityStatus::MODE_FULL) {
             $tokens[] = 'DIRECT_MESSAGING';
+        }
+
+        if (LocalTransfer::isAvailable()) {
+            $tokens[] = 'LOCAL_TRANSFER';
         }
 
         if ($this->whisper->isHealthy()) {

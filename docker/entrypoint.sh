@@ -60,6 +60,24 @@ elif [ "${DB_CONNECTION:-sqlite}" = "pgsql" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# LAN listener certificate (docs/LOCAL_TRANSFER.md): self-signed and long-lived,
+# kept on the storage volume so the key the apps pin survives rebuilds. The apps
+# learn its key over APP_URL, so no name or CA is needed.
+# ---------------------------------------------------------------------------
+tls_dir="/var/www/html/storage/app/local-tls"
+if [ ! -s "$tls_dir/cert.pem" ] || [ ! -s "$tls_dir/key.pem" ]; then
+    echo "[entrypoint] Generating the LAN listener certificate in $tls_dir"
+    mkdir -p "$tls_dir"
+    (
+        umask 077
+        openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+            -keyout "$tls_dir/key.pem" -out "$tls_dir/cert.pem" -days 3650 \
+            -subj "/CN=Audiobook Librarian local transfer" 2>/dev/null
+    )
+    chmod 644 "$tls_dir/cert.pem"
+fi
+
+# ---------------------------------------------------------------------------
 # Non-destructive schema migration only. This never drops/truncates data —
 # see CLAUDE.md database safety rules. Fresh installs get their schema
 # created; existing installs get new migrations applied.
