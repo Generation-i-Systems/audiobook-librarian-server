@@ -8602,6 +8602,47 @@
                 }
             }
         },
+        "/local-transfer": {
+            "get": {
+                "tags": ["Health"],
+                "summary": "Direct LAN route for book file downloads",
+                "description": "The https addresses of this server's LAN listener and the SHA-256 (base64) of its certificate's SubjectPublicKeyInfo. Clients on the same network download book files (GET /books/{book}/download/{file} and its /chunks) from the first address that answers, trusting only a certificate with that key, and fall back to the public URL. The listener serves only those routes and GET /health/ping. Signed-in users only; the capability token LOCAL_TRANSFER says this returns a route. See docs/LOCAL_TRANSFER.md.",
+                "operationId": "localTransferRoute",
+                "security": [{"BearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "The route, or null when the server has no usable LAN listener",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["localTransfer"],
+                                    "properties": {
+                                        "localTransfer": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "required": ["urls", "spkiSha256"],
+                                            "properties": {
+                                                "urls": {
+                                                    "type": "array",
+                                                    "items": {"type": "string", "format": "uri"},
+                                                    "example": ["https://192.168.1.20:8443"]
+                                                },
+                                                "spkiSha256": {
+                                                    "type": "string",
+                                                    "example": "1iMLGFhHVeYreZqZcQHesAL+J6y6IzEK+t8K7YxXtL8="
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Not signed in"}
+                }
+            }
+        },
         "/health/capabilities": {
             "get": {
                 "tags": [
@@ -8633,7 +8674,7 @@
                                         },
                                         "capabilities": {
                                             "type": "array",
-                                            "description": "Feature tokens. MESSAGING: GET /messages/history, POST /messages/{id}/acknowledge and the messages summary in /sync/events are served. DIRECT_MESSAGING: users can also send messages to each other with POST /messages recipient_id (only while community features are available). A server without these tokens does not support the message history API, so clients should not poll it. TRANSCRIPTION: POST /transcriptions works (the Whisper sidecar answered its health check, cached for TRANSCRIPTION_HEALTH_CACHE_SECONDS). TRANSCRIPTION_SERVER_FILES: POST /books/{book}/files/{file}/transcriptions also works (Whisper healthy and ffmpeg/ffprobe available). Each is present only while its condition holds.",
+                                            "description": "Feature tokens. LOCAL_TRANSFER: GET /local-transfer returns a LAN route for book file downloads. MESSAGING: GET /messages/history, POST /messages/{id}/acknowledge and the messages summary in /sync/events are served. DIRECT_MESSAGING: users can also send messages to each other with POST /messages recipient_id (only while community features are available). A server without these tokens does not support the message history API, so clients should not poll it. TRANSCRIPTION: POST /transcriptions works (the Whisper sidecar answered its health check, cached for TRANSCRIPTION_HEALTH_CACHE_SECONDS). TRANSCRIPTION_SERVER_FILES: POST /books/{book}/files/{file}/transcriptions also works (Whisper healthy and ffmpeg/ffprobe available). Each is present only while its condition holds.",
                                             "items": {
                                                 "type": "string"
                                             },

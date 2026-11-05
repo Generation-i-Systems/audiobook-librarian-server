@@ -54,6 +54,7 @@ use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\TranscriptionController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\UserStatusController;
+use App\Http\Controllers\Api\LocalTransferController;
 use App\Http\Controllers\Api\FeedbackController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -96,6 +97,7 @@ Route::prefix('v1')->group(function () {
         ->name('api.v1.themes.download');
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
+        Route::get('/local-transfer', [LocalTransferController::class, 'show'])->name('api.local-transfer');
         Route::get('/user', [UserApiController::class, 'show']);
         Route::put('/user', [UserApiController::class, 'update']);
 

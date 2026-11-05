@@ -482,6 +482,15 @@ about whether the image actually builds, boots, serves traffic, or persists data
   tested, but a broken selector or payload key fails silently (the page still works, it just stops remembering).
   The `users.book_list_preferences` migration must also be applied on live before saves succeed.
 
+- **LAN download listener** (`docker/nginx/local-transfer.conf`, the certificate step in
+  `docker/entrypoint.sh`, `LOCAL_URL`/`LOCAL_PORT`, `App\Support\LocalTransfer`, `GET /local-transfer`) —
+  PHPUnit covers the route answer and the key pin against a fixture certificate. Not provable there: that the
+  image's openssl writes a certificate nginx accepts on every start (nginx refuses to start without it, taking
+  port 80 down too), that the storage volume keeps it across rebuilds (a new key makes every app refuse the
+  listener until it refreshes), that the listener refuses everything but downloads and the ping, that Range and
+  large files stream through it, and that a phone on the LAN reaches the published port (host firewalls, Docker
+  Desktop). Check with the `curl --pinnedpubkey` commands in `docs/LOCAL_TRANSFER.md` after deploying.
+
 - **`transcription` compose profile** (`docker-compose.yml` `whisper` service, `ffmpeg` in the `Dockerfile`) —
   `docker compose config` validates the file, but nothing here pulls the `speaches` image, checks that the model
   cache volume path (`/home/ubuntu/.cache/huggingface/hub`) matches the image, that the app container reaches

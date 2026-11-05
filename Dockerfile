@@ -45,6 +45,7 @@ RUN apk add --no-cache \
         supervisor \
         bash \
         curl \
+        openssl \
         ffmpeg \
         sqlite \
         libpng-dev \
@@ -86,6 +87,7 @@ COPY --from=frontend /app/public/build ./public/build
 # Runtime configuration
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/99-app.ini
 COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+COPY docker/nginx/local-transfer.conf /etc/nginx/http.d/local-transfer.conf
 COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
@@ -94,7 +96,7 @@ RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cac
     && chown -R ${WWW_USER}:${WWW_GROUP} storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-EXPOSE 80
+EXPOSE 80 8443
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -f http://127.0.0.1/up || exit 1

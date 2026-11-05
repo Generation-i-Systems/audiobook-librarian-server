@@ -1,5 +1,11 @@
 # OpenAPI Documentation Changelog
 
+## 2026-11-01
+
+### Added
+
+- Documented `GET /local-transfer` (`localTransferRoute`) and the `LOCAL_TRANSFER` capability token.
+
 ## 2026-09-29
 
 ### Added

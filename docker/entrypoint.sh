@@ -13,8 +13,9 @@ if [ -z "${APP_KEY:-}" ]; then
     mkdir -p "$(dirname "$key_file")"
     if [ ! -s "$key_file" ]; then
         echo "[entrypoint] APP_KEY not set, generating one in persistent storage..."
-        umask 077
-        php artisan key:generate --show > "$key_file"
+        # In a subshell: a umask left in place here made config:cache below write
+        # root-only cache files that php-fpm (www-data) cannot read.
+        (umask 077 && php artisan key:generate --show > "$key_file")
     fi
     APP_KEY=$(cat "$key_file")
     export APP_KEY
@@ -58,8 +59,23 @@ elif [ "${DB_CONNECTION:-sqlite}" = "pgsql" ]; then
     done
 fi
 
-# Fix ownership in case a bind-mounted volume reset it.
-chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
+# ---------------------------------------------------------------------------
+# LAN listener certificate (docs/LOCAL_TRANSFER.md): self-signed and long-lived,
+# kept on the storage volume so the key the apps pin survives rebuilds. The apps
+# learn its key over APP_URL, so no name or CA is needed.
+# ---------------------------------------------------------------------------
+tls_dir="/var/www/html/storage/app/local-tls"
+if [ ! -s "$tls_dir/cert.pem" ] || [ ! -s "$tls_dir/key.pem" ]; then
+    echo "[entrypoint] Generating the LAN listener certificate in $tls_dir"
+    mkdir -p "$tls_dir"
+    (
+        umask 077
+        openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+            -keyout "$tls_dir/key.pem" -out "$tls_dir/cert.pem" -days 3650 \
+            -subj "/CN=Audiobook Librarian local transfer" 2>/dev/null
+    )
+    chmod 644 "$tls_dir/cert.pem"
+fi
 
 # ---------------------------------------------------------------------------
 # Non-destructive schema migration only. This never drops/truncates data —
@@ -80,5 +96,10 @@ if [ "${APP_ENV:-production}" = "production" ]; then
 else
     php artisan config:clear
 fi
+
+# Fix ownership in case a bind-mounted volume reset it. Last, because the artisan
+# commands above run as root and create files there (laravel.log, the config and
+# route caches) that php-fpm, running as www-data, must be able to write and read.
+chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
 
 exec "$@"

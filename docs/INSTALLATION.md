@@ -28,6 +28,9 @@ Caddy obtains and renews the certificate and forwards traffic to the private app
 container. Ports 80 and 443 must reach the host. Do not expose the internal HTTP application port
 to mobile clients.
 
+If phones download books on the same network as the server, set `LOCAL_URL` so they can download
+straight from it instead of through `APP_URL`; see [direct downloads](LOCAL_TRANSFER.md).
+
 ## Portable storage configuration
 
 By default, books and backups are stored below Laravel's `storage/app` directory. To use an
