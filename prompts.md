@@ -698,3 +698,7 @@ create a script to clear old db backups keeping one per month, one per week for 
 The default should NOT be dry run. Add to AGENTS.md that all scripts should support -n and --dry-run; -h and --help; -v and --verbose, including numeric verbosity or repeated -v flags.
 
 The completed `import-books` and `pre-*` database backups should be covered by retention too. Make the cleanup run daily.
+
+## 2026-11-02: profile page out of memory
+
+https://books.ablibrarian.com/profile — FatalError: Allowed memory size of 134217728 bytes exhausted (ProfileController@index; last query `select * from listening_events where user_id = '2' order by timestamp_ms desc`).

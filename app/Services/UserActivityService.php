@@ -11,6 +11,7 @@ use App\Models\ListeningEvent;
 use App\Models\User;
 use App\Models\UserBadge;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class UserActivityService
@@ -60,23 +61,35 @@ class UserActivityService
             // still a genuine engagement signal here.
             $positionCarryingEventTypes = [...PositionMaterializer::POSITION_CARRYING_EVENTS, 'BOOK_MARK_COMPLETE'];
 
-            $listeningEvents = ListeningEvent::where('user_id', $userId)
-                ->with('book')
-                ->orderBy('timestamp_ms', 'desc')
-                ->get()
-                ->groupBy('book_id');
+            // Only the latest event and the latest finish event per book are ever used, so fetch
+            // just those — hydrating a heavy listener's whole event history (tens of thousands of
+            // rows) exhausted the PHP memory limit on /profile.
+            $latestEventsByBookId = $this->latestEventPerBook($userId);
+            $finishEventsByBookId = $this->latestEventPerBook($userId, ['BOOK_FINISH', 'BOOK_MARK_COMPLETE']);
+            $bookIdsWithRealPlayback = ListeningEvent::where('user_id', $userId)
+                ->whereIn('event_type', $positionCarryingEventTypes)
+                ->distinct()
+                ->pluck('book_id')
+                ->flip();
+            $booksById = Book::whereIn('id', $latestEventsByBookId->keys())->get()->keyBy('id');
 
             $positionsByBookId = BookPosition::where('user_id', $userId)
-                ->whereIn('book_id', $listeningEvents->keys())
+                ->whereIn('book_id', $latestEventsByBookId->keys())
                 ->get()
                 ->groupBy('book_id')
                 ->map(fn ($rows) => $rows->sortByDesc('last_event_timestamp_ms')->first());
 
-            $derivedProgress = $listeningEvents->map(function ($events, $bookId) use ($positionsByBookId, $positionCarryingEventTypes) {
-                /** @var ListeningEvent $latest */
-                $latest = $events->first();
+            $derivedProgress = $latestEventsByBookId->map(function (
+                ListeningEvent $latest,
+                $bookId
+            ) use (
+                $positionsByBookId,
+                $finishEventsByBookId,
+                $bookIdsWithRealPlayback,
+                $booksById
+            ) {
                 /** @var Book|null $book */
-                $book = $latest->book;
+                $book = $booksById->get($bookId);
                 $metadata = $latest->metadata ?? [];
                 $title = $book instanceof Book ? $book->title : ($metadata['fallbackTitle'] ?? 'Unknown Book');
 
@@ -104,8 +117,7 @@ class UserActivityService
                     ];
                 }
 
-                $hasRealPlaybackEvent = $events->contains(fn (ListeningEvent $e) => in_array($e->event_type, $positionCarryingEventTypes, true));
-                if (!$hasRealPlaybackEvent) {
+                if (!$bookIdsWithRealPlayback->has($bookId)) {
                     return [
                         'book_id' => $bookId,
                         'book_title' => $title,
@@ -120,7 +132,8 @@ class UserActivityService
                 // chapter-index reset firing moments after a finish, which would otherwise
                 // hide the completion behind a stale 0% (this only reaches here when book_id
                 // is a phantom id with no materialized BookPosition to fall back on instead).
-                $finishEvent = $events->first(fn (ListeningEvent $e) => in_array($e->event_type, ['BOOK_FINISH', 'BOOK_MARK_COMPLETE'], true));
+                /** @var ListeningEvent|null $finishEvent */
+                $finishEvent = $finishEventsByBookId->get($bookId);
                 $eventForStatus = $finishEvent ?? $latest;
                 $statusMetadata = $eventForStatus->metadata ?? [];
 
@@ -173,6 +186,39 @@ class UserActivityService
 
             return [];
         }
+    }
+
+    /**
+     * The most recent event per book for a user (optionally limited to some event types),
+     * keyed by book_id and ordered most recently listened first.
+     *
+     * @param list<string>|null $eventTypes
+     * @return Collection<int|string, ListeningEvent>
+     */
+    private function latestEventPerBook(string $userId, ?array $eventTypes = null): Collection
+    {
+        $latestTimestamps = ListeningEvent::query()
+            ->select('book_id')
+            ->selectRaw('MAX(timestamp_ms) as latest_timestamp_ms')
+            ->where('user_id', $userId)
+            ->when($eventTypes !== null, fn ($query) => $query->whereIn('event_type', $eventTypes))
+            ->groupBy('book_id');
+
+        return ListeningEvent::query()
+            ->from('listening_events as le')
+            ->joinSub($latestTimestamps, 'latest', function ($join): void {
+                $join->on('le.book_id', '=', 'latest.book_id')
+                    ->on('le.timestamp_ms', '=', 'latest.latest_timestamp_ms');
+            })
+            ->where('le.user_id', $userId)
+            ->when($eventTypes !== null, fn ($query) => $query->whereIn('le.event_type', $eventTypes))
+            ->select('le.*')
+            ->orderByDesc('le.timestamp_ms')
+            ->orderByDesc('le.id')
+            ->get()
+            ->unique('book_id')
+            ->keyBy('book_id')
+            ->toBase();
     }
 
     private function clampPercentage(float $percentage): float

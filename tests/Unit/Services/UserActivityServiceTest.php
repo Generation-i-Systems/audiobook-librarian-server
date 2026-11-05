@@ -15,6 +15,7 @@ use App\Models\UserBookStatus;
 use App\Models\UserRecommendation;
 use App\Services\UserActivityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -376,5 +377,58 @@ class UserActivityServiceTest extends TestCase
         $activity = $service->getUserActivityData((string) $user->id);
 
         $this->assertSame('Finished', $activity['progress'][0]['status']);
+    }
+
+    #[Test]
+    public function hydratesOnlyTheEventsItNeedsPerBookRatherThanTheWholeHistory(): void
+    {
+        // Regression: /profile hit the 128 MB memory limit for a user with ~42k events because
+        // every event (plus its book) was hydrated just to keep the latest one or two per book.
+        $service = new UserActivityService();
+        $user = User::factory()->create();
+        $books = Book::factory()->count(2)->create(['duration' => 1000]);
+        $eventsPerBook = 25;
+        $baseMs = now()->subDay()->getTimestampMs();
+
+        foreach ($books as $bookIndex => $book) {
+            for ($i = 0; $i < $eventsPerBook; $i++) {
+                $timestampMs = $baseMs + ($bookIndex * 100000) + ($i * 1000);
+                ListeningEvent::query()->create([
+                    'id' => "evt-{$bookIndex}-{$i}",
+                    'user_id' => $user->id,
+                    'book_id' => $book->id,
+                    'event_type' => $i === 3 ? 'BOOK_FINISH' : 'CHAPTER_CHANGE',
+                    'timestamp_ms' => $timestampMs,
+                    'position_ms' => $i * 1000,
+                    'metadata' => [],
+                    'device_id' => 'device-1',
+                    'timezone' => 'UTC',
+                    'sync_status' => 'synced',
+                    'created_at' => $timestampMs,
+                    'synced_at' => $timestampMs,
+                ]);
+            }
+        }
+
+        $hydrated = 0;
+        Event::listen('eloquent.retrieved: ' . ListeningEvent::class, function () use (&$hydrated): void {
+            $hydrated++;
+        });
+
+        $activity = $service->getUserActivityData((string) $user->id);
+
+        // At most the latest event plus the latest finish event per book.
+        $this->assertLessThanOrEqual(2 * $books->count(), $hydrated);
+        // Most recently listened book first; the earlier BOOK_FINISH still marks it finished.
+        $this->assertSame(
+            [
+                ['book_id' => $books[1]->id, 'status' => 'Finished'],
+                ['book_id' => $books[0]->id, 'status' => 'Finished'],
+            ],
+            array_map(
+                fn (array $row): array => ['book_id' => $row['book_id'], 'status' => $row['status']],
+                $activity['progress']
+            )
+        );
     }
 }
