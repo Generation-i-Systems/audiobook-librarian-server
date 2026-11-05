@@ -53,6 +53,69 @@ For production and self-hosted installs, also configure the scheduler and queue 
 [Cross-platform installation](docs/INSTALLATION.md#required-background-processes) for the required
 and optional background jobs (including the nightly Library Repair scan).
 
+### Direct downloads on your network (optional)
+
+If the server sits behind Cloudflare, a tunnel or another CDN, phones on the same Wi-Fi otherwise
+download every book out through your internet connection and back. A second HTTPS listener on the
+LAN (port 8443) lets the apps download straight from the server; they fall back to `APP_URL`
+whenever it doesn't answer. For a native install:
+
+1. Create a long-lived self-signed certificate. Don't use Caddy's `tls internal`: its key changes
+   on every renewal and the apps pin the key.
+
+   ```bash
+   sudo mkdir -p /etc/ablibrarian/local-tls
+   sudo openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+       -keyout /etc/ablibrarian/local-tls/key.pem -out /etc/ablibrarian/local-tls/cert.pem \
+       -days 3650 -subj "/CN=Audiobook Librarian local transfer"
+   ```
+
+2. Let the web server read both files and PHP read `cert.pem` only (adjust `caddy` to your web
+   server's group):
+
+   ```bash
+   sudo chown -R root:caddy /etc/ablibrarian/local-tls
+   sudo chmod 755 /etc/ablibrarian /etc/ablibrarian/local-tls
+   sudo chmod 644 /etc/ablibrarian/local-tls/cert.pem
+   sudo chmod 640 /etc/ablibrarian/local-tls/key.pem
+   ```
+
+3. Add a listener that serves only the download routes. For Caddy (change `root` to this
+   checkout's `public` directory and the socket to your PHP-FPM socket):
+
+   ```caddy
+   :8443 {
+       tls /etc/ablibrarian/local-tls/cert.pem /etc/ablibrarian/local-tls/key.pem
+       root * /path/to/server/public
+
+       @blocked not remote_ip 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 127.0.0.1 ::1
+       respond @blocked "Forbidden" 403
+
+       @transfer path_regexp ^/api/v1/(health/ping|books/[^/]+/download/.+)$
+       handle @transfer {
+           php_fastcgi unix//run/php/php8.3-fpm.sock
+       }
+       handle {
+           respond 404
+       }
+   }
+   ```
+
+   Run `sudo caddy validate --config /etc/caddy/Caddyfile` and `sudo systemctl reload caddy`.
+   For nginx, use [`docker/nginx/local-transfer.conf`](docker/nginx/local-transfer.conf).
+
+4. Set the address phones on your Wi-Fi use to reach the server (give it a DHCP reservation) and
+   the certificate path in `.env`, then run `php artisan config:cache` if you cache configuration:
+
+   ```bash
+   LOCAL_URL=https://192.168.1.20:8443
+   LOCAL_TLS_CERT=/etc/ablibrarian/local-tls/cert.pem
+   ```
+
+Don't forward port 8443 in your router. Docker images generate the certificate and publish the
+listener themselves; only `LOCAL_URL` is needed. See [Direct downloads](docs/LOCAL_TRANSFER.md)
+for how the key pinning works and how to check the listener with `curl`.
+
 ### Docker (demo / easy deploy elsewhere)
 
 Prefer a container? See [docker/README.md](docker/README.md) for a
@@ -105,6 +168,7 @@ integration tests.
 - [AI Processing Setup](docs/AI_PROCESSING_SETUP.md) — AI provider configuration and model comparison
 - [Library Repair & Needs Review](docs/LIBRARY_REPAIR.md)
 - [Mobile App Connection](docs/MOBILE_APP_CONNECTION.md)
+- [Direct Downloads on Your Network](docs/LOCAL_TRANSFER.md)
 - [Host-Based Library Profiles](docs/HOST_PROFILES.md)
 - [Vector Database & Recommendations](docs/RECOMMENDATIONS.md)
 - [Speech-to-text for text sync](docs/TRANSCRIPTION.md)

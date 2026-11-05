@@ -702,3 +702,7 @@ The completed `import-books` and `pre-*` database backups should be covered by r
 ## 2026-11-02: profile page out of memory
 
 https://books.ablibrarian.com/profile — FatalError: Allowed memory size of 134217728 bytes exhausted (ProfileController@index; last query `select * from listening_events where user_id = '2' order by timestamp_ms desc`).
+
+## 2026-11-05: local transfer install instructions
+
+add instructions to the install section of the server readme as appropriate

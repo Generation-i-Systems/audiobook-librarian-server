@@ -2,6 +2,8 @@
 
 ### Added
 
+- Direct downloads on the LAN: `LOCAL_URL` and `LOCAL_TLS_CERT` advertise a second HTTPS listener (port 8443) to signed-in apps through `GET /api/v1/local-transfer`, with the certificate's public-key pin, so phones on the same network download book files from the server instead of through `APP_URL`. The README's Setup section now walks through the certificate, the Caddy listener and the `.env` lines for native installs; see `docs/LOCAL_TRANSFER.md`.
+
 - Database backups: added `scripts/prune-db-backups.php`, which prunes by default and supports `-n`/`--dry-run`, help, and increasing verbosity. Completed backups, including named operation snapshots, now keep one recent daily copy, one per week for the preceding month, and one per older month; incomplete partial files remain untouched.
 
 - Navigation: group skins, themes, badges, user management, database admin, and the admin queue under an Admin menu.
