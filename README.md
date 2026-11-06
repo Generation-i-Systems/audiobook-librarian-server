@@ -176,6 +176,7 @@ integration tests.
 - [Library Repair & Needs Review](docs/LIBRARY_REPAIR.md)
 - [Mobile App Connection](docs/MOBILE_APP_CONNECTION.md)
 - [Direct Downloads on Your Network](docs/LOCAL_TRANSFER.md)
+- [Letting the Web Server Send Book Files](docs/FILE_DELIVERY.md) — optional X-Accel-Redirect / X-Sendfile
 - [Host-Based Library Profiles](docs/HOST_PROFILES.md)
 - [Vector Database & Recommendations](docs/RECOMMENDATIONS.md)
 - [Speech-to-text for text sync](docs/TRANSCRIPTION.md)

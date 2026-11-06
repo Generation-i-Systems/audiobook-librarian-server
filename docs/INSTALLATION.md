@@ -30,6 +30,8 @@ to mobile clients.
 
 If phones download books on the same network as the server, set `LOCAL_URL` so they can download
 straight from it instead of through `APP_URL`; see [direct downloads](LOCAL_TRANSFER.md).
+To have nginx, Caddy or Apache send book files instead of PHP, see
+[file delivery](FILE_DELIVERY.md).
 
 ## Portable storage configuration
 

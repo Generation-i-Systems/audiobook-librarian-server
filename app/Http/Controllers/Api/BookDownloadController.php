@@ -6,6 +6,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\Traits\BookTransformTrait;
 use App\Http\Controllers\Controller;
 use App\Services\BookFileChunkHashService;
+use App\Support\FileDelivery;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -490,6 +491,11 @@ class BookDownloadController extends Controller
             'Access-Control-Allow-Headers' => 'Content-Type, Authorization, Range',
             'Access-Control-Expose-Headers' => 'Content-Range, Accept-Ranges, Content-Length',
         ];
+
+        $delivered = FileDelivery::response($filePath, $fullPath, $headers);
+        if ($delivered !== null) {
+            return $delivered;
+        }
 
         $request = request();
         $rangeHeader = $request->header('Range');

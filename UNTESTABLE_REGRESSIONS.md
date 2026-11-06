@@ -325,6 +325,15 @@ Real bytes streamed to a client cannot be verified by unit or feature tests.
   `filesize()` call) must be caught by code review, not tests.
 - **`BookDownloadController::downloadFile()`** — same `freshFileSize()` fix, for the
   `Content-Length`/Range-header size used by the actual byte-streaming endpoint.
+- **`FILE_DELIVERY` (`App\Support\FileDelivery`, `config/file_delivery.php`, `docker/nginx/*.conf`
+  `/_protected_books/`, `docs/FILE_DELIVERY.md`)** — with `x-accel-redirect`/`x-sendfile`,
+  `downloadFile()` returns an empty response carrying the header and the web server sends the
+  bytes. Feature tests check the header and that the default still streams through PHP; they
+  cannot check that a web server acts on it. Checked by hand once (2026-11-06) with throwaway
+  nginx 1.24 (internal `alias`, percent-encoded path, Range → 206, direct access → 404) and Caddy
+  2.11 (`php_fastcgi` + `handle_response` with `{rp.header.X-Accel-Redirect}`); the Docker image's
+  nginx only passed `nginx -t`; Apache mod_xsendfile and lighttpd were never tried. A web server
+  that ignores the header sends the apps empty files.
 - **`BookDownloadController::downloadUrl()`** — same `freshFileSize()` fix, for the per-file
   `size` field in its signed-URL response (unused by the current Android client, which calls
   `download()` for its manifest, but shares the same bug class).
