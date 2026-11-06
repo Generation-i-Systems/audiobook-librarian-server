@@ -105,7 +105,8 @@ whenever it doesn't answer. For a native install:
    For nginx, use [`docker/nginx/local-transfer.conf`](docker/nginx/local-transfer.conf).
 
 4. Set the address phones on your Wi-Fi use to reach the server (give it a DHCP reservation) and
-   the certificate path in `.env`, then run `php artisan config:cache` if you cache configuration:
+   the certificate path in `.env` (both are listed in `.env.example`), then run
+   `php artisan config:cache` if you cache configuration:
 
    ```bash
    LOCAL_URL=https://192.168.1.20:8443

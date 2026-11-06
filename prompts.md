@@ -706,3 +706,7 @@ https://books.ablibrarian.com/profile — FatalError: Allowed memory size of 134
 ## 2026-11-05: local transfer install instructions
 
 add instructions to the install section of the server readme as appropriate
+
+## 2026-11-06: local transfer env example
+
+those .env values should be in the .env.example
