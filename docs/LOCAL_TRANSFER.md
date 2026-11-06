@@ -60,6 +60,10 @@ reached on. If another site serves that IP on any port, Caddy picks that site's 
 the handshake fails unless this one also names the IP. Reissuing from the same key with
 `openssl req -x509 -key key.pem ...` keeps the pinned key, so the apps are unaffected.
 
+Open port 8443 to your LAN only in the host firewall (for example
+`sudo ufw allow from 192.168.1.0/24 to any port 8443 proto tcp`). Checks run on the server itself
+pass even while the firewall drops phones' connections, so test from another device.
+
 The web server user must be able to read `cert.pem` (not `key.pem`). After changing `.env` run
 `php artisan config:cache` if you cache configuration.
 

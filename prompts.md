@@ -714,3 +714,7 @@ those .env values should be in the .env.example
 ## 2026-11-06: local transfer on a shared IP
 
 you cannot take over .242 for all ports. only this one port but that is the ip that must be used
+
+## 2026-11-06: local transfer not used by the phone
+
+I tried a download and it is not using the local. no traffic in the local logs

@@ -107,6 +107,8 @@ whenever it doesn't answer. For a native install:
 
    Run `sudo caddy validate --config /etc/caddy/Caddyfile` and `sudo systemctl reload caddy`.
    For nginx, use [`docker/nginx/local-transfer.conf`](docker/nginx/local-transfer.conf).
+   Open the port to your LAN only in the host firewall, e.g.
+   `sudo ufw allow from 192.168.1.0/24 to any port 8443 proto tcp`.
 
 4. Set the address phones on your Wi-Fi use to reach the server (give it a DHCP reservation) and
    the certificate path in `.env` (both are listed in `.env.example`), then run
