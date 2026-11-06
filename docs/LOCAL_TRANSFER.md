@@ -43,7 +43,8 @@ certificate, and set `LOCAL_URL`. A long-lived self-signed certificate is the si
 sudo mkdir -p /etc/ablibrarian/local-tls
 sudo openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
     -keyout /etc/ablibrarian/local-tls/key.pem -out /etc/ablibrarian/local-tls/cert.pem \
-    -days 3650 -subj "/CN=Audiobook Librarian local transfer"
+    -days 3650 -subj "/CN=Audiobook Librarian local transfer" \
+    -addext "subjectAltName=IP:192.168.1.20"
 ```
 
 `.env`:
@@ -52,6 +53,12 @@ sudo openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
 LOCAL_URL=https://192.168.1.20:8443
 LOCAL_TLS_CERT=/etc/ablibrarian/local-tls/cert.pem
 ```
+
+Put the address from `LOCAL_URL` in `subjectAltName` (add more with `,IP:...` or `,DNS:...`).
+Phones connecting to an IP send no server name, so Caddy chooses the certificate by the IP it was
+reached on. If another site serves that IP on any port, Caddy picks that site's certificate and
+the handshake fails unless this one also names the IP. Reissuing from the same key with
+`openssl req -x509 -key key.pem ...` keeps the pinned key, so the apps are unaffected.
 
 The web server user must be able to read `cert.pem` (not `key.pem`). After changing `.env` run
 `php artisan config:cache` if you cache configuration.

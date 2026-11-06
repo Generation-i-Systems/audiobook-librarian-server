@@ -60,14 +60,18 @@ download every book out through your internet connection and back. A second HTTP
 LAN (port 8443) lets the apps download straight from the server; they fall back to `APP_URL`
 whenever it doesn't answer. For a native install:
 
-1. Create a long-lived self-signed certificate. Don't use Caddy's `tls internal`: its key changes
-   on every renewal and the apps pin the key.
+1. Create a long-lived self-signed certificate, with the LAN address from `LOCAL_URL` as its
+   subject alternative name. Phones connecting to an IP send no server name, so Caddy picks the
+   certificate by that IP; without it, another site on the same IP (on any port) can win and the
+   handshake fails. Don't use Caddy's `tls internal`: its key changes on every renewal and the
+   apps pin the key.
 
    ```bash
    sudo mkdir -p /etc/ablibrarian/local-tls
    sudo openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
        -keyout /etc/ablibrarian/local-tls/key.pem -out /etc/ablibrarian/local-tls/cert.pem \
-       -days 3650 -subj "/CN=Audiobook Librarian local transfer"
+       -days 3650 -subj "/CN=Audiobook Librarian local transfer" \
+       -addext "subjectAltName=IP:192.168.1.20"
    ```
 
 2. Let the web server read both files and PHP read `cert.pem` only (adjust `caddy` to your web
