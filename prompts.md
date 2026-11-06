@@ -722,3 +722,5 @@ I tried a download and it is not using the local. no traffic in the local logs
 ## 2026-11-06: X-Accel-Redirect
 
 the server is meant to be able to run on various webservers so as long as it doesn't hurt implement it anyway
+
+yes, the symfony update is fine

@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Security
+
+- Symfony 7.4.23 (console, filesystem, finder, http-foundation, http-kernel, routing, translation, yaml) and contracts 3.8 for the 2026-11-04 advisories: CVE-2026-118514 (HEAD requests bypassing method rules), CVE-2026-118516 (host placeholders bypassing path rules), trusted-proxy and forwarded-header host issues, a filesystem path escape and slow YAML parsing.
+
 ### Added
 
 - File delivery: `FILE_DELIVERY=x-accel-redirect` (nginx, or Caddy with `handle_response`) or `x-sendfile` (Apache mod_xsendfile, lighttpd) lets the web server send book files from `GET /api/v1/books/{book}/download/{file}` after the API's checks, Range requests included, instead of a PHP worker streaming them. Default `php` keeps the current behavior. The Docker image's nginx has the internal `/_protected_books/` location ready. See `docs/FILE_DELIVERY.md`.
