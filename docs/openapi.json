@@ -7609,7 +7609,7 @@
             "post": {
                 "tags": ["Status"],
                 "summary": "Mark or unmark a book as read",
-                "description": "Independent of `status`/`finished_at`/`read_count` — never affects completion stats, badges, or goal fulfillment.",
+                "description": "Independent of `status`/`finished_at`/`read_count` — never affects completion stats, badges, or goal fulfillment. Exception: when the user's last listening progress for the book is over 90%, marking it read finishes it instead (status `completed`, `marked_read_at` cleared, progress 100% through a BOOK_FINISH event) and the response has `is_read` false and `finished` true.",
                 "operationId": "markBookRead",
                 "security": [
                     {
@@ -7655,6 +7655,10 @@
                                         },
                                         "is_read": {
                                             "type": "boolean"
+                                        },
+                                        "finished": {
+                                            "type": "boolean",
+                                            "description": "True when the book was finished instead of marked read because its listening progress was over 90%."
                                         }
                                     }
                                 }

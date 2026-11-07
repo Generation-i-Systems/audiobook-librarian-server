@@ -10,6 +10,7 @@ use App\Jobs\RecomputeRecommendationsJob;
 use App\Models\Book;
 use App\Models\UserBookStatus;
 use App\Models\User;
+use App\Services\ReadToFinishedPromoter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -116,8 +117,12 @@ class UserStatusController extends Controller
      * Deliberately does not touch status/started_at/finished_at/read_count and does not
      * dispatch BookStatusUpdated — this must never affect completion stats, badges, or
      * goal fulfillment (see BookCompletionService, which never reads marked_read_at).
+     *
+     * Exception: when the user's last listening progress for the book is over 90%, marking it
+     * read finishes it instead (ReadToFinishedPromoter): status `completed`, marked_read_at
+     * cleared, progress 100%. The response then has is_read false and finished true.
      */
-    public function markRead(Request $request, Book $book): JsonResponse
+    public function markRead(Request $request, Book $book, ReadToFinishedPromoter $promoter): JsonResponse
     {
         $data = $request->validate([
             'is_read' => ['required', 'boolean'],
@@ -155,9 +160,19 @@ class UserStatusController extends Controller
         // so shelves still need a recompute — just not the badge/stats/goal side effects.
         RecomputeRecommendationsJob::dispatch($user->id);
 
+        $finished = $data['is_read'] && $promoter->promoteForUser($user, [(int) $book->id]) !== [];
+        if ($finished) {
+            return response()->json([
+                'message' => 'Book marked as finished: listening progress was over 90%.',
+                'is_read' => false,
+                'finished' => true,
+            ], 200);
+        }
+
         return response()->json([
             'message' => $data['is_read'] ? 'Book marked as read.' : 'Book unmarked as read.',
             'is_read' => $statusModel->marked_read_at !== null,
+            'finished' => false,
         ], 200);
     }
 

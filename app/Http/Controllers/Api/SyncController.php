@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Book;
 use App\Models\BookProgress;
 use App\Models\ClientBook;
+use App\Models\User;
+use App\Services\ReadToFinishedPromoter;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class SyncController extends Controller
 {
@@ -33,6 +36,7 @@ class SyncController extends Controller
         $deviceId = $request->header('X-Device-ID') ?? 'unknown';
 
         $serverUpdates = [];
+        $progressBookIds = [];
 
         foreach ($validated['progress'] as $item) {
             $bookId = $item['bookId'] ?? null;
@@ -155,6 +159,9 @@ class SyncController extends Controller
                     ],
                     $updateData
                 );
+                if ($book) {
+                    $progressBookIds[] = (int) $book->id;
+                }
             } elseif ($shouldUpdateClient) {
                 // Prepare response for client
                 $serverUpdates[] = [
@@ -164,6 +171,16 @@ class SyncController extends Controller
                     'source' => 'server',
                     'lastUpdated' => $serverProgress->updated_at->toISOString(),
                 ];
+            }
+        }
+
+        // A marked-read book whose new progress is over 90% becomes finished at 100%.
+        $user = $userId !== null ? User::find($userId) : null;
+        if ($user !== null && $progressBookIds !== []) {
+            try {
+                app(ReadToFinishedPromoter::class)->promoteForUser($user, array_values(array_unique($progressBookIds)));
+            } catch (\Exception $e) {
+                Log::warning('Read-to-finished promotion failed after progress sync', ['error' => $e->getMessage()]);
             }
         }
 

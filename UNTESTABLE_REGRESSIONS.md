@@ -408,6 +408,13 @@ feature tests without running a real queue worker.
   Android/iOS hardware; cannot be reliably simulated.
 - **Audio playback progress sync** — position tracking is driven by the mobile client;
   server-side tests only verify storage, not end-to-end accuracy.
+- **Read-to-finished promotion** (`ReadToFinishedPromoter`, `books:promote-read-to-finished`) —
+  tests prove the server finishes a marked-read book over 90% and records a `BOOK_FINISH` event
+  with `device_id` `server`. Not provable here: that the Android/iOS clients pull that event and
+  show the book as finished at 100% (instead of re-sending their older position, or treating the
+  unknown `server` device oddly), and how a client reacts to the `finished: true` response of
+  `POST /status/{book}/read` when it expected `is_read: true`. Verify on a device: mark a book
+  read at >90%, sync a second device, confirm both show it finished.
 - **Mobile app QR/server-connect redirector** — QR scanning, custom URL scheme dispatch,
   app-store fallback behavior, and returning after first install depend on real Android/iOS
   devices, installed app variants, browser behavior, and store availability.

@@ -724,3 +724,7 @@ I tried a download and it is not using the local. no traffic in the local logs
 the server is meant to be able to run on various webservers so as long as it doesn't hurt implement it anyway
 
 yes, the symfony update is fine
+
+## 2026-11-07: Read-to-finished promotion
+
+A book marked "read" whose last listening progress is over 90% becomes finished at 100%; fix existing data with a one-time command.

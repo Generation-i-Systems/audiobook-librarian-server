@@ -11,6 +11,7 @@ use App\Models\UserNotification;
 use App\Services\BadgeService;
 use App\Services\BookIdResolver;
 use App\Services\PositionMaterializer;
+use App\Services\ReadToFinishedPromoter;
 use App\Support\CommunityStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -66,6 +67,7 @@ class EventController extends Controller
         $serverTimestamp = (int) (now()->timestamp * 1000);
         $hasSessionEnd   = false;
         $recommendationsDirty = false;
+        $progressBookIds = [];
 
         ControllerDatabase::beginTransaction();
         try {
@@ -117,6 +119,9 @@ class EventController extends Controller
                 ]);
                 if ($isSignificant) {
                     $recommendationsDirty = true;
+                }
+                if (in_array($eventData['eventType'], PositionMaterializer::POSITION_CARRYING_EVENTS, true)) {
+                    $progressBookIds[(int) $resolvedBookId] = true;
                 }
 
                 if ($eventData['eventType'] === 'SESSION_END') {
@@ -172,6 +177,15 @@ class EventController extends Controller
             });
 
             ControllerDatabase::commit();
+
+            // A marked-read book whose new progress is over 90% becomes finished at 100%.
+            if ($progressBookIds !== []) {
+                try {
+                    app(ReadToFinishedPromoter::class)->promoteForUser($user, array_keys($progressBookIds));
+                } catch (\Exception $e) {
+                    Log::warning('Read-to-finished promotion failed after event sync', ['error' => $e->getMessage()]);
+                }
+            }
 
             // A book was just started or finished — recommendation shelves are precomputed and
             // stale otherwise, so re-run them (outside the transaction, queued).

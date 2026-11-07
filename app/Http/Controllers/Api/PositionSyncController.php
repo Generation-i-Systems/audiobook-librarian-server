@@ -9,6 +9,7 @@ use App\Models\BookProgress;
 use App\Models\Device;
 use App\Services\BadgeService;
 use App\Services\PositionMaterializer;
+use App\Services\ReadToFinishedPromoter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -273,6 +274,16 @@ class PositionSyncController extends Controller
 
         if ($recommendationsDirty) {
             RecomputeRecommendationsJob::dispatch((int) $user->id);
+        }
+
+        // A marked-read book whose new progress is over 90% becomes finished at 100%.
+        try {
+            app(ReadToFinishedPromoter::class)->promoteForUser(
+                $user,
+                array_values(array_unique(array_map('intval', array_column($validated['positions'], 'book_id')))),
+            );
+        } catch (\Exception $e) {
+            Log::warning('Read-to-finished promotion failed after position sync', ['error' => $e->getMessage()]);
         }
 
         $badgesEarned = [];

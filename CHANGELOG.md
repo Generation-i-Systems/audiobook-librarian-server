@@ -6,6 +6,8 @@
 
 ### Added
 
+- Read books nearly listened to: a book marked read whose last listening progress is over 90% is marked finished instead, with its progress set to 100% (status `completed`, a BOOK_FINISH event so other devices see it, legacy progress rows completed). This happens when the book is marked read and when progress for a marked-read book arrives through `/sync/events`, `/sync/positions` or `/sync/progress`. `POST /api/v1/status/{book}/read` returns `finished: true` when it did this. `php artisan books:promote-read-to-finished [--user=ID] [--dry-run] [-v]` fixes books already in that state.
+
 - File delivery: `FILE_DELIVERY=x-accel-redirect` (nginx, or Caddy with `handle_response`) or `x-sendfile` (Apache mod_xsendfile, lighttpd) lets the web server send book files from `GET /api/v1/books/{book}/download/{file}` after the API's checks, Range requests included, instead of a PHP worker streaming them. Default `php` keeps the current behavior. The Docker image's nginx has the internal `/_protected_books/` location ready. See `docs/FILE_DELIVERY.md`.
 
 - Direct downloads on the LAN: `LOCAL_URL` and `LOCAL_TLS_CERT` advertise a second HTTPS listener (port 8443) to signed-in apps through `GET /api/v1/local-transfer`, with the certificate's public-key pin, so phones on the same network download book files from the server instead of through `APP_URL`. The README's Setup section now walks through the certificate, the Caddy listener and the `.env` lines for native installs; the certificate must name the LAN IP so Caddy picks it when another site serves that IP on another port. See `docs/LOCAL_TRANSFER.md`.
