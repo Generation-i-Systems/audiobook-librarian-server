@@ -355,6 +355,10 @@ and OTP arrival timing cannot be verified.
   "Send login email" / "Show QR code" actions (`AdminUserController::sendOtp()`,
   `generateLoginQr()`) share this same real-arrival-timing risk — tests can only verify the
   DB record and mail-fake dispatch, not that a real inbox receives it in time.
+- **Welcome email app install steps** (`ClientAppInstallOptions`, `emails/auth/welcome.blade.php`) —
+  tests check which store/beta links are chosen and that they render, but not that the Google
+  Play test-track opt-in and TestFlight links work for a new tester's account, or how the steps
+  look in real mail clients.
 - **Password reset emails** (`PasswordResetController`).
 - **Web-based account deletion** (`ProfileController::destroy()`) — reuses the same
   `AccountDeletionScheduledMail` as the app's API-based deletion flow (`AuthController::

@@ -211,6 +211,21 @@ return [
 
     'mobile_ios_store_url' => env('ABLIBRARIAN_IOS_STORE_URL', '#'),
 
+    // Beta channels offered in the welcome email (see App\Support\ClientAppInstallOptions).
+    // ABLIBRARIAN_APP_BETA: auto (only where a store link above is empty), always, or never.
+    'mobile_beta' => env('ABLIBRARIAN_APP_BETA', 'auto'),
+
+    'mobile_android_beta_url' => env(
+        'ABLIBRARIAN_ANDROID_BETA_URL',
+        'https://play.google.com/apps/testing/com.ablibrarian.library'
+    ),
+
+    // Public TestFlight link (https://testflight.apple.com/join/...). Empty: people are told to ask for an invite.
+    'mobile_ios_beta_url' => env('ABLIBRARIAN_IOS_BETA_URL', ''),
+
+    // Desktop builds (e.g. the GitHub releases page). Empty: desktop is not mentioned.
+    'desktop_download_url' => env('ABLIBRARIAN_DESKTOP_DOWNLOAD_URL', ''),
+
     /*
     |--------------------------------------------------------------------------
     | Encryption Key

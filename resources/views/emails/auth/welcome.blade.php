@@ -37,21 +37,38 @@
                             <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">
 
                             <h2 style="margin:0 0 8px 0; font-size:16px; color:#1a1a1a;">Get the app</h2>
-                            <p style="margin:0 0 16px 0; font-size:14px; color:#444; line-height:1.5;">
-                                Install {{ $appName }} on your phone or tablet:
-                            </p>
-                            <p style="margin:0 0 24px 0;">
-                                <a href="{{ $androidStoreUrl }}" style="display:inline-block; background:#1a1a1a; color:#ffffff; text-decoration:none; padding:10px 16px; border-radius:8px; font-weight:600; font-size:13px; margin-right:8px;">Get it on Google Play</a>
-                                <a href="{{ $iosStoreUrl }}" style="display:inline-block; background:#1a1a1a; color:#ffffff; text-decoration:none; padding:10px 16px; border-radius:8px; font-weight:600; font-size:13px;">Download on the App Store</a>
-                            </p>
+                            @forelse($installOptions as $option)
+                                <h3 style="margin:16px 0 8px 0; font-size:14px; color:#1a1a1a;">{{ $option['platform'] }}</h3>
+                                @if($option['storeUrl'] !== null)
+                                    <p style="margin:0 0 12px 0;">
+                                        <a href="{{ $option['storeUrl'] }}" style="display:inline-block; background:#1a1a1a; color:#ffffff; text-decoration:none; padding:10px 16px; border-radius:8px; font-weight:600; font-size:13px;">{{ $option['storeLabel'] }}</a>
+                                    </p>
+                                @endif
+                                @if($option['betaUrl'] !== null)
+                                    <p style="margin:0 0 8px 0; font-size:14px; color:#444; line-height:1.5;">{{ $option['betaIntro'] }}</p>
+                                    <ol style="margin:0 0 12px 0; padding-left:20px; font-size:14px; color:#444; line-height:1.5;">
+                                        @foreach($option['betaSteps'] as $step)
+                                            <li style="margin:0 0 4px 0;">{{ $step }}</li>
+                                        @endforeach
+                                    </ol>
+                                    <p style="margin:0 0 4px 0;">
+                                        <a href="{{ $option['betaUrl'] }}" style="display:inline-block; background:#ffffff; color:#1a1a1a; border:1px solid #1a1a1a; text-decoration:none; padding:9px 15px; border-radius:8px; font-weight:600; font-size:13px;">{{ $option['betaLabel'] }}</a>
+                                    </p>
+                                    <p style="margin:0 0 12px 0; font-size:12px; color:#888; word-break:break-all;">{{ $option['betaUrl'] }}</p>
+                                @endif
+                            @empty
+                                <p style="margin:0 0 16px 0; font-size:14px; color:#444; line-height:1.5;">Ask the admin of this server where to get the {{ $appName }} app.</p>
+                            @endforelse
 
-                            <h2 style="margin:0 0 8px 0; font-size:16px; color:#1a1a1a;">Connect it to this server</h2>
+                            <h2 style="margin:24px 0 8px 0; font-size:16px; color:#1a1a1a;">Connect it to this server</h2>
                             <p style="margin:0 0 16px 0; font-size:14px; color:#444; line-height:1.5;">
-                                Open the app, tap the button below (or visit it on this device to scan its QR code), then sign in with the code above. You can also connect any time later from the app's first-time setup screens or from Settings &rarr; Connected Services.
+                                Once the app is installed, open it, tap the button below (or visit it on this device to scan its QR code), then sign in with the code above. You can also connect any time later from the app's first-time setup screens or from Settings &rarr; Connected Services.
                             </p>
-                            <p style="margin:0 0 24px 0;">
+                            <p style="margin:0 0 16px 0;">
                                 <a href="{{ $connectUrl }}" style="display:inline-block; background:#3955ff; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:600; font-size:14px;">Connect the app to this server</a>
                             </p>
+                            <p style="margin:0 0 4px 0; font-size:12px; color:#888;">To connect by hand, enter this server address in the app:</p>
+                            <p style="margin:0 0 24px 0; font-size:14px; color:#1a1a1a; font-family: 'SFMono-Regular', Menlo, Consolas, monospace; word-break:break-all;">{{ $serverAddress }}</p>
 
                             <hr style="border:none; border-top:1px solid #eee; margin:24px 0;">
                             <p style="margin:0; font-size:12px; color:#888; line-height:1.5;">

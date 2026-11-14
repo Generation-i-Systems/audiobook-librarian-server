@@ -11,6 +11,7 @@ use App\Mail\WelcomeMail;
 use App\Models\EmailOtp;
 use App\Models\Role;
 use App\Support\AppConnectLinks;
+use App\Support\ClientAppInstallOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -310,8 +311,8 @@ class AdminUserController extends Controller
                 ttlMinutes: EmailOtp::TTL_MINUTES,
                 recipientName: $name,
                 connectUrl: AppConnectLinks::redirectorUrl($request, $apiUrl),
-                androidStoreUrl: (string) config('app.mobile_android_store_url', 'https://play.google.com/store/apps/details?id=com.ablibrarian.library'),
-                iosStoreUrl: (string) config('app.mobile_ios_store_url', '#'),
+                serverAddress: $request->getSchemeAndHttpHost(),
+                installOptions: ClientAppInstallOptions::fromConfig(),
             ));
         } catch (\Throwable $e) {
             Log::error('AdminUserController: failed to send welcome mail', [

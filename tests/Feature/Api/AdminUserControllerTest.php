@@ -112,6 +112,36 @@ class AdminUserControllerTest extends TestCase
         Mail::assertNotSent(EmailOtpMail::class);
     }
 
+    public function test_welcome_mail_includes_server_specific_install_steps(): void
+    {
+        Mail::fake();
+        config([
+            'app.mobile_android_store_url' => '',
+            'app.mobile_ios_store_url' => '',
+            'app.mobile_beta' => 'auto',
+            'app.mobile_android_beta_url' => 'https://play.google.com/apps/testing/com.ablibrarian.library',
+            'app.mobile_ios_beta_url' => 'https://testflight.apple.com/join/AbCdEf',
+        ]);
+        $this->actingAs($this->admin());
+
+        $this->postJson('/api/v1/admin/users', [
+            'name' => 'Beta User',
+            'email' => 'betauser@example.com',
+            'username' => 'betauser',
+        ])->assertStatus(201);
+
+        Mail::assertSent(WelcomeMail::class, function (WelcomeMail $mail) {
+            $html = $mail->render();
+
+            return $mail->serverAddress === 'http://localhost'
+                && str_contains($html, 'http://localhost')
+                && str_contains($html, 'https://play.google.com/apps/testing/com.ablibrarian.library')
+                && str_contains($html, 'https://testflight.apple.com/join/AbCdEf')
+                && str_contains($html, 'Become a tester')
+                && str_contains($html, '/app/connect/server?apiUrl=');
+        });
+    }
+
     public function test_store_does_not_send_mail_when_send_otp_email_false(): void
     {
         Mail::fake();

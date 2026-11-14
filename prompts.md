@@ -728,3 +728,7 @@ yes, the symfony update is fine
 ## 2026-11-07: Read-to-finished promotion
 
 A book marked "read" whose last listening progress is over 90% becomes finished at 100%; fix existing data with a one-time command.
+
+## 2026-11-14: Welcome email app install steps
+
+generate server specific instructions for installing the apps (including beta if desired or there is no prod release) to include with the welcome email when an account is created on the server

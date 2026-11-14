@@ -12,7 +12,8 @@ use Illuminate\Queue\SerializesModels;
  * Sent the first time a user account becomes usable — a fresh admin-created
  * account, or a self-service signup that an admin just verified. Unlike
  * EmailOtpMail (used for every subsequent sign-in), this also links to the
- * client apps and to the existing "connect this device to the server" flow.
+ * client apps (store or beta, per ClientAppInstallOptions) and to the existing
+ * "connect this device to the server" flow.
  */
 class WelcomeMail extends Mailable
 {
@@ -25,8 +26,9 @@ class WelcomeMail extends Mailable
         public int $ttlMinutes,
         public ?string $recipientName,
         public string $connectUrl,
-        public string $androidStoreUrl,
-        public string $iosStoreUrl,
+        public string $serverAddress,
+        /** @var list<array<string, mixed>> see ClientAppInstallOptions::fromConfig() */
+        public array $installOptions,
     ) {
     }
 
@@ -41,8 +43,8 @@ class WelcomeMail extends Mailable
                 'ttlMinutes' => $this->ttlMinutes,
                 'recipientName' => $this->recipientName,
                 'connectUrl' => $this->connectUrl,
-                'androidStoreUrl' => $this->androidStoreUrl,
-                'iosStoreUrl' => $this->iosStoreUrl,
+                'serverAddress' => $this->serverAddress,
+                'installOptions' => $this->installOptions,
             ]);
     }
 }
