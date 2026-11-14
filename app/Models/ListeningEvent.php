@@ -26,6 +26,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ListeningEvent extends Model
 {
     /**
+     * device_id written on events the server creates itself (e.g. sessions:close-orphaned).
+     * It never belongs to a real device, so clients must not receive these as "remote" events.
+     */
+    public const SERVER_SYNTHESIZED_DEVICE_ID = 'server-synthesized';
+
+    /**
      * The table associated with the model.
      */
     protected $table = 'listening_events';

@@ -56,6 +56,23 @@ class CloseOrphanedSessionsTest extends TestCase
     }
 
     #[Test]
+    public function it_leaves_a_session_alone_while_its_window_is_still_open(): void
+    {
+        // A session started an hour ago may still be playing; closing it "now" produced a
+        // synthesized end that phones treated as progress from another device.
+        $user = User::factory()->create();
+        $book = Book::factory()->create();
+
+        $this->createSessionStart($user, $book, now()->subHour()->getTimestampMs());
+
+        Artisan::call('sessions:close-orphaned');
+
+        $this->assertSame(0, ListeningEvent::where('user_id', $user->id)
+            ->where('event_type', 'SESSION_END')
+            ->count());
+    }
+
+    #[Test]
     public function it_does_not_create_a_duplicate_end_event_on_a_second_run(): void
     {
         // Regression test: the command used to only recognize a matching SESSION_END if its
@@ -87,7 +104,8 @@ class CloseOrphanedSessionsTest extends TestCase
     {
         $user = User::factory()->create();
         $book = Book::factory()->create();
-        $start = now()->subHours(2)->getTimestampMs();
+        // Must be older than the 4 h session window, or the command correctly leaves it open.
+        $start = now()->subHours(6)->getTimestampMs();
 
         $this->createSessionStart($user, $book, $start);
 

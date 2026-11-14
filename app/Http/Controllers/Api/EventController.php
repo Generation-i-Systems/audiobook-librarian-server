@@ -137,6 +137,9 @@ class EventController extends Controller
             $remoteQuery = ListeningEvent::where('user_id', $user->id)
                 ->where('synced_at', '>=', $syncAfter)
                 ->where('device_id', '!=', $deviceId)
+                // Server-synthesized events (orphaned-session closers) are not from another
+                // device; sending them made single-device users see the remote/local dialog.
+                ->where('device_id', '!=', ListeningEvent::SERVER_SYNTHESIZED_DEVICE_ID)
                 ->whereNull('migrated_from')
                 ->orderBy('synced_at', 'asc')
                 ->limit(101);

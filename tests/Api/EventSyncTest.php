@@ -145,6 +145,39 @@ class EventSyncTest extends TestCase
             ->assertJsonPath('remoteEvents.0.deviceId', 'other-device');
     }
 
+    public function testSyncDoesNotReturnServerSynthesizedEvents(): void
+    {
+        $user = User::factory()->create(['role' => 'library-user']);
+        $book = Book::factory()->create();
+        $this->actingAs($user, 'api');
+
+        ListeningEvent::create([
+            'id' => 'synthesized-end-1',
+            'user_id' => $user->id,
+            'book_id' => $book->id,
+            'event_type' => 'SESSION_END',
+            'timestamp_ms' => 1707945600000,
+            'position_ms' => 5000000,
+            'device_id' => ListeningEvent::SERVER_SYNTHESIZED_DEVICE_ID,
+            'timezone' => 'UTC',
+            'sync_status' => 'SYNCED',
+            'created_at' => 1707945600000,
+            'synced_at' => 1707945605000,
+        ]);
+
+        $response = $this->postJson('/api/v1/sync/events', [
+            'events' => [],
+            'lastSyncTimestamp' => 0,
+        ], [
+            'X-Device-ID' => 'requesting-device',
+            'X-Acting-As-Test' => 'true',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonCount(0, 'remoteEvents');
+    }
+
     public function testSyncDoesNotReturnEventsJustPushedByTheSameDevice(): void
     {
         $user = User::factory()->create(['role' => 'library-user']);

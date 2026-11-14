@@ -73,8 +73,14 @@ class CloseOrphanedSessions extends Command
      */
     private function processUser(int $userId, bool $isDryRun): array
     {
+        $nowMs = (int) (now()->getPreciseTimestamp(3));
+
+        // Only sessions whose whole window has elapsed can be orphaned. Without this cutoff a
+        // session still playing when the job ran was "closed" at the current moment, and the
+        // synthesized end then showed up on the listener's phone as progress from another device.
         $sessionStarts = ListeningEvent::where('user_id', $userId)
             ->where('event_type', 'SESSION_START')
+            ->where('timestamp_ms', '<=', $nowMs - self::MAX_SESSION_WINDOW_MS)
             ->get();
 
         if ($sessionStarts->isEmpty()) {
@@ -83,7 +89,6 @@ class CloseOrphanedSessions extends Command
 
         $orphanedCount = 0;
         $closedCount = 0;
-        $nowMs = (int) (now()->getPreciseTimestamp(3));
 
         foreach ($sessionStarts as $start) {
             $windowEnd = $start->timestamp_ms + self::MAX_SESSION_WINDOW_MS;
@@ -102,7 +107,7 @@ class CloseOrphanedSessions extends Command
                 // without this branch, every rerun would find the orphan "still open" and
                 // synthesize another duplicate end event for it, forever.
                 return $event->event_type === 'SESSION_END'
-                    && ($event->device_id === $start->device_id || $event->device_id === 'server-synthesized');
+                    && ($event->device_id === $start->device_id || $event->device_id === ListeningEvent::SERVER_SYNTHESIZED_DEVICE_ID);
             });
 
             if ($hasMatchingEnd) {
@@ -142,7 +147,7 @@ class CloseOrphanedSessions extends Command
                         'playbackSpeed' => 1.0,
                         'pauseCount' => 0,
                     ],
-                    'device_id' => 'server-synthesized',
+                    'device_id' => ListeningEvent::SERVER_SYNTHESIZED_DEVICE_ID,
                     'timezone' => $start->timezone,
                     'sync_status' => 'SYNCED',
                     'created_at' => $nowMs,

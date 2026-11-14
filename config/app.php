@@ -181,6 +181,13 @@ return [
     'timezone' => 'UTC',
 
     /*
+    | Timezone for scheduled jobs (e.g. "America/Boise"). The nightly maintenance times in
+    | bootstrap/app.php are meant as local night; with UTC they land in the evening for
+    | listeners in the Americas. Defaults to UTC, like the app timezone.
+    */
+    'schedule_timezone' => env('SCHEDULE_TIMEZONE', 'UTC'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
