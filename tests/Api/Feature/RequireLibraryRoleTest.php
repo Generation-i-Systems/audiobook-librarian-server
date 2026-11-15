@@ -22,6 +22,10 @@ class RequireLibraryRoleTest extends TestCase
     {
         parent::setUp();
 
+        // The API CI workflow does not build front-end assets, so web-page
+        // requests here must not depend on public/build/manifest.json.
+        $this->withoutVite();
+
         config([
             'library_profiles.profiles.librivox.hosts' => ['librivox.test'],
             'library_profiles.profiles.hybrid.hosts' => ['hybrid.test'],
