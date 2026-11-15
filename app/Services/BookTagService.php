@@ -10,6 +10,7 @@ use App\Models\BookTag;
 use App\Models\Group;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class BookTagService
 {
@@ -32,6 +33,70 @@ class BookTagService
             ->get();
 
         return $this->formatVisibleTags($rows, $user->id);
+    }
+
+    /**
+     * @param User|\Illuminate\Contracts\Auth\Authenticatable|null $user
+     * @param array<int, int|string> $bookIds
+     * @return array<int|string, array{system: array<int, string>, groups: array<int, array{groupId: int, groupName: ?string, tags: array<int, string>}>, user: array<int, string>}>
+     */
+    public function visibleTagsForBookIds(User|\Illuminate\Contracts\Auth\Authenticatable|null $user, array $bookIds): array
+    {
+        if (empty($bookIds) || !Schema::hasTable('book_tags')) {
+            return [];
+        }
+
+        $numericIds = array_values(array_filter(
+            array_map(fn (mixed $id): ?int => is_numeric($id) ? (int) $id : null, $bookIds),
+            fn (?int $id): bool => $id !== null
+        ));
+
+        if (empty($numericIds)) {
+            return [];
+        }
+
+        $userId = $user ? ($user->getAuthIdentifier() ?? $user->id ?? null) : null;
+        $groupIds = ($user instanceof User || (is_object($user) && method_exists($user, 'groups'))) ? $user->groups()->pluck('groups.id') : (is_numeric($userId) ? (User::find((int) $userId)?->groups()->pluck('groups.id') ?? collect()) : collect());
+
+        $ownerKeys = ['system'];
+        if ($user && $userId !== null) {
+            foreach ($groupIds as $groupId) {
+                $ownerKeys[] = "group:{$groupId}";
+            }
+            $ownerKeys[] = "user:{$userId}";
+        }
+
+        $rows = BookTag::query()
+            ->whereIn('book_id', $numericIds)
+            ->whereIn('owner_key', $ownerKeys)
+            ->get();
+
+        $groupedByBook = $rows->groupBy('book_id');
+
+        $groupRows = $rows->where('scope', 'group');
+        $groupNames = $groupRows->isNotEmpty() ? Group::query()->whereIn('id', $groupRows->pluck('group_id'))->pluck('name', 'id') : collect();
+
+        $result = [];
+        foreach ($numericIds as $bookId) {
+            $bookRows = $groupedByBook->get($bookId, collect());
+            $systemTags = $bookRows->firstWhere('scope', 'system')->tags ?? [];
+            $userTags = ($userId !== null) ? ($bookRows->firstWhere('owner_key', "user:{$userId}")->tags ?? []) : [];
+
+            $bookGroupRows = $bookRows->where('scope', 'group');
+            $groups = $bookGroupRows->map(fn (BookTag $row): array => [
+                'groupId' => $row->group_id,
+                'groupName' => $groupNames->get($row->group_id),
+                'tags' => array_values($row->tags),
+            ])->values()->all();
+
+            $result[$bookId] = [
+                'system' => array_values($systemTags),
+                'groups' => $groups,
+                'user' => array_values($userTags),
+            ];
+        }
+
+        return $result;
     }
 
     /**

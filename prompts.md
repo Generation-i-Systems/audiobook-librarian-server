@@ -732,3 +732,7 @@ A book marked "read" whose last listening progress is over 90% becomes finished 
 ## 2026-11-14: Welcome email app install steps
 
 generate server specific instructions for installing the apps (including beta if desired or there is no prod release) to include with the welcome email when an account is created on the server
+
+## 2026-11-09: list view tags row
+
+add a row that spans the title through length columns on every row of /books that lists tags on each book

@@ -10,7 +10,7 @@ The scheduled `books:validate-directories` command checks that the configured bo
 
 Unavailable catalog records are audited against available replacements by book ID, metadata, and real directory presence before cleanup. A verified database backup and user-activity check precede recoverable trash moves; near matches with different editions or narrators remain for review.
 
-The book list keeps its list-view action buttons on one line and displays a Needs Review badge in each view for records flagged for review, including those marked by library repair scans.
+The book list keeps its list-view action buttons on one line, renders a row spanning the Title through Length columns (`colspan="6"`) listing visible tags for each book, and displays a Needs Review badge in each view for records flagged for review, including those marked by library repair scans.
 
 ## Reading Progress & Statistics Requirements
 

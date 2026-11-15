@@ -686,8 +686,8 @@ $canManageBooks = $canManageBooks ?? false;
                                     $genresList = !empty($book['genres']) && is_array($book['genres']) ? $book['genres'] : [];
                                     $directoryMissing = isset($book['directoryExists']) && $book['directoryExists'] === false;
                                 @endphp
-                                <tr>
-                                    <td>
+                                <tr class="book-main-row" data-book-id="{{ $book['id'] }}" data-book-url="{{ route('books.show', $book['id']) }}">
+                                    <td rowspan="2" class="align-middle">
                                         @if($hasCover)
                                             <img src="{{ $cover }}" alt="{{ $title }}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">
                                         @else
@@ -728,7 +728,7 @@ $canManageBooks = $canManageBooks ?? false;
                                         @endforelse
                                     </td>
                                     <td class="text-muted small">{{ (!empty($book['duration']) && $book['duration'] !== '00:00:00') ? $book['duration'] : '' }}</td>
-                                    <td>
+                                    <td rowspan="2" class="align-middle">
                                         <div class="d-flex flex-nowrap gap-1">
                                             <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary" title="{{ __('Download') }}"><i class="fas fa-download"></i></a>
                                             @can('manage-books')
@@ -741,6 +741,32 @@ $canManageBooks = $canManageBooks ?? false;
                                                 </form>
                                             @endcan
                                         </div>
+                                    </td>
+                                </tr>
+                                <tr class="book-tags-row" data-book-id="{{ $book['id'] }}" data-book-url="{{ route('books.show', $book['id']) }}">
+                                    <td colspan="6" class="pt-0 pb-2">
+                                        @php
+                                            $bookTags = $book['tags'] ?? ['system' => [], 'groups' => [], 'user' => []];
+                                            $systemTags = $bookTags['system'] ?? [];
+                                            $groupTags = $bookTags['groups'] ?? [];
+                                            $userTags = $bookTags['user'] ?? [];
+                                            $hasAnyTags = !empty($systemTags) || !empty($groupTags) || !empty($userTags);
+                                        @endphp
+                                        @if($hasAnyTags)
+                                            <div class="d-flex flex-wrap align-items-center gap-1">
+                                                @foreach($systemTags as $tag)
+                                                    <a href="{{ route('books.index', ['tag' => $tag]) }}" class="badge bg-primary text-decoration-none" title="{{ __('Filter by tag: :tag', ['tag' => $tag]) }}">{{ $tag }}</a>
+                                                @endforeach
+                                                @foreach($groupTags as $groupTagEntry)
+                                                    @foreach($groupTagEntry['tags'] as $tag)
+                                                        <a href="{{ route('books.index', ['tag' => $tag]) }}" class="badge bg-info text-dark text-decoration-none" title="{{ $groupTagEntry['groupName'] ?? __('Group tag') }}">{{ $tag }}</a>
+                                                    @endforeach
+                                                @endforeach
+                                                @foreach($userTags as $tag)
+                                                    <a href="{{ route('books.index', ['tag' => $tag]) }}" class="badge bg-secondary text-decoration-none" title="{{ __('Filter by tag: :tag', ['tag' => $tag]) }}">{{ $tag }}</a>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -764,6 +790,14 @@ $canManageBooks = $canManageBooks ?? false;
 
 @push('styles')
     <link rel="stylesheet" href="/css/pagination-fix.css">
+    <style>
+        #main-books-list tbody tr.book-main-row > td:not([rowspan]) {
+            border-bottom: 0;
+        }
+        #main-books-list tbody tr.book-tags-row > td {
+            border-top: 0;
+        }
+    </style>
 @endpush
 
 @push('scripts')
@@ -943,14 +977,30 @@ $canManageBooks = $canManageBooks ?? false;
             const bookRows = document.querySelectorAll('table.table-hover tbody tr');
             bookRows.forEach(row => {
                 row.addEventListener('click', function (e) {
-                    // Don't navigate if clicking on a button
+                    // Don't navigate if clicking on a button or link
                     if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A' || e.target.closest('a') || e.target.closest('button')) {
                         return;
                     }
 
-                    const link = this.querySelector('td a');
+                    const link = this.dataset.bookUrl || this.querySelector('td a')?.getAttribute('href');
                     if (link) {
-                        window.location.href = link.getAttribute('href');
+                        window.location.href = link;
+                    }
+                });
+            });
+
+            // Synchronize hover state across the two rows of each book in list view
+            document.querySelectorAll('#main-books-list tbody tr').forEach(row => {
+                row.addEventListener('mouseenter', function () {
+                    const bookId = this.dataset.bookId;
+                    if (bookId) {
+                        document.querySelectorAll(`#main-books-list tbody tr[data-book-id="${bookId}"]`).forEach(r => r.classList.add('table-active'));
+                    }
+                });
+                row.addEventListener('mouseleave', function () {
+                    const bookId = this.dataset.bookId;
+                    if (bookId) {
+                        document.querySelectorAll(`#main-books-list tbody tr[data-book-id="${bookId}"]`).forEach(r => r.classList.remove('table-active'));
                     }
                 });
             });
@@ -1151,9 +1201,9 @@ $canManageBooks = $canManageBooks ?? false;
                             return;
                         }
 
-                        const link = this.querySelector('td a');
+                        const link = this.dataset.bookUrl || this.querySelector('td a')?.getAttribute('href');
                         if (link) {
-                            window.location.href = link.getAttribute('href');
+                            window.location.href = link;
                         }
                     });
                 });

@@ -178,11 +178,20 @@ class BookController extends Controller
 
         $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
 
+        $bookIds = array_values(array_filter(array_map(
+            fn (mixed $b): int|string|null => is_array($b) ? ($b['id'] ?? null) : null,
+            $books
+        )));
+        $visibleTagsByBook = $this->bookTagService->visibleTagsForBookIds($request->user(), $bookIds);
+
         // Minimal book field formatting to reduce memory usage; permission
         // holders additionally get the directory-exists flag used to show a
         // "missing files" warning and to power the edit/delete affordances.
         $processedBooks = [];
         foreach ($books as $book) {
+            $bookId = $book['id'] ?? null;
+            $book['tags'] = ($bookId !== null && isset($visibleTagsByBook[$bookId])) ? $visibleTagsByBook[$bookId] : ['system' => [], 'groups' => [], 'user' => []];
+
             $minimal = $this->ensureBookFieldsMinimal($book);
 
             if ($canManageBooks) {
@@ -789,6 +798,7 @@ class BookController extends Controller
             'duration' => $book['duration'] ?? null,
             'source' => $book['source'] ?? null,
             'needsReview' => (bool) ($book['needsReview'] ?? $book['needs_review'] ?? false),
+            'tags' => $book['tags'] ?? ['system' => [], 'groups' => [], 'user' => []],
         ];
     }
 
